@@ -1,0 +1,19 @@
+[package]
+name = "hitc"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "compiler"
+path = "src/lib.rs"
+
+[[bin]]
+name = "compiler"
+path = "src/main.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# 使用clap 稳定版
+clap = "3.0.0-beta.3"
+thiserror = "1.0.50"
