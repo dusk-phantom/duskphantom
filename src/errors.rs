@@ -49,3 +49,13 @@ pub enum BackendError {
     #[error("optimize error")]
     OptimizeError,
 }
+
+/// 全局 错误处理函数
+pub fn handle_error(err: &CompilerError) {
+    match err {
+        _ => {}
+    }
+    eprintln!("msg: compile failed");
+    eprintln!("err: {}", err);
+    std::process::exit(1);
+}
