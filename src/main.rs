@@ -1,7 +1,10 @@
 // use self lib
 extern crate compiler;
 
+use std::borrow::Borrow;
+
 use clap::{App, Arg};
+use compiler::errors::handle_error;
 
 fn main() {
     let src_arg = Arg::new("src").help("Source file").required(true).index(1);
@@ -47,7 +50,16 @@ fn main() {
     // read src file
     let src = std::fs::read_to_string(src_file).expect("msg: read src file failed");
     // compile
-    let asm = compiler::compile(&src, opt_flag).expect("msg: compile failed");
-    // write asm file
-    std::fs::write(output_file, asm).expect("msg: write asm file failed");
+    let asm = compiler::compile(&src, opt_flag);
+    if let Err(err) = asm.borrow() {
+        handle_error(&err);
+    }
+    if asm_flag {
+        // write asm file
+        std::fs::write(output_file, asm.unwrap()).expect("msg: write asm file failed");
+    } else {
+        // gen and write bin file
+        let bin = compiler::backend::asm2bin(asm.unwrap());
+        std::fs::write(output_file, bin).expect("msg: write bin file failed");
+    }
 }

@@ -18,3 +18,8 @@ pub fn gen(program: &middle::Program) -> Result<Program, BackendError> {
 pub fn optimize(program: &mut Program) {
     program.content = program.content.replace("1+1", "2");
 }
+
+#[allow(unused)]
+pub fn asm2bin(asm: String) -> String {
+    panic!("not implemented")
+}
