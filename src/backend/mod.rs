@@ -13,6 +13,7 @@ impl Program {
     pub fn gen_asm(&self) -> String {
         self.content.clone()
     }
+    pub fn optimize(&mut self) {}
 }
 
 pub fn gen(program: &middle::Program) -> Result<Program, BackendError> {
@@ -22,6 +23,7 @@ pub fn gen(program: &middle::Program) -> Result<Program, BackendError> {
 }
 
 pub fn optimize(program: &mut Program) {
+    program.optimize();
     program.content = program.content.replace("1+1", "2");
 }
 
