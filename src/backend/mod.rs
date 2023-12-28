@@ -1,4 +1,10 @@
+pub mod block;
+pub mod func;
+pub mod gen;
+pub mod inst;
+pub mod var;
 use crate::{errors::BackendError, middle};
+
 pub struct Program {
     content: String,
 }

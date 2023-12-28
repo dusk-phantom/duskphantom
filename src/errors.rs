@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+use crate::backend;
+
 // 全局error处理表
 #[derive(Debug, Error)]
 pub enum CompilerError {
