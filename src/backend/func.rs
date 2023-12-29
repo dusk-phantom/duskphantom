@@ -1,4 +1,6 @@
-use super::block::*;
+use super::{block::Block, gen::Rv64gcGen};
+use rayon::prelude::*;
+
 #[allow(unused)]
 pub struct Func {
     name: String,
@@ -7,4 +9,28 @@ pub struct Func {
     bbs: Vec<Block>,
     // sorted basic blocks by dict order of label,ascendingly
     sorted_bbs: Vec<Block>,
+    // entry block
+    entry: String,
+}
+
+impl Func {
+    pub fn name(&self) -> &str {
+        self.name.as_str()
+    }
+    pub fn gen_asm(&self) -> String {
+        let entry = self.bbs.iter().find(|bb| bb.label() == self.entry).unwrap();
+        let entry = entry.gen_asm();
+        let mut other_bbs = self
+            .bbs
+            .iter()
+            .filter(|bb| bb.label() != self.entry)
+            .collect::<Vec<&Block>>();
+        other_bbs.sort_by_cached_key(|bb| bb.label());
+        let other_bbs = other_bbs
+            .par_iter()
+            .map(|bb| bb.gen_asm())
+            .collect::<Vec<String>>()
+            .join("\n");
+        Rv64gcGen::gen_func(self.name.as_str(), entry.as_str(), other_bbs.as_str())
+    }
 }

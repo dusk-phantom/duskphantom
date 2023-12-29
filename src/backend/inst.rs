@@ -34,6 +34,10 @@ impl Inst {
             Inst::Ret => InstType::Ret,
         }
     }
+    pub fn gen_asm(&self) -> String {
+        // TODO
+        String::new()
+    }
 }
 
 // unit test

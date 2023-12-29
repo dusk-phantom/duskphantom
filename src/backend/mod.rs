@@ -3,6 +3,8 @@ pub mod func;
 pub mod gen;
 pub mod inst;
 pub mod var;
+use rayon::prelude::*;
+
 use crate::{errors::BackendError, middle};
 // use ARC and Mutex
 
@@ -19,8 +21,20 @@ impl Program {
         self.entry.is_some()
     }
     pub fn gen_asm(&self) -> String {
-        // TODO
-        String::new()
+        let mut funcs: Vec<&func::Func> = self.funcs.iter().collect();
+        funcs.sort_by_cached_key(|f| f.name());
+        let funcs = funcs
+            .par_iter()
+            .map(|f| f.gen_asm())
+            .collect::<Vec<String>>()
+            .join("\n");
+        let global = self
+            .global
+            .par_iter()
+            .map(|v| v.gen_asm())
+            .collect::<Vec<String>>()
+            .join("\n");
+        gen::Rv64gcGen::gen_prog("test.c", global.as_str(), funcs.as_str())
     }
 }
 
