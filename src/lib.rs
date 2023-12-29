@@ -1,4 +1,3 @@
-use backend::gen::Rv64gcGen;
 use errors::CompilerError;
 
 pub mod backend;

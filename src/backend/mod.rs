@@ -4,27 +4,37 @@ pub mod gen;
 pub mod inst;
 pub mod var;
 use crate::{errors::BackendError, middle};
+// use ARC and Mutex
 
 pub struct Program {
-    content: String,
+    // global var ,including primtype var and arr var
+    pub global: Vec<var::Var>,
+    // all funcs
+    pub funcs: Vec<func::Func>,
+    // optional entry func
+    pub entry: Option<String>,
 }
-
 impl Program {
-    pub fn gen_asm(&self) -> String {
-        self.content.clone()
+    pub fn has_entry(&self) -> bool {
+        self.entry.is_some()
     }
-    pub fn optimize(&mut self) {}
+    pub fn gen_asm(&self) -> String {
+        // TODO
+        String::new()
+    }
 }
 
 pub fn gen(program: &middle::Program) -> Result<Program, BackendError> {
+    // TODO
     Ok(Program {
-        content: program.content.clone(),
+        global: Vec::new(),
+        funcs: Vec::new(),
+        entry: None,
     })
 }
 
 pub fn optimize(program: &mut Program) {
-    program.optimize();
-    program.content = program.content.replace("1+1", "2");
+    //TODO
 }
 
 #[allow(unused)]
