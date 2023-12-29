@@ -1,4 +1,5 @@
 use super::block::*;
+#[allow(unused)]
 pub struct Func {
     name: String,
     args: Vec<String>,

@@ -24,6 +24,7 @@ impl Program {
     }
 }
 
+#[allow(unused)]
 pub fn gen(program: &middle::Program) -> Result<Program, BackendError> {
     // TODO
     Ok(Program {
@@ -33,6 +34,7 @@ pub fn gen(program: &middle::Program) -> Result<Program, BackendError> {
     })
 }
 
+#[allow(unused)]
 pub fn optimize(program: &mut Program) {
     //TODO
 }
