@@ -65,4 +65,33 @@ impl Rv64gcGen {
         ret.push_str(insts);
         ret
     }
+    pub fn gen_prim_var(vname: &str, size: u32, default: Option<&str>) -> String {
+        let model = r#"
+.text
+	.globl	{1}
+	.bss
+	.align	3
+	.type	{1}, @object
+	.size	{1}, {2}
+a:
+	.zero	{2}
+"#;
+        let mut ret = String::with_capacity(256);
+        ret.push_str(
+            model
+                .replace("{1}", vname)
+                .replace("{2}", size.to_string().as_str())
+                .as_str(),
+        );
+        match default {
+            Some(d) => {
+                ret.push_str(format!(".word {}\n", d).as_str());
+            }
+            None => {
+                ret.push_str(format!(".zero {}\n", size).as_str());
+            }
+        }
+        ret
+    }
+    pub fn gen_arr() {}
 }
