@@ -1,3 +1,5 @@
+use super::*;
+
 pub enum Inst {
     Add,
     Mv,
