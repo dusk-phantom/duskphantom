@@ -7,6 +7,7 @@ pub struct Program {
     // optional entry func
     pub entry: Option<String>,
 }
+
 impl Program {
     pub fn has_entry(&self) -> bool {
         self.entry.is_some()
