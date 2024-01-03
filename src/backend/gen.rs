@@ -66,7 +66,7 @@ impl Rv64gcGen {
         ret
     }
     pub fn gen_prim_var(vname: &str, size: u32, default: Option<&str>) -> String {
-        let model = r#"
+        let template = r#"
 .text
 	.globl	{1}
 	.bss
@@ -78,7 +78,7 @@ a:
 "#;
         let mut ret = String::with_capacity(256);
         ret.push_str(
-            model
+            template
                 .replace("{1}", vname)
                 .replace("{2}", size.to_string().as_str())
                 .as_str(),
@@ -94,7 +94,7 @@ a:
         ret
     }
     pub fn gen_arr(arr: &str, init: &[&str]) -> String {
-        let model = r##"
+        let template = r##"
     .text
     .globl	{1}
 	.data
@@ -106,7 +106,7 @@ a:
 "##;
         let mut ret = String::new();
         ret.push_str(
-            model
+            template
                 .replace("{1}", arr)
                 .replace("{2}", (init.len() * 4).to_string().as_str())
                 .as_str(),
