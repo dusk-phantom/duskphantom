@@ -93,19 +93,27 @@ a:
         }
         ret
     }
-    pub fn gen_arr() -> String {
+    pub fn gen_arr(arr: &str, init: &[&str]) -> String {
         let model = r##"
-.globl	b
+    .text
+    .globl	{1}
 	.data
 	.align	3
 	.set	.LANCHOR0,. + 0
-	.type	b, @object
-	.size	b, 16
-b:
-	.dword	44
-	.dword	2
+	.type	{1}, @object
+	.size	{1}, {2}
+{1}:
 "##;
         let mut ret = String::new();
+        ret.push_str(
+            model
+                .replace("{1}", arr)
+                .replace("{2}", (init.len() * 4).to_string().as_str())
+                .as_str(),
+        );
+        for v in init {
+            ret.push_str(format!(".word {}\n", v).as_str());
+        }
         ret
     }
     pub fn gen_str() {}
