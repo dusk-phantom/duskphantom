@@ -93,5 +93,20 @@ a:
         }
         ret
     }
-    pub fn gen_arr() {}
+    pub fn gen_arr() -> String {
+        let model = r##"
+.globl	b
+	.data
+	.align	3
+	.set	.LANCHOR0,. + 0
+	.type	b, @object
+	.size	b, 16
+b:
+	.dword	44
+	.dword	2
+"##;
+        let mut ret = String::new();
+        ret
+    }
+    pub fn gen_str() {}
 }
