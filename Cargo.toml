@@ -16,5 +16,6 @@ path = "src/main.rs"
 [dependencies]
 # 使用clap 稳定版
 clap = "3.0.0-beta.3"
+rand = "0.8.5"
 rayon = "1.8.0"
 thiserror = "1.0.50"
