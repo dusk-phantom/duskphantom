@@ -1,5 +1,7 @@
 use std::env;
 
+use rand::seq::index;
+
 // tools supporting gening rv64gc assemble
 pub struct Rv64gcGen;
 impl Rv64gcGen {
@@ -93,7 +95,7 @@ a:
         }
         ret
     }
-    pub fn gen_arr(arr: &str, init: &[&str]) -> String {
+    pub fn gen_arr(arr: &str, size: u32, init: &[(u32, &str)]) -> String {
         let template = r##"
     .text
     .globl	{1}
@@ -108,11 +110,22 @@ a:
         ret.push_str(
             template
                 .replace("{1}", arr)
-                .replace("{2}", (init.len() * 4).to_string().as_str())
+                .replace("{2}", size.to_string().as_str())
                 .as_str(),
         );
-        for v in init {
-            ret.push_str(format!(".word {}\n", v).as_str());
+        let mut init: Vec<(u32, &str)> = init.to_vec();
+        init.sort_by(|a, b| a.0.cmp(&b.0));
+        let mut last = 0;
+        while last < init.len() {
+            let (idx, val) = init[last];
+            if last == 0 && idx != 0 {
+                ret.push_str(format!(".zero {}\n", idx * 4).as_str());
+            }
+            ret.push_str(format!(".word {}\n", val).as_str());
+            if last == init.len() - 1 && idx * 4 < size {
+                ret.push_str(format!(".zero {}\n", size - (idx + 1) * 4).as_str());
+            }
+            last += 1;
         }
         ret
     }
