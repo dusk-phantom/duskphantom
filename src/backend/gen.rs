@@ -67,67 +67,40 @@ impl Rv64gcGen {
         ret.push_str(insts);
         ret
     }
-    pub fn gen_prim_var(vname: &str, size: u32, default: Option<&str>) -> String {
-        let template = r#"
-.text
-	.globl	{1}
-	.bss
-	.align	3
-	.type	{1}, @object
-	.size	{1}, {2}
-a:
-	.zero	{2}
-"#;
-        let mut ret = String::with_capacity(256);
-        ret.push_str(
-            template
-                .replace("{1}", vname)
-                .replace("{2}", size.to_string().as_str())
-                .as_str(),
-        );
-        match default {
-            Some(d) => {
-                ret.push_str(format!(".word {}\n", d).as_str());
-            }
-            None => {
-                ret.push_str(format!(".zero {}\n", size).as_str());
-            }
-        }
+    pub fn gen_word(name: &str, val: u32) -> String {
+        let mut ret = String::with_capacity(128);
         ret
     }
-    pub fn gen_arr(arr: &str, size: u32, init: &[(u32, &str)]) -> String {
-        let template = r##"
-    .text
-    .globl	{1}
-	.data
-	.align	3
-	.set	.LANCHOR0,. + 0
-	.type	{1}, @object
-	.size	{1}, {2}
-{1}:
-"##;
-        let mut ret = String::new();
-        ret.push_str(
-            template
-                .replace("{1}", arr)
-                .replace("{2}", size.to_string().as_str())
-                .as_str(),
-        );
-        let mut init: Vec<(u32, &str)> = init.to_vec();
-        init.sort_by(|a, b| a.0.cmp(&b.0));
-        let mut last = 0;
-        while last < init.len() {
-            let (idx, val) = init[last];
-            if last == 0 && idx != 0 {
-                ret.push_str(format!(".zero {}\n", idx * 4).as_str());
-            }
-            ret.push_str(format!(".word {}\n", val).as_str());
-            if last == init.len() - 1 && idx * 4 < size {
-                ret.push_str(format!(".zero {}\n", size - (idx + 1) * 4).as_str());
-            }
-            last += 1;
-        }
+    pub fn gen_dword(name: &str, val: u64) -> String {
+        let mut ret = String::with_capacity(128);
         ret
     }
-    pub fn gen_str() {}
+    pub fn gen_float(name: &str, val: f32) -> String {
+        let mut ret = String::with_capacity(128);
+        ret
+    }
+    pub fn gen_const_str(name: &str, val: &str) -> String {
+        let mut ret = String::with_capacity(128);
+        ret
+    }
+    pub fn gen_byte_arr(name: &str, val: &str) -> String {
+        let mut ret = String::with_capacity(128);
+        ret
+    }
+    pub fn gen_word_arr(name: &str, val: &str) -> String {
+        let mut ret = String::with_capacity(128);
+        ret
+    }
+    pub fn gen_dword_arr(name: &str, val: &str) -> String {
+        let mut ret = String::with_capacity(128);
+        ret
+    }
+    pub fn gen_f32_arr(name: &str, elem_num: u32, init: &[(u32, f32)]) -> String {
+        let mut ret = String::with_capacity(128);
+        ret
+    }
+    pub fn gen_f64_arr(name: &str, elem_num: u32, init: &[(u32, f64)]) -> String {
+        let mut ret = String::with_capacity(128);
+        ret
+    }
 }
