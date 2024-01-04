@@ -1,6 +1,6 @@
 pub mod block;
 pub mod func;
-pub mod gen;
+pub mod gen_asm;
 pub mod inst;
 pub mod prog;
 pub mod var;

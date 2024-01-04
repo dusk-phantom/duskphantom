@@ -1,4 +1,4 @@
-use super::{block::Block, gen::Rv64gcGen};
+use super::{block::Block, gen_asm::Rv64gcGen};
 use rayon::prelude::*;
 
 #[allow(unused)]

@@ -26,6 +26,6 @@ impl Program {
             .map(|v| v.gen_asm())
             .collect::<Vec<String>>()
             .join("\n");
-        gen::Rv64gcGen::gen_prog("test.c", global.as_str(), funcs.as_str())
+        gen_asm::Rv64gcGen::gen_prog("test.c", global.as_str(), funcs.as_str())
     }
 }

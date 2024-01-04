@@ -1,4 +1,4 @@
-use super::{gen::Rv64gcGen, *};
+use super::{gen_asm::Rv64gcGen, *};
 pub struct Block {
     label: String,
     insts: Vec<inst::Inst>,
