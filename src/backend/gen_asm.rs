@@ -66,7 +66,15 @@ impl Rv64gcGen {
         ret
     }
     pub fn gen_word(name: &str, val: u32) -> String {
-        let mut ret = String::with_capacity(128);
+        let mut ret = String::with_capacity(64);
+        ret.push_str(".data\n.align\t3\n");
+        ret.push_str(
+            format!(
+                ".type {0}, @object\n.size {0}, 4\n{0}:\n.word 0x{1:X}\n",
+                name, val
+            )
+            .as_str(),
+        );
         ret
     }
     pub fn gen_dword(name: &str, val: u64) -> String {
@@ -123,6 +131,18 @@ mod tests {
 .align  3
 hello:
 .string "world"
+"##;
+        assert_eq!(s, raw_match);
+    }
+    #[test]
+    fn test_gen_word() {
+        let s = super::Rv64gcGen::gen_word("hello", 0x12345678);
+        let raw_match = r##".data
+.align	3
+.type hello, @object
+.size hello, 4
+hello:
+.word 0x12345678
 "##;
         assert_eq!(s, raw_match);
     }
