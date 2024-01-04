@@ -1,7 +1,5 @@
 use std::env;
 
-use rand::seq::index;
-
 // tools supporting gening rv64gc assemble
 pub struct Rv64gcGen;
 impl Rv64gcGen {
@@ -80,7 +78,17 @@ impl Rv64gcGen {
         ret
     }
     pub fn gen_const_str(name: &str, val: &str) -> String {
-        let mut ret = String::with_capacity(128);
+        let mut ret = String::with_capacity(32 + val.len());
+        ret.push_str(".globl\t");
+        ret.push_str(name);
+        ret.push('\n');
+        ret.push_str(".section\t.rodata\n");
+        ret.push_str(".align  3\n");
+        ret.push_str(name);
+        ret.push_str(":\n");
+        ret.push_str(".string \"");
+        ret.push_str(val);
+        ret.push_str("\"\n");
         ret
     }
     pub fn gen_byte_arr(name: &str, val: &str) -> String {
@@ -102,5 +110,20 @@ impl Rv64gcGen {
     pub fn gen_f64_arr(name: &str, elem_num: u32, init: &[(u32, f64)]) -> String {
         let mut ret = String::with_capacity(128);
         ret
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_gen_const_str() {
+        let s = super::Rv64gcGen::gen_const_str("hello", "world");
+        let raw_match = r##".globl	hello
+.section	.rodata
+.align  3
+hello:
+.string "world"
+"##;
+        assert_eq!(s, raw_match);
     }
 }
