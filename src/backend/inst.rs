@@ -270,6 +270,7 @@ impl MulInst {
     }
     pub fn optimize(&self) -> Vec<Inst> {
         //TODO, 判断是否有优化必要
+
         vec![Inst::Mul(self.to_owned())]
     }
 }
@@ -308,7 +309,7 @@ impl SdInst {
 }
 impl LaInst {
     pub fn gen_asm(&self) -> String {
-        format!("lla {},{}", self.0.gen_asm(), self.1.gen_asm())
+        format!("la {},{}", self.0.gen_asm(), self.1.gen_asm())
     }
 }
 impl JmpInst {
