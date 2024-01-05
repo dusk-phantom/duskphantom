@@ -9,11 +9,11 @@ pub enum Var {
 
 #[derive(Clone)]
 pub enum PrimVar {
-    Int(Int),
-    Float(Float),
+    IntVar(IntVar),
+    FloatVar(FloatVar),
 }
 #[derive(Clone)]
-pub struct Int {
+pub struct IntVar {
     pub name: String,
     pub init: Option<i64>,
 }
@@ -28,7 +28,7 @@ impl Str {
     }
 }
 #[derive(Clone)]
-pub struct Float {
+pub struct FloatVar {
     pub name: String,
     pub init: Option<f64>,
 }

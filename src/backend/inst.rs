@@ -1,44 +1,122 @@
 use super::*;
 
-pub enum Inst {
-    Add,
-    Mv,
-    Mul,
-    Div,
-    Jmp,
-    Branch,
-    Call,
-    Ret,
+#[derive(Clone)]
+pub enum Operand {
+    Reg(Reg),
+    Imm(Imm),
+    Fmm(Fmm),
+    Label(Label),
 }
 
-#[derive(Clone, PartialEq, Eq)]
-pub enum InstType {
-    Add = 0,
-    Mv,
-    Mul,
-    Div,
-    Jmp,
-    Branch,
-    Call,
-    Ret,
-}
+pub type Reg = u64;
+pub type Imm = i64;
+pub type Fmm = f64;
+pub type Label = String;
 
-impl Inst {
-    pub fn _type(&self) -> InstType {
+impl Operand {
+    pub fn reg(&self) -> Option<Reg> {
         match self {
-            Inst::Add => InstType::Add,
-            Inst::Mv => InstType::Mv,
-            Inst::Mul => InstType::Mul,
-            Inst::Div => InstType::Div,
-            Inst::Jmp => InstType::Jmp,
-            Inst::Branch => InstType::Branch,
-            Inst::Call => InstType::Call,
-            Inst::Ret => InstType::Ret,
+            Self::Reg(reg) => Some(*reg),
+            _ => None,
         }
     }
+    pub fn imm(&self) -> Option<Imm> {
+        match self {
+            Self::Imm(imm) => Some(*imm),
+            _ => None,
+        }
+    }
+    pub fn fmm(&self) -> Option<Fmm> {
+        match self {
+            Self::Fmm(fmm) => Some(*fmm),
+            _ => None,
+        }
+    }
+    pub fn label(&self) -> Option<Label> {
+        match self {
+            Self::Label(label) => Some(label.clone()),
+            _ => None,
+        }
+    }
+}
+
+pub enum Inst {
+    // 运算类型指令
+    Add(AddInst),
+    Mul(MulInst),
+    Div(DivInst),
+    // 数据移动指令
+    Mv(MvInst),
+    Ld(LdInst),
+    Sd(SdInst),
+    La(LaInst),
+    // 控制流指令
+    Jmp(JmpInst),
+    Branch(BranchInst),
+    Call(CallInst),
+    Ret,
+}
+
+pub struct OneOpInst(Operand);
+pub struct TwoOpInst(Operand, Operand);
+pub struct ThreeOpInst(Operand, Operand, Operand);
+
+impl OneOpInst {
     pub fn gen_asm(&self) -> String {
         // TODO
         String::new()
+    }
+}
+impl TwoOpInst {
+    pub fn gen_asm(&self) -> String {
+        // TODO
+        String::new()
+    }
+}
+impl ThreeOpInst {
+    pub fn gen_asm(&self) -> String {
+        // TODO
+        String::new()
+    }
+}
+
+type AddInst = ThreeOpInst;
+type MulInst = ThreeOpInst;
+type DivInst = ThreeOpInst;
+type MvInst = TwoOpInst;
+type LdInst = TwoOpInst;
+type SdInst = TwoOpInst;
+type LaInst = TwoOpInst;
+type JmpInst = OneOpInst;
+type BranchInst = ThreeOpInst;
+type CallInst = OneOpInst;
+
+impl AddInst {}
+impl MulInst {}
+impl DivInst {}
+impl MvInst {}
+impl LdInst {}
+impl SdInst {}
+impl LaInst {}
+impl JmpInst {}
+impl BranchInst {}
+impl CallInst {}
+
+impl Inst {
+    pub fn gen_asm(&self) -> String {
+        match self {
+            Inst::Add(inst) => inst.gen_asm(),
+            Inst::Mul(inst) => inst.gen_asm(),
+            Inst::Div(inst) => inst.gen_asm(),
+            Inst::Mv(inst) => inst.gen_asm(),
+            Inst::Ld(inst) => inst.gen_asm(),
+            Inst::Sd(inst) => inst.gen_asm(),
+            Inst::La(inst) => inst.gen_asm(),
+            Inst::Jmp(inst) => inst.gen_asm(),
+            Inst::Branch(inst) => inst.gen_asm(),
+            Inst::Call(inst) => inst.gen_asm(),
+            Inst::Ret => String::from("ret"),
+        }
     }
 }
 
@@ -46,31 +124,4 @@ impl Inst {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    #[test]
-    pub fn test_inst_type() {
-        let inst = Inst::Add;
-        assert_eq!(inst._type() as usize, InstType::Add as usize);
-        assert_eq!(inst._type() as usize, 0);
-        let inst = Inst::Mv;
-        assert_eq!(inst._type() as usize, InstType::Mv as usize);
-        assert_eq!(inst._type() as usize, 1);
-        let inst = Inst::Mul;
-        assert_eq!(inst._type() as usize, InstType::Mul as usize);
-        assert_eq!(inst._type() as usize, 2);
-        let inst = Inst::Div;
-        assert_eq!(inst._type() as usize, InstType::Div as usize);
-        assert_eq!(inst._type() as usize, 3);
-        let inst = Inst::Jmp;
-        assert_eq!(inst._type() as usize, InstType::Jmp as usize);
-        assert_eq!(inst._type() as usize, 4);
-        let inst = Inst::Branch;
-        assert_eq!(inst._type() as usize, InstType::Branch as usize);
-        assert_eq!(inst._type() as usize, 5);
-        let inst = Inst::Call;
-        assert_eq!(inst._type() as usize, InstType::Call as usize);
-        assert_eq!(inst._type() as usize, 6);
-        let inst = Inst::Ret;
-        assert_eq!(inst._type() as usize, InstType::Ret as usize);
-        assert_eq!(inst._type() as usize, 7);
-    }
 }
