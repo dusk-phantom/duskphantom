@@ -24,6 +24,7 @@ impl Rv64gcGen {
         ret.push_str(".attribute stack_align, 16");
         ret
     }
+    #[inline]
     pub fn gen_prog(file: &str, global: &str, funcs: &str) -> String {
         let mut ret = String::with_capacity(1024);
         // gen preffix
@@ -40,6 +41,7 @@ impl Rv64gcGen {
         ret.push('\n');
         ret
     }
+    #[inline]
     pub fn gen_func(fname: &str, entry_bb: &str, other_bbs: &str) -> String {
         let mut ret = String::with_capacity(1024);
         ret.push_str(".text\n.align\t3\n");
@@ -54,6 +56,7 @@ impl Rv64gcGen {
         ret.push_str(format!(".size\t{}, .-{}", fname, fname).as_str());
         ret
     }
+    #[inline]
     pub fn gen_bb(label: &str, insts: &str) -> String {
         let mut ret = String::with_capacity(1024);
         ret.push_str(label);
@@ -61,6 +64,7 @@ impl Rv64gcGen {
         ret.push_str(insts);
         ret
     }
+    #[inline]
     pub fn gen_word(name: &str, val: u32) -> String {
         let mut ret = String::with_capacity(64);
         ret.push_str(".data\n.align\t3\n");
@@ -74,6 +78,7 @@ impl Rv64gcGen {
         );
         ret
     }
+    #[inline]
     pub fn gen_dword(name: &str, val: u64) -> String {
         let mut ret = String::with_capacity(64);
         ret.push_str(".data\n.align\t3\n");
@@ -87,6 +92,7 @@ impl Rv64gcGen {
         );
         ret
     }
+    #[inline]
     pub fn gen_float(name: &str, val: f32) -> String {
         let mut ret = String::with_capacity(128);
         ret.push_str(".data\n.align\t3\n");
@@ -100,6 +106,7 @@ impl Rv64gcGen {
         );
         ret
     }
+    #[inline]
     pub fn gen_double(name: &str, val: f64) -> String {
         let mut ret = String::with_capacity(128);
         ret.push_str(".data\n.align\t3\n");
@@ -113,6 +120,7 @@ impl Rv64gcGen {
         );
         ret
     }
+    #[inline]
     pub fn gen_const_str(name: &str, val: &str) -> String {
         let mut ret = String::with_capacity(32 + val.len());
         ret.push_str(".globl\t");
@@ -127,7 +135,7 @@ impl Rv64gcGen {
         ret.push_str("\"\n");
         ret
     }
-
+    #[inline]
     pub fn gen_array<T: Data>(name: &str, num_elems: u32, init: &[(u32, T)]) -> String {
         let mut ret = String::with_capacity(128);
         let size_elem: u32 = T::size();
@@ -207,7 +215,6 @@ impl Data for u64 {
         format!(".dword\t0x{:X}", self)
     }
 }
-
 impl Data for f64 {
     fn size() -> u32 {
         8
