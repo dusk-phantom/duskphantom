@@ -1,4 +1,5 @@
 {
-    // 配置保存即格式化
-    "editor.formatOnSave": true,
+  // 配置保存即格式化
+  "editor.formatOnSave": true,
+  "rust-analyzer.linkedProjects": ["./Cargo.toml"]
 }

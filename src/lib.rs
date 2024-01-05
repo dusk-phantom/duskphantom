@@ -4,6 +4,7 @@ pub mod backend;
 pub mod errors;
 pub mod frontend;
 pub mod middle;
+pub mod utils;
 
 /// compile sysy source code to rv64gc asm
 pub fn compile(sysy_src: &str, opt: bool) -> Result<String, CompilerError> {

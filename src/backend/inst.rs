@@ -52,13 +52,45 @@ const REG_T3: Reg = Reg(28);
 const REG_T4: Reg = Reg(29);
 const REG_T5: Reg = Reg(30);
 const REG_T6: Reg = Reg(31);
+
 // 浮点寄存器
+const REG_FT0: Reg = Reg(32);
+const REG_FT1: Reg = Reg(33);
+const REG_FT2: Reg = Reg(34);
+const REG_FT3: Reg = Reg(35);
+const REG_FT4: Reg = Reg(36);
+const REG_FT5: Reg = Reg(37);
+const REG_FT6: Reg = Reg(38);
+const REG_FT7: Reg = Reg(39);
+const REG_FS0: Reg = Reg(40);
+const REG_FS1: Reg = Reg(41);
+const REG_FA0: Reg = Reg(42);
+const REG_FA1: Reg = Reg(43);
+const REG_FA2: Reg = Reg(44);
+const REG_FA3: Reg = Reg(45);
+const REG_FA4: Reg = Reg(46);
+const REG_FA5: Reg = Reg(47);
+const REG_FA6: Reg = Reg(48);
+const REG_FA7: Reg = Reg(49);
+const REG_FS2: Reg = Reg(50);
+const REG_FS3: Reg = Reg(51);
+const REG_FS4: Reg = Reg(52);
+const REG_FS5: Reg = Reg(53);
+const REG_FS6: Reg = Reg(54);
+const REG_FS7: Reg = Reg(55);
+const REG_FS8: Reg = Reg(56);
+const REG_FS9: Reg = Reg(57);
+const REG_FS10: Reg = Reg(58);
+const REG_FS11: Reg = Reg(59);
+const REG_FT8: Reg = Reg(60);
+const REG_FT9: Reg = Reg(61);
+const REG_FT10: Reg = Reg(62);
+const REG_FT11: Reg = Reg(63);
 
 // 虚拟寄存器计数器
 lazy_static! {
-    static ref VIRTUAL_REG_COUNTER: Arc<Mutex<u64>> = Arc::new(Mutex::new(0));
+    static ref VIRTUAL_REG_COUNTER: Arc<Mutex<u64>> = Arc::new(Mutex::new(64));
 }
-
 impl Reg {
     #[inline]
     pub fn to_str(&self) -> &'static str {
@@ -77,11 +109,28 @@ impl Reg {
     #[inline]
     pub fn is_phisic(&self) -> bool {
         match self.0 {
-            0..=31 => true,
+            0..=63 => true,
             _ => false,
         }
     }
-
+    #[inline]
+    pub fn is_virtual(&self) -> bool {
+        !self.is_phisic()
+    }
+    // 判断是否是通用寄存器
+    #[inline]
+    pub fn is_usual(&self) -> bool {
+        // 如果是物理寄存器,则0-31是通用寄存器
+        if self.is_phisic() {
+            match self.0 {
+                0..=31 => true,
+                _ => false,
+            }
+        } else {
+            // 如果是虚拟寄存器,则末位是1的是通用寄存器！！！
+            self.0 & 1 == 1
+        }
+    }
     #[inline]
     pub fn gen_virtual_reg() -> Self {
         let mut counter = VIRTUAL_REG_COUNTER.lock().unwrap();
