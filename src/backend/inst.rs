@@ -191,6 +191,7 @@ impl Operand {
     }
 }
 
+#[derive(Clone)]
 pub enum Inst {
     // 运算类型指令
     Add(AddInst),
@@ -208,50 +209,129 @@ pub enum Inst {
     Ret,
 }
 
-pub struct OneOpInst(Operand);
-pub struct TwoOpInst(Operand, Operand);
-pub struct ThreeOpInst(Operand, Operand, Operand);
+#[derive(Clone)]
+pub struct AddInst(Operand, Operand, Operand);
+#[derive(Clone)]
+pub struct MulInst(Operand, Operand, Operand);
+#[derive(Clone)]
+pub struct DivInst(Operand, Operand, Operand);
+#[derive(Clone)]
+pub struct MvInst(Operand, Operand);
+#[derive(Clone)]
+pub struct LdInst(Operand, Operand, Operand);
 
-impl OneOpInst {
+#[derive(Clone)]
+// to_store , offset , base
+pub struct SdInst(Operand, Operand, Operand);
+#[derive(Clone)]
+pub struct LaInst(Operand, Operand);
+#[derive(Clone)]
+pub struct JmpInst(Operand);
+#[derive(Clone)]
+pub struct BranchInst(BranchOp, Operand, Operand, Operand);
+#[derive(Clone)]
+pub struct CallInst(Operand);
+#[derive(Clone)]
+pub enum BranchOp {
+    Beq,
+    Bne,
+    Blt,
+    Ble,
+    Bgt,
+    Bge,
+}
+impl BranchOp {
     pub fn gen_asm(&self) -> String {
-        // TODO
-        String::new()
+        match self {
+            Self::Beq => String::from("beq"),
+            Self::Bne => String::from("bne"),
+            Self::Blt => String::from("blt"),
+            Self::Ble => String::from("ble"),
+            Self::Bgt => String::from("bgt"),
+            Self::Bge => String::from("bge"),
+        }
     }
 }
-impl TwoOpInst {
+
+impl AddInst {
     pub fn gen_asm(&self) -> String {
-        // TODO
-        String::new()
+        let dst = self.0.gen_asm();
+        let lhs = self.1.gen_asm();
+        let rhs = self.2.gen_asm();
+        format!("add {},{},{}", dst, lhs, rhs)
     }
 }
-impl ThreeOpInst {
+impl MulInst {
     pub fn gen_asm(&self) -> String {
-        // TODO
-        String::new()
+        let dst = self.0.gen_asm();
+        let lhs = self.1.gen_asm();
+        let rhs = self.2.gen_asm();
+        format!("mul {},{},{}", dst, lhs, rhs)
+    }
+    pub fn optimize(&self) -> Vec<Inst> {
+        //TODO, 判断是否有优化必要
+        vec![Inst::Mul(self.to_owned())]
     }
 }
-
-type AddInst = ThreeOpInst;
-type MulInst = ThreeOpInst;
-type DivInst = ThreeOpInst;
-type MvInst = TwoOpInst;
-type LdInst = TwoOpInst;
-type SdInst = TwoOpInst;
-type LaInst = TwoOpInst;
-type JmpInst = OneOpInst;
-type BranchInst = ThreeOpInst;
-type CallInst = OneOpInst;
-
-impl AddInst {}
-impl MulInst {}
-impl DivInst {}
-impl MvInst {}
-impl LdInst {}
-impl SdInst {}
-impl LaInst {}
-impl JmpInst {}
-impl BranchInst {}
-impl CallInst {}
+impl DivInst {
+    pub fn gen_asm(&self) -> String {
+        let dst = self.0.gen_asm();
+        let lhs = self.1.gen_asm();
+        let rhs = self.2.gen_asm();
+        format!("div {},{},{}", dst, lhs, rhs)
+    }
+    pub fn optimize(&self) -> Vec<Inst> {
+        //TODO, 判断是否有优化必要
+        vec![Inst::Div(self.to_owned())]
+    }
+}
+impl MvInst {
+    pub fn gen_asm(&self) -> String {
+        format!("mv {},{}", self.0.gen_asm(), self.1.gen_asm())
+    }
+}
+impl LdInst {
+    pub fn gen_asm(&self) -> String {
+        let to_store = self.0.gen_asm();
+        let offset = self.1.gen_asm();
+        let base = self.2.gen_asm();
+        format!("ld {},{}({})", to_store, offset, base)
+    }
+}
+impl SdInst {
+    pub fn gen_asm(&self) -> String {
+        let to_store = self.0.gen_asm();
+        let offset = self.1.gen_asm();
+        let base = self.2.gen_asm();
+        format!("sd {},{}({})", to_store, offset, base)
+    }
+}
+impl LaInst {
+    pub fn gen_asm(&self) -> String {
+        format!("lla {},{}", self.0.gen_asm(), self.1.gen_asm())
+    }
+}
+impl JmpInst {
+    pub fn gen_asm(&self) -> String {
+        format!("j {}", self.0.gen_asm())
+    }
+}
+impl BranchInst {
+    pub fn gen_asm(&self) -> String {
+        format!(
+            "{} {},{},{}",
+            self.0.gen_asm(),
+            self.1.gen_asm(),
+            self.2.gen_asm(),
+            self.3.gen_asm(),
+        )
+    }
+}
+impl CallInst {
+    pub fn gen_asm(&self) -> String {
+        format!("call {}", self.0.gen_asm())
+    }
+}
 
 impl Inst {
     pub fn gen_asm(&self) -> String {
