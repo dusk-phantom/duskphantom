@@ -42,20 +42,16 @@ impl Rv64gcGen {
     }
     pub fn gen_func(fname: &str, entry_bb: &str, other_bbs: &str) -> String {
         let mut ret = String::with_capacity(1024);
-        ret.push_str(
-            format!(
-                ".text\n.align  2\n.globl  {}\n.type   {}, @function\n",
-                fname, fname
-            )
-            .as_str(),
-        );
+        ret.push_str(".text\n.align\t3\n");
+        ret.push_str(format!(".globl\t{}\n", fname).as_str());
+        ret.push_str(format!(".type\t{}, @function\n", fname).as_str());
         ret.push_str(fname);
         ret.push_str(":\n");
         ret.push_str(entry_bb);
         ret.push('\n');
         ret.push_str(other_bbs);
         ret.push('\n');
-        ret.push_str(format!(".size   {}, .-{}", fname, fname).as_str());
+        ret.push_str(format!(".size\t{}, .-{}", fname, fname).as_str());
         ret
     }
     pub fn gen_bb(label: &str, insts: &str) -> String {
@@ -68,9 +64,10 @@ impl Rv64gcGen {
     pub fn gen_word(name: &str, val: u32) -> String {
         let mut ret = String::with_capacity(64);
         ret.push_str(".data\n.align\t3\n");
+        ret.push_str(format!(".globl\t{}\n", name).as_str());
         ret.push_str(
             format!(
-                ".type {0}, @object\n.size {0}, 4\n{0}:\n.word 0x{1:X}\n",
+                ".type\t{0}, @object\n.size\t{0}, 4\n{0}:\n.word\t0x{1:X}",
                 name, val
             )
             .as_str(),
@@ -78,7 +75,16 @@ impl Rv64gcGen {
         ret
     }
     pub fn gen_dword(name: &str, val: u64) -> String {
-        let mut ret = String::with_capacity(128);
+        let mut ret = String::with_capacity(64);
+        ret.push_str(".data\n.align\t3\n");
+        ret.push_str(format!(".globl\t{}\n", name).as_str());
+        ret.push_str(
+            format!(
+                ".type\t{0}, @object\n.size\t{0}, 8\n{0}:\n.dword\t0x{1:X}",
+                name, val
+            )
+            .as_str(),
+        );
         ret
     }
     pub fn gen_float(name: &str, val: f32) -> String {
@@ -137,13 +143,27 @@ hello:
     #[test]
     fn test_gen_word() {
         let s = super::Rv64gcGen::gen_word("hello", 0x12345678);
-        let raw_match = r##".data
-.align	3
-.type hello, @object
-.size hello, 4
+        println!("{}", s);
+        let raw_match = ".data
+.align\t3
+.globl\thello
+.type\thello, @object
+.size\thello, 4
 hello:
-.word 0x12345678
-"##;
+.word\t0x12345678";
+        assert_eq!(s, raw_match);
+    }
+    #[test]
+    fn test_gen_dword() {
+        let s = super::Rv64gcGen::gen_dword("hello", 0x1234567890ABCDEF);
+        println!("{}", s);
+        let raw_match = ".data
+.align\t3
+.globl\thello
+.type\thello, @object
+.size\thello, 8
+hello:
+.dword\t0x1234567890ABCDEF";
         assert_eq!(s, raw_match);
     }
 }
