@@ -87,10 +87,16 @@ const REG_FT9: Reg = Reg(61);
 const REG_FT10: Reg = Reg(62);
 const REG_FT11: Reg = Reg(63);
 
+const VIRTUAL_USUAL_BASE: u64 = 64;
+const VIRTUAL_FLOAT_BASE: u64 = 65;
 // 虚拟寄存器计数器
 lazy_static! {
-    static ref VIRTUAL_REG_COUNTER: Arc<Mutex<u64>> = Arc::new(Mutex::new(64));
+    static ref VIRTUAL_USUAL_REG_COUNTER: Arc<Mutex<u64>> =
+        Arc::new(Mutex::new(VIRTUAL_USUAL_BASE));
+    static ref VIRTUAL_FLOAT_REG_COUNTER: Arc<Mutex<u64>> =
+        Arc::new(Mutex::new(VIRTUAL_FLOAT_BASE));
 }
+
 impl Reg {
     #[inline]
     pub fn to_str(&self) -> &'static str {
@@ -128,14 +134,20 @@ impl Reg {
             }
         } else {
             // 如果是虚拟寄存器,则末位是1的是通用寄存器！！！
-            self.0 & 1 == 1
+            self.0 & 1 == VIRTUAL_USUAL_BASE & 1
         }
     }
-    #[inline]
-    pub fn gen_virtual_reg() -> Self {
-        let mut counter = VIRTUAL_REG_COUNTER.lock().unwrap();
+
+    pub fn gen_virtual_usual_reg() -> Self {
+        let mut counter = VIRTUAL_USUAL_REG_COUNTER.lock().unwrap();
         let reg = Reg(*counter);
-        *counter += 1;
+        *counter += 2;
+        reg
+    }
+    pub fn gen_virtual_float_reg() -> Self {
+        let mut counter = VIRTUAL_FLOAT_REG_COUNTER.lock().unwrap();
+        let reg = Reg(*counter);
+        *counter += 2;
         reg
     }
 }
