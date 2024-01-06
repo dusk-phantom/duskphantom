@@ -1,6 +1,7 @@
 use errors::CompilerError;
 
 pub mod backend;
+#[cfg(feature = "clang_frontend")]
 pub mod clang_frontend;
 pub mod errors;
 pub mod frontend;
