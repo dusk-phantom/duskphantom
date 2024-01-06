@@ -1,10 +1,11 @@
 pub mod block;
+#[cfg(feature = "clang_frontend")]
+pub mod clang_gen;
 pub mod func;
 pub mod gen_asm;
 pub mod inst;
 pub mod prog;
 pub mod var;
-use std::os::unix::process::CommandExt;
 
 use rayon::prelude::*;
 

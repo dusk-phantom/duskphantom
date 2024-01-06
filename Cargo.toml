@@ -25,3 +25,8 @@ lazy_static = "1.4.0"
 rand = "0.8.5"
 rayon = "1.8.0"
 thiserror = "1.0.50"
+
+# 特性管理
+[features]
+# default = ["clang_frontend"]
+clang_frontend = []
