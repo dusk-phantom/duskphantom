@@ -10,7 +10,7 @@
 
 `compiler a.sy -S -o a.s -O1`
 
-## TODOq
+## TODO
 
 1. 架构
 
