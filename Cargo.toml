@@ -2,6 +2,7 @@
 name = "hitc"
 version = "0.1.0"
 edition = "2021"
+default-run = "compiler"
 
 [lib]
 name = "compiler"
@@ -12,18 +13,21 @@ name = "compiler"
 path = "src/main.rs"
 
 [[bin]]
-name = "compiler_clang"
+name = "compiler-clang"
 path = "src/main_clang.rs"
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 # clang = "2.0.0"
 # 使用clap 稳定版
-clap = "3.0.0-beta.3"
+clap = "3.0.0-beta.2"
 lazy_static = "1.4.0"
 rand = "0.8.5"
 rayon = "1.8.0"
+serde = { version = "1.0.130", features = ["derive"] }
+serde_yaml = "0.9.30"
 thiserror = "1.0.50"
 
 # 特性管理

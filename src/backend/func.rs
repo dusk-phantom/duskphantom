@@ -1,3 +1,5 @@
+use crate::config::CONFIG;
+
 use super::{asm::GenTool, block::Block};
 use rayon::prelude::*;
 
@@ -29,17 +31,23 @@ impl Func {
     pub fn gen_asm(&self) -> String {
         let entry = self.bbs.iter().find(|bb| bb.label() == self.entry).unwrap();
         let entry = entry.gen_asm();
+        let thread_pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(CONFIG.num_parallel_for_block_gen_asm)
+            .build()
+            .unwrap();
         let mut other_bbs = self
             .bbs
             .iter()
             .filter(|bb| bb.label() != self.entry)
             .collect::<Vec<&Block>>();
         other_bbs.sort_by_cached_key(|bb| bb.label());
-        let other_bbs = other_bbs
-            .par_iter()
-            .map(|bb| bb.gen_asm())
-            .collect::<Vec<String>>()
-            .join("\n");
+        let other_bbs = thread_pool.install(|| {
+            other_bbs
+                .par_iter()
+                .map(|bb| bb.gen_asm())
+                .collect::<Vec<String>>()
+                .join("\n")
+        });
         GenTool::gen_func(self.name.as_str(), entry.as_str(), other_bbs.as_str())
     }
 }

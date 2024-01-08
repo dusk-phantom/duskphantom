@@ -3,6 +3,7 @@ use errors::CompilerError;
 pub mod backend;
 #[cfg(feature = "clang_frontend")]
 pub mod clang_frontend;
+pub mod config;
 pub mod errors;
 pub mod frontend;
 pub mod middle;
@@ -12,14 +13,15 @@ use clap::{arg, App};
 
 pub fn get_args() -> (String, String, bool, bool) {
     let app = App::new("compiler")
+        .about("compiler <src> [-S] [-o <output>] [-O]")
         .arg(arg!(<src> "Source file").index(1))
         .arg(arg!(-S --asm "output asm file"))
-        .arg(arg!(-o --output <FILE> "output asm file"))
+        .arg(arg!(-o --output <FILE> "output asm file").default_value("a.s"))
         .arg(arg!(-O --optimized "optimization level"))
         .get_matches();
     let sy_path = app.value_of("src").expect("msg: src file not found");
     let asm_flag = app.is_present("asm");
-    let output_path = app.value_of("output").unwrap_or("a.s");
+    let output_path = app.value_of("output").unwrap();
     let opt_flag = app.is_present("optimized");
     (
         sy_path.to_string(),
