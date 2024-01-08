@@ -16,11 +16,13 @@ pub enum PrimVar {
 pub struct IntVar {
     pub name: String,
     pub init: Option<i64>,
+    pub is_const: bool,
 }
 #[derive(Clone)]
 pub struct Str {
     pub name: String,
     pub init: Option<String>,
+    pub is_const: bool,
 }
 impl Str {
     fn gen_asm(&self) -> String {
@@ -31,12 +33,14 @@ impl Str {
 pub struct FloatVar {
     pub name: String,
     pub init: Option<f64>,
+    pub is_const: bool,
 }
 #[derive(Clone)]
 pub struct ArrVar {
     pub name: String,
     pub size: usize,
     pub init: Vec<PrimVar>,
+    pub is_const: bool,
 }
 
 impl ArrVar {

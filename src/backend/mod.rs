@@ -1,8 +1,6 @@
+pub mod asm;
 pub mod block;
-#[cfg(feature = "clang_frontend")]
-pub mod clang_gen;
 pub mod func;
-pub mod gen_asm;
 pub mod inst;
 pub mod prog;
 pub mod var;
@@ -10,7 +8,6 @@ pub mod var;
 use rayon::prelude::*;
 
 use crate::{errors::BackendError, middle};
-// use ARC and Mutex
 
 #[allow(unused)]
 pub fn gen(program: &middle::Program) -> Result<prog::Program, BackendError> {

@@ -1,8 +1,62 @@
 use std::env;
 
+// 为各种基础的 数据类型以及其值的表达实现基本的
+pub trait Data {
+    fn size() -> u32;
+    fn to_str(&self) -> String;
+}
+impl Data for u8 {
+    fn size() -> u32 {
+        1
+    }
+    fn to_str(&self) -> String {
+        format!(".byte\t0x{:X}", self)
+    }
+}
+impl Data for u16 {
+    fn size() -> u32 {
+        2
+    }
+    fn to_str(&self) -> String {
+        format!(".short\t0x{:X}", self)
+    }
+}
+impl Data for u32 {
+    fn size() -> u32 {
+        4
+    }
+    fn to_str(&self) -> String {
+        format!(".word\t0x{:X}", self)
+    }
+}
+impl Data for f32 {
+    fn size() -> u32 {
+        4
+    }
+    fn to_str(&self) -> String {
+        format!(".float\t{}", self)
+    }
+}
+impl Data for u64 {
+    fn size() -> u32 {
+        8
+    }
+    fn to_str(&self) -> String {
+        format!(".dword\t0x{:X}", self)
+    }
+}
+impl Data for f64 {
+    fn size() -> u32 {
+        8
+    }
+    fn to_str(&self) -> String {
+        format!(".double\t{}", self)
+    }
+}
+
 // tools supporting gening rv64gc assemble
-pub struct Rv64gcGen;
-impl Rv64gcGen {
+pub struct GenTool;
+impl GenTool {
     #[inline]
     fn gen_suffix() -> String {
         const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -28,7 +82,7 @@ impl Rv64gcGen {
     pub fn gen_prog(file: &str, global: &str, funcs: &str) -> String {
         let mut ret = String::with_capacity(1024);
         // gen preffix
-        ret.push_str(Rv64gcGen::gen_preffix(file).as_str());
+        ret.push_str(GenTool::gen_preffix(file).as_str());
         ret.push('\n');
         // gen global data
         ret.push_str(global);
@@ -37,7 +91,7 @@ impl Rv64gcGen {
         ret.push_str(funcs);
         ret.push('\n');
         // gen suffix
-        ret.push_str(Rv64gcGen::gen_suffix().as_str());
+        ret.push_str(GenTool::gen_suffix().as_str());
         ret.push('\n');
         ret
     }
@@ -170,65 +224,11 @@ impl Rv64gcGen {
     }
 }
 
-// 为各种基础的 数据类型以及其值的表达实现基本的
-pub trait Data {
-    fn size() -> u32;
-    fn to_str(&self) -> String;
-}
-impl Data for u8 {
-    fn size() -> u32 {
-        1
-    }
-    fn to_str(&self) -> String {
-        format!(".byte\t0x{:X}", self)
-    }
-}
-impl Data for u16 {
-    fn size() -> u32 {
-        2
-    }
-    fn to_str(&self) -> String {
-        format!(".short\t0x{:X}", self)
-    }
-}
-impl Data for u32 {
-    fn size() -> u32 {
-        4
-    }
-    fn to_str(&self) -> String {
-        format!(".word\t0x{:X}", self)
-    }
-}
-impl Data for f32 {
-    fn size() -> u32 {
-        4
-    }
-    fn to_str(&self) -> String {
-        format!(".float\t{}", self)
-    }
-}
-impl Data for u64 {
-    fn size() -> u32 {
-        8
-    }
-    fn to_str(&self) -> String {
-        format!(".dword\t0x{:X}", self)
-    }
-}
-impl Data for f64 {
-    fn size() -> u32 {
-        8
-    }
-    fn to_str(&self) -> String {
-        format!(".double\t{}", self)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     #[test]
     fn test_gen_const_str() {
-        let s = super::Rv64gcGen::gen_const_str("hello", "world");
+        let s = super::GenTool::gen_const_str("hello", "world");
         let raw_match = r##".globl	hello
 .section	.rodata
 .align  3
@@ -239,7 +239,7 @@ hello:
     }
     #[test]
     fn test_gen_word() {
-        let s = super::Rv64gcGen::gen_word("hello", 0x12345678);
+        let s = super::GenTool::gen_word("hello", 0x12345678);
         println!("{}", s);
         let raw_match = ".data
 .align\t3
@@ -252,7 +252,7 @@ hello:
     }
     #[test]
     fn test_gen_dword() {
-        let s = super::Rv64gcGen::gen_dword("hello", 0x1234567890ABCDEF);
+        let s = super::GenTool::gen_dword("hello", 0x1234567890ABCDEF);
         println!("{}", s);
         let raw_match = ".data
 .align\t3
@@ -266,7 +266,7 @@ hello:
 
     #[test]
     fn test_gen_float() {
-        let s = super::Rv64gcGen::gen_float("hello", 1.2345678);
+        let s = super::GenTool::gen_float("hello", 1.2345678);
         println!("{}", s);
         let raw_match = ".data
 .align\t3
@@ -279,7 +279,7 @@ hello:
     }
     #[test]
     fn test_gen_double() {
-        let s = super::Rv64gcGen::gen_double("hello", 1.234567890123456789);
+        let s = super::GenTool::gen_double("hello", 1.234567890123456789);
         println!("{}", s);
         let raw_match = ".data
 .align\t3
@@ -292,7 +292,7 @@ hello:
     }
     #[test]
     fn test_gen_array() {
-        let s = super::Rv64gcGen::gen_array::<u32>("hello", 10, &[(0, 1), (1, 2), (2, 3)]);
+        let s = super::GenTool::gen_array::<u32>("hello", 10, &[(0, 1), (1, 2), (2, 3)]);
         println!("{}", s);
         let raw_match = ".data
 .align\t3
@@ -308,7 +308,7 @@ hello:
     }
     #[test]
     fn test_gen_bb() {
-        let s = super::Rv64gcGen::gen_bb("hello", "addi x0, x0, 0");
+        let s = super::GenTool::gen_bb("hello", "addi x0, x0, 0");
         println!("{}", s);
         let raw_match = "hello:
 addi x0, x0, 0";
@@ -316,7 +316,7 @@ addi x0, x0, 0";
     }
     #[test]
     fn test_gen_func() {
-        let s = super::Rv64gcGen::gen_func(
+        let s = super::GenTool::gen_func(
             "hello",
             "hello_0:\naddi a0, a0, 33",
             "hello_1:\naddi x0, x0, 0",
@@ -336,7 +336,7 @@ addi x0, x0, 0
     }
     #[test]
     fn test_gen_byte_arr() {
-        let s = super::Rv64gcGen::gen_array::<u8>("hello", 10, &[(0, 1), (1, 2), (2, 3)]);
+        let s = super::GenTool::gen_array::<u8>("hello", 10, &[(0, 1), (1, 2), (2, 3)]);
         println!("{}", s);
         let raw_match = ".data
 .align\t3
@@ -352,7 +352,7 @@ hello:
     }
     #[test]
     fn test_gen_short_arr() {
-        let s = super::Rv64gcGen::gen_array::<u16>("hello", 10, &[(0, 1), (1, 2), (2, 3)]);
+        let s = super::GenTool::gen_array::<u16>("hello", 10, &[(0, 1), (1, 2), (2, 3)]);
         println!("{}", s);
         let raw_match = ".data
 .align\t3
@@ -368,7 +368,7 @@ hello:
     }
     #[test]
     fn test_gen_word_arr() {
-        let s = super::Rv64gcGen::gen_array::<u32>("hello", 10, &[(0, 1), (1, 2), (2, 3)]);
+        let s = super::GenTool::gen_array::<u32>("hello", 10, &[(0, 1), (1, 2), (2, 3)]);
         println!("{}", s);
         let raw_match = ".data
 .align\t3
@@ -384,7 +384,7 @@ hello:
     }
     #[test]
     fn test_gen_dword_arr() {
-        let s = super::Rv64gcGen::gen_array::<u64>("hello", 10, &[(0, 1), (1, 2), (2, 3)]);
+        let s = super::GenTool::gen_array::<u64>("hello", 10, &[(0, 1), (1, 2), (2, 3)]);
         println!("{}", s);
         let raw_match = ".data
 .align\t3
@@ -400,7 +400,7 @@ hello:
     }
     #[test]
     fn test_gen_float_arr() {
-        let s = super::Rv64gcGen::gen_array::<f32>("hello", 10, &[(0, 1.0), (1, 2.0), (2, 3.0)]);
+        let s = super::GenTool::gen_array::<f32>("hello", 10, &[(0, 1.0), (1, 2.0), (2, 3.0)]);
         println!("{}", s);
         let raw_match = ".data
 .align\t3
@@ -416,7 +416,7 @@ hello:
     }
     #[test]
     fn test_gen_double_arr() {
-        let s = super::Rv64gcGen::gen_array::<f64>("hello", 10, &[(0, 1.0), (1, 2.0), (2, 3.0)]);
+        let s = super::GenTool::gen_array::<f64>("hello", 10, &[(0, 1.0), (1, 2.0), (2, 3.0)]);
         println!("{}", s);
         let raw_match = ".data
 .align\t3

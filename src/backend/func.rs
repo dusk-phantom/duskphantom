@@ -1,4 +1,4 @@
-use super::{block::Block, gen_asm::Rv64gcGen};
+use super::{asm::GenTool, block::Block};
 use rayon::prelude::*;
 
 #[allow(unused)]
@@ -14,6 +14,15 @@ pub struct Func {
 }
 
 impl Func {
+    pub fn new() -> Func {
+        Func {
+            name: String::new(),
+            args: Vec::new(),
+            bbs: Vec::new(),
+            sorted_bbs: Vec::new(),
+            entry: String::new(),
+        }
+    }
     pub fn name(&self) -> &str {
         self.name.as_str()
     }
@@ -31,6 +40,6 @@ impl Func {
             .map(|bb| bb.gen_asm())
             .collect::<Vec<String>>()
             .join("\n");
-        Rv64gcGen::gen_func(self.name.as_str(), entry.as_str(), other_bbs.as_str())
+        GenTool::gen_func(self.name.as_str(), entry.as_str(), other_bbs.as_str())
     }
 }

@@ -1,4 +1,4 @@
-use super::{gen_asm::Rv64gcGen, *};
+use super::{asm::GenTool, *};
 pub struct Block {
     label: String,
     insts: Vec<inst::Inst>,
@@ -16,6 +16,6 @@ impl Block {
             .map(|inst| inst.gen_asm())
             .collect::<Vec<String>>()
             .join("\n");
-        Rv64gcGen::gen_bb(label, insts.as_str())
+        GenTool::gen_bb(label, insts.as_str())
     }
 }
