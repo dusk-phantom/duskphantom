@@ -1,18 +1,7 @@
 extern crate compiler;
 
-use clap::{arg, App};
 fn main() {
-    let app = App::new("compiler")
-        .arg(arg!(<src> "Source file").index(1))
-        .arg(arg!(-S --asm "output asm file"))
-        .arg(arg!(-o --output <FILE> "output asm file"))
-        .arg(arg!(-O --optimized "optimization level"))
-        .get_matches();
-    let src_file = app.value_of("src").expect("msg: src file not found");
-    let asm_flag = app.is_present("asm");
-    let output_file = app.value_of("output").unwrap_or("a.s");
-    let opt_flag = app.is_present("optimized");
-
+    let (src_file, output_file, opt_flag, asm_flag) = compiler::get_args();
     #[cfg(feature = "clang_frontend")]
     {
         let program = compiler::clang_frontend::Program::parse(src_file);

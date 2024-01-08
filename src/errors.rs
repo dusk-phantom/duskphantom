@@ -8,7 +8,7 @@ pub enum CompilerError {
     IOError(#[from] std::io::Error),
     // 前端错误
     #[error("frontend error, cause: {0}")]
-    FrontendError(#[from] FrontEndError),
+    FrontendError(#[from] FrontendError),
     // 中端错误
     #[error("middle error, cause: {0}")]
     MiddleError(#[from] MiddelError),
@@ -19,7 +19,7 @@ pub enum CompilerError {
 
 // 前端错误
 #[derive(Debug, Error)]
-pub enum FrontEndError {
+pub enum FrontendError {
     // 解析错误
     #[error("parse error")]
     ParseError,

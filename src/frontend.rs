@@ -1,10 +1,10 @@
-use crate::errors::FrontEndError;
+use crate::errors::FrontendError;
 
 pub struct Program {
     pub content: String,
 }
 
-pub fn parse(src: &str) -> Result<Program, FrontEndError> {
+pub fn parse(src: &str) -> Result<Program, FrontendError> {
     Ok(Program {
         content: src.to_string(),
     })
