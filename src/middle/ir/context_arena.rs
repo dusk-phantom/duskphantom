@@ -1,7 +1,7 @@
-use std::sync::OnceLock;
-
 use super::*;
 
-static mut CONTEXT_FUNCTION: OnceLock<Arena<Function>> = OnceLock::new();
-static mut CONTEXT_BASIC_BLOCK: OnceLock<Arena<BasicBlock>> = OnceLock::new();
-static mut CONTEXT_INSTRUCTION: OnceLock<Arena<Box<dyn Instruction>>> = OnceLock::new();
+pub static CONTEXT_FUNCTION: OnceLock<Mutex<HashMap<FunPtr, Arena<Function>>>> = OnceLock::new();
+pub static CONTEXT_BASIC_BLOCK: OnceLock<Mutex<HashMap<FunPtr, Arena<BasicBlock>>>> =
+    OnceLock::new();
+pub static CONTEXT_INSTRUCTION: OnceLock<Mutex<HashMap<FunPtr, Arena<Box<dyn Instruction>>>>> =
+    OnceLock::new();

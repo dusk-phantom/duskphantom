@@ -1,1 +1,1 @@
-pub trait Instruction {}
+pub trait Instruction: Send {}
