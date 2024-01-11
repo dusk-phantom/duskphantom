@@ -1,2 +1,2 @@
 use super::*;
-pub trait Instruction: Send {}
+pub trait Instruction {}
