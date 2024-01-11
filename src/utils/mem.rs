@@ -7,6 +7,12 @@ use std::{
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct ObjPtr<T>(NonNull<T>);
 
+impl<T> ObjPtr<T> {
+    pub fn new(ptr: &T) -> ObjPtr<T> {
+        ObjPtr(NonNull::new(ptr as *const _ as *mut _).unwrap())
+    }
+}
+
 impl<T> Deref for ObjPtr<T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
@@ -20,7 +26,10 @@ impl<T> DerefMut for ObjPtr<T> {
     }
 }
 
-pub struct ObjPool<T> {
+pub struct ObjPool<T>
+where
+    T: Sized,
+{
     arena: typed_arena::Arena<std::pin::Pin<Box<T>>>,
 }
 
@@ -34,6 +43,6 @@ impl<T> ObjPool<T> {
 
     /// 分配一块内存存放obj
     pub fn alloc(&mut self, obj: T) -> ObjPtr<T> {
-        ObjPtr(NonNull::new(self.arena.alloc(Box::pin(obj)) as *const _ as *mut _).unwrap())
+        ObjPtr::new(self.arena.alloc(Box::pin(obj)))
     }
 }
