@@ -2,7 +2,6 @@ use crate::{errors::MiddelError, frontend};
 
 mod analysis;
 pub mod ir;
-mod tool;
 mod transform;
 
 pub struct Program {
