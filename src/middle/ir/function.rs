@@ -1,26 +1,34 @@
 use super::*;
 
+pub type FunPtr = ObjPtr<Function>;
+
 /// 函数
-/// 函数主要结构为函数名、入口基本块、返回值、参数列表
-/// 其中，入口基本块为entry，出口基本块为exit，二者类型为Option<BBPtr>，若为库函数，则均为None
-/// 函数内部的数据流结构为基本块组成的有向图，其中该图只有一个入口和一个出口，分别为entry和exit
-/// 只有一个入口和一个出口有利于数据流分析
 pub struct Function {
+    /// 函数名
     name: String,
+
+    /// 函数入口，若为库函数，则为None
     entry: Option<BBPtr>,
+
+    /// 函数出口，若为库函数，则为None
     exit: Option<BBPtr>,
+
+    /// 返回值类型
     return_type: ValueType,
-    // TODO: 参数列表
+
+    /// 函数参数
+    params: Vec<InstPtr>,
 }
 
-impl Function {
-    /// 构造一个新的函数
+impl<'func> Function {
+    /// 构造一个空函数
     pub fn new(name: String, return_type: ValueType) -> Self {
         Self {
             name,
             entry: None,
             exit: None,
             return_type,
+            params: Vec::new(),
         }
     }
 
@@ -67,5 +75,10 @@ impl Function {
     /// 检查是否为库函数
     pub fn is_lib(&self) -> bool {
         self.entry.is_none()
+    }
+
+    /// 获取函数参数
+    pub fn get_param(&self, index: usize) -> InstPtr {
+        self.params[index]
     }
 }

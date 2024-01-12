@@ -18,4 +18,34 @@ impl Module {
             global_variables: Vec::new(),
         }
     }
+
+    /// 根据索引获取函数
+    pub fn get_function(&self, index: usize) -> FunPtr {
+        self.functions[index]
+    }
+
+    /// 调用vec的insert方法插入一个函数
+    pub fn insert_function(&mut self, index: usize, function: FunPtr) {
+        self.functions.insert(index, function);
+    }
+
+    /// 调用vec的push方法在末尾插入一个函数
+    pub fn push_function(&mut self, function: FunPtr) {
+        self.functions.push(function);
+    }
+
+    /// 根据索引获取全局变量
+    pub fn get_global_variable(&self, index: usize) -> InstPtr {
+        self.global_variables[index]
+    }
+
+    /// 调用vec的insert方法插入一个全局变量
+    pub fn insert_global_variable(&mut self, index: usize, global_variable: InstPtr) {
+        self.global_variables.insert(index, global_variable);
+    }
+
+    /// 调用vec的push方法在末尾插入一个全局变量
+    pub fn push_global_variable(&mut self, global_variable: InstPtr) {
+        self.global_variables.push(global_variable);
+    }
 }

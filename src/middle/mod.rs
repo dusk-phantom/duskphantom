@@ -9,7 +9,6 @@ pub struct Program {
 }
 
 pub fn gen(program: &mut frontend::Program) -> Result<Program, MiddelError> {
-    ir::context_init();
     todo!()
 }
 
