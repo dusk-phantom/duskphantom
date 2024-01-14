@@ -6,7 +6,8 @@ use super::*;
 /// global_variables是全局变量集合，使用HashMap是为了便于根据名字查找，且并不要求顺序
 /// Index可以抽象为对应对象的下标，通过相应的函数即可获得
 pub struct Module {
-    global_variables: Vec<InstPtr>,
+    /// 全局变量集合，存放于基本块中，便于操作
+    global_variables: BBPtr,
     functions: Vec<FunPtr>,
 }
 
@@ -15,7 +16,7 @@ impl Module {
     pub fn new() -> Self {
         Self {
             functions: Vec::new(),
-            global_variables: Vec::new(),
+            global_variables: mem_pool::alloc_basic_block(BasicBlock::new("global".to_string())),
         }
     }
 
@@ -34,18 +35,13 @@ impl Module {
         self.functions.push(function);
     }
 
-    /// 根据索引获取全局变量
-    pub fn get_global_variable(&self, index: usize) -> InstPtr {
-        self.global_variables[index]
+    /// 获得全局变量所在的基本块
+    pub fn get_global_variables(&self) -> BBPtr {
+        self.global_variables
     }
 
-    /// 调用vec的insert方法插入一个全局变量
-    pub fn insert_global_variable(&mut self, index: usize, global_variable: InstPtr) {
-        self.global_variables.insert(index, global_variable);
-    }
-
-    /// 调用vec的push方法在末尾插入一个全局变量
-    pub fn push_global_variable(&mut self, global_variable: InstPtr) {
-        self.global_variables.push(global_variable);
+    /// 插入全局变量
+    pub fn insert_global_variable(&mut self, global_variable: InstPtr) {
+        self.global_variables.push_back(global_variable);
     }
 }

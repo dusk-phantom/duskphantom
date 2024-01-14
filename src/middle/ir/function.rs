@@ -16,8 +16,9 @@ pub struct Function {
     /// 返回值类型
     return_type: ValueType,
 
-    /// 函数参数
-    params: Vec<InstPtr>,
+    /// 函数参数，存放在一个基本块中
+    /// 便于统一指令的运算
+    params: BBPtr,
 }
 
 impl<'func> Function {
@@ -28,7 +29,7 @@ impl<'func> Function {
             entry: None,
             exit: None,
             return_type,
-            params: Vec::new(),
+            params: mem_pool::alloc_basic_block(BasicBlock::new("params".to_string())),
         }
     }
 
@@ -72,13 +73,18 @@ impl<'func> Function {
         self.exit = Some(bb);
     }
 
+    /// 获取函数参数所在基本块
+    pub fn get_params(&self) -> BBPtr {
+        self.params
+    }
+
+    /// 在参数块尾部插入一个参数
+    pub fn push_param(&mut self, param: InstPtr) {
+        todo!()
+    }
+
     /// 检查是否为库函数
     pub fn is_lib(&self) -> bool {
         self.entry.is_none()
-    }
-
-    /// 获取函数参数
-    pub fn get_param(&self, index: usize) -> InstPtr {
-        self.params[index]
     }
 }
