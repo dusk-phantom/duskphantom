@@ -11,7 +11,7 @@ static mut INST_POOL: OnceLock<ObjPool<Box<dyn Instruction>>> = OnceLock::new();
 
 /// 初始化内存池
 /// 请确保初始化后再使用后续函数
-pub fn init() {
+pub fn pool_init() {
     unsafe {
         let _ = FUN_POOL.set(ObjPool::new());
         let _ = BB_POOL.set(ObjPool::new());
@@ -21,7 +21,7 @@ pub fn init() {
 
 /// 清空内存池，使其恢复到未初始化的状态
 /// 在使用此函数后再使用其分配的空间的指针为未定义行为
-pub fn clear() {
+pub fn pool_clear() {
     unsafe {
         FUN_POOL.take();
         BB_POOL.take();
