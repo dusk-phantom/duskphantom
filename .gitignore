@@ -1,3 +1,4 @@
 /target
 .vscode
 config.yaml
+./data/.git
