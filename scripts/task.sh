@@ -48,14 +48,15 @@ function edited_files() {
         last_edit=$(stat -c %Y $file)
         # 获取文件无后缀名,使用basename工具以外的方式获得
         base_name=$(basename $file .sy)
-        # 从 time/$base_name 中读取 上一次修改时间  
+        # 从 time/$base_name 中读取 上一次修改时间 
+        time_path="time/${base_name}.time" 
         # 如果文件不存在,则赋值为0,如果文件为空,则赋值为0
-        last_time=$(cat time/$base_name 2>/dev/null  || echo 0)
-        # 如果文件的最后修改时间大于上一次修改时间,则输出
+        last_time=$(cat $time_path 2>/dev/null  || echo 0)
+        # 如果文件的最后修改时间大于上一次测试时间,则输出
         if [ $last_edit -gt $last_time ]; then
             echo $filename
             # 并且把新修改时间写入对应文件
-            echo $last_edit > time/$base_name
+            echo $last_edit > $time_path
         fi
     done
 }
