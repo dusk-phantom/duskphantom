@@ -10,6 +10,25 @@
 
 `compiler a.sy -S -o a.s -O1`
 
+## 验证
+
+```
+# 拉取更新子模块内容,可以看到当前项目路径下data文件夹中出现很多测试用例集文件夹
+git submodule update --init --recursive
+# 使用rv64gc-linux-gnu-gcc-12交叉编译器编译目标用例
+# 如下命令会编译./data/functional中的用例,并结构化的把编译产物放到各个文件夹中
+./scripts/test.sh functional
+# 与自身编译器输出进行对比,需要把编译后的编译器放入目标用例文件夹下面
+cargo build --release && cp ./target/release/compiler ./data/functional/compiler 
+./scripts/test.sh functional
+
+## 更多使用方式
+# ./scripts/test.sh $target_dir $task_script_path
+# $target_dir 用于 指定 测试的 用例集 为 ./data/$target_dir
+# $task_script_path 指定 测试任务执行 时 镜像中 所在测试用例目录下执行的脚本
+# 可以通过配置这两个参数实现各种自定义的编译测试任务
+```
+
 ## TODO
 
 1. 架构
