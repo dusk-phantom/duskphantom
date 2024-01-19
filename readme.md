@@ -13,8 +13,13 @@
 ## 验证
 
 ```
+# 先下载git-lfs
+sudo apt install git-lfs
+git-lfs install
 # 拉取更新子模块内容,可以看到当前项目路径下data文件夹中出现很多测试用例集文件夹
 git submodule update --init --recursive
+# 如果是第一次使用需要先调用./scripts/init.sh
+cd ./scripts && ./init.sh && cd ..
 # 使用rv64gc-linux-gnu-gcc-12交叉编译器编译目标用例
 # 如下命令会编译./data/functional中的用例,并结构化的把编译产物放到各个文件夹中
 ./scripts/test.sh functional
@@ -28,6 +33,8 @@ cargo build --release && cp ./target/release/compiler ./data/functional/compiler
 # $task_script_path 指定 测试任务执行 时 镜像中 所在测试用例目录下执行的脚本
 # 可以通过配置这两个参数实现各种自定义的编译测试任务
 ```
+
+ps: 如果依赖的工具和环境配置好了的话,上面的脚本可以直接复制黏贴到控制台使用
 
 ## TODO
 

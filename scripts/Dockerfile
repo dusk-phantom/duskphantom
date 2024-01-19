@@ -5,7 +5,7 @@
 FROM ubuntu:23.04
 
 # COPY localtime /etc/localtime
-COPY  sources.list /etc/apt/sources.list
+# COPY  sources.list /etc/apt/sources.list
 
 RUN apt-get update -y || true
 
