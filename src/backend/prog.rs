@@ -1,45 +1,28 @@
-use crate::config::CONFIG;
-
 use super::*;
+
+// 一个program是一个程序, 可能由多个 module组成
 pub struct Program {
-    // global var ,including primtype var and arr var
-    pub global: Vec<var::Var>,
-    // all funcs
-    pub funcs: Vec<func::Func>,
-    // optional entry func
+    // optional entry module name, to specify if this program is a library or executable
     pub entry: Option<String>,
+    pub modules: Vec<module::Module>,
 }
 
 impl Program {
-    pub fn has_entry(&self) -> bool {
-        self.entry.is_some()
+    pub fn entry(&self) -> Option<&module::Module> {
+        if let Some(entry) = self.entry.as_ref() {
+            for module in self.modules.iter() {
+                if module.name() == entry.as_str() {
+                    return Some(module);
+                }
+            }
+        }
+        None
     }
     pub fn gen_asm(&self) -> String {
-        let mut funcs: Vec<&func::Func> = self.funcs.iter().collect();
-        funcs.sort_by_cached_key(|f| f.name());
-        let thread_pool = rayon::ThreadPoolBuilder::new()
-            .num_threads(CONFIG.num_parallel_for_func_gen_asm)
-            .build()
-            .unwrap();
-        let funcs = thread_pool.install(|| {
-            funcs
-                .par_iter()
-                .map(|f| f.gen_asm())
-                .collect::<Vec<String>>()
-                .join("\n")
-        });
-        //
-        let thread_pool = rayon::ThreadPoolBuilder::new()
-            .num_threads(CONFIG.num_parallel_for_global_gen_asm)
-            .build()
-            .unwrap();
-        let global = thread_pool.install(|| {
-            self.global
-                .par_iter()
-                .map(|v| v.gen_asm())
-                .collect::<Vec<String>>()
-                .join("\n")
-        });
-        asm::GenTool::gen_prog("test.c", global.as_str(), funcs.as_str())
+        let mut asm = String::with_capacity(1024 * 1024);
+        for module in self.modules.iter() {
+            asm.push_str(module.gen_asm().as_str());
+        }
+        asm
     }
 }
