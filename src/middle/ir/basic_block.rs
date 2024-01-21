@@ -28,12 +28,12 @@ impl BasicBlock {
     }
 
     /// 获取基本块中的第一条指令
-    pub fn get_head_inst(&self) -> InstPtr {
+    pub fn get_first_inst(&self) -> InstPtr {
         todo!()
     }
 
     /// 获取基本块中的最后一条指令
-    pub fn get_tail_inst(&self) -> InstPtr {
+    pub fn get_last_inst(&self) -> InstPtr {
         todo!()
     }
 
