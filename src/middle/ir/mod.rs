@@ -1,15 +1,15 @@
 pub mod basic_block;
-mod context_arena;
 pub mod function;
 pub mod instruction;
+mod mem_pool;
 pub mod module;
+pub mod value_type;
 
-pub use self::basic_block::BasicBlock;
-pub use self::function::Function;
-pub use self::instruction::Instruction;
+pub use self::basic_block::{BBPtr, BasicBlock};
+pub use self::function::{FunPtr, Function};
+pub use self::instruction::{InstPtr, Instruction};
 pub use self::module::Module;
 
-use self::context_arena::ContextArena;
-use crate::middle::tool::ObjPtr;
-use generational_arena::{Arena, Index};
-use std::{collections::HashMap, pin::Pin};
+use crate::utils::mem::{ObjPool, ObjPtr};
+use std::sync::OnceLock;
+use value_type::ValueType;

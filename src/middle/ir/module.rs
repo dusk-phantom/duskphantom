@@ -1,31 +1,29 @@
 use super::*;
 
 /// 中间代码形式，由Moudle组织
-/// 重点关注的是function、global_variables
-/// functions是函数集合，需要保证下标为0时为main函数，其余的位置可以随意安排
-/// global_variables是全局变量集合，使用HashMap是为了便于根据名字查找，且并不要求顺序
-/// Index可以抽象为对应对象的下标，通过相应的函数即可获得
 pub struct Module {
-    context_arena: Pin<Box<ContextArena>>,
+    /// 全局变量集合，存放于基本块中，便于操作
+    pub global_variables: BBPtr,
 
-    global_variables: HashMap<String, Index>,
-    functions: Vec<(String, Index)>,
+    /// functions是函数集合，需要保证下标为0时为main函数，其余的位置可以随意安排
+    pub functions: Vec<FunPtr>,
 }
 
 impl Module {
     /// 构造一个空的Module
     pub fn new() -> Self {
+        // 初始化内存池
+        mem_pool::pool_init();
         Self {
             functions: Vec::new(),
-            global_variables: HashMap::new(),
-            context_arena: Box::pin(ContextArena::new()),
+            global_variables: mem_pool::alloc_basic_block(BasicBlock::new("global".to_string())),
         }
     }
+}
 
-    /// 构造一个新的函数
-    pub fn new_function(&mut self, name: String) -> Index {
-        let id = self.context_arena.new_function(&name);
-        self.functions.push((name, id));
-        id
+impl Drop for Module {
+    fn drop(&mut self) {
+        // 释放内存池
+        mem_pool::pool_clear();
     }
 }

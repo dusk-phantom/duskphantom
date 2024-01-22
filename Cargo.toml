@@ -29,7 +29,7 @@ rayon = "1.8.0"
 serde = { version = "1.0.130", features = ["derive"] }
 serde_yaml = "0.9.30"
 thiserror = "1.0.50"
-generational-arena = "0.2.9"
+typed-arena = "2.0.2"
 
 # 特性管理
 [features]
