@@ -41,7 +41,9 @@ pub fn alloc_function(func: Function) -> FunPtr {
 pub fn alloc_basic_block(bb: BasicBlock) -> BBPtr {
     unsafe {
         let pool = BB_POOL.get_mut().unwrap();
-        pool.alloc(bb)
+        let bb = pool.alloc(bb);
+        BasicBlock::init_bb(bb);
+        bb
     }
 }
 
