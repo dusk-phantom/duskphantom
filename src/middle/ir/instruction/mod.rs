@@ -58,6 +58,11 @@ pub trait Instruction {
         self.get_manager_mut().next = Some(inst);
     }
 
+    /// 获取当前指令计算结果的类型
+    fn get_value_type(&self) -> ValueType {
+        self.get_manager().value_type
+    }
+
     /// 将指令移出当前基本块中，请保证在移出后和将当前指令插入别的
     /// 基本块前，没有任何对当前指令的的操作。
     ///
@@ -83,6 +88,7 @@ pub trait Instruction {
         let manager = self.get_manager_mut();
         manager.prev = None;
         manager.next = None;
+        manager.parent_bb = None;
     }
 
     /// 在当前指令前插入一条指令inst，inst可以在原本就在基本块中。
@@ -93,6 +99,7 @@ pub trait Instruction {
     fn insert_before(&mut self, mut inst: InstPtr) {
         unsafe {
             inst.move_self();
+            inst.set_parent_bb(self.get_parent_bb().unwrap())
         }
 
         let mut prev = self.get_prev().unwrap();
@@ -114,6 +121,7 @@ pub trait Instruction {
     fn insert_after(&mut self, mut inst: InstPtr) {
         unsafe {
             inst.move_self();
+            inst.set_parent_bb(self.get_parent_bb().unwrap());
         }
 
         let mut next = self.get_next().unwrap();
@@ -132,10 +140,7 @@ pub trait Instruction {
     where
         Self: Sized,
     {
-        let mut prev = self.get_prev().unwrap();
-        let mut next = self.get_next().unwrap();
-        prev.set_next(next);
-        next.set_prev(prev);
+        unsafe { self.move_self() };
 
         // 丑陋代码，不知道该怎么优化
         let self_p = ObjPtr::new(self);
@@ -149,6 +154,21 @@ pub trait Instruction {
                 .retain(|user| !is_same(user.as_ref().as_ref(), self_p.as_ref()));
         });
         manager.operand.clear();
+    }
+
+    /// 获得当前指令所在的基本块
+    #[inline]
+    fn get_parent_bb(&self) -> Option<BBPtr> {
+        self.get_manager().parent_bb
+    }
+
+    /// 设置当前指令所在的基本块
+    ///
+    /// # Safety
+    /// 你不应该使用这个函数，这可能会导致未知的错误
+    #[inline]
+    unsafe fn set_parent_bb(&mut self, bb: BBPtr) {
+        self.get_manager_mut().parent_bb = Some(bb);
     }
 }
 
@@ -277,6 +297,13 @@ pub struct InstManager {
 
     /// 当前指令的后继指令，若当前指令不在基本块中，则为None
     next: Option<InstPtr>,
+
+    /// 当前指令所在的基本块
+    parent_bb: Option<BBPtr>,
+
+    /// 当前指令计算结果的类型
+    /// 默认类型为Void
+    value_type: ValueType,
 }
 
 impl InstManager {
@@ -286,6 +313,8 @@ impl InstManager {
             operand: vec![],
             prev: None,
             next: None,
+            parent_bb: None,
+            value_type: ValueType::Void,
         }
     }
 }
