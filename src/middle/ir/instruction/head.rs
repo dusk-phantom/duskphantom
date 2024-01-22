@@ -1,12 +1,15 @@
 use super::*;
+use crate::impl_instruction_common_methods;
 pub struct Head {
-    inst_type: InstType,
+    manager: InstManager,
 }
 
 impl Head {
     pub fn new() -> Self {
         Self {
-            inst_type: InstType::Head,
+            manager: InstManager::new(),
         }
     }
 }
+
+impl_instruction_common_methods!(Head, Head);
