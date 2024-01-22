@@ -52,15 +52,24 @@ pub trait Instruction {
     ///
     /// # Safety
     /// 你不应该使用这个函数，因为def-use需要双方共同维持，单方面修改会发生未知的错误
+    #[inline]
     unsafe fn get_operand_mut(&mut self) -> &mut Vec<InstPtr> {
         &mut self.get_manager_mut().operand
     }
 
     /// 获取当前指令的前驱指令
     /// 若当前指令为第一条指令，则返回None
+    ///
+    /// # Panics
+    /// 请确保当前指令在基本块中，否则会panic
     #[inline]
     fn get_prev(&self) -> Option<InstPtr> {
-        self.get_manager().prev
+        let prev = self.get_manager().prev.unwrap();
+        if let InstType::Head = prev.get_type() {
+            None
+        } else {
+            Some(prev)
+        }
     }
 
     /// 设置当前指令的前驱指令
@@ -74,9 +83,17 @@ pub trait Instruction {
 
     /// 获取当前指令的后继指令
     /// 若当前指令为最后一条指令，则返回None
+    ///
+    /// # Panics
+    /// 请确保当前指令在基本块中，否则会panic
     #[inline]
     fn get_next(&self) -> Option<InstPtr> {
-        self.get_manager().next
+        let next = self.get_manager().next.unwrap();
+        if let InstType::Head = next.get_type() {
+            None
+        } else {
+            Some(next)
+        }
     }
 
     /// 设置当前指令的后继指令
@@ -206,6 +223,24 @@ pub trait Instruction {
     #[inline]
     unsafe fn set_parent_bb(&mut self, bb: BBPtr) {
         self.get_manager_mut().parent_bb = Some(bb);
+    }
+
+    /// 判断是否为最后一条指令
+    ///
+    /// # Panics
+    /// 请先确保当前指令在基本块中，否则会panic
+    #[inline]
+    fn is_last(&self) -> bool {
+        self.get_manager().next.unwrap().get_type() == InstType::Head
+    }
+
+    /// 判断是否为第一条指令
+    ///
+    /// # Panics
+    /// 请先确保当前指令在基本块中，否则会panic
+    #[inline]
+    fn is_first(&self) -> bool {
+        self.get_manager().prev.unwrap().get_type() == InstType::Head
     }
 }
 
