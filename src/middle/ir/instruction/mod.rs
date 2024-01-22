@@ -22,43 +22,74 @@ pub trait Instruction {
     fn get_manager(&self) -> &InstManager;
 
     /// 获取当前指令的管理器的可变引用
-    fn get_manager_mut(&mut self) -> &mut InstManager;
+    ///
+    /// # Safety
+    /// 你不应该使用这个函数，这可能会导致未知的错误
+    unsafe fn get_manager_mut(&mut self) -> &mut InstManager;
 
     /// 获取使用当前指令作为操作数的指令
-    /// 若需要设置当前指令的user，应该使用get_manager_mut，然后直接进行设置
+    #[inline]
     fn get_user(&self) -> &[InstPtr] {
         &self.get_manager().user
     }
 
-    /// 获取当前指令的操作数的可变引用
-    /// 若需要设置当前指令的operand，应该使用get_manager_mut，然后直接进行设置
+    /// 获取使用当前指令作为操作数的指令的可变引用
+    ///
+    /// # Safety
+    /// 你不应该使用这个函数，因为def-use需要双方共同维持，单方面修改会发生未知的错误
+    #[inline]
+    unsafe fn get_user_mut(&mut self) -> &mut Vec<InstPtr> {
+        &mut self.get_manager_mut().user
+    }
+
+    /// 获取当前指令的操作数的引用
+    #[inline]
     fn get_operand(&self) -> &[InstPtr] {
         &self.get_manager().operand
     }
 
+    /// 获取当前指令的操作数的可变引用
+    ///
+    /// # Safety
+    /// 你不应该使用这个函数，因为def-use需要双方共同维持，单方面修改会发生未知的错误
+    unsafe fn get_operand_mut(&mut self) -> &mut Vec<InstPtr> {
+        &mut self.get_manager_mut().operand
+    }
+
     /// 获取当前指令的前驱指令
     /// 若当前指令为第一条指令，则返回None
+    #[inline]
     fn get_prev(&self) -> Option<InstPtr> {
         self.get_manager().prev
     }
 
     /// 设置当前指令的前驱指令
-    fn set_prev(&mut self, inst: InstPtr) {
+    ///
+    /// # Safety
+    /// 你不应该使用这个函数，这可能会导致未知的错误
+    #[inline]
+    unsafe fn set_prev(&mut self, inst: InstPtr) {
         self.get_manager_mut().prev = Some(inst);
     }
 
     /// 获取当前指令的后继指令
     /// 若当前指令为最后一条指令，则返回None
+    #[inline]
     fn get_next(&self) -> Option<InstPtr> {
         self.get_manager().next
     }
 
     /// 设置当前指令的后继指令
-    fn set_next(&mut self, inst: InstPtr) {
+    ///
+    /// # Safety
+    /// 你不应该使用这个函数，这可能会导致未知的错误
+    #[inline]
+    unsafe fn set_next(&mut self, inst: InstPtr) {
         self.get_manager_mut().next = Some(inst);
     }
 
     /// 获取当前指令计算结果的类型
+    #[inline]
     fn get_value_type(&self) -> ValueType {
         self.get_manager().value_type
     }
@@ -107,10 +138,12 @@ pub trait Instruction {
         // 无法通过self获得指向自己的InstPtr，只有通过这种丑陋的方法了
         let mut self_ptr = prev.get_next().unwrap();
 
-        prev.set_next(inst);
-        self_ptr.set_prev(inst);
-        inst.set_prev(prev);
-        inst.set_next(self_ptr);
+        unsafe {
+            prev.set_next(inst);
+            self_ptr.set_prev(inst);
+            inst.set_prev(prev);
+            inst.set_next(self_ptr);
+        }
     }
 
     /// 在当前指令后插入一条指令
@@ -126,12 +159,14 @@ pub trait Instruction {
 
         let mut next = self.get_next().unwrap();
 
-        // 无法通过self获得指向自己的InstPtr，只有通过这种丑陋的方法了
-        let mut self_ptr = next.get_prev().unwrap();
-        next.set_prev(inst);
-        self_ptr.set_next(inst);
-        inst.set_prev(self_ptr);
-        inst.set_next(next);
+        unsafe {
+            // 无法通过self获得指向自己的InstPtr，只有通过这种丑陋的方法了
+            let mut self_ptr = next.get_prev().unwrap();
+            next.set_prev(inst);
+            self_ptr.set_next(inst);
+            inst.set_prev(self_ptr);
+            inst.set_next(next);
+        }
     }
 
     /// 将当前指令从基本块中移出。
@@ -140,20 +175,22 @@ pub trait Instruction {
     where
         Self: Sized,
     {
-        unsafe { self.move_self() };
+        unsafe {
+            self.move_self();
 
-        // 丑陋代码，不知道该怎么优化
-        let self_p = ObjPtr::new(self);
+            // 丑陋代码，不知道该怎么优化
+            let self_p = ObjPtr::new(self);
 
-        let manager = self.get_manager_mut();
-        manager.prev = None;
-        manager.next = None;
-        manager.operand.iter_mut().for_each(|op| {
-            op.get_manager_mut()
-                .user
-                .retain(|user| !is_same(user.as_ref().as_ref(), self_p.as_ref()));
-        });
-        manager.operand.clear();
+            let manager = self.get_manager_mut();
+
+            manager.prev = None;
+            manager.next = None;
+            manager.operand.iter_mut().for_each(|op| {
+                op.get_user_mut()
+                    .retain(|user| !is_same(user.as_ref().as_ref(), self_p.as_ref()));
+            });
+            manager.operand.clear();
+        }
     }
 
     /// 获得当前指令所在的基本块
@@ -195,7 +232,7 @@ macro_rules! impl_instruction_common_methods {
                 &self.manager
             }
             #[inline]
-            fn get_manager_mut(&mut self) -> &mut InstManager {
+            unsafe fn get_manager_mut(&mut self) -> &mut InstManager {
                 &mut self.manager
             }
         }
@@ -284,13 +321,13 @@ pub struct InstManager {
     /// 例如：add a, b
     /// 此时a和b的user中都有add指令
     /// user的顺序不需要考虑
-    pub user: Vec<InstPtr>,
+    user: Vec<InstPtr>,
 
     /// 当前指令的操作数
     /// 例如：add a, b
     /// 此时add指令的operand中有a和b
     /// 要注意operand的顺序
-    pub operand: Vec<InstPtr>,
+    operand: Vec<InstPtr>,
 
     /// 当前指令的前驱指令，若当前指令不在基本块中，则为None
     prev: Option<InstPtr>,
