@@ -29,8 +29,10 @@ pub struct Function {
 impl<'func> Function {
     /// 构造一个空函数
     pub fn new(name: String, return_type: ValueType, mem_pool: ObjPtr<ProgramMemPool>) -> Self {
-        let params = mem_pool.alloc_basic_block(BasicBlock::new("params".to_string()));
-        // let mem_pool = ObjPtr::new(mem_pool.asre);
+        let mut mut_mem_pool: ObjPtr<ProgramMemPool> = mem_pool.clone();
+        let mut_mem_pool: &mut ProgramMemPool = mut_mem_pool.as_mut();
+        let params =
+            mut_mem_pool.alloc_basic_block(BasicBlock::new("params".to_string(), mem_pool));
         Self {
             mem_pool,
             name,

@@ -1,3 +1,5 @@
+use crate::backend::prog::Program;
+
 use self::program_mem_pool::ProgramMemPool;
 
 use super::*;
@@ -14,22 +16,14 @@ pub struct Module {
 impl Module {
     /// 构造一个空的Module
     pub fn new(mem_pool: ObjPtr<ProgramMemPool>) -> Self {
-        let golbal_variables = mem_pool
-            .as_mut()
-            .alloc_basic_block(BasicBlock::new("global".to_string()));
+        let mut mut_mem_pool: ObjPtr<ProgramMemPool> = mem_pool.clone();
+        let mut_mem_pool: &mut ProgramMemPool = mut_mem_pool.as_mut();
+        let global_variables =
+            mut_mem_pool.alloc_basic_block(BasicBlock::new("global".to_string(), mem_pool));
         Self {
             functions: Vec::new(),
             mem_pool,
-            global_variables: mem_pool
-                .as_mut()
-                .alloc_basic_block(BasicBlock::new("global".to_string())),
+            global_variables: global_variables,
         }
-    }
-}
-
-impl Drop for Module {
-    fn drop(&mut self) {
-        // 释放内存池
-        mem_pool::pool_clear();
     }
 }

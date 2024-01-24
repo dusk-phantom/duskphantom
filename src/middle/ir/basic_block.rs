@@ -1,3 +1,5 @@
+use self::program_mem_pool::ProgramMemPool;
+
 use super::*;
 
 pub type BBPtr = ObjPtr<BasicBlock>;
@@ -6,6 +8,8 @@ pub type BBPtr = ObjPtr<BasicBlock>;
 /// 基本块主要结构为基本块名、基本块首指令
 /// 基本块内部的指令格式为链表结构，最后一条指令必为跳转指令或者函数返回指令
 pub struct BasicBlock {
+    ///
+    pub mem_pool: ObjPtr<ProgramMemPool>,
     /// 基本块名
     pub name: String,
 
@@ -29,10 +33,14 @@ pub struct BasicBlock {
 }
 
 impl BasicBlock {
-    pub fn new(name: String) -> Self {
+    pub fn new(name: String, mem_pool: ObjPtr<ProgramMemPool>) -> Self {
+        let mut mut_mem_pool: ObjPtr<ProgramMemPool> = mem_pool.clone();
+        let mut_mem_pool: &mut ProgramMemPool = mut_mem_pool.as_mut();
+        let head_inst = mut_mem_pool.alloc_instruction(Box::new(instruction::head::Head::new()));
         Self {
+            mem_pool,
             name,
-            head_inst: mem_pool::alloc_instruction(Box::new(instruction::head::Head::new())),
+            head_inst: head_inst,
             pred_bbs: Vec::new(),
             succ_bbs: Vec::new(),
         }

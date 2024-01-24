@@ -33,9 +33,8 @@ impl ProgramMemPool {
     }
 }
 
-//
-impl Drop for ProgramMemPool {
-    fn drop(&mut self) {
+impl ProgramMemPool {
+    pub fn clear(&mut self) {
         self.fun_pool.clear();
         self.bb_pool.clear();
         self.inst_pool.clear();
