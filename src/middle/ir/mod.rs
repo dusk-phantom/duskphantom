@@ -1,8 +1,8 @@
 pub mod basic_block;
 pub mod function;
 pub mod instruction;
-mod mem_pool;
 pub mod module;
+pub mod program_mem_pool;
 pub mod value_type;
 
 pub use self::basic_block::{BBPtr, BasicBlock};

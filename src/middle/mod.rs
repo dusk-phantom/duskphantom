@@ -5,8 +5,9 @@ pub mod ir;
 mod transform;
 
 pub struct Program {
-    /// 整个代码的中间表示集中在一个module中
+    /// 整个代码的中间表示集中在一个module中,后面可能扩展到多文件程序时候多个modules
     pub module: ir::Module,
+    pub mem_pool: ir::program_mem_pool::ProgramMemPool,
 }
 
 pub fn gen(program: &mut frontend::Program) -> Result<Program, MiddelError> {
