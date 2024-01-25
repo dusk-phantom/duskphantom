@@ -1,7 +1,8 @@
-pub mod asm;
 pub mod block;
 pub mod func;
+pub mod gen_asm;
 pub mod inst;
+pub mod module;
 pub mod prog;
 pub mod var;
 
@@ -13,9 +14,8 @@ use crate::{errors::BackendError, middle};
 pub fn gen(program: &middle::Program) -> Result<prog::Program, BackendError> {
     // TODO
     Ok(prog::Program {
-        global: Vec::new(),
-        funcs: Vec::new(),
         entry: None,
+        modules: vec![],
     })
 }
 

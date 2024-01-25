@@ -1,6 +1,6 @@
 use crate::config::CONFIG;
 
-use super::{asm::GenTool, block::Block};
+use super::{block::Block, gen_asm::GenTool};
 use rayon::prelude::*;
 
 #[allow(unused)]
@@ -27,6 +27,9 @@ impl Func {
     }
     pub fn name(&self) -> &str {
         self.name.as_str()
+    }
+    pub fn entry(&self) -> Option<&Block> {
+        self.bbs.iter().find(|bb| bb.label() == self.entry)
     }
     pub fn gen_asm(&self) -> String {
         let entry = self.bbs.iter().find(|bb| bb.label() == self.entry).unwrap();
