@@ -1,4 +1,4 @@
-use self::program_mem_pool::ProgramMemPool;
+use self::prog_mem_pool::ProgramMemPool;
 
 use super::*;
 
@@ -34,13 +34,13 @@ pub struct BasicBlock {
 
 impl BasicBlock {
     pub fn new(name: String, mem_pool: ObjPtr<ProgramMemPool>) -> Self {
-        let mut mut_mem_pool: ObjPtr<ProgramMemPool> = mem_pool.clone();
-        let mut_mem_pool: &mut ProgramMemPool = mut_mem_pool.as_mut();
-        let head_inst = mut_mem_pool.alloc_instruction(Box::new(instruction::head::Head::new()));
+        let head_inst = mem_pool
+            .clone()
+            .alloc_instruction(Box::new(instruction::head::Head::new()));
         Self {
             mem_pool,
             name,
-            head_inst: head_inst,
+            head_inst,
             pred_bbs: Vec::new(),
             succ_bbs: Vec::new(),
         }
