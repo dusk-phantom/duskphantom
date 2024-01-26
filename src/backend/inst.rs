@@ -209,6 +209,9 @@ pub enum Inst {
     Add(AddInst),
     Mul(MulInst),
     Div(DivInst),
+    SLL(SllInst), //逻辑左移
+    SRL(SrlInst), //逻辑右移
+    Neg(NegInst),
     // 数据移动指令
     Mv(MvInst),
     Ld(LdInst),
@@ -227,11 +230,18 @@ pub struct AddInst(Operand, Operand, Operand);
 pub struct MulInst(Operand, Operand, Operand);
 #[derive(Clone)]
 pub struct DivInst(Operand, Operand, Operand);
+
+#[derive(Clone)]
+pub struct SllInst(Operand, Operand, Operand);
+#[derive(Clone)]
+pub struct SrlInst(Operand, Operand, Operand);
+#[derive(Clone)]
+pub struct NegInst(Operand, Operand);
+
 #[derive(Clone)]
 pub struct MvInst(Operand, Operand);
 #[derive(Clone)]
 pub struct LdInst(Operand, Operand, Operand);
-
 #[derive(Clone)]
 // to_store , offset , base
 pub struct SdInst(Operand, Operand, Operand);
@@ -282,8 +292,22 @@ impl MulInst {
     }
     pub fn optimize(&self) -> Vec<Inst> {
         //TODO, 判断是否有优化必要
-
-        vec![Inst::Mul(self.to_owned())]
+        // 把惩罚指令判断是否能够优化成移位指令
+        // 如果乘法指令中的一个是常数,且该常数能够拆分成2的幂次方,则可以优化成移位指令
+        let mut ret: Vec<Inst> = vec![];
+        if self.2.imm().is_none() {
+            ret.push(Inst::Mul(self.clone()));
+            return ret;
+        }
+        let imm = self.2.imm().unwrap().0;
+        if imm == 0 {
+            ret.push(Inst::Mv(MvInst(self.0.clone(), self.1.clone())));
+            return ret;
+        } else if imm < 0 {
+            ret.push(Inst::Mul(self.clone()));
+            return ret;
+        }
+        ret
     }
 }
 impl DivInst {
@@ -296,6 +320,29 @@ impl DivInst {
     pub fn optimize(&self) -> Vec<Inst> {
         //TODO, 判断是否有优化必要
         vec![Inst::Div(self.to_owned())]
+    }
+}
+impl SllInst {
+    pub fn gen_asm(&self) -> String {
+        let dst = self.0.gen_asm();
+        let lhs = self.1.gen_asm();
+        let rhs = self.2.gen_asm();
+        format!("sll {},{},{}", dst, lhs, rhs)
+    }
+}
+impl SrlInst {
+    pub fn gen_asm(&self) -> String {
+        let dst = self.0.gen_asm();
+        let lhs = self.1.gen_asm();
+        let rhs = self.2.gen_asm();
+        format!("srl {},{},{}", dst, lhs, rhs)
+    }
+}
+impl NegInst {
+    pub fn gen_asm(&self) -> String {
+        let dst = self.0.gen_asm();
+        let src = self.1.gen_asm();
+        format!("neg {},{}", dst, src)
     }
 }
 impl MvInst {
@@ -352,6 +399,9 @@ impl Inst {
             Inst::Add(inst) => inst.gen_asm(),
             Inst::Mul(inst) => inst.gen_asm(),
             Inst::Div(inst) => inst.gen_asm(),
+            Inst::SLL(inst) => inst.gen_asm(),
+            Inst::SRL(inst) => inst.gen_asm(),
+            Inst::Neg(inst) => inst.gen_asm(),
             Inst::Mv(inst) => inst.gen_asm(),
             Inst::Ld(inst) => inst.gen_asm(),
             Inst::Sd(inst) => inst.gen_asm(),

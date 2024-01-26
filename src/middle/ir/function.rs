@@ -1,9 +1,14 @@
+use self::prog_mem_pool::ProgramMemPool;
+
 use super::*;
 
 pub type FunPtr = ObjPtr<Function>;
 
 /// 函数
 pub struct Function {
+    /// mem_pool
+    pub mem_pool: ObjPtr<ProgramMemPool>,
+
     /// 函数名
     pub name: String,
 
@@ -23,13 +28,17 @@ pub struct Function {
 
 impl<'func> Function {
     /// 构造一个空函数
-    pub fn new(name: String, return_type: ValueType) -> Self {
+    pub fn new(name: String, return_type: ValueType, mem_pool: ObjPtr<ProgramMemPool>) -> Self {
+        let params = mem_pool
+            .clone()
+            .alloc_basic_block(BasicBlock::new("params".to_string(), mem_pool));
         Self {
+            mem_pool,
             name,
             entry: None,
             exit: None,
             return_type,
-            params: mem_pool::alloc_basic_block(BasicBlock::new("params".to_string())),
+            params: params,
         }
     }
 
