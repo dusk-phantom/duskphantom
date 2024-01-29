@@ -1,5 +1,4 @@
 use super::*;
-
 pub mod head;
 
 pub type InstPtr = ObjPtr<Box<dyn Instruction>>;

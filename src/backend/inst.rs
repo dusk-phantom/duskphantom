@@ -1,7 +1,6 @@
-use lazy_static::lazy_static;
+use crate::utils::paral_counter::{self, ParalCounter};
+use once_cell::sync::Lazy;
 use std::sync::{Arc, Mutex};
-
-use super::*;
 
 #[derive(Clone)]
 pub enum Operand {
@@ -10,8 +9,22 @@ pub enum Operand {
     Fmm(Fmm),
     Label(Label),
 }
-#[derive(Clone)]
-pub struct Reg(u64);
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct Reg {
+    id: u32,
+    is_usual: bool,
+}
+impl Reg {
+    const fn new(id: u32, is_usual: bool) -> Self {
+        Self { id, is_usual }
+    }
+    pub fn id(&self) -> u32 {
+        self.id
+    }
+    pub fn is_usual(&self) -> bool {
+        self.is_usual
+    }
+}
 #[derive(Clone)]
 pub struct Imm(i64);
 #[derive(Clone)]
@@ -19,136 +32,183 @@ pub struct Fmm(f64);
 #[derive(Clone)]
 pub struct Label(String);
 
-// 通用寄存器
-const REG_ZERO: Reg = Reg(0);
-const REG_RA: Reg = Reg(1);
-const REG_SP: Reg = Reg(2);
-const REG_GP: Reg = Reg(3);
-const REG_TP: Reg = Reg(4);
-const REG_T0: Reg = Reg(5);
-const REG_T1: Reg = Reg(6);
-const REG_T2: Reg = Reg(7);
-const REG_S0: Reg = Reg(8); //栈帧寄存器
-const REG_S1: Reg = Reg(9); //保留寄存器
-const REG_A0: Reg = Reg(10); //返回值寄存器 以及 函数参数寄存器
-const REG_A1: Reg = Reg(11);
-const REG_A2: Reg = Reg(12);
-const REG_A3: Reg = Reg(13);
-const REG_A4: Reg = Reg(14);
-const REG_A5: Reg = Reg(15);
-const REG_A6: Reg = Reg(16);
-const REG_A7: Reg = Reg(17);
-const REG_S2: Reg = Reg(18);
-const REG_S3: Reg = Reg(19);
-const REG_S4: Reg = Reg(20);
-const REG_S5: Reg = Reg(21);
-const REG_S6: Reg = Reg(22);
-const REG_S7: Reg = Reg(23);
-const REG_S8: Reg = Reg(24);
-const REG_S9: Reg = Reg(25);
-const REG_S10: Reg = Reg(26);
-const REG_S11: Reg = Reg(27);
-const REG_T3: Reg = Reg(28);
-const REG_T4: Reg = Reg(29);
-const REG_T5: Reg = Reg(30);
-const REG_T6: Reg = Reg(31);
+// 基于 Reg::new(id, is_usual) 的寄存器定义重写如上代码
+const REG_ZERO: Reg = Reg::new(0, true);
+const REG_RA: Reg = Reg::new(1, true);
+const REG_SP: Reg = Reg::new(2, true);
+const REG_GP: Reg = Reg::new(3, true);
+const REG_TP: Reg = Reg::new(4, true);
+const REG_T0: Reg = Reg::new(5, true);
+const REG_T1: Reg = Reg::new(6, true);
+const REG_T2: Reg = Reg::new(7, true);
+const REG_S0: Reg = Reg::new(8, true); //栈帧寄存器
+const REG_S1: Reg = Reg::new(9, true); //保留寄存器
+const REG_A0: Reg = Reg::new(10, true); //返回值寄存器 以及 函数参数寄存器
+const REG_A1: Reg = Reg::new(11, true);
+const REG_A2: Reg = Reg::new(12, true);
+const REG_A3: Reg = Reg::new(13, true);
+const REG_A4: Reg = Reg::new(14, true);
+const REG_A5: Reg = Reg::new(15, true);
+const REG_A6: Reg = Reg::new(16, true);
+const REG_A7: Reg = Reg::new(17, true);
+const REG_S2: Reg = Reg::new(18, true);
+const REG_S3: Reg = Reg::new(19, true);
+const REG_S4: Reg = Reg::new(20, true);
+const REG_S5: Reg = Reg::new(21, true);
+const REG_S6: Reg = Reg::new(22, true);
+const REG_S7: Reg = Reg::new(23, true);
+const REG_S8: Reg = Reg::new(24, true);
+const REG_S9: Reg = Reg::new(25, true);
+const REG_S10: Reg = Reg::new(26, true);
+const REG_S11: Reg = Reg::new(27, true);
+const REG_T3: Reg = Reg::new(28, true);
+const REG_T4: Reg = Reg::new(29, true);
+const REG_T5: Reg = Reg::new(30, true);
+const REG_T6: Reg = Reg::new(31, true);
 
 // 浮点寄存器
-const REG_FT0: Reg = Reg(32);
-const REG_FT1: Reg = Reg(33);
-const REG_FT2: Reg = Reg(34);
-const REG_FT3: Reg = Reg(35);
-const REG_FT4: Reg = Reg(36);
-const REG_FT5: Reg = Reg(37);
-const REG_FT6: Reg = Reg(38);
-const REG_FT7: Reg = Reg(39);
-const REG_FS0: Reg = Reg(40);
-const REG_FS1: Reg = Reg(41);
-const REG_FA0: Reg = Reg(42);
-const REG_FA1: Reg = Reg(43);
-const REG_FA2: Reg = Reg(44);
-const REG_FA3: Reg = Reg(45);
-const REG_FA4: Reg = Reg(46);
-const REG_FA5: Reg = Reg(47);
-const REG_FA6: Reg = Reg(48);
-const REG_FA7: Reg = Reg(49);
-const REG_FS2: Reg = Reg(50);
-const REG_FS3: Reg = Reg(51);
-const REG_FS4: Reg = Reg(52);
-const REG_FS5: Reg = Reg(53);
-const REG_FS6: Reg = Reg(54);
-const REG_FS7: Reg = Reg(55);
-const REG_FS8: Reg = Reg(56);
-const REG_FS9: Reg = Reg(57);
-const REG_FS10: Reg = Reg(58);
-const REG_FS11: Reg = Reg(59);
-const REG_FT8: Reg = Reg(60);
-const REG_FT9: Reg = Reg(61);
-const REG_FT10: Reg = Reg(62);
-const REG_FT11: Reg = Reg(63);
+// const REG_FT0: Reg = Reg::new(32, false);
+const REG_FT0: Reg = Reg::new(0, false);
+const REG_FT1: Reg = Reg::new(1, false);
+const REG_FT2: Reg = Reg::new(2, false);
+const REG_FT3: Reg = Reg::new(3, false);
+const REG_FT4: Reg = Reg::new(4, false);
+const REG_FT5: Reg = Reg::new(5, false);
+const REG_FT6: Reg = Reg::new(6, false);
+const REG_FT7: Reg = Reg::new(7, false);
+const REG_FS0: Reg = Reg::new(8, false);
+const REG_FS1: Reg = Reg::new(9, false);
+const REG_FA0: Reg = Reg::new(10, false);
+const REG_FA1: Reg = Reg::new(11, false);
+const REG_FA2: Reg = Reg::new(12, false);
+const REG_FA3: Reg = Reg::new(13, false);
+const REG_FA4: Reg = Reg::new(14, false);
+const REG_FA5: Reg = Reg::new(15, false);
+const REG_FA6: Reg = Reg::new(16, false);
+const REG_FA7: Reg = Reg::new(17, false);
+const REG_FS2: Reg = Reg::new(18, false);
+const REG_FS3: Reg = Reg::new(19, false);
+const REG_FS4: Reg = Reg::new(20, false);
+const REG_FS5: Reg = Reg::new(21, false);
+const REG_FS6: Reg = Reg::new(22, false);
+const REG_FS7: Reg = Reg::new(23, false);
+const REG_FS8: Reg = Reg::new(24, false);
+const REG_FS9: Reg = Reg::new(25, false);
+const REG_FS10: Reg = Reg::new(26, false);
+const REG_FS11: Reg = Reg::new(27, false);
+const REG_FT8: Reg = Reg::new(28, false);
+const REG_FT9: Reg = Reg::new(29, false);
+const REG_FT10: Reg = Reg::new(30, false);
+const REG_FT11: Reg = Reg::new(31, false);
 
-const VIRTUAL_USUAL_BASE: u64 = 64;
-const VIRTUAL_FLOAT_BASE: u64 = 65;
-// 虚拟寄存器计数器
-lazy_static! {
-    static ref VIRTUAL_USUAL_REG_COUNTER: Arc<Mutex<u64>> =
-        Arc::new(Mutex::new(VIRTUAL_USUAL_BASE));
-    static ref VIRTUAL_FLOAT_REG_COUNTER: Arc<Mutex<u64>> =
-        Arc::new(Mutex::new(VIRTUAL_FLOAT_BASE));
-}
-
+static USUAL_REG_COUNTER: Lazy<ParalCounter> = Lazy::new(|| ParalCounter::new(32, 100_000_000));
+static FLOAT_REG_COUNTER: Lazy<ParalCounter> = Lazy::new(|| ParalCounter::new(32, 100_000_000));
 impl Reg {
     #[inline]
-    pub fn to_str(&self) -> &'static str {
-        match self.0 {
-            1 => "ra",
-            2 => "sp",
-            3 => "fp",
-            4 => "gp",
-            _ => panic!("unknown register"),
+    pub fn gen_asm(&self) -> String {
+        if self.is_phisic() {
+            match self.is_usual {
+                true => match self.id {
+                    0 => String::from("zero"),
+                    1 => String::from("ra"),
+                    2 => String::from("sp"),
+                    3 => String::from("gp"),
+                    4 => String::from("tp"),
+                    5 => String::from("t0"),
+                    6 => String::from("t1"),
+                    7 => String::from("t2"),
+                    8 => String::from("s0"),
+                    9 => String::from("s1"),
+                    10 => String::from("a0"),
+                    11 => String::from("a1"),
+                    12 => String::from("a2"),
+                    13 => String::from("a3"),
+                    14 => String::from("a4"),
+                    15 => String::from("a5"),
+                    16 => String::from("a6"),
+                    17 => String::from("a7"),
+                    18 => String::from("s2"),
+                    19 => String::from("s3"),
+                    20 => String::from("s4"),
+                    21 => String::from("s5"),
+                    22 => String::from("s6"),
+                    23 => String::from("s7"),
+                    24 => String::from("s8"),
+                    25 => String::from("s9"),
+                    26 => String::from("s10"),
+                    27 => String::from("s11"),
+                    28 => String::from("t3"),
+                    29 => String::from("t4"),
+                    30 => String::from("t5"),
+                    31 => String::from("t6"),
+                    _ => panic!("Invalid register id"),
+                },
+                false => match self.id {
+                    0 => String::from("ft0"),
+                    1 => String::from("ft1"),
+                    2 => String::from("ft2"),
+                    3 => String::from("ft3"),
+                    4 => String::from("ft4"),
+                    5 => String::from("ft5"),
+                    6 => String::from("ft6"),
+                    7 => String::from("ft7"),
+                    8 => String::from("fs0"),
+                    9 => String::from("fs1"),
+                    10 => String::from("fa0"),
+                    11 => String::from("fa1"),
+                    12 => String::from("fa2"),
+                    13 => String::from("fa3"),
+                    14 => String::from("fa4"),
+                    15 => String::from("fa5"),
+                    16 => String::from("fa6"),
+                    17 => String::from("fa7"),
+                    18 => String::from("fs2"),
+                    19 => String::from("fs3"),
+                    20 => String::from("fs4"),
+                    21 => String::from("fs5"),
+                    22 => String::from("fs6"),
+                    23 => String::from("fs7"),
+                    24 => String::from("fs8"),
+                    25 => String::from("fs9"),
+                    26 => String::from("fs10"),
+                    27 => String::from("fs11"),
+                    28 => String::from("ft8"),
+                    29 => String::from("ft9"),
+                    30 => String::from("ft10"),
+                    31 => String::from("ft11"),
+                    _ => panic!("Invalid register id"),
+                },
+            }
+        } else {
+            panic!("gen_asm for virtual reg is not implemented");
         }
     }
+
     #[inline]
-    pub fn gen_asm(&self) -> String {
-        self.to_str().to_string()
+    pub fn to_str(&self) -> String {
+        match self.is_usual {
+            true => format!("x{}", self.id),
+            false => format!("f{}", self.id),
+        }
     }
+
     #[inline]
     pub fn is_phisic(&self) -> bool {
-        match self.0 {
-            0..=63 => true,
-            _ => false,
-        }
+        (0..=31).contains(&self.id)
     }
     #[inline]
     pub fn is_virtual(&self) -> bool {
         !self.is_phisic()
     }
-    // 判断是否是通用寄存器
-    #[inline]
-    pub fn is_usual(&self) -> bool {
-        // 如果是物理寄存器,则0-31是通用寄存器
-        if self.is_phisic() {
-            match self.0 {
-                0..=31 => true,
-                _ => false,
-            }
-        } else {
-            // 如果是虚拟寄存器,则末位是1的是通用寄存器！！！
-            self.0 & 1 == VIRTUAL_USUAL_BASE & 1
-        }
-    }
-
+    // 生成一个虚拟通用寄存器
     pub fn gen_virtual_usual_reg() -> Self {
-        let mut counter = VIRTUAL_USUAL_REG_COUNTER.lock().unwrap();
-        let reg = Reg(*counter);
-        *counter += 2;
-        reg
+        let id = USUAL_REG_COUNTER.get_id().unwrap();
+        Self::new(id as u32, true)
     }
+    // 生成一个虚拟浮点寄存器
     pub fn gen_virtual_float_reg() -> Self {
-        let mut counter = VIRTUAL_FLOAT_REG_COUNTER.lock().unwrap();
-        let reg = Reg(*counter);
-        *counter += 2;
-        reg
+        let id = FLOAT_REG_COUNTER.get_id().unwrap();
+        Self::new(id as u32, false)
     }
 }
 impl Imm {
@@ -300,6 +360,7 @@ impl MulInst {
             return ret;
         }
         let imm = self.2.imm().unwrap().0;
+
         if imm == 0 {
             ret.push(Inst::Mv(MvInst(self.0.clone(), self.1.clone())));
             return ret;
@@ -414,8 +475,151 @@ impl Inst {
     }
 }
 
-// unit test
+/// 单元测试
 #[cfg(test)]
 pub mod tests {
+    use std::collections::HashSet;
+
     use super::*;
+
+    #[test]
+    fn test_gen_reg() {
+        let mut regs = HashSet::new();
+        let mut handlers = vec![];
+        for _ in 0..10 {
+            let handler = std::thread::spawn(move || {
+                let mut regs = HashSet::new();
+                for _ in 0..1000 {
+                    let reg = Reg::gen_virtual_usual_reg();
+                    regs.insert(reg.clone());
+                    let reg = Reg::gen_virtual_float_reg();
+                    regs.insert(reg.clone());
+                }
+                regs
+            });
+            handlers.push(handler);
+        }
+        for handler in handlers {
+            let par_regs = handler.join().unwrap();
+            regs.extend(par_regs.iter().cloned())
+        }
+        assert_eq!(regs.len(), 20000);
+        for reg in regs.iter() {
+            assert!(reg.is_virtual());
+        }
+        for i in 0..10000 {
+            let reg = Reg::new(i + 32, true);
+            assert!(regs.contains(&reg));
+            let reg = Reg::new(i + 32, false);
+            assert!(regs.contains(&reg));
+        }
+    }
+
+    #[test]
+    fn test_special_reg() {
+        let reg = Reg::new(0, true);
+        assert_eq!(reg.gen_asm(), "zero");
+        let reg = Reg::new(1, true);
+        assert_eq!(reg.gen_asm(), "ra");
+        let reg = Reg::new(2, true);
+        assert_eq!(reg.gen_asm(), "sp");
+        let reg = Reg::new(3, true);
+        assert_eq!(reg.gen_asm(), "gp");
+        let reg = Reg::new(4, true);
+        assert_eq!(reg.gen_asm(), "tp");
+    }
+    #[test]
+    fn test_usual_float() {
+        for i in 0..=31 {
+            let reg = Reg::new(i, true);
+            assert_eq!(reg.to_str(), format!("x{}", i));
+            assert!(reg.is_usual());
+            let reg = Reg::new(i, false);
+            assert_eq!(reg.to_str(), format!("f{}", i));
+            assert!(!reg.is_usual());
+        }
+    }
+    #[test]
+    fn test_phisic_virtual() {
+        for i in 0..=31 {
+            let reg = Reg::new(i, true);
+            assert!(reg.is_phisic());
+            assert!(!reg.is_virtual());
+            let reg = Reg::new(i, false);
+            assert!(reg.is_phisic());
+            assert!(!reg.is_virtual());
+        }
+        for i in 32..=127 {
+            let reg = Reg::new(i, false);
+            assert!(!reg.is_phisic());
+            assert!(reg.is_virtual());
+        }
+    }
+    #[test]
+    pub fn test_const_phisic_reg() {
+        assert_eq!(REG_ZERO.gen_asm(), "zero");
+        assert_eq!(REG_RA.gen_asm(), "ra");
+        assert_eq!(REG_SP.gen_asm(), "sp");
+        assert_eq!(REG_GP.gen_asm(), "gp");
+        assert_eq!(REG_TP.gen_asm(), "tp");
+        assert_eq!(REG_T0.gen_asm(), "t0");
+        assert_eq!(REG_T1.gen_asm(), "t1");
+        assert_eq!(REG_T2.gen_asm(), "t2");
+        assert_eq!(REG_S0.gen_asm(), "s0");
+        assert_eq!(REG_S1.gen_asm(), "s1");
+        assert_eq!(REG_A0.gen_asm(), "a0");
+        assert_eq!(REG_A1.gen_asm(), "a1");
+        assert_eq!(REG_A2.gen_asm(), "a2");
+        assert_eq!(REG_A3.gen_asm(), "a3");
+        assert_eq!(REG_A4.gen_asm(), "a4");
+        assert_eq!(REG_A5.gen_asm(), "a5");
+        assert_eq!(REG_A6.gen_asm(), "a6");
+        assert_eq!(REG_A7.gen_asm(), "a7");
+        assert_eq!(REG_S2.gen_asm(), "s2");
+        assert_eq!(REG_S3.gen_asm(), "s3");
+        assert_eq!(REG_S4.gen_asm(), "s4");
+        assert_eq!(REG_S5.gen_asm(), "s5");
+        assert_eq!(REG_S6.gen_asm(), "s6");
+        assert_eq!(REG_S7.gen_asm(), "s7");
+        assert_eq!(REG_S8.gen_asm(), "s8");
+        assert_eq!(REG_S9.gen_asm(), "s9");
+        assert_eq!(REG_S10.gen_asm(), "s10");
+        assert_eq!(REG_S11.gen_asm(), "s11");
+        assert_eq!(REG_T3.gen_asm(), "t3");
+        assert_eq!(REG_T4.gen_asm(), "t4");
+        assert_eq!(REG_T5.gen_asm(), "t5");
+        assert_eq!(REG_T6.gen_asm(), "t6");
+        assert_eq!(REG_FT0.gen_asm(), "ft0");
+        assert_eq!(REG_FT1.gen_asm(), "ft1");
+        assert_eq!(REG_FT2.gen_asm(), "ft2");
+        assert_eq!(REG_FT3.gen_asm(), "ft3");
+        assert_eq!(REG_FT4.gen_asm(), "ft4");
+        assert_eq!(REG_FT5.gen_asm(), "ft5");
+        assert_eq!(REG_FT6.gen_asm(), "ft6");
+        assert_eq!(REG_FT7.gen_asm(), "ft7");
+        assert_eq!(REG_FS0.gen_asm(), "fs0");
+        assert_eq!(REG_FS1.gen_asm(), "fs1");
+        assert_eq!(REG_FA0.gen_asm(), "fa0");
+        assert_eq!(REG_FA1.gen_asm(), "fa1");
+        assert_eq!(REG_FA2.gen_asm(), "fa2");
+        assert_eq!(REG_FA3.gen_asm(), "fa3");
+        assert_eq!(REG_FA4.gen_asm(), "fa4");
+        assert_eq!(REG_FA5.gen_asm(), "fa5");
+        assert_eq!(REG_FA6.gen_asm(), "fa6");
+        assert_eq!(REG_FA7.gen_asm(), "fa7");
+        assert_eq!(REG_FS2.gen_asm(), "fs2");
+        assert_eq!(REG_FS3.gen_asm(), "fs3");
+        assert_eq!(REG_FS4.gen_asm(), "fs4");
+        assert_eq!(REG_FS5.gen_asm(), "fs5");
+        assert_eq!(REG_FS6.gen_asm(), "fs6");
+        assert_eq!(REG_FS7.gen_asm(), "fs7");
+        assert_eq!(REG_FS8.gen_asm(), "fs8");
+        assert_eq!(REG_FS9.gen_asm(), "fs9");
+        assert_eq!(REG_FS10.gen_asm(), "fs10");
+        assert_eq!(REG_FS11.gen_asm(), "fs11");
+        assert_eq!(REG_FT8.gen_asm(), "ft8");
+        assert_eq!(REG_FT9.gen_asm(), "ft9");
+        assert_eq!(REG_FT10.gen_asm(), "ft10");
+        assert_eq!(REG_FT11.gen_asm(), "ft11");
+    }
 }
