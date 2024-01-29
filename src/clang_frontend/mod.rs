@@ -1,19 +1,22 @@
-// 指定该模块的所有内容条件编译
-#[cfg(feature = "clang_frontend")]
-use clang::*;
+use std::process::Command;
+use tempfile::NamedTempFile;
 
-pub struct Program {
-    tu: TranslationUnit<'_>,
-    llvm: LLVM,
-}
+pub struct Program {}
 
 impl Program {
     pub fn parse(file: &str) -> Self {
-        let clang = Clang::new().unwrap();
-        let index = Index::new(&clang, false, false);
-        let tu = index.parser("f.c").parse().unwrap();
-        TranslationUnit::set_emit_option(&tu, Emit::LLVM);
-        let llvm = tu.emit().unwrap();
-        Self { tu, llvm }
+        //创建临时文件
+        let tmp_file = NamedTempFile::new().expect("msg: create tmp file failed");
+
+        let cmd = Command::new("clang")
+            .arg("-S")
+            .arg("-emit-llvm")
+            .arg(file)
+            .arg("-o")
+            //指定输出到临时文件中
+            .output()
+            .expect("msg: clang failed");
+
+        Self {}
     }
 }

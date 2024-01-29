@@ -2,7 +2,7 @@
 name = "hitc"
 version = "0.1.0"
 edition = "2021"
-default-run = "compiler"
+default-run = "compiler-clang"
 
 [lib]
 name = "compiler"
@@ -31,8 +31,9 @@ serde_yaml = "0.9.30"
 thiserror = "1.0.50"
 typed-arena = "2.0.2"
 once_cell = "1.7.2"
-
+llvm-ir = { version = "0.10.0", features = ["llvm-14"] }
+tempfile = "3.9.0"
 # 特性管理
 [features]
-# default = ["clang_frontend"]
+default = ["clang_frontend"]
 clang_frontend = []

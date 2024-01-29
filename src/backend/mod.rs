@@ -8,10 +8,19 @@ pub mod var;
 
 use rayon::prelude::*;
 
-use crate::{errors::BackendError, middle};
+use crate::{clang_frontend, errors::BackendError, middle};
 
 #[allow(unused)]
 pub fn gen(program: &middle::Program) -> Result<prog::Program, BackendError> {
+    // TODO
+    Ok(prog::Program {
+        entry: None,
+        modules: vec![],
+    })
+}
+
+#[allow(unused)]
+pub fn gen_from_clang(program: &clang_frontend::Program) -> Result<prog::Program, BackendError> {
     // TODO
     Ok(prog::Program {
         entry: None,

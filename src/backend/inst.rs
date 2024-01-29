@@ -1,6 +1,5 @@
 use crate::utils::paral_counter::{self, ParalCounter};
 use once_cell::sync::Lazy;
-use std::sync::{Arc, Mutex};
 
 #[derive(Clone)]
 pub enum Operand {

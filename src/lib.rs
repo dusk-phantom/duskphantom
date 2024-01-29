@@ -56,7 +56,29 @@ pub fn compile(
     } else {
         asm
     };
-    std::fs::write(output_path, output).map_err(|err| CompilerError::IOError(err))
+    std::fs::write(output_path, output).map_err(CompilerError::IOError)
+}
+
+#[cfg(feature = "clang_frontend")]
+/// compile from clang
+pub fn compile_clang(
+    src_file: &str,
+    output_file: &str,
+    opt_flag: bool,
+    asm_flag: bool,
+) -> Result<(), CompilerError> {
+    let program = clang_frontend::Program::parse(src_file);
+    let mut program = backend::gen_from_clang(&program)?;
+    if opt_flag {
+        backend::optimize(&mut program);
+    }
+    let asm = program.gen_asm();
+    let output = if !asm_flag {
+        output_file.replace(".s", ".bin")
+    } else {
+        asm
+    };
+    std::fs::write(output_file, output).map_err(CompilerError::IOError)
 }
 
 pub fn asm2bin(asm: String) -> String {
