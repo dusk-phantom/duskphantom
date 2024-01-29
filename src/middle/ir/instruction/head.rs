@@ -1,5 +1,4 @@
 use super::*;
-use crate::impl_instruction_common_methods;
 pub struct Head {
     manager: InstManager,
 }
@@ -12,4 +11,9 @@ impl Head {
     }
 }
 
-impl_instruction_common_methods!(Head, Head);
+impl Instruction for Head {
+    gen_common_code!(Head, Head);
+    fn gen_llvm_ir(&self) -> String {
+        String::new()
+    }
+}

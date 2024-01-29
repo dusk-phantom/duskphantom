@@ -139,4 +139,9 @@ impl BasicBlock {
         }
         bb.pred_bbs.push(self_ptr);
     }
+
+    /// 提供类似`vec`中的`iter()`方法的功能
+    pub fn iter(&self) -> Option<InstPtr> {
+        self.head_inst.get_next()
+    }
 }
