@@ -1,9 +1,9 @@
 extern crate compiler;
 
+#[cfg(feature = "clang_frontend")]
+use compiler::compile_clang;
+use compiler::{compile, config, errors::handle_error, get_args};
 use std::borrow::Borrow;
-
-use compiler::{compile, compile_clang, config, errors::handle_error, get_args};
-
 fn main() {
     #[cfg(feature = "clang_frontend")]
     {

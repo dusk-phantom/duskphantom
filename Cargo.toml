@@ -2,7 +2,7 @@
 name = "hitc"
 version = "0.1.0"
 edition = "2021"
-default-run = "compiler-clang"
+default-run = "compiler"
 
 [lib]
 name = "compiler"

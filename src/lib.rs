@@ -52,7 +52,7 @@ pub fn compile(
     }
     let asm = program.gen_asm();
     let output = if !asm_flag {
-        output_path.replace(".s", ".bin")
+        backend::asm2bin(asm)
     } else {
         asm
     };
@@ -67,14 +67,18 @@ pub fn compile_clang(
     opt_flag: bool,
     asm_flag: bool,
 ) -> Result<(), CompilerError> {
-    let program = clang_frontend::Program::parse(src_file);
+    let mut program = clang_frontend::Program::parse(src_file);
+    println!("{}", program);
+    if opt_flag {
+        clang_frontend::optimize(&mut program);
+    }
     let mut program = backend::gen_from_clang(&program)?;
     if opt_flag {
         backend::optimize(&mut program);
     }
     let asm = program.gen_asm();
     let output = if !asm_flag {
-        output_file.replace(".s", ".bin")
+        backend::asm2bin(asm)
     } else {
         asm
     };
