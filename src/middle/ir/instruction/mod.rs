@@ -278,8 +278,10 @@ macro_rules! impl_instruction_common_methods {
 ///
 /// # Example
 /// ```
-/// let inst = InstPtr::new(Head::new());
-/// let add_inst = downcast_ref::<Head>(&inst);
+/// # use compiler::middle::ir::InstPtr;
+/// # use compiler::middle::ir::instruction::{head::Head,Instruction,downcast_ref};
+/// let dyn_head: Box<dyn Instruction> = Box::new(Head::new());
+/// let head = downcast_ref::<Head>(dyn_head.as_ref());
 /// ```
 ///
 /// # Panics
@@ -304,8 +306,10 @@ where
 ///
 /// # Example
 /// ```
-/// let inst = InstPtr::new(Head::new());
-/// let add_inst = downcast_mut::<Head>(&mut inst);
+/// # use compiler::middle::ir::InstPtr;
+/// # use compiler::middle::ir::instruction::{head::Head,Instruction,downcast_mut};
+/// let mut dyn_head: Box<dyn Instruction> = Box::new(Head::new());
+/// let add_inst = downcast_mut::<Head>(dyn_head.as_mut());
 /// ```
 ///
 /// # Panics
