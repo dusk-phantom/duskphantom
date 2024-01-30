@@ -111,6 +111,12 @@ impl BasicBlock {
         &self.pred_bbs
     }
 
+    /// 获取后继基本块
+    #[inline]
+    pub fn get_succ_bbs(&self) -> &Vec<BBPtr> {
+        &self.succ_bbs
+    }
+
     /// 设置条件为真时跳转的基本块
     pub fn set_true_bb(&mut self, mut bb: BBPtr) {
         let self_ptr = ObjPtr::new(self);
@@ -140,8 +146,25 @@ impl BasicBlock {
         bb.pred_bbs.push(self_ptr);
     }
 
-    /// 提供类似`vec`中的`iter()`方法的功能
-    pub fn iter(&self) -> Option<InstPtr> {
-        self.head_inst.get_next()
+    pub fn iter(&self) -> BasicBlockIterator {
+        BasicBlockIterator {
+            cur: self.head_inst,
+            next: self.head_inst.get_next(),
+        }
+    }
+}
+
+/// 基本块的迭代器，用于遍历基本块中的指令
+pub struct BasicBlockIterator {
+    cur: InstPtr,
+    next: Option<InstPtr>,
+}
+
+impl Iterator for BasicBlockIterator {
+    type Item = InstPtr;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.cur = self.next?;
+        self.next = self.cur.get_next();
+        Some(self.cur)
     }
 }

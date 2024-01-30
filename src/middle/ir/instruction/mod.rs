@@ -338,13 +338,6 @@ pub fn is_same(left: &dyn Instruction, right: &dyn Instruction) -> bool {
     left as *const dyn Instruction == right as *const dyn Instruction
 }
 
-impl Iterator for Box<dyn Instruction> {
-    type Item = InstPtr;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.get_next()
-    }
-}
-
 /// 指令类型
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum InstType {
