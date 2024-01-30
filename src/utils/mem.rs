@@ -1,4 +1,5 @@
 use std::{
+    hash::{Hash, Hasher},
     ops::{Deref, DerefMut},
     ptr::NonNull,
 };
@@ -48,6 +49,12 @@ impl<T> PartialEq for ObjPtr<T> {
 }
 
 impl<T> Eq for ObjPtr<T> {}
+
+impl<T> Hash for ObjPtr<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::ptr::hash(self.as_ref(), state)
+    }
+}
 
 pub struct ObjPool<T>
 where
