@@ -3,6 +3,7 @@ pub mod head;
 
 pub type InstPtr = ObjPtr<Box<dyn Instruction>>;
 
+use crate::gen_common_code;
 use std::any::Any;
 /// 指令中有很多共有的方法，在此将其抽象为一个 trait
 pub trait Instruction {
@@ -241,34 +242,35 @@ pub trait Instruction {
     fn is_first(&self) -> bool {
         self.get_manager().prev.unwrap().get_type() == InstType::Head
     }
+
+    /// 将其生成相关的llvm ir
+    fn gen_llvm_ir(&self) -> String;
 }
 
 /// 用于实现Instruction中的通用方法，简化代码
 /// 需要保证指令内部存在InstManager，且命名为manager
 #[macro_export]
-macro_rules! impl_instruction_common_methods {
+macro_rules! gen_common_code {
     ($type:ty,$id:ident) => {
-        impl Instruction for $type {
-            #[inline]
-            unsafe fn as_any(&self) -> &dyn Any {
-                self
-            }
-            #[inline]
-            unsafe fn as_any_mut(&mut self) -> &mut dyn Any {
-                self
-            }
-            #[inline]
-            fn get_type(&self) -> InstType {
-                InstType::$id
-            }
-            #[inline]
-            fn get_manager(&self) -> &InstManager {
-                &self.manager
-            }
-            #[inline]
-            unsafe fn get_manager_mut(&mut self) -> &mut InstManager {
-                &mut self.manager
-            }
+        #[inline]
+        unsafe fn as_any(&self) -> &dyn Any {
+            self
+        }
+        #[inline]
+        unsafe fn as_any_mut(&mut self) -> &mut dyn Any {
+            self
+        }
+        #[inline]
+        fn get_type(&self) -> InstType {
+            InstType::$id
+        }
+        #[inline]
+        fn get_manager(&self) -> &InstManager {
+            &self.manager
+        }
+        #[inline]
+        unsafe fn get_manager_mut(&mut self) -> &mut InstManager {
+            &mut self.manager
         }
     };
 }

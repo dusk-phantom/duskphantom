@@ -8,8 +8,8 @@ use ir::prog_mem_pool::ProgramMemPool;
 mod analysis;
 pub mod ir;
 mod transform;
-use std::pin::Pin;
 
+use std::pin::Pin;
 pub struct Program {
     /// 整个代码的中间表示集中在一个module中,后面可能扩展到多文件程序时候多个modules
     pub module: ir::Module,
