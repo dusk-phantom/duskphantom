@@ -13,7 +13,7 @@ use rayon::prelude::*;
 
 use crate::{errors::BackendError, middle};
 
-#[cfg(feature = "clang_frontend")]
+#[cfg(feature = "clang_embeded")]
 use crate::clang_frontend;
 
 #[allow(unused)]
@@ -25,7 +25,7 @@ pub fn gen(program: &middle::Program) -> Result<prog::Program, BackendError> {
     })
 }
 
-#[cfg(feature = "clang_frontend")]
+#[cfg(feature = "clang_embeded")]
 #[allow(unused)]
 pub fn gen_from_clang(program: &clang_frontend::Program) -> Result<prog::Program, BackendError> {
     let mut global_vas = Vec::new();
@@ -74,7 +74,3 @@ pub fn optimize(program: &mut prog::Program) {
     // 寄存器分配与合并
 }
 
-#[allow(unused)]
-pub fn asm2bin(asm: String) -> String {
-    panic!("not implemented")
-}
