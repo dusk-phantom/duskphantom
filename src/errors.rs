@@ -53,7 +53,19 @@ pub enum BackendError {
 /// 全局 错误处理函数
 pub fn handle_error(err: &CompilerError) {
     match err {
-        _ => {}
+        CompilerError::IOError(err) => {
+            eprintln!("msg: io error");
+            eprintln!("err: {}", err);
+        }
+        CompilerError::FrontendError(err) => match err {
+            FrontendError::ParseError => {
+                eprintln!("msg: parse error");
+            }
+            FrontendError::OptimizeError => {
+                eprintln!("msg: optimize error");
+            }
+        },
+        _ => (),
     }
     eprintln!("msg: compile failed");
     eprintln!("err: {}", err);
