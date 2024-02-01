@@ -56,6 +56,18 @@ impl<T> Hash for ObjPtr<T> {
     }
 }
 
+impl<T> From<&T> for ObjPtr<T> {
+    fn from(ptr: &T) -> Self {
+        Self::new(ptr)
+    }
+}
+
+impl<T> From<&mut T> for ObjPtr<T> {
+    fn from(ptr: &mut T) -> Self {
+        Self::new(ptr)
+    }
+}
+
 pub struct ObjPool<T>
 where
     T: Sized,
