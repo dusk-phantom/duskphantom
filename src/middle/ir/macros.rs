@@ -30,3 +30,92 @@ macro_rules! define_graph_iterator {
         }
     };
 }
+
+/// Use this macro to generate some code for instruction to simplify the codesize.
+/// Make sure to use this macro in the impl Instruction block
+/// and the Instruction struct must have a field named manager
+/// which is an instance of InstManager.
+#[macro_export]
+macro_rules! gen_common_code {
+    ($type:ty,$id:ident) => {
+        #[inline]
+        unsafe fn as_any(&self) -> &dyn Any {
+            self
+        }
+        #[inline]
+        unsafe fn as_any_mut(&mut self) -> &mut dyn Any {
+            self
+        }
+        #[inline]
+        fn get_type(&self) -> InstType {
+            InstType::$id
+        }
+        #[inline]
+        fn get_manager(&self) -> &InstManager {
+            &self.manager
+        }
+        #[inline]
+        unsafe fn get_manager_mut(&mut self) -> &mut InstManager {
+            &mut self.manager
+        }
+    };
+}
+
+/// impl InstType enum automatically.
+#[macro_export]
+macro_rules! define_inst_type_enum {
+    ($( $variant:ident ),*) => {
+        #[derive(Clone, Copy, Eq, PartialEq)]
+        pub enum InstType {
+            $( $variant ),*
+        }
+
+        impl InstType {
+            #[inline]
+            fn get_name(&self) -> String {
+                match self {
+                    $( InstType::$variant => stringify!($variant).to_lowercase(), )*
+                }
+            }
+        }
+
+        impl std::fmt::Display for InstType {
+            #[inline]
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{}", self.get_name())
+            }
+        }
+
+        impl std::fmt::Debug for InstType {
+            #[inline]
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{}", self.get_name())
+            }
+        }
+    };
+}
+
+/// impl BinaryInst trait automatically.
+#[macro_export]
+macro_rules! impl_BinaryInst {
+    ($type:ty) => {
+        impl BinaryInst for $type {
+            #[inline]
+            fn get_lhs(&self) -> InstPtr {
+                self.manager.operand[0]
+            }
+            #[inline]
+            fn set_lhs(&mut self, lhs: InstPtr) {
+                self.manager.operand[0] = lhs;
+            }
+            #[inline]
+            fn get_rhs(&self) -> InstPtr {
+                self.manager.operand[1]
+            }
+            #[inline]
+            fn set_rhs(&mut self, rhs: InstPtr) {
+                self.manager.operand[1] = rhs;
+            }
+        }
+    };
+}

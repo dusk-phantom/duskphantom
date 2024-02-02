@@ -1,9 +1,5 @@
-use crate::{
-    errors::MiddelError,
-    frontend,
-    utils::mem::{ObjPool, ObjPtr},
-};
-use ir::prog_mem_pool::ProgramMemPool;
+use crate::{errors::MiddelError, frontend, utils::mem::ObjPtr};
+use ir::ir_builder::IRBuilder;
 
 mod analysis;
 pub mod ir;
@@ -11,9 +7,8 @@ mod transform;
 
 use std::pin::Pin;
 pub struct Program {
-    /// 整个代码的中间表示集中在一个module中,后面可能扩展到多文件程序时候多个modules
     pub module: ir::Module,
-    pub mem_pool: Pin<Box<ProgramMemPool>>,
+    pub mem_pool: Pin<Box<IRBuilder>>,
 }
 
 pub fn gen(program: &mut frontend::Program) -> Result<Program, MiddelError> {
@@ -26,8 +21,8 @@ pub fn optimize(program: &mut Program) {
 
 impl Program {
     pub fn new() -> Self {
-        let program_mem_pool = Box::pin(ProgramMemPool::new());
-        let mem_pool: ObjPtr<ProgramMemPool> = ObjPtr::new(&program_mem_pool);
+        let program_mem_pool = Box::pin(IRBuilder::new());
+        let mem_pool: ObjPtr<IRBuilder> = ObjPtr::new(&program_mem_pool);
         Self {
             mem_pool: program_mem_pool,
             module: ir::Module::new(mem_pool),
@@ -35,9 +30,8 @@ impl Program {
     }
 }
 
-// 为program实现drop方法
 impl Drop for Program {
     fn drop(&mut self) {
-        self.mem_pool.as_mut().clear();
+        self.mem_pool.clear();
     }
 }
