@@ -1,9 +1,23 @@
-/// 表示值类型
-/// 如果是函数，则表示该函数的返回值类型。
-/// 如果是指令，若为非指针指令，则为该指令代表的值，若为指针或者数组，则表示该指令指向的值的类型。
+/// Represent the type of a value.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum ValueType {
     Void,
     Int,
     Float,
+}
+
+impl std::fmt::Display for ValueType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ValueType::Void => write!(f, "void"),
+            ValueType::Int => write!(f, "i32"),
+            ValueType::Float => write!(f, "float"),
+        }
+    }
+}
+
+impl std::fmt::Debug for ValueType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
+    }
 }

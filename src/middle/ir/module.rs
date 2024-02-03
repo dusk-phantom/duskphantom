@@ -1,24 +1,20 @@
-use crate::backend::prog::Program;
-
-use self::prog_mem_pool::ProgramMemPool;
-
 use super::*;
 
-/// 中间代码形式，由Moudle组织
+/// one module is one file
 pub struct Module {
-    /// 全局变量集合，存放于基本块中，便于操作
+    /// global variables in this module
     pub global_variables: BBPtr,
-    pub mem_pool: ObjPtr<ProgramMemPool>,
-    /// functions是函数集合，需要保证下标为0时为main函数，其余的位置可以随意安排
+
+    /// functions in this module.
+    /// Make sure that the first function is `main` function.
     pub functions: Vec<FunPtr>,
+
+    pub mem_pool: ObjPtr<IRBuilder>,
 }
 
 impl Module {
-    /// 构造一个空的Module
-    pub fn new(mem_pool: ObjPtr<ProgramMemPool>) -> Self {
-        let global_variables = mem_pool
-            .clone()
-            .alloc_basic_block(BasicBlock::new("global".to_string(), mem_pool));
+    pub fn new(mut mem_pool: ObjPtr<IRBuilder>) -> Self {
+        let global_variables = mem_pool.new_basicblock("global".to_string());
         Self {
             functions: Vec::new(),
             mem_pool,

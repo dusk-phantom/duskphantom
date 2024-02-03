@@ -1,67 +1,111 @@
 use super::*;
+pub mod binary_inst;
 pub mod head;
 
 pub type InstPtr = ObjPtr<Box<dyn Instruction>>;
 
-use crate::gen_common_code;
+use crate::{define_inst_type_enum, gen_common_code};
 use std::any::Any;
-/// 指令中有很多共有的方法，在此将其抽象为一个 trait
+
+define_inst_type_enum!(
+    // You will never get this type
+    Head,
+    // Binary Operations
+    Add,
+    FAdd,
+    Sub,
+    FSub,
+    Mul,
+    FMul,
+    UDiv,
+    SDiv,
+    FDiv,
+    URem,
+    SRem,
+    FRem,
+    // Bitwise Binary Operations
+    Shl,
+    LShr,
+    AShr,
+    And,
+    Or,
+    Xor,
+    // Unary Operations
+    FNeg,
+    // Terminator Instructions
+    Ret,
+    Br,
+    // Memory Access and Addressing Operations
+    Alloca,
+    Load,
+    Store,
+    GetElementPtr,
+    // Conversion Operations
+    ZextTo,
+    SextTo,
+    // Other Operations
+    ICmp,
+    FCmp,
+    Phi,
+    Call
+);
+
 pub trait Instruction {
     /// # Safety
-    /// 不要调用此方法，统一使用downcast_ref
+    /// Don't call this method, use downcast_ref instead.
     unsafe fn as_any(&self) -> &dyn Any;
 
     /// # Safety
-    /// 不要调用此方法，统一使用downcast_mut
+    /// Don't call this method, use downcast_mut instead.
     unsafe fn as_any_mut(&mut self) -> &mut dyn Any;
 
-    /// 获取当前指令的类型
+    /// Returns the type of current instruction.
     fn get_type(&self) -> InstType;
 
-    /// 获取当前指令的管理器的不可变引用
+    /// Returns the manager of current instruction.
     fn get_manager(&self) -> &InstManager;
 
-    /// 获取当前指令的管理器的可变引用
+    /// Returns the manager of current instruction.
     ///
     /// # Safety
-    /// 你不应该使用这个函数，这可能会导致未知的错误
+    /// You should not use this function, because it may cause unknown errors.
     unsafe fn get_manager_mut(&mut self) -> &mut InstManager;
 
-    /// 获取使用当前指令作为操作数的指令
+    /// Returns the instructions that use current instruction as operand.
     #[inline]
     fn get_user(&self) -> &[InstPtr] {
         &self.get_manager().user
     }
 
-    /// 获取使用当前指令作为操作数的指令的可变引用
+    /// Returns the instructions that use current instruction as operand.
     ///
     /// # Safety
-    /// 你不应该使用这个函数，因为def-use需要双方共同维持，单方面修改会发生未知的错误
+    /// You should not use this function, because it may cause unknown errors.
     #[inline]
     unsafe fn get_user_mut(&mut self) -> &mut Vec<InstPtr> {
         &mut self.get_manager_mut().user
     }
 
-    /// 获取当前指令的操作数的引用
+    /// Returns the operands of current instruction.
     #[inline]
     fn get_operand(&self) -> &[InstPtr] {
         &self.get_manager().operand
     }
 
-    /// 获取当前指令的操作数的可变引用
+    /// Returns the operands of current instruction.
     ///
     /// # Safety
-    /// 你不应该使用这个函数，因为def-use需要双方共同维持，单方面修改会发生未知的错误
+    /// You should not use this function, because it may cause unknown errors.
     #[inline]
     unsafe fn get_operand_mut(&mut self) -> &mut Vec<InstPtr> {
         &mut self.get_manager_mut().operand
     }
 
-    /// 获取当前指令的前驱指令
-    /// 若当前指令为第一条指令，则返回None
+    /// Gets the previous instruction of current instruction.
+    /// If current instruction is the first instruction of the `BasicBlock`, it will return None.
     ///
     /// # Panics
-    /// 请确保当前指令在基本块中，否则会panic
+    /// Please make sure the current instruction is in the `BasicBlock`, otherwise it will panic.
     #[inline]
     fn get_prev(&self) -> Option<InstPtr> {
         let prev = self.get_manager().prev.unwrap();
@@ -72,20 +116,20 @@ pub trait Instruction {
         }
     }
 
-    /// 设置当前指令的前驱指令
+    /// Sets the previous instruction of current instruction.
     ///
     /// # Safety
-    /// 你不应该使用这个函数，这可能会导致未知的错误
+    /// You should not use this function, because it may cause unknown errors.
     #[inline]
     unsafe fn set_prev(&mut self, inst: InstPtr) {
         self.get_manager_mut().prev = Some(inst);
     }
 
-    /// 获取当前指令的后继指令
-    /// 若当前指令为最后一条指令，则返回None
+    /// Gets the next instruction of current instruction.
+    /// If current instruction is the last instruction of the `BasicBlock`, it will return None.
     ///
     /// # Panics
-    /// 请确保当前指令在基本块中，否则会panic
+    /// Please make sure the current instruction is in the `BasicBlock`, otherwise it will panic.
     #[inline]
     fn get_next(&self) -> Option<InstPtr> {
         let next = self.get_manager().next.unwrap();
@@ -96,32 +140,34 @@ pub trait Instruction {
         }
     }
 
-    /// 设置当前指令的后继指令
+    /// Sets the next instruction of current instruction.
     ///
     /// # Safety
-    /// 你不应该使用这个函数，这可能会导致未知的错误
+    /// You should not use this function, because it may cause unknown errors.
     #[inline]
     unsafe fn set_next(&mut self, inst: InstPtr) {
         self.get_manager_mut().next = Some(inst);
     }
 
-    /// 获取当前指令计算结果的类型
+    /// Returns the value type of current instruction.
     #[inline]
     fn get_value_type(&self) -> ValueType {
         self.get_manager().value_type
     }
 
-    /// 将指令移出当前基本块中，请保证在移出后和将当前指令插入别的
-    /// 基本块前，没有任何对当前指令的的操作。
+    /// Moves the current instruction out of the `BasicBlock`.
+    /// Please ensure that after moving out and inserting the current instruction into another `BasicBlock`,
+    /// the current instruction will not be used again.
     ///
     /// # Safety
-    /// 不建议使用此指令，请使用别的方法。例如：insert_before、insert_after以及remove_self
+    /// This operation is not safe, use other methods instead.
+    /// For example: insert_before, insert_after and remove_self.
     ///
     /// # Panics
-    /// 只检查了在有前驱的情况下没有后继的错误，此时会panic。
-    /// 但是对于只有后继没有前驱的情况，没有报错
+    /// Only checked the error of having a predecessor but no successor, in which case it will panic.
+    /// But for the case of having a successor but no predecessor, it does not report an error.
     unsafe fn move_self(&mut self) {
-        if let Some(mut prev) = self.get_prev() {
+        if let Some(mut prev) = self.get_manager().prev {
             let mut next = self.get_next().unwrap_or_else(|| {
                 panic!(
                     "move_self failed! inst {} has a prev ({}) but no next",
@@ -139,21 +185,23 @@ pub trait Instruction {
         manager.parent_bb = None;
     }
 
-    /// 在当前指令前插入一条指令inst，inst可以在原本就在基本块中。
-    /// 该操作会先将其从原本的基本块中移出，然后再插入到当前的基本块的指定位置中。
+    /// Inserts a new instruction before the current instruction.
+    /// The operation will first remove the new instruction from the original `BasicBlock`
+    /// and then insert it into the specified position of the current `BasicBlock`.
     ///
     /// # Panics
-    /// 需要保证当前指令一定在基本块中，否则会panic
+    /// You need to ensure that the current instruction is definitely in the `BasicBlock`,
+    /// otherwise it will panic.
     fn insert_before(&mut self, mut inst: InstPtr) {
         unsafe {
             inst.move_self();
             inst.set_parent_bb(self.get_parent_bb().unwrap())
         }
 
-        let mut prev = self.get_prev().unwrap();
+        let mut prev = self.get_manager().prev.unwrap();
 
         // 无法通过self获得指向自己的InstPtr，只有通过这种丑陋的方法了
-        let mut self_ptr = prev.get_next().unwrap();
+        let mut self_ptr = prev.get_manager().next.unwrap();
 
         unsafe {
             prev.set_next(inst);
@@ -163,11 +211,13 @@ pub trait Instruction {
         }
     }
 
-    /// 在当前指令后插入一条指令
-    /// 该操作会先将其从原本的基本块中移出，然后再插入到当前的基本块的指定位置中。
+    /// Inserts a new instruction after the current instruction.
+    /// The operation will first remove the new instruction from the original `BasicBlock`
+    /// and then insert it into the specified position of the current `BasicBlock`.
     ///
     /// # Panics
-    /// 需要保证当前指令一定在基本块中，否则会panic
+    /// You need to ensure that the current instruction is definitely in the `BasicBlock`,
+    /// otherwise it will panic.
     fn insert_after(&mut self, mut inst: InstPtr) {
         unsafe {
             inst.move_self();
@@ -177,7 +227,6 @@ pub trait Instruction {
         let mut next = self.get_next().unwrap();
 
         unsafe {
-            // 无法通过self获得指向自己的InstPtr，只有通过这种丑陋的方法了
             let mut self_ptr = next.get_prev().unwrap();
             next.set_prev(inst);
             self_ptr.set_next(inst);
@@ -186,8 +235,8 @@ pub trait Instruction {
         }
     }
 
-    /// 将当前指令从基本块中移出。
-    /// 该操作会将当前指令移出基本块中，并清除当前的操作数。
+    /// Remove current instruction from the `BasicBlock`.
+    /// This operation will remove the current instruction from the `BasicBlock` and clear the current operand.
     fn remove_self(&mut self)
     where
         Self: Sized,
@@ -195,7 +244,6 @@ pub trait Instruction {
         unsafe {
             self.move_self();
 
-            // 丑陋代码，不知道该怎么优化
             let self_p = ObjPtr::new(self);
 
             let manager = self.get_manager_mut();
@@ -210,73 +258,49 @@ pub trait Instruction {
         }
     }
 
-    /// 获得当前指令所在的基本块
+    /// Returns the `BasicBlock` that current instruction belongs to.
     #[inline]
     fn get_parent_bb(&self) -> Option<BBPtr> {
         self.get_manager().parent_bb
     }
 
-    /// 设置当前指令所在的基本块
+    /// Set the parent `BasicBlock` of current instruction.
     ///
     /// # Safety
-    /// 你不应该使用这个函数，这可能会导致未知的错误
+    /// You should not use this function, because it may cause unknown errors.
     #[inline]
     unsafe fn set_parent_bb(&mut self, bb: BBPtr) {
         self.get_manager_mut().parent_bb = Some(bb);
     }
 
-    /// 判断是否为最后一条指令
+    /// Returns `True` if the current instruction is the last instruction in the `BasicBlock`.
     ///
     /// # Panics
-    /// 请先确保当前指令在基本块中，否则会panic
+    /// Please make sure the current instruction is in the `BasicBlock`, otherwise it will panic.
     #[inline]
     fn is_last(&self) -> bool {
         self.get_manager().next.unwrap().get_type() == InstType::Head
     }
 
-    /// 判断是否为第一条指令
+    /// Returns `True` if the current instruction is the first instruction in the `BasicBlock`.
     ///
     /// # Panics
-    /// 请先确保当前指令在基本块中，否则会panic
+    /// Please make sure the current instruction is in the `BasicBlock`, otherwise it will panic.
     #[inline]
     fn is_first(&self) -> bool {
         self.get_manager().prev.unwrap().get_type() == InstType::Head
+    }
+
+    /// Returns the unique id of current instruction.
+    fn get_id(&self) -> usize {
+        self.get_manager().id
     }
 
     /// 将其生成相关的llvm ir
     fn gen_llvm_ir(&self) -> String;
 }
 
-/// 用于实现Instruction中的通用方法，简化代码
-/// 需要保证指令内部存在InstManager，且命名为manager
-#[macro_export]
-macro_rules! gen_common_code {
-    ($type:ty,$id:ident) => {
-        #[inline]
-        unsafe fn as_any(&self) -> &dyn Any {
-            self
-        }
-        #[inline]
-        unsafe fn as_any_mut(&mut self) -> &mut dyn Any {
-            self
-        }
-        #[inline]
-        fn get_type(&self) -> InstType {
-            InstType::$id
-        }
-        #[inline]
-        fn get_manager(&self) -> &InstManager {
-            &self.manager
-        }
-        #[inline]
-        unsafe fn get_manager_mut(&mut self) -> &mut InstManager {
-            &mut self.manager
-        }
-    };
-}
-
-/// 当需要使用具体类型的指令方法时，使用此方法来获取具体指令类型的引用
-/// 使用前请先确保当前指令为指定类型
+/// Downcasts a `dyn instruction` to a `&T`, where `T` is a concrete `Instruction` type.
 ///
 /// # Example
 /// ```
@@ -287,7 +311,7 @@ macro_rules! gen_common_code {
 /// ```
 ///
 /// # Panics
-/// 若当前指令不为指定类型时，会panic!("downcast_ref failed")
+/// If the downcast fails, this function will panic.
 pub fn downcast_ref<T>(inst: &dyn Instruction) -> &T
 where
     T: 'static + Instruction,
@@ -303,8 +327,7 @@ where
     }
 }
 
-/// 当需要使用具体类型的指令方法时，使用此方法来获取具体指令类型的可变引用
-/// 使用前请先确保当前指令为指定类型
+/// Downcasts a `dyn instruction` to a `&mut T`, where `T` is a concrete `Instruction` type.
 ///
 /// # Example
 /// ```
@@ -315,7 +338,7 @@ where
 /// ```
 ///
 /// # Panics
-/// 若当前指令不为指定类型时，会panic!("downcast_mut failed")
+/// If the downcast fails, this function will panic.
 pub fn downcast_mut<T>(inst: &mut dyn Instruction) -> &mut T
 where
     T: 'static + Instruction,
@@ -332,60 +355,49 @@ where
     }
 }
 
-/// 判断两个&dyn Instruction是否为同一个指令的引用
+/// Returns `true` if the two instructions are the same.
 #[inline]
 pub fn is_same(left: &dyn Instruction, right: &dyn Instruction) -> bool {
     left as *const dyn Instruction == right as *const dyn Instruction
 }
 
-/// 指令类型
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum InstType {
-    /// 无实际意义，平时操作不会拿到这个指令
-    Head,
-}
-
-use std::fmt::{Display, Formatter};
-impl Display for InstType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            InstType::Head => write!(f, "InstType::Head"),
-        }
-    }
-}
-
-/// 管理指令的统一功能
-/// 包括def-use关系、指令的前后关系等
+/// Instruction Manager
+/// This struct is used to manage the instructions.
+/// Including def-use relationship, the relationship between instructions, etc.
 pub struct InstManager {
-    /// 使用当前指令作为操作数的指令，与operand互为逆关系
-    /// 例如：add a, b
-    /// 此时a和b的user中都有add指令
-    /// user的顺序不需要考虑
+    /// The unique id of current instruction.
+    id: usize,
+    /// The instructions that use current instruction as operand.
+    /// For example: `add a, b`
+    /// `a` and `b` are the operand of `add` instruction.
+    /// At this time, the `user` of `a` and `b` both have `add` instruction.
+    /// The order of `user` does not need to be considered.
     user: Vec<InstPtr>,
 
-    /// 当前指令的操作数
-    /// 例如：add a, b
-    /// 此时add指令的operand中有a和b
-    /// 要注意operand的顺序
+    /// The operand of current instruction.
+    /// For example: `add a, b`
+    /// At this time, the `add` instruction's operand has `a` and `b`.
+    /// The order of `operand` needs to be considered.
     operand: Vec<InstPtr>,
 
-    /// 当前指令的前驱指令，若当前指令不在基本块中，则为None
+    /// Prev instruction of current instruction, if current instruction is not in a `BasicBlock`, it is None.
     prev: Option<InstPtr>,
 
-    /// 当前指令的后继指令，若当前指令不在基本块中，则为None
+    /// Next instruction of current instruction, if current instruction is not in a `BasicBlock`, it is None.
     next: Option<InstPtr>,
 
-    /// 当前指令所在的基本块
+    /// The `BasicBlock` that current instruction belongs to.
     parent_bb: Option<BBPtr>,
 
-    /// 当前指令计算结果的类型
-    /// 默认类型为Void
+    /// Value type of current instruction.
+    /// Default type is Void.
     value_type: ValueType,
 }
 
 impl InstManager {
-    pub fn new() -> Self {
+    pub fn new(id: usize) -> Self {
         Self {
+            id,
             user: vec![],
             operand: vec![],
             prev: None,
