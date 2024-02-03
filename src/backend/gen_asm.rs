@@ -73,7 +73,7 @@ impl GenTool {
         ret.push_str(
             r#".attribute arch, "rv64i2p1_m2p0_a2p1_f2p2_d2p2_c2p0_zicsr2p0_zifencei2p0""#,
         );
-        ret.push_str("\n");
+        ret.push('\n');
         ret.push_str(".attribute unaligned_access, 0\n");
         ret.push_str(".attribute stack_align, 16");
         ret
@@ -279,7 +279,7 @@ hello:
     }
     #[test]
     fn test_gen_double() {
-        let s = super::GenTool::gen_double("hello", 1.234567890123456789);
+        let s = super::GenTool::gen_double("hello", 1.234_567_890_123_456_7);
         println!("{}", s);
         let raw_match = ".data
 .align\t3

@@ -3,13 +3,13 @@ use std::process::Command;
 
 // 从clang frontend 生成riscv 汇编
 pub struct Program {
-    pub asm:String
+    pub asm: String,
 }
 
+#[allow(unused)]
 pub fn optimize(program: &mut Program) {
     // TODO
 }
-
 
 pub fn gen_from_clang(program: &clang_frontend::Program) -> Result<Program, CompilerError> {
     let tmp_llvm_file = program.tmp_llvm_file.path();
@@ -31,5 +31,4 @@ impl Program {
     pub fn gen_asm(&mut self) -> String {
         self.asm.clone()
     }
-    
 }

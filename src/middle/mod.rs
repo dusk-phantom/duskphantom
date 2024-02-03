@@ -11,7 +11,7 @@ pub struct Program {
     pub mem_pool: Pin<Box<IRBuilder>>,
 }
 
-pub fn gen(program: &mut frontend::Program) -> Result<Program, MiddelError> {
+pub fn gen(program: &frontend::Program) -> Result<Program, MiddelError> {
     todo!()
 }
 

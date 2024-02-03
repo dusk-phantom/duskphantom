@@ -6,9 +6,6 @@ pub mod module;
 pub mod prog;
 pub mod var;
 
-use std::any::{Any, TypeId};
-
-use llvm_ir::types::Typed;
 use rayon::prelude::*;
 
 use crate::{errors::BackendError, middle};
@@ -73,4 +70,3 @@ pub fn optimize(program: &mut prog::Program) {
     // 指令调度
     // 寄存器分配与合并
 }
-
