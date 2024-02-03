@@ -1,5 +1,3 @@
-use super::*;
-
 #[derive(Clone)]
 pub enum Var {
     Prim(PrimVar),
