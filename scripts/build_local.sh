@@ -55,6 +55,7 @@ check_folder out
 check_folder logs
 check_folder time
 check_folder lib
+check_folder llvm
 
 # TODO,检查lib中的函数库是否存在
 
@@ -105,7 +106,8 @@ for base_name in $edited_base_names; do
     input_file="sy/$base_name.sy"
     output_file="my_asm/$base_name.s"
     log_file="my_logs/$base_name.log"
+    llvm_file="llvm/$base_name.ll"
 
     # 使用自定义编译器编译输入文件，并将错误输出到日志文件
-    $compiler -S $input_file -o $output_file 1>$log_file 2>&1
+    $compiler -S $input_file -o $output_file -l $llvm_file 1>$log_file 2>&1
 done

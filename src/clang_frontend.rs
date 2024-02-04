@@ -46,6 +46,9 @@ impl Program {
             llvm,
         }
     }
+    pub fn gen_ll(&self) -> String {
+        fs::read_to_string(self.tmp_llvm_file.path()).expect("msg: read llvm file failed")
+    }
 }
 
 impl Display for Program {
