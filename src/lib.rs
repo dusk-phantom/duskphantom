@@ -87,7 +87,6 @@ pub fn compile_clang_llc(
     asm_flag: bool,
 ) -> Result<(), CompilerError> {
     let mut program = clang_frontend::Program::parse(src_file);
-    println!("{}", program);
     if opt_flag {
         clang_frontend::optimize(&mut program);
     }

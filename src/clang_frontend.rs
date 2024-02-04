@@ -18,10 +18,13 @@ impl Program {
         let tmp_llvm_file = builder.suffix(".ll").tempfile().unwrap();
         fs::copy(file, tmp_cfile.path()).expect("msg: copy file failed");
         let mut cmd = Command::new("clang");
+        // clang -S -emit-llvm -Xclang -disable-O0-optnone -target riscv64 1.c -o 1.ll
         cmd.arg("-S")
             .arg("-emit-llvm")
             .arg("-Xclang")
             .arg("-disable-O0-optnone")
+            .arg("-target")
+            .arg("riscv64")
             // 制定使用非.c后缀的文件名
             .arg(tmp_cfile.path())
             .arg("-o")
@@ -65,18 +68,12 @@ impl Display for Program {
 pub fn optimize(program: &mut Program) {
     // 使用clang 命令优化.ll 代码
     let llvm_path = program.tmp_llvm_file.path();
-    let mut cmd = Command::new("clang");
-    cmd.arg("-S")
-        .arg("-O2")
-        .arg("-emit-llvm")
-        .arg(llvm_path)
-        .arg("-o")
-        .arg(llvm_path);
+    let mut cmd = Command::new("opt");
+    cmd.arg("-O3").arg(llvm_path).arg("-o").arg(llvm_path);
     let output = cmd.output().expect("msg: exec clang failed");
     if !output.status.success() {
         panic!("msg: exec clang failed");
     }
-    // 使用llvm_ir crate从.ll内容文件中读取llvm ir
     let llvm = Module::from_ir_path(llvm_path).expect("msg: parse llvm ir failed");
     program.llvm = llvm;
 }
