@@ -21,6 +21,8 @@ impl Program {
         // clang -S -emit-llvm -Xclang -disable-O0-optnone -target riscv64 1.c -o 1.ll
         cmd.arg("-S")
             .arg("-emit-llvm")
+            .arg("-Wno-implicit-function-declaration")
+            .arg("-Werror")
             .arg("-Xclang")
             .arg("-disable-O0-optnone")
             .arg("-target")
