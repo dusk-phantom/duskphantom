@@ -3,19 +3,33 @@
 # 用来指导本地构建过程
 
 dir=$1
-# 如果判断第一个参数为--all,则把$2赋值给dir
-if [ $1 == "--all" ]; then
-    dir=$2
-    dir="data/$dir"
-    # 更新文件夹中的文件修改时间
+dir="data/$dir"
+compiler=$2
+# 如果没有传入编译器,则使用默认编译器
+if [ -z $compiler ]; then
+    compiler="compiler"
+fi
+
+opt=""
+# 遍历所有命令行参数判断是否有-a或者--all
+for arg in $@; do
+    if [ $arg == "-a" ] || [ $arg == "--all" ]; then
+        opt="--all"
+    fi
+done
+# 
+if [ $opt == "--all" ]; then
+    # 编译所有文件
+    echo "compiling all files"
     touch $dir/sy/*
-else
-    dir="data/$dir"
+else 
+    echo "compiling changed files"
 fi
 
 cd $dir
 pwd
-compiler="compiler"
+
+
 
 # 输出当前时间到总日志中
 echo $(date +%Y-%m-%d\ %H:%M:%S) >> all.log
