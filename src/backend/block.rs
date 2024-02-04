@@ -1,6 +1,7 @@
 use super::{gen_asm::GenTool, *};
 use crate::config::CONFIG;
 
+#[allow(unused)]
 pub struct Block {
     label: String,
     insts: Vec<inst::Inst>,

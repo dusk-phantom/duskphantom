@@ -1,4 +1,4 @@
-use crate::utils::paral_counter::{self, ParalCounter};
+use crate::utils::paral_counter::ParalCounter;
 use once_cell::sync::Lazy;
 
 #[derive(Clone)]
@@ -32,73 +32,72 @@ pub struct Fmm(f64);
 pub struct Label(String);
 
 // 基于 Reg::new(id, is_usual) 的寄存器定义重写如上代码
-const REG_ZERO: Reg = Reg::new(0, true);
-const REG_RA: Reg = Reg::new(1, true);
-const REG_SP: Reg = Reg::new(2, true);
-const REG_GP: Reg = Reg::new(3, true);
-const REG_TP: Reg = Reg::new(4, true);
-const REG_T0: Reg = Reg::new(5, true);
-const REG_T1: Reg = Reg::new(6, true);
-const REG_T2: Reg = Reg::new(7, true);
-const REG_S0: Reg = Reg::new(8, true); //栈帧寄存器
-const REG_S1: Reg = Reg::new(9, true); //保留寄存器
-const REG_A0: Reg = Reg::new(10, true); //返回值寄存器 以及 函数参数寄存器
-const REG_A1: Reg = Reg::new(11, true);
-const REG_A2: Reg = Reg::new(12, true);
-const REG_A3: Reg = Reg::new(13, true);
-const REG_A4: Reg = Reg::new(14, true);
-const REG_A5: Reg = Reg::new(15, true);
-const REG_A6: Reg = Reg::new(16, true);
-const REG_A7: Reg = Reg::new(17, true);
-const REG_S2: Reg = Reg::new(18, true);
-const REG_S3: Reg = Reg::new(19, true);
-const REG_S4: Reg = Reg::new(20, true);
-const REG_S5: Reg = Reg::new(21, true);
-const REG_S6: Reg = Reg::new(22, true);
-const REG_S7: Reg = Reg::new(23, true);
-const REG_S8: Reg = Reg::new(24, true);
-const REG_S9: Reg = Reg::new(25, true);
-const REG_S10: Reg = Reg::new(26, true);
-const REG_S11: Reg = Reg::new(27, true);
-const REG_T3: Reg = Reg::new(28, true);
-const REG_T4: Reg = Reg::new(29, true);
-const REG_T5: Reg = Reg::new(30, true);
-const REG_T6: Reg = Reg::new(31, true);
+pub const REG_ZERO: Reg = Reg::new(0, true);
+pub const REG_RA: Reg = Reg::new(1, true);
+pub const REG_SP: Reg = Reg::new(2, true);
+pub const REG_GP: Reg = Reg::new(3, true);
+pub const REG_TP: Reg = Reg::new(4, true);
+pub const REG_T0: Reg = Reg::new(5, true);
+pub const REG_T1: Reg = Reg::new(6, true);
+pub const REG_T2: Reg = Reg::new(7, true);
+pub const REG_S0: Reg = Reg::new(8, true); //栈帧寄存器
+pub const REG_S1: Reg = Reg::new(9, true); //保留寄存器
+pub const REG_A0: Reg = Reg::new(10, true); //返回值寄存器 以及 函数参数寄存器
+pub const REG_A1: Reg = Reg::new(11, true);
+pub const REG_A2: Reg = Reg::new(12, true);
+pub const REG_A3: Reg = Reg::new(13, true);
+pub const REG_A4: Reg = Reg::new(14, true);
+pub const REG_A5: Reg = Reg::new(15, true);
+pub const REG_A6: Reg = Reg::new(16, true);
+pub const REG_A7: Reg = Reg::new(17, true);
+pub const REG_S2: Reg = Reg::new(18, true);
+pub const REG_S3: Reg = Reg::new(19, true);
+pub const REG_S4: Reg = Reg::new(20, true);
+pub const REG_S5: Reg = Reg::new(21, true);
+pub const REG_S6: Reg = Reg::new(22, true);
+pub const REG_S7: Reg = Reg::new(23, true);
+pub const REG_S8: Reg = Reg::new(24, true);
+pub const REG_S9: Reg = Reg::new(25, true);
+pub const REG_S10: Reg = Reg::new(26, true);
+pub const REG_S11: Reg = Reg::new(27, true);
+pub const REG_T3: Reg = Reg::new(28, true);
+pub const REG_T4: Reg = Reg::new(29, true);
+pub const REG_T5: Reg = Reg::new(30, true);
+pub const REG_T6: Reg = Reg::new(31, true);
 
 // 浮点寄存器
-// const REG_FT0: Reg = Reg::new(32, false);
-const REG_FT0: Reg = Reg::new(0, false);
-const REG_FT1: Reg = Reg::new(1, false);
-const REG_FT2: Reg = Reg::new(2, false);
-const REG_FT3: Reg = Reg::new(3, false);
-const REG_FT4: Reg = Reg::new(4, false);
-const REG_FT5: Reg = Reg::new(5, false);
-const REG_FT6: Reg = Reg::new(6, false);
-const REG_FT7: Reg = Reg::new(7, false);
-const REG_FS0: Reg = Reg::new(8, false);
-const REG_FS1: Reg = Reg::new(9, false);
-const REG_FA0: Reg = Reg::new(10, false);
-const REG_FA1: Reg = Reg::new(11, false);
-const REG_FA2: Reg = Reg::new(12, false);
-const REG_FA3: Reg = Reg::new(13, false);
-const REG_FA4: Reg = Reg::new(14, false);
-const REG_FA5: Reg = Reg::new(15, false);
-const REG_FA6: Reg = Reg::new(16, false);
-const REG_FA7: Reg = Reg::new(17, false);
-const REG_FS2: Reg = Reg::new(18, false);
-const REG_FS3: Reg = Reg::new(19, false);
-const REG_FS4: Reg = Reg::new(20, false);
-const REG_FS5: Reg = Reg::new(21, false);
-const REG_FS6: Reg = Reg::new(22, false);
-const REG_FS7: Reg = Reg::new(23, false);
-const REG_FS8: Reg = Reg::new(24, false);
-const REG_FS9: Reg = Reg::new(25, false);
-const REG_FS10: Reg = Reg::new(26, false);
-const REG_FS11: Reg = Reg::new(27, false);
-const REG_FT8: Reg = Reg::new(28, false);
-const REG_FT9: Reg = Reg::new(29, false);
-const REG_FT10: Reg = Reg::new(30, false);
-const REG_FT11: Reg = Reg::new(31, false);
+pub const REG_FT0: Reg = Reg::new(0, false);
+pub const REG_FT1: Reg = Reg::new(1, false);
+pub const REG_FT2: Reg = Reg::new(2, false);
+pub const REG_FT3: Reg = Reg::new(3, false);
+pub const REG_FT4: Reg = Reg::new(4, false);
+pub const REG_FT5: Reg = Reg::new(5, false);
+pub const REG_FT6: Reg = Reg::new(6, false);
+pub const REG_FT7: Reg = Reg::new(7, false);
+pub const REG_FS0: Reg = Reg::new(8, false);
+pub const REG_FS1: Reg = Reg::new(9, false);
+pub const REG_FA0: Reg = Reg::new(10, false);
+pub const REG_FA1: Reg = Reg::new(11, false);
+pub const REG_FA2: Reg = Reg::new(12, false);
+pub const REG_FA3: Reg = Reg::new(13, false);
+pub const REG_FA4: Reg = Reg::new(14, false);
+pub const REG_FA5: Reg = Reg::new(15, false);
+pub const REG_FA6: Reg = Reg::new(16, false);
+pub const REG_FA7: Reg = Reg::new(17, false);
+pub const REG_FS2: Reg = Reg::new(18, false);
+pub const REG_FS3: Reg = Reg::new(19, false);
+pub const REG_FS4: Reg = Reg::new(20, false);
+pub const REG_FS5: Reg = Reg::new(21, false);
+pub const REG_FS6: Reg = Reg::new(22, false);
+pub const REG_FS7: Reg = Reg::new(23, false);
+pub const REG_FS8: Reg = Reg::new(24, false);
+pub const REG_FS9: Reg = Reg::new(25, false);
+pub const REG_FS10: Reg = Reg::new(26, false);
+pub const REG_FS11: Reg = Reg::new(27, false);
+pub const REG_FT8: Reg = Reg::new(28, false);
+pub const REG_FT9: Reg = Reg::new(29, false);
+pub const REG_FT10: Reg = Reg::new(30, false);
+pub const REG_FT11: Reg = Reg::new(31, false);
 
 static USUAL_REG_COUNTER: Lazy<ParalCounter> = Lazy::new(|| ParalCounter::new(32, 100_000_000));
 static FLOAT_REG_COUNTER: Lazy<ParalCounter> = Lazy::new(|| ParalCounter::new(32, 100_000_000));
@@ -222,7 +221,7 @@ impl Fmm {
 }
 impl Label {
     pub fn gen_asm(&self) -> String {
-        format!("{}", self.0)
+        self.0.clone()
     }
 }
 
@@ -354,18 +353,24 @@ impl MulInst {
         // 把惩罚指令判断是否能够优化成移位指令
         // 如果乘法指令中的一个是常数,且该常数能够拆分成2的幂次方,则可以优化成移位指令
         let mut ret: Vec<Inst> = vec![];
+        // 如果第二个数不是常数,没有优化必要
         if self.2.imm().is_none() {
             ret.push(Inst::Mul(self.clone()));
             return ret;
         }
         let imm = self.2.imm().unwrap().0;
-
-        if imm == 0 {
-            ret.push(Inst::Mv(MvInst(self.0.clone(), self.1.clone())));
-            return ret;
-        } else if imm < 0 {
-            ret.push(Inst::Mul(self.clone()));
-            return ret;
+        match imm.cmp(&0) {
+            std::cmp::Ordering::Less => {
+                ret.push(Inst::Mul(self.clone()));
+                todo!("优化乘以负常数的情况")
+            }
+            std::cmp::Ordering::Equal => {
+                // 优化乘以0的情况,则把zero赋予,事实上,不应该出现乘0指令,如果出现,中应该能够优化掉
+                ret.push(Inst::Mv(MvInst(self.0.clone(), Operand::Reg(REG_ZERO))));
+            }
+            std::cmp::Ordering::Greater => {
+                todo!("优化乘以正整数的情况")
+            }
         }
         ret
     }

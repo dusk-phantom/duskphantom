@@ -4,6 +4,7 @@ use super::{block::Block, gen_asm::GenTool};
 use rayon::prelude::*;
 
 #[allow(unused)]
+#[derive(Default)]
 pub struct Func {
     name: String,
     args: Vec<String>,
@@ -16,15 +17,6 @@ pub struct Func {
 }
 
 impl Func {
-    pub fn new() -> Func {
-        Func {
-            name: String::new(),
-            args: Vec::new(),
-            bbs: Vec::new(),
-            sorted_bbs: Vec::new(),
-            entry: String::new(),
-        }
-    }
     pub fn name(&self) -> &str {
         self.name.as_str()
     }
