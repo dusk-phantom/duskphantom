@@ -45,15 +45,19 @@ impl Program {
 
 impl Display for Program {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}\n", self.llvm.name).unwrap();
-        write!(f, "global_vars:\n",).unwrap();
+        let mut s = String::new();
+        s.push_str(&self.llvm.name);
+        s.push('\n');
+        s.push_str("global_vars:\n");
         for global_var in &self.llvm.global_vars {
-            write!(f, "{}\n", &global_var.name.to_string()[1..]).unwrap();
+            s.push_str(&global_var.name.to_string()[1..]);
+            s.push('\n');
         }
-        write!(f, "functions:\n",).unwrap();
+        s.push_str("functions:\n");
         for func in &self.llvm.functions {
-            write!(f, "{}", func.name).unwrap();
+            s.push_str(&func.name);
         }
+        write!(f, "{}", s)?;
         Ok(())
     }
 }

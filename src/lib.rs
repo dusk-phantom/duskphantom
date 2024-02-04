@@ -2,9 +2,9 @@ use errors::CompilerError;
 
 pub mod backend;
 #[cfg(feature = "clang_embeded")]
-pub mod clang_frontend;
-#[cfg(feature = "clang_embeded")]
 pub mod clang_backend;
+#[cfg(feature = "clang_embeded")]
+pub mod clang_frontend;
 pub mod config;
 pub mod errors;
 pub mod frontend;
@@ -44,20 +44,16 @@ pub fn compile(
     if opt_flag {
         frontend::optimize(&mut program);
     }
-    let mut program = middle::gen(&mut program)?;
+    let mut program = middle::gen(&program)?;
     if opt_flag {
         middle::optimize(&mut program);
     }
-    let mut program = backend::gen(&mut program)?;
+    let mut program = backend::gen(&program)?;
     if opt_flag {
         backend::optimize(&mut program);
     }
     let asm = program.gen_asm();
-    let output = if !asm_flag {
-        asm2bin(asm)
-    } else {
-        asm
-    };
+    let output = if !asm_flag { asm2bin(asm) } else { asm };
     std::fs::write(output_path, output).map_err(CompilerError::IOError)
 }
 
@@ -79,14 +75,9 @@ pub fn compile_clang(
         backend::optimize(&mut program);
     }
     let asm = program.gen_asm();
-    let output = if !asm_flag {
-        asm2bin(asm)
-    } else {
-        asm
-    };
+    let output = if !asm_flag { asm2bin(asm) } else { asm };
     std::fs::write(output_file, output).map_err(CompilerError::IOError)
 }
-
 
 #[cfg(feature = "clang_embeded")]
 pub fn compile_clang_llc(
@@ -105,41 +96,36 @@ pub fn compile_clang_llc(
         clang_backend::optimize(&mut program);
     }
     let asm = program.gen_asm();
-    let output = if !asm_flag {
-        asm2bin(asm)
-    } else {
-        asm
-    };
+    let output = if !asm_flag { asm2bin(asm) } else { asm };
     std::fs::write(output_file, output).map_err(CompilerError::IOError)
 }
 
-
-
+#[allow(unused)]
 pub fn asm2bin(asm: String) -> String {
     // 使用lcc将汇编代码编译成二进制文件
     #[cfg(feature = "clang_embeded")]
     {
         let mut builder = tempfile::Builder::new();
-    let tmp_asm_file = builder.suffix(".s").tempfile().unwrap();
-    let tmp_bin_file = builder.suffix(".bin").tempfile().unwrap();
-    let tmp_bin_path = tmp_bin_file.path();
-    let tmp_asm_path = tmp_asm_file.path();
-    std::fs::write(tmp_asm_path, asm).expect("msg: write asm failed");
-    let mut cmd = std::process::Command::new("lcc");
-    cmd.arg("-o")
-        .arg(tmp_bin_path)
-        .arg(tmp_asm_path)
-        .arg("-Wl,-Ttext=0x80000000");
-    let output = cmd.output().expect("msg: exec lcc failed");
-    if !output.status.success() {
-        panic!("msg: exec lcc failed");
-    }
-    let bin = std::fs::read(tmp_bin_path).expect("msg: read bin failed");
-    let mut bin_str = String::new();
-    for byte in bin {
-        bin_str.push_str(&format!("{:02x}", byte));
-    }
-    bin_str
+        let tmp_asm_file = builder.suffix(".s").tempfile().unwrap();
+        let tmp_bin_file = builder.suffix(".bin").tempfile().unwrap();
+        let tmp_bin_path = tmp_bin_file.path();
+        let tmp_asm_path = tmp_asm_file.path();
+        std::fs::write(tmp_asm_path, asm).expect("msg: write asm failed");
+        let mut cmd = std::process::Command::new("lcc");
+        cmd.arg("-o")
+            .arg(tmp_bin_path)
+            .arg(tmp_asm_path)
+            .arg("-Wl,-Ttext=0x80000000");
+        let output = cmd.output().expect("msg: exec lcc failed");
+        if !output.status.success() {
+            panic!("msg: exec lcc failed");
+        }
+        let bin = std::fs::read(tmp_bin_path).expect("msg: read bin failed");
+        let mut bin_str = String::new();
+        for byte in bin {
+            bin_str.push_str(&format!("{:02x}", byte));
+        }
+        bin_str
     }
     #[cfg(not(feature = "clang_embeded"))]
     {
