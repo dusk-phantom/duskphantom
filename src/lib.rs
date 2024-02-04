@@ -1,5 +1,6 @@
 use errors::CompilerError;
 
+pub mod args;
 pub mod backend;
 #[cfg(feature = "clang_embeded")]
 pub mod clang_backend;
@@ -12,26 +13,6 @@ pub mod middle;
 pub mod utils;
 
 use clap::{arg, App};
-
-pub fn get_args() -> (String, String, bool, bool) {
-    let app = App::new("compiler")
-        .about("compiler <src> [-S] [-o <output>] [-O]")
-        .arg(arg!(<src> "Source file").index(1))
-        .arg(arg!(-S --asm "output asm file"))
-        .arg(arg!(-o --output <FILE> "output asm file").default_value("a.s"))
-        .arg(arg!(-O --optimized "optimization level"))
-        .get_matches();
-    let sy_path = app.value_of("src").expect("msg: src file not found");
-    let asm_flag = app.is_present("asm");
-    let output_path = app.value_of("output").unwrap();
-    let opt_flag = app.is_present("optimized");
-    (
-        sy_path.to_string(),
-        output_path.to_string(),
-        opt_flag,
-        asm_flag,
-    )
-}
 
 /// compile sysy source code to rv64gc asm
 pub fn compile(
@@ -64,11 +45,15 @@ pub fn compile_clang(
     output_file: &str,
     opt_flag: bool,
     asm_flag: bool,
+    ll_path: Option<String>,
 ) -> Result<(), CompilerError> {
     let mut program = clang_frontend::Program::parse(src_file);
     println!("{}", program);
     if opt_flag {
         clang_frontend::optimize(&mut program);
+    }
+    if let Some(ll_path) = ll_path {
+        std::fs::write(ll_path, program.gen_ll()).map_err(CompilerError::IOError)?;
     }
     let mut program = backend::gen_from_clang(&program)?;
     if opt_flag {
@@ -85,10 +70,14 @@ pub fn compile_clang_llc(
     output_file: &str,
     opt_flag: bool,
     asm_flag: bool,
+    ll_path: Option<String>,
 ) -> Result<(), CompilerError> {
     let mut program = clang_frontend::Program::parse(src_file);
     if opt_flag {
         clang_frontend::optimize(&mut program);
+    }
+    if let Some(ll_path) = ll_path {
+        std::fs::write(ll_path, program.gen_ll()).map_err(CompilerError::IOError)?;
     }
     let mut program = clang_backend::gen_from_clang(&program)?;
     if opt_flag {
