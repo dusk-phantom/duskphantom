@@ -1,6 +1,7 @@
 use super::*;
 pub mod binary_inst;
 pub mod head;
+pub mod unary_inst;
 
 pub type InstPtr = ObjPtr<Box<dyn Instruction>>;
 
@@ -22,7 +23,7 @@ define_inst_type_enum!(
     FDiv,
     URem,
     SRem,
-    FRem,
+    // FRem,
     // Bitwise Binary Operations
     Shl,
     LShr,
@@ -31,7 +32,7 @@ define_inst_type_enum!(
     Or,
     Xor,
     // Unary Operations
-    FNeg,
+    // FNeg,
     // Terminator Instructions
     Ret,
     Br,
@@ -252,7 +253,7 @@ pub trait Instruction {
             manager.next = None;
             manager.operand.iter_mut().for_each(|op| {
                 op.get_user_mut()
-                    .retain(|user| !is_same(user.as_ref().as_ref(), self_p.as_ref()));
+                    .retain(|user| !std::ptr::eq(user.as_ref().as_ref(), self_p.as_ref()));
             });
             manager.operand.clear();
         }
@@ -353,12 +354,6 @@ where
             )
         })
     }
-}
-
-/// Returns `true` if the two instructions are the same.
-#[inline]
-pub fn is_same(left: &dyn Instruction, right: &dyn Instruction) -> bool {
-    left as *const dyn Instruction == right as *const dyn Instruction
 }
 
 /// Instruction Manager
