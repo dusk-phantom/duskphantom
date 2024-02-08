@@ -97,24 +97,59 @@ macro_rules! define_inst_type_enum {
 
 /// impl BinaryInst trait automatically.
 #[macro_export]
-macro_rules! impl_BinaryInst {
-    ($type:ty) => {
+macro_rules! impl_binary_inst {
+    ($type:ident, $operand_type:expr,$func: ident, $lhs:ident, $rhs: ident) => {
+        /// If you want to make a new binary inst,
+        /// please use the IRBuilder to create it.
+        pub struct $type {
+            manager: InstManager,
+        }
         impl BinaryInst for $type {
             #[inline]
             fn get_lhs(&self) -> InstPtr {
                 self.manager.operand[0]
             }
+
             #[inline]
             fn set_lhs(&mut self, lhs: InstPtr) {
                 self.manager.operand[0] = lhs;
             }
+
             #[inline]
             fn get_rhs(&self) -> InstPtr {
                 self.manager.operand[1]
             }
+
             #[inline]
             fn set_rhs(&mut self, rhs: InstPtr) {
                 self.manager.operand[1] = rhs;
+            }
+        }
+
+        impl Instruction for $type {
+            gen_common_code!($type, $type);
+            #[inline]
+            fn gen_llvm_ir(&self) -> String {
+                format!(
+                    "%{} = {} {}, %{}, %{}",
+                    self.get_id(),
+                    self.get_type(),
+                    $operand_type,
+                    self.get_lhs().get_id(),
+                    self.get_rhs().get_id()
+                )
+            }
+        }
+
+        impl IRBuilder {
+            /// Get a new inst instruction with operands.
+            pub fn $func(&mut self, $lhs: InstPtr, $rhs: InstPtr) -> InstPtr {
+                let mut inst = $type {
+                    manager: InstManager::new(self.new_inst_id()),
+                };
+                inst.set_lhs($lhs);
+                inst.set_rhs($rhs);
+                self.new_instruction(Box::new(inst))
             }
         }
     };
