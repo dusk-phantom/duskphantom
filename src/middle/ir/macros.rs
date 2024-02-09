@@ -112,7 +112,7 @@ macro_rules! impl_binary_inst {
 
             #[inline]
             fn set_lhs(&mut self, lhs: InstPtr) {
-                self.manager.operand[0] = lhs;
+                unsafe { self.get_manager_mut().set_operand(0, lhs) };
             }
 
             #[inline]
@@ -122,7 +122,7 @@ macro_rules! impl_binary_inst {
 
             #[inline]
             fn set_rhs(&mut self, rhs: InstPtr) {
-                self.manager.operand[1] = rhs;
+                unsafe { self.get_manager_mut().set_operand(1, rhs) };
             }
         }
 
@@ -131,25 +131,33 @@ macro_rules! impl_binary_inst {
             #[inline]
             fn gen_llvm_ir(&self) -> String {
                 format!(
-                    "%{} = {} {}, %{}, %{}",
-                    self.get_id(),
+                    "{} = {} {}, {}, {}",
+                    self,
                     self.get_type(),
                     $operand_type,
-                    self.get_lhs().get_id(),
-                    self.get_rhs().get_id()
+                    self.get_lhs().as_ref(),
+                    self.get_rhs().as_ref()
                 )
+            }
+        }
+
+        impl Display for $type {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "%{}_{}", stringify!($type), self.get_id())
             }
         }
 
         impl IRBuilder {
             /// Get a new inst instruction with operands.
             pub fn $func(&mut self, $lhs: InstPtr, $rhs: InstPtr) -> InstPtr {
-                let mut inst = $type {
-                    manager: InstManager::new(self.new_inst_id()),
-                };
-                inst.set_lhs($lhs);
-                inst.set_rhs($rhs);
-                self.new_instruction(Box::new(inst))
+                let mut inst = self.new_instruction(Box::new($type {
+                    manager: InstManager::new(),
+                }));
+                unsafe {
+                    inst.get_manager_mut().add_operand($lhs);
+                    inst.get_manager_mut().add_operand($rhs);
+                }
+                inst
             }
         }
     };

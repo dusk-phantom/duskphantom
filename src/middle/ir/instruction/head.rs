@@ -5,10 +5,9 @@ pub struct Head {
 
 impl IRBuilder {
     pub fn new_head(&mut self) -> InstPtr {
-        let head = Head {
-            manager: InstManager::new(self.new_inst_id()),
-        };
-        self.new_instruction(Box::new(head))
+        self.new_instruction(Box::new(Head {
+            manager: InstManager::new(),
+        }))
     }
 }
 
@@ -17,5 +16,11 @@ impl Instruction for Head {
     #[inline]
     fn gen_llvm_ir(&self) -> String {
         String::new()
+    }
+}
+
+impl Display for Head {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "")
     }
 }
