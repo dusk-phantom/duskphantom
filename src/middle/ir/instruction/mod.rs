@@ -1,11 +1,13 @@
 use super::*;
 pub mod binary_inst;
 pub mod head;
+pub mod terminator_inst;
+pub mod unary_inst;
 
 pub type InstPtr = ObjPtr<Box<dyn Instruction>>;
 
 use crate::{define_inst_type_enum, gen_common_code};
-use std::any::Any;
+use std::{any::Any, fmt::Display};
 
 define_inst_type_enum!(
     // You will never get this type
@@ -22,7 +24,7 @@ define_inst_type_enum!(
     FDiv,
     URem,
     SRem,
-    FRem,
+    // FRem,
     // Bitwise Binary Operations
     Shl,
     LShr,
@@ -31,7 +33,7 @@ define_inst_type_enum!(
     Or,
     Xor,
     // Unary Operations
-    FNeg,
+    // FNeg,
     // Terminator Instructions
     Ret,
     Br,
@@ -50,7 +52,7 @@ define_inst_type_enum!(
     Call
 );
 
-pub trait Instruction {
+pub trait Instruction: Display {
     /// # Safety
     /// Don't call this method, use downcast_ref instead.
     unsafe fn as_any(&self) -> &dyn Any;
@@ -252,7 +254,7 @@ pub trait Instruction {
             manager.next = None;
             manager.operand.iter_mut().for_each(|op| {
                 op.get_user_mut()
-                    .retain(|user| !is_same(user.as_ref().as_ref(), self_p.as_ref()));
+                    .retain(|user| !std::ptr::eq(user.as_ref().as_ref(), self_p.as_ref()));
             });
             manager.operand.clear();
         }
@@ -293,7 +295,7 @@ pub trait Instruction {
 
     /// Returns the unique id of current instruction.
     fn get_id(&self) -> usize {
-        self.get_manager().id
+        self.get_manager().id.unwrap()
     }
 
     /// 将其生成相关的llvm ir
@@ -304,10 +306,11 @@ pub trait Instruction {
 ///
 /// # Example
 /// ```
-/// # use compiler::middle::ir::InstPtr;
-/// # use compiler::middle::ir::instruction::{head::Head,Instruction,downcast_ref};
-/// let dyn_head: Box<dyn Instruction> = Box::new(Head::new());
-/// let head = downcast_ref::<Head>(dyn_head.as_ref());
+/// # use compiler::middle::ir::instruction::{head::Head,downcast_ref};
+/// # use compiler::middle::ir::ir_builder::IRBuilder;
+/// # let mut ir_builder = IRBuilder::new();
+/// let dyn_head = ir_builder.new_head();
+/// let head = downcast_ref::<Head>(dyn_head.as_ref().as_ref());
 /// ```
 ///
 /// # Panics
@@ -331,10 +334,11 @@ where
 ///
 /// # Example
 /// ```
-/// # use compiler::middle::ir::InstPtr;
-/// # use compiler::middle::ir::instruction::{head::Head,Instruction,downcast_mut};
-/// let mut dyn_head: Box<dyn Instruction> = Box::new(Head::new());
-/// let add_inst = downcast_mut::<Head>(dyn_head.as_mut());
+/// # use compiler::middle::ir::instruction::{head::Head,downcast_mut};
+/// # use compiler::middle::ir::ir_builder::IRBuilder;
+/// # let mut ir_builder = IRBuilder::new();
+/// let mut dyn_head = ir_builder.new_head();
+/// let add_inst = downcast_mut::<Head>(dyn_head.as_mut().as_mut());
 /// ```
 ///
 /// # Panics
@@ -355,18 +359,12 @@ where
     }
 }
 
-/// Returns `true` if the two instructions are the same.
-#[inline]
-pub fn is_same(left: &dyn Instruction, right: &dyn Instruction) -> bool {
-    left as *const dyn Instruction == right as *const dyn Instruction
-}
-
 /// Instruction Manager
 /// This struct is used to manage the instructions.
 /// Including def-use relationship, the relationship between instructions, etc.
 pub struct InstManager {
     /// The unique id of current instruction.
-    id: usize,
+    id: Option<usize>,
     /// The instructions that use current instruction as operand.
     /// For example: `add a, b`
     /// `a` and `b` are the operand of `add` instruction.
@@ -392,18 +390,45 @@ pub struct InstManager {
     /// Value type of current instruction.
     /// Default type is Void.
     value_type: ValueType,
+
+    /// The ObjPtr of current instruction.
+    self_ptr: Option<InstPtr>,
 }
 
 impl InstManager {
-    pub fn new(id: usize) -> Self {
+    pub fn new() -> Self {
         Self {
-            id,
+            id: None,
             user: vec![],
             operand: vec![],
             prev: None,
             next: None,
             parent_bb: None,
             value_type: ValueType::Void,
+            self_ptr: None,
         }
+    }
+}
+
+impl InstManager {
+    pub unsafe fn set_operand(&mut self, index: usize, mut operand: InstPtr) {
+        self.operand[index]
+            .get_user_mut()
+            .retain(|&user| user != self.self_ptr.unwrap());
+        operand.get_user_mut().push(self.self_ptr.unwrap());
+        self.operand[index] = operand;
+    }
+
+    pub unsafe fn add_operand(&mut self, mut operand: InstPtr) {
+        operand.get_user_mut().push(self.self_ptr.unwrap());
+        self.operand.push(operand);
+    }
+
+    pub unsafe fn set_id(&mut self, id: usize) {
+        self.id = Some(id);
+    }
+
+    pub unsafe fn set_self_ptr(&mut self, self_ptr: InstPtr) {
+        self.self_ptr = Some(self_ptr);
     }
 }

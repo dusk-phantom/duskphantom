@@ -50,7 +50,14 @@ impl IRBuilder {
 
     /// Allocate a space for instruction, return a pointer to this space.
     pub fn new_instruction(&mut self, inst: Box<dyn Instruction>) -> InstPtr {
-        self.inst_pool.alloc(inst)
+        let mut inst = self.inst_pool.alloc(inst);
+        let id = self.new_inst_id();
+        unsafe {
+            inst.get_manager_mut().set_id(id);
+            let ic = inst.clone();
+            inst.get_manager_mut().set_self_ptr(ic);
+        }
+        inst
     }
 }
 
