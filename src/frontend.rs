@@ -7,10 +7,12 @@ pub struct Program {
     pub blocks: Vec<Declaration>,
 }
 
+pub type Block = Vec<BlockItem>;
+
 /// A group of operations.
 /// Only declarations can appear at top level.
 /// Example: `x = 4;`
-pub enum Block {
+pub enum BlockItem {
     /// A declaration.
     /// Example:
     /// `void f(int)` is `Declare(DeclareFunc(...))`
@@ -20,11 +22,6 @@ pub enum Block {
     /// Example:
     /// `break` is `State(Break)`
     State(Statement),
-
-    /// A nested block.
-    /// Example:
-    /// `{ ... }` is `Nest([...])`
-    Nest(Vec<Block>),
 }
 
 /// A declaration.
@@ -70,22 +67,22 @@ pub enum Statement {
     /// If the third argument is empty, it means there's no else block.
     /// Example:
     /// `if (x == 4) { ... } else { ... }` is `If(Binary(...), [...], [...])`
-    If(Expression, Vec<Block>, Vec<Block>),
+    If(Expression, Block, Block),
 
     /// A while-loop.
     /// Example:
     /// `while (true) { ... }` is `While(True, [...])`
-    While(Expression, Vec<Block>),
+    While(Expression, Block),
 
     /// A do-while-loop.
     /// Example:
     /// `while (true) { ... }` is `While(True, [...])`
-    DoWhile(Expression, Vec<Block>),
+    DoWhile(Expression, Block),
 
     /// A for-loop.
     /// Example:
     /// `for (x; y; z) { ... }` is `For(x, y, z, [...])`
-    For(Box<Block>, Expression, Expression, Vec<Block>),
+    For(Box<BlockItem>, Expression, Expression, Block),
 
     /// A break statement.
     Break,
@@ -97,6 +94,11 @@ pub enum Statement {
     /// Example:
     /// `return x` is `Return(x)`
     Return(Expression),
+
+    /// A nested block.
+    /// Example:
+    /// `{ ... }` is `Nest([...])`
+    Block(Block),
 }
 
 /// A term that can be evaluated.
