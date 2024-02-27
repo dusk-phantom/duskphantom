@@ -7,12 +7,12 @@ pub struct Program {
     pub blocks: Vec<Declaration>,
 }
 
-pub type Block = Vec<BlockItem>;
+pub type Block = Vec<Entity>;
 
-/// A group of operations.
+/// An AST entity.
 /// Only declarations can appear at top level.
 /// Example: `x = 4;`
-pub enum BlockItem {
+pub enum Entity {
     /// A declaration.
     /// Example:
     /// `void f(int)` is `Declare(DeclareFunc(...))`
@@ -82,7 +82,7 @@ pub enum Statement {
     /// A for-loop.
     /// Example:
     /// `for (x; y; z) { ... }` is `For(x, y, z, [...])`
-    For(Box<BlockItem>, Expression, Expression, Block),
+    For(Box<Entity>, Expression, Expression, Block),
 
     /// A break statement.
     Break,
@@ -97,7 +97,7 @@ pub enum Statement {
 
     /// A nested block.
     /// Example:
-    /// `{ ... }` is `Nest([...])`
+    /// `{ ... }` is `Block([...])`
     Block(Block),
 }
 
