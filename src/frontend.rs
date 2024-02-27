@@ -1,33 +1,24 @@
 use crate::errors::FrontendError;
 
+// a excutable program is a set of modules with an entry module
 /// The full program.
 pub struct Program {
     /// Blocks of the program.
     /// A block at top level can only be declaration.
-    pub blocks: Vec<Declaration>,
+    pub modules: Vec<Module>,
 }
 
+// a function/ class lib is also a set of modules
+// pub struct Lib {
+//     pub modules: Vec<Module>,
+// }
+pub type Module = Vec<Entity>;
 pub type Block = Vec<Entity>;
-
-/// An AST entity.
-/// Only declarations can appear at top level.
-/// Example: `x = 4;`
-pub enum Entity {
-    /// A declaration.
-    /// Example:
-    /// `void f(int)` is `Declare(DeclareFunc(...))`
-    Declare(Declaration),
-
-    /// A statement.
-    /// Example:
-    /// `break` is `State(Break)`
-    State(Statement),
-}
 
 /// A declaration.
 /// Only declaration can appear at top level.
 /// Example: `int x = 4;`
-pub enum Declaration {
+pub enum Entity {
     /// A declaration of a variable.
     /// Example:
     /// `int x` is `DeclareVariable(Int32, x)`
