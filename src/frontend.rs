@@ -79,7 +79,7 @@ pub enum Stmt {
 
     /// A do-while-loop.
     /// Example:
-    /// `while (true) { ... }` is `While(True, [...])`
+    /// `do{...}while(true)` is `DoWhile([...], True)`
     DoWhile(Expr, Vec<Stmt>),
 
     /// A for-loop.
@@ -197,8 +197,8 @@ pub enum Type {
 
     /// Function pointer to given type.
     /// Example:
-    /// `void (*x)(int)` is `Function([Int32], Void)`
-    Function(Vec<Type>, Box<Type>),
+    /// `void (*x)(int)` is `Function(Void,[Int32])`
+    Function(Box<Type>, Vec<Type>),
 
     /// Enum of given name.
     /// Example:
