@@ -1,3 +1,5 @@
+use rayon::iter::Either;
+
 use crate::errors::FrontendError;
 
 /// The full program.
@@ -24,9 +26,9 @@ pub enum Decl {
 
     /// A declaration of a function, optionally with implementation.
     /// Example:
-    /// `void f(int x)` is `Func(Void, [(Some("x"), Int32)] "f", None)`
-    /// `void f() { ... }` is `Func(Void, [], "f", Some(...))`
-    Func(Type, Vec<(Option<String>, Type)>, String, Option<Vec<Stmt>>),
+    /// `void f(int x)` is `Func(Void, "f", [(Int32, (Some("x"))], None)`
+    /// `void f() { ... }` is `Func(Void, "f", [], Some(...))`
+    Func(Type, String, Vec<(Type, Option<String>)>, Option<Vec<Stmt>>),
 
     /// A declaration of an enum.
     /// Example:
@@ -69,23 +71,23 @@ pub enum Stmt {
     /// A conditional branch.
     /// If the third argument is empty, it means there's no else block.
     /// Example:
-    /// `if (x == 4) { ... } else { ... }` is `If(Binary(...), [...], [...])`
-    If(Expr, Vec<Stmt>, Vec<Stmt>),
+    /// `if (x == 4) ... else ...` is `If(Binary(...), ..., ...)`
+    If(Expr, Box<Stmt>, Box<Stmt>),
 
     /// A while-loop.
     /// Example:
-    /// `while (true) { ... }` is `While(True, [...])`
-    While(Expr, Vec<Stmt>),
+    /// `while (true) ...` is `While(True, ...)`
+    While(Expr, Box<Stmt>),
 
     /// A do-while-loop.
     /// Example:
-    /// `do{...}while(true)` is `DoWhile([...], True)`
-    DoWhile(Expr, Vec<Stmt>),
+    /// `do ... while (true)` is `DoWhile(..., True)`
+    DoWhile(Box<Stmt>, Expr),
 
     /// A for-loop.
     /// Example:
-    /// `for (x; y; z) { ... }` is `For(x, y, z, [...])`
-    For(Box<Decl>, Expr, Expr, Vec<Stmt>),
+    /// `for (x; y; z) ...` is `For(x, y, z, ...)`
+    For(Either<Decl, Expr>, Expr, Expr, Box<Stmt>),
 
     /// A break statement.
     Break,
@@ -148,11 +150,11 @@ pub enum Expr {
     Bool(bool),
 
     /// A function call.
-    /// Example: `f(x)`
+    /// Example: `f(x, y)`
     Call(Box<Expr>, Vec<Expr>),
 
     /// Application of unary operator.
-    /// Example: `!false`
+    /// Example: `!false`, `x++`
     Unary(UnaryOp, Box<Expr>),
 
     /// Application of binary operator.
@@ -192,12 +194,12 @@ pub enum Type {
 
     /// Array of given type.
     /// Example:
-    /// `int x[4]` is `Array(Int32, [4])`
-    Array(Box<Type>, Vec<i32>),
+    /// `int x[4]` is `Array(Int32, 4)`
+    Array(Box<Type>, i32),
 
     /// Function pointer to given type.
     /// Example:
-    /// `void (*x)(int)` is `Function(Void,[Int32])`
+    /// `void (*x)(int)` is `Function(Void, [Int32])`
     Function(Box<Type>, Vec<Type>),
 
     /// Enum of given name.
@@ -239,6 +241,8 @@ pub enum UnaryOp {
 /// Bianry operator type.
 /// Example: `+`, `-`
 pub enum BinaryOp {
+    /// =
+    Assign,
     /// +
     Add,
     /// -
