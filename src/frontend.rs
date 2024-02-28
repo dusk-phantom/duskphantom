@@ -1,79 +1,91 @@
 use crate::errors::FrontendError;
 
-// a excutable program is a set of modules with an entry module
 /// The full program.
+/// A excutable program is a set of modules with an entry module.
+/// For now, only one module is supported, so the only module is entry.
 pub struct Program {
-    /// Blocks of the program.
-    /// A block at top level can only be declaration.
-    pub modules: Vec<Module>,
+    /// The module of the program.
+    /// Currently only one module is supported.
+    pub module: Module,
 }
 
-// a function/ class lib is also a set of modules
-// pub struct Lib {
-//     pub modules: Vec<Module>,
-// }
-pub type Module = Vec<Entity>;
-pub type Block = Vec<Entity>;
+/// A module is a single file.
+/// Only declaration can appear at top level.
+pub type Module = Vec<Decl>;
 
 /// A declaration.
-/// Only declaration can appear at top level.
 /// Example: `int x = 4;`
-pub enum Entity {
-    /// A declaration of a variable.
+pub enum Decl {
+    /// A declaration of a variable, optionally with assignment.
     /// Example:
-    /// `int x` is `DeclareVariable(Int32, x)`
-    DeclareVariable(Type, LeftValue),
+    /// `int x` is `Var(Int32, x, None)`
+    /// `int x = 4` is `Var(Int32, x, Some(Int32(4)))`
+    Var(Type, String, Option<Expr>),
 
-    /// A declaration with assignment.
+    /// A declaration of a function, optionally with implementation.
     /// Example:
-    /// `int x = 4` is `DefineVariable(Int32, x, Int32(4))`
-    DefineVariable(Type, LeftValue, Expression),
+    /// `void f(int x)` is `Func(Void, [(Some("x"), Int32)] "f", None)`
+    /// `void f() { ... }` is `Func(Void, [], "f", Some(...))`
+    Func(Type, Vec<(Option<String>, Type)>, String, Option<Vec<Stmt>>),
 
-    /// A function declaration.
+    /// A declaration of an enum.
     /// Example:
-    /// `void f(int)` is `DeclareFunc(Void, [...], "f")`
-    DeclareFunc(Type, Vec<Type>, String),
+    /// `enum fruit { x, y = 114 }` is
+    /// `Enum("fruit", vec![("x", None), ("y", 114)])`
+    Enum(String, Vec<(String, Option<i32>)>),
 
-    /// A function implementation.
+    /// A declaration of an union.
     /// Example:
-    /// `void f() { ... }` is `ImplementFunc(Void, [], "f", ...)`
-    ImplementFunc(Type, Vec<Param>, String, Expression),
+    /// `union numbers { int i; float f; }` is
+    /// `Union("numbers", vec![(Int32, "i"), (Float32, "f")])`
+    Union(String, Vec<(Type, String)>),
+
+    /// A declaration of a struct.
+    /// Example:
+    /// `struct numbers { int i; float f; }` is
+    /// `Struct("numbers", vec![(Int32, "i"), (Float32, "f")])`
+    Struct(String, Vec<(Type, String)>),
 }
 
 /// A statement.
 /// Statements can not appear at top level.
 /// Example: `continue`
-pub enum Statement {
-    /// A single expression as a block.
+pub enum Stmt {
+    /// A declaration as statement.
     /// Example:
-    /// `x++` is `Single(UnaryOperator(...))`
-    Single(Expression),
+    /// `int x;` is `Decl(Var(Int32, "x"))`
+    Decl(Decl),
+
+    /// An expression as statement.
+    /// Example:
+    /// `x++` is `Expression(UnaryOperator(...))`
+    Expr(Expr),
 
     /// An operation that assign RHS to LHS.
     /// Example:
     /// `x = 4` is `Assign(x, Int32(4))`
-    Assign(LeftValue, Expression),
+    Assign(Expr, Expr),
 
     /// A conditional branch.
     /// If the third argument is empty, it means there's no else block.
     /// Example:
     /// `if (x == 4) { ... } else { ... }` is `If(Binary(...), [...], [...])`
-    If(Expression, Block, Block),
+    If(Expr, Vec<Stmt>, Vec<Stmt>),
 
     /// A while-loop.
     /// Example:
     /// `while (true) { ... }` is `While(True, [...])`
-    While(Expression, Block),
+    While(Expr, Vec<Stmt>),
 
     /// A do-while-loop.
     /// Example:
     /// `while (true) { ... }` is `While(True, [...])`
-    DoWhile(Expression, Block),
+    DoWhile(Expr, Vec<Stmt>),
 
     /// A for-loop.
     /// Example:
     /// `for (x; y; z) { ... }` is `For(x, y, z, [...])`
-    For(Box<Entity>, Expression, Expression, Block),
+    For(Box<Decl>, Expr, Expr, Vec<Stmt>),
 
     /// A break statement.
     Break,
@@ -84,24 +96,36 @@ pub enum Statement {
     /// A return statement.
     /// Example:
     /// `return x` is `Return(x)`
-    Return(Expression),
+    Return(Expr),
 
     /// A nested block.
     /// Example:
-    /// `{ ... }` is `Block([...])`
-    Block(Block),
+    /// `{ ... }` is `Vec<Statement>([...])`
+    Block(Vec<Stmt>),
 }
 
 /// A term that can be evaluated.
 /// Example: `f("224")`
-pub enum Expression {
+pub enum Expr {
     /// A single variable.
     /// Example: `x`
-    Variable(String),
+    Var(String),
 
-    /// An array.
+    /// An array, union or struct.
     /// Example: `{ 1, 2, 3 }`
-    Array(Vec<Expression>),
+    Pack(Vec<Expr>),
+
+    /// A named instantiation of an union or struct.
+    /// Example: `{ x: 1, y: 2 }` or `{ .x = 1 }`
+    Map(Vec<(String, Expr)>),
+
+    /// Array indexing.
+    /// Example: `x[8]`
+    Index(Box<Expr>, Box<Expr>),
+
+    /// Field of a value.
+    /// Example: `point.x`
+    Field(Box<Expr>, String),
 
     /// A single 32-bit integer.
     /// Example: `8`
@@ -121,27 +145,23 @@ pub enum Expression {
 
     /// A boolean literal.
     /// Example: `false`
-    Boolean(bool),
+    Bool(bool),
 
     /// A function call.
     /// Example: `f(x)`
-    Call(Box<Expression>, Vec<Expression>),
+    Call(Box<Expr>, Vec<Expr>),
 
     /// Application of unary operator.
     /// Example: `!false`
-    Unary(UnaryOperator, Box<Expression>),
-
-    /// Application of action.
-    /// Example: `x++`
-    Action(Action, Box<LeftValue>),
+    Unary(UnaryOp, Box<Expr>),
 
     /// Application of binary operator.
     /// Example: `a + b`
-    Binary(BinaryOperator, Box<Expression>, Box<Expression>),
+    Binary(BinaryOp, Box<Expr>, Box<Expr>),
 
     /// Application of conditional operator.
     /// Example: `cond ? a : b`
-    Conditional(Box<Expression>, Box<Expression>, Box<Expression>),
+    Conditional(Box<Expr>, Box<Expr>, Box<Expr>),
 }
 
 /// A type.
@@ -170,57 +190,55 @@ pub enum Type {
     /// `*int` is `Pointer(Int32)`
     Pointer(Box<Type>),
 
+    /// Array of given type.
+    /// Example:
+    /// `int x[4]` is `Array(Int32, [4])`
+    Array(Box<Type>, Vec<i32>),
+
     /// Function pointer to given type.
     /// Example:
     /// `void (*x)(int)` is `Function([Int32], Void)`
     Function(Vec<Type>, Box<Type>),
-}
 
-/// Parameter of function.
-/// Example: `int x`
-pub struct Param {
-    /// Identifier of parameter.
-    pub identifier: String,
+    /// Enum of given name.
+    /// Example:
+    /// `enum fruits` is `Enum("fruits")`
+    Enum(String),
 
-    /// Type of parameter.
-    pub param_type: Type,
-}
+    /// Union of given name.
+    /// Example:
+    /// `union numbers` is `Union("numbers")`
+    Union(String),
 
-/// Left value.
-/// Example: `x, a[2]`
-pub struct LeftValue {
-    /// Name of left value.
-    pub identifier: String,
-
-    /// Array indexer of left value.
-    pub indexer: Vec<Expression>,
+    /// Struct of given name.
+    /// Example:
+    /// `struct numbers` is `Struct("numbers")`
+    Struct(String),
 }
 
 /// Unary operator type.
 /// Unlike action, target of unary operator does not need to be a left value.
 /// Example: `!`, `~`
-pub enum UnaryOperator {
+pub enum UnaryOp {
     /// `!`
     Not,
     /// `~`
     Inv,
     /// `-`
     Neg,
-}
-
-/// Action type.
-/// Unlike unary operator, target of action must be a left value.
-/// Example: `++`, `--`
-pub enum Action {
     /// `++`
     Inc,
     /// `--`
     Dec,
+    /// Indirection operator, `*`
+    Ind,
+    /// Address operator, `&`
+    Addr,
 }
 
 /// Bianry operator type.
 /// Example: `+`, `-`
-pub enum BinaryOperator {
+pub enum BinaryOp {
     /// +
     Add,
     /// -
