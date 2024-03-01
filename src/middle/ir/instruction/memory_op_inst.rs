@@ -67,7 +67,7 @@ impl IRBuilder {
     /// # use compiler::middle::ir::*;
     /// let mut ir_builder = IRBuilder::new();
     /// let ptr = ir_builder.get_alloca(ValueType::Int, 1);// %ptr = alloca i32
-    /// let value = ir_builder.get_const_int(1, 32);// %value = 1
+    /// let value = ir_builder.get_int_const(1);// %value = 1
     /// let store_0 = ir_builder.get_store(value, ptr);// store i32 %value, ptr %ptr
     /// ```
     pub fn get_store(&mut self, value: InstPtr, ptr: InstPtr) -> InstPtr {
@@ -97,7 +97,7 @@ impl IRBuilder {
     /// # use compiler::middle::ir::*;
     /// let mut ir_builder = IRBuilder::new();
     /// let ptr = ir_builder.get_alloca(ValueType::Int, 1);// %ptr = alloca i32
-    /// let index = vec![ir_builder.get_const_int(1, 32)];// %index = 1
+    /// let index = vec![ir_builder.get_int_const(1)];// %index = 1
     /// let getelementptr_0 = ir_builder.get_getelementptr(ValueType::Int, ptr, index);// %getelementptr_0 = getelementptr i32, ptr %ptr, i32 %index
     /// ```
     pub fn get_getelementptr(
