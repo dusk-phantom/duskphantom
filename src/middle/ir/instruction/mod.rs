@@ -1,5 +1,6 @@
 use super::*;
 pub mod binary_inst;
+pub mod const_inst;
 pub mod head;
 pub mod memory_op_inst;
 pub mod terminator_inst;
@@ -50,7 +51,10 @@ define_inst_type_enum!(
     ICmp,
     FCmp,
     Phi,
-    Call
+    Call,
+    // Constant Values
+    IntConst,
+    FloatConst
 );
 
 pub trait Instruction: Display {
