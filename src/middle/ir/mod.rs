@@ -11,8 +11,8 @@ pub use self::basic_block::{BBPtr, BasicBlock};
 pub use self::function::{FunPtr, Function};
 pub use self::instruction::{InstPtr, Instruction};
 pub use self::module::Module;
+pub use ir_builder::IRBuilder;
+pub use value_type::ValueType;
 
 use crate::utils::mem::{ObjPool, ObjPtr};
-use ir_builder::IRBuilder;
 use std::collections::{HashSet, VecDeque};
-use value_type::ValueType;

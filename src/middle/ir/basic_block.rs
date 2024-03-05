@@ -149,6 +149,10 @@ impl BasicBlock {
             next: self.head_inst.get_next(),
         }
     }
+
+    pub fn gen_llvm_ir(&self) -> String {
+        todo!()
+    }
 }
 
 impl Extend<InstPtr> for BasicBlock {
