@@ -43,7 +43,7 @@ impl IRBuilder {
     /// let ptr = ir_builder.get_alloca(ValueType::Int, 1);// %ptr = alloca i32
     /// let load_0 = ir_builder.get_load(ValueType::Int, ptr);// %load_0 = load i32, ptr
     /// ```
-    pub fn get_load(&mut self, value_type: ValueType, ptr: InstPtr) -> InstPtr {
+    pub fn get_load(&mut self, value_type: ValueType, ptr: Operand) -> InstPtr {
         let mut inst = self.new_instruction(Box::new(Load {
             value_type,
             manager: InstManager::new(),
@@ -70,7 +70,7 @@ impl IRBuilder {
     /// let value = ir_builder.get_int_const(1);// %value = 1
     /// let store_0 = ir_builder.get_store(value, ptr);// store i32 %value, ptr %ptr
     /// ```
-    pub fn get_store(&mut self, value: InstPtr, ptr: InstPtr) -> InstPtr {
+    pub fn get_store(&mut self, value: Operand, ptr: Operand) -> InstPtr {
         let mut inst = self.new_instruction(Box::new(Store {
             manager: InstManager::new(),
         }));
@@ -103,8 +103,8 @@ impl IRBuilder {
     pub fn get_getelementptr(
         &mut self,
         element_type: ValueType,
-        ptr: InstPtr,
-        index: Vec<InstPtr>,
+        ptr: Operand,
+        index: Vec<Operand>,
     ) -> InstPtr {
         let mut inst = self.new_instruction(Box::new(GetElementPtr {
             element_type,
@@ -162,14 +162,14 @@ impl Load {
     /// Get the pointer to the value to be loaded
     /// # Return
     /// The pointer to the value to be loaded
-    pub fn get_ptr(&self) -> InstPtr {
-        self.get_operand()[0]
+    pub fn get_ptr(&self) -> &Operand {
+        &self.get_operand()[0]
     }
 
     /// Set the pointer to the value to be loaded
     /// # Arguments
     /// * `ptr` - The pointer to the value to be loaded
-    pub unsafe fn set_ptr(&mut self, ptr: InstPtr) {
+    pub unsafe fn set_ptr(&mut self, ptr: Operand) {
         self.get_manager_mut().set_operand(0, ptr);
     }
 }
@@ -187,7 +187,7 @@ impl Instruction for Load {
             "{} = load {}, ptr {}",
             self,
             self.value_type,
-            self.get_operand()[0].as_ref()
+            self.get_operand()[0]
         )
     }
 }
@@ -200,28 +200,28 @@ impl Store {
     /// Get the value to be stored
     /// # Return
     /// The value to be stored
-    pub fn get_value(&self) -> InstPtr {
-        self.get_operand()[0]
+    pub fn get_value(&self) -> &Operand {
+        &self.get_operand()[0]
     }
 
     /// Get the pointer to the value to be stored
     /// # Return
     /// The pointer to the value to be stored
-    pub fn get_ptr(&self) -> InstPtr {
-        self.get_operand()[1]
+    pub fn get_ptr(&self) -> &Operand {
+        &self.get_operand()[1]
     }
 
     /// Set the value to be stored
     /// # Arguments
     /// * `value` - The value to be stored
-    pub unsafe fn set_value(&mut self, value: InstPtr) {
+    pub unsafe fn set_value(&mut self, value: Operand) {
         self.get_manager_mut().set_operand(0, value);
     }
 
     /// Set the pointer to the value to be stored
     /// # Arguments
     /// * `ptr` - The pointer to the value to be stored
-    pub unsafe fn set_ptr(&mut self, ptr: InstPtr) {
+    pub unsafe fn set_ptr(&mut self, ptr: Operand) {
         self.get_manager_mut().set_operand(1, ptr);
     }
 }
@@ -237,9 +237,14 @@ impl Instruction for Store {
     fn gen_llvm_ir(&self) -> String {
         format!(
             "store {} {}, ptr {}",
-            self.get_operand()[0].get_type(),
-            self.get_operand()[0].as_ref(),
-            self.get_operand()[1].as_ref()
+            match &self.get_operand()[0] {
+                Operand::Instruction(inst) => format!("{}", inst.get_type()),
+                Operand::Constant(c) => format!("{}", c.get_type()),
+                Operand::Parametr(param) => format!("{}", param.get_type()),
+                _ => panic!("Invalid operand type"),
+            },
+            self.get_operand()[0],
+            self.get_operand()[1]
         )
     }
 }
@@ -256,32 +261,32 @@ impl GetElementPtr {
     /// Get the pointer to the array or the struct
     /// # Return
     /// The pointer to the array or the struct
-    pub fn get_ptr(&self) -> InstPtr {
-        self.get_operand()[0]
+    pub fn get_ptr(&self) -> &Operand {
+        &self.get_operand()[0]
     }
 
     /// Set the pointer to the array or the struct
     /// # Arguments
     /// * `ptr` - The pointer to the array or the struct
-    pub unsafe fn set_ptr(&mut self, ptr: InstPtr) {
+    pub unsafe fn set_ptr(&mut self, ptr: Operand) {
         self.get_manager_mut().set_operand(0, ptr);
     }
 
     /// Get the index of the element to be accessed
     /// # Return
     /// The index of the element to be accessed
-    pub fn get_index(&self) -> &[InstPtr] {
+    pub fn get_index(&self) -> &[Operand] {
         &self.get_operand()[1..]
     }
 
     /// Set the index of the element to be accessed
     /// # Arguments
     /// * `index` - The index of the element to be accessed
-    pub unsafe fn set_index(&mut self, index: Vec<InstPtr>) {
+    pub unsafe fn set_index(&mut self, index: Vec<Operand>) {
         let operand_len = self.get_operand().len();
 
-        for i in 1..operand_len {
-            self.get_manager_mut().set_operand(i, index[i - 1]);
+        for (i, idx) in index.into_iter().enumerate() {
+            self.get_manager_mut().set_operand(i + 1, idx);
         }
     }
 }
@@ -299,11 +304,11 @@ impl Instruction for GetElementPtr {
             "{} = getelementptr {}, ptr {}",
             self,
             self.element_type,
-            self.get_operand()[0].as_ref()
+            self.get_operand()[0]
         );
         if self.get_operand().len() > 1 {
             for index in &self.get_operand()[1..] {
-                s.push_str(&format!(", i32 {}", index.as_ref()));
+                s.push_str(&format!(", i32 {}", index));
             }
         }
         s

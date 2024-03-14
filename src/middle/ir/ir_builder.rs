@@ -25,7 +25,7 @@ impl IRBuilder {
             entry: None,
             exit: None,
             return_type,
-            params: self.new_basicblock(format!("p_{}", name)),
+            params: Vec::new(),
         };
         self.fun_pool.alloc(func)
     }

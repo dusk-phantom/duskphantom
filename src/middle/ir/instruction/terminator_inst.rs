@@ -14,7 +14,10 @@ impl IRBuilder {
             manager: InstManager::new(),
         }));
         if let Some(return_value) = return_value {
-            unsafe { ret.get_manager_mut().add_operand(return_value) };
+            unsafe {
+                ret.get_manager_mut()
+                    .add_operand(Operand::Instruction(return_value))
+            };
         }
         ret
     }
@@ -24,7 +27,7 @@ impl IRBuilder {
             manager: InstManager::new(),
         }));
         if let Some(cond) = cond {
-            unsafe { br.get_manager_mut().add_operand(cond) };
+            unsafe { br.get_manager_mut().add_operand(Operand::Instruction(cond)) };
         }
         br
     }
@@ -35,8 +38,8 @@ impl Ret {
         self.manager.operand.len() == 0
     }
 
-    pub fn get_return_value(&self) -> InstPtr {
-        self.manager.operand[0]
+    pub fn get_return_value(&self) -> &Operand {
+        &self.manager.operand[0]
     }
 }
 
@@ -44,8 +47,8 @@ impl Br {
     pub fn is_cond_br(&self) -> bool {
         self.manager.operand.len() == 1
     }
-    pub fn get_cond(&self) -> InstPtr {
-        self.manager.operand[0]
+    pub fn get_cond(&self) -> &Operand {
+        &self.manager.operand[0]
     }
 }
 
@@ -68,7 +71,7 @@ impl Instruction for Ret {
         if self.is_void() {
             format!("ret void")
         } else {
-            format!("ret {}", self.get_return_value().as_ref())
+            format!("ret {}", self.get_return_value())
         }
     }
 }
@@ -82,12 +85,12 @@ impl Instruction for Br {
             let next_bb = parent_bb.get_succ_bb();
             format!(
                 "br i1 {}, label %{}, label %{}",
-                self.get_cond().as_ref(),
+                self.get_cond(),
                 next_bb[0].name,
                 next_bb[1].name
             )
         } else {
-            format!("br label %{}", self.manager.operand[0].as_ref())
+            format!("br label %{}", self.manager.operand[0])
         }
     }
 }

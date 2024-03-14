@@ -3,10 +3,10 @@ use crate::impl_binary_inst;
 
 /// impl for binary operation and bitwise binary_inst
 pub trait BinaryInst {
-    fn get_lhs(&self) -> InstPtr;
-    fn set_lhs(&mut self, lhs: InstPtr);
-    fn get_rhs(&self) -> InstPtr;
-    fn set_rhs(&mut self, rhs: InstPtr);
+    fn get_lhs(&self) -> &Operand;
+    fn set_lhs(&mut self, lhs: Operand);
+    fn get_rhs(&self) -> &Operand;
+    fn set_rhs(&mut self, rhs: Operand);
 }
 
 impl_binary_inst!(Add, "i32", get_add, lhs, rhs);
