@@ -106,22 +106,22 @@ macro_rules! impl_binary_inst {
         }
         impl BinaryInst for $type {
             #[inline]
-            fn get_lhs(&self) -> InstPtr {
-                self.manager.operand[0]
+            fn get_lhs(&self) -> &Operand {
+                &self.manager.operand[0]
             }
 
             #[inline]
-            fn set_lhs(&mut self, lhs: InstPtr) {
+            fn set_lhs(&mut self, lhs: Operand) {
                 unsafe { self.get_manager_mut().set_operand(0, lhs) };
             }
 
             #[inline]
-            fn get_rhs(&self) -> InstPtr {
-                self.manager.operand[1]
+            fn get_rhs(&self) -> &Operand {
+                &self.manager.operand[1]
             }
 
             #[inline]
-            fn set_rhs(&mut self, rhs: InstPtr) {
+            fn set_rhs(&mut self, rhs: Operand) {
                 unsafe { self.get_manager_mut().set_operand(1, rhs) };
             }
         }
@@ -135,8 +135,8 @@ macro_rules! impl_binary_inst {
                     self,
                     self.get_type(),
                     $operand_type,
-                    self.get_lhs().as_ref(),
-                    self.get_rhs().as_ref()
+                    self.get_lhs(),
+                    self.get_rhs()
                 )
             }
         }
@@ -149,7 +149,7 @@ macro_rules! impl_binary_inst {
 
         impl IRBuilder {
             /// Get a new inst instruction with operands.
-            pub fn $func(&mut self, $lhs: InstPtr, $rhs: InstPtr) -> InstPtr {
+            pub fn $func(&mut self, $lhs: Operand, $rhs: Operand) -> InstPtr {
                 let mut inst = self.new_instruction(Box::new($type {
                     manager: InstManager::new(),
                 }));

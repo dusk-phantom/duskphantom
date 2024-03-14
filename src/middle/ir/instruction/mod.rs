@@ -1,15 +1,22 @@
 use super::*;
 pub mod binary_inst;
-pub mod const_inst;
 pub mod head;
 pub mod memory_op_inst;
+pub mod operand;
 pub mod terminator_inst;
 pub mod unary_inst;
 
 pub type InstPtr = ObjPtr<Box<dyn Instruction>>;
 
 use crate::{define_inst_type_enum, gen_common_code};
-use std::{any::Any, fmt::Display};
+use operand::Operand;
+use std::any::Any;
+
+impl Display for InstPtr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_ref())
+    }
+}
 
 define_inst_type_enum!(
     // You will never get this type
@@ -51,10 +58,7 @@ define_inst_type_enum!(
     ICmp,
     FCmp,
     Phi,
-    Call,
-    // Constant Values
-    IntConst,
-    FloatConst
+    Call
 );
 
 pub trait Instruction: Display {
@@ -95,7 +99,7 @@ pub trait Instruction: Display {
 
     /// Returns the operands of current instruction.
     #[inline]
-    fn get_operand(&self) -> &[InstPtr] {
+    fn get_operand(&self) -> &[Operand] {
         &self.get_manager().operand
     }
 
@@ -104,7 +108,7 @@ pub trait Instruction: Display {
     /// # Safety
     /// You should not use this function, because it may cause unknown errors.
     #[inline]
-    unsafe fn get_operand_mut(&mut self) -> &mut Vec<InstPtr> {
+    unsafe fn get_operand_mut(&mut self) -> &mut Vec<Operand> {
         &mut self.get_manager_mut().operand
     }
 
@@ -258,8 +262,10 @@ pub trait Instruction: Display {
             manager.prev = None;
             manager.next = None;
             manager.operand.iter_mut().for_each(|op| {
-                op.get_user_mut()
-                    .retain(|user| !std::ptr::eq(user.as_ref().as_ref(), self_p.as_ref()));
+                if let Operand::Instruction(op) = op {
+                    op.get_user_mut()
+                        .retain(|user| !std::ptr::eq(user.as_ref().as_ref(), self_p.as_ref()));
+                }
             });
             manager.operand.clear();
         }
@@ -381,7 +387,7 @@ pub struct InstManager {
     /// For example: `add a, b`
     /// At this time, the `add` instruction's operand has `a` and `b`.
     /// The order of `operand` needs to be considered.
-    operand: Vec<InstPtr>,
+    operand: Vec<Operand>,
 
     /// Prev instruction of current instruction, if current instruction is not in a `BasicBlock`, it is None.
     prev: Option<InstPtr>,
@@ -416,16 +422,19 @@ impl InstManager {
 }
 
 impl InstManager {
-    pub unsafe fn set_operand(&mut self, index: usize, mut operand: InstPtr) {
-        self.operand[index]
-            .get_user_mut()
-            .retain(|&user| user != self.self_ptr.unwrap());
-        operand.get_user_mut().push(self.self_ptr.unwrap());
+    pub unsafe fn set_operand(&mut self, index: usize, mut operand: Operand) {
+        if let Operand::Instruction(mut inst) = self.operand[index] {
+            inst.get_user_mut()
+                .retain(|&user| user != self.self_ptr.unwrap());
+            inst.get_user_mut().push(self.self_ptr.unwrap());
+        }
         self.operand[index] = operand;
     }
 
-    pub unsafe fn add_operand(&mut self, mut operand: InstPtr) {
-        operand.get_user_mut().push(self.self_ptr.unwrap());
+    pub unsafe fn add_operand(&mut self, mut operand: Operand) {
+        if let Operand::Instruction(mut operand) = operand {
+            operand.get_user_mut().push(self.self_ptr.unwrap());
+        }
         self.operand.push(operand);
     }
 

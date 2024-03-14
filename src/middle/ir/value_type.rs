@@ -4,6 +4,7 @@ pub enum ValueType {
     Void,
     Int,
     Float,
+    Bool,
     Array(Box<ValueType>, usize),
     Pointer(Box<ValueType>),
 }
@@ -14,6 +15,7 @@ impl std::fmt::Display for ValueType {
             ValueType::Void => write!(f, "void"),
             ValueType::Int => write!(f, "i32"),
             ValueType::Float => write!(f, "float"),
+            ValueType::Bool => write!(f, "i1"),
             ValueType::Array(one_type, size) => write!(f, "[{} x {}]", size, one_type),
             ValueType::Pointer(pointer) => write!(f, "{}*", pointer),
         }

@@ -19,7 +19,7 @@ pub struct Function {
     pub return_type: ValueType,
 
     /// BasicBlock of function parameters
-    pub params: BBPtr,
+    pub params: Vec<Parameter>,
 }
 
 impl Function {
@@ -61,3 +61,21 @@ define_graph_iterator!(BFSIterator, VecDeque<BBPtr>, pop_front, get_succ_bb);
 define_graph_iterator!(BFSIteratorRev, VecDeque<BBPtr>, pop_front, get_pred_bb);
 define_graph_iterator!(DFSIterator, Vec<BBPtr>, pop, get_succ_bb);
 define_graph_iterator!(DFSIteratorRev, Vec<BBPtr>, pop, get_pred_bb);
+
+#[derive(Clone)]
+pub struct Parameter {
+    pub name: String,
+    pub value_type: ValueType,
+}
+
+impl Display for Parameter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {}", self.value_type, self.name)
+    }
+}
+
+impl Parameter {
+    pub fn get_type(&self) -> ValueType {
+        self.value_type.clone()
+    }
+}
