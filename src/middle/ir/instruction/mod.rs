@@ -2,14 +2,12 @@ use super::*;
 pub mod binary_inst;
 pub mod head;
 pub mod memory_op_inst;
-pub mod operand;
 pub mod terminator_inst;
 pub mod unary_inst;
 
 pub type InstPtr = ObjPtr<Box<dyn Instruction>>;
 
 use crate::{define_inst_type_enum, gen_common_code};
-use operand::Operand;
 use std::any::Any;
 
 impl Display for InstPtr {
