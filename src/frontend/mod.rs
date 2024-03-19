@@ -20,6 +20,7 @@ pub use rayon::iter::Either;
 pub use winnow::ascii::space0;
 pub use winnow::ascii::space1;
 pub use winnow::combinator::alt;
+pub use winnow::combinator::preceded;
 pub use winnow::combinator::repeat;
 pub use winnow::combinator::separated;
 pub use winnow::combinator::trace;

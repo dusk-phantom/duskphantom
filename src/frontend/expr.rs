@@ -10,7 +10,7 @@ pub enum Expr {
 
     /// An array, union or struct.
     /// Example: `{ 1, 2, 3 }`
-    Pack(Vec<Box<Expr>>),
+    Pack(Vec<Expr>),
 
     /// A named instantiation of an union or struct.
     /// Example: `{ x: 1, y: 2 }` or `{ .x = 1 }`
@@ -46,7 +46,7 @@ pub enum Expr {
 
     /// A function call.
     /// Example: `f(x, y)`
-    Call(Box<Expr>, Vec<Box<Expr>>),
+    Call(Box<Expr>, Vec<Expr>),
 
     /// Application of unary operator.
     /// Example: `!false`, `x++`
@@ -61,15 +61,16 @@ pub enum Expr {
     Conditional(Box<Expr>, Box<Expr>, Box<Expr>),
 }
 
-pub fn expr(input: &mut &str) -> PResult<Box<Expr>> {
-    let atom = alt((ident1.map(Box::new(Expr::Var)), expr));
-    alt((
-        curly(separated(0.., expr, pad0(','))).map(|vec| Box::new(Expr::Pack(vec))),
-        curly(separated(0.., map_entry, pad0(','))).map(|vec| Box::new(Expr::Map(vec))),
+pub fn expr(input: &mut &str) -> PResult<Expr> {
+    let atom = alt((
+        ident1.map(Expr::Var),
+        curly(separated(0.., expr, pad0(','))).map(Expr::Pack),
+        curly(separated(0.., map_entry, pad0(','))).map(Expr::Map),
         paren(expr),
-        atom.flat_map(|base| {
-            repeat(0.., bracket(expr)).fold(|| base, |acc, item| Box::new(Expr::Index(acc, item)))
-        }),
-    ))
-    .parse_next(input)
+    ));
+    let field = lrec(atom, repeat(0.., preceded(pad0('.'), ident1)), Expr::Field);
+    let mut index = lrec(field, repeat(0.., pre0(bracket(expr))), |x, y| {
+        Expr::Index(x, Box::new(y))
+    });
+    index.parse_next(input)
 }

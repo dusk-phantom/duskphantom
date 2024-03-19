@@ -5,11 +5,11 @@ use super::*;
 #[derive(Clone)]
 pub struct MapEntry {
     pub id: String,
-    pub expr: Box<Expr>,
+    pub expr: Expr,
 }
 
 impl MapEntry {
-    pub fn new(id: String, expr: Box<Expr>) -> Self {
+    pub fn new(id: String, expr: Expr) -> Self {
         Self { id, expr }
     }
 }
