@@ -1,4 +1,16 @@
 use rayon::iter::Either;
+use winnow::ascii::space0;
+use winnow::ascii::space1;
+use winnow::combinator::alt;
+use winnow::combinator::separated;
+use winnow::combinator::trace;
+use winnow::error::ParserError;
+use winnow::stream::AsChar;
+use winnow::stream::Compare;
+use winnow::stream::Stream;
+use winnow::stream::StreamIsPartial;
+use winnow::PResult;
+use winnow::Parser;
 
 use crate::errors::FrontendError;
 
@@ -166,8 +178,17 @@ pub enum Expr {
     Conditional(Box<Expr>, Box<Expr>, Box<Expr>),
 }
 
+fn expr(input: &mut &str) -> PResult<Expr> {
+    alt((
+        ident1.map(Expr::Var),
+        curly(separated(1.., expr, pad(','))).map(Expr::Pack),
+    ))
+    .parse_next(input)
+}
+
 /// A type.
 /// Example: *int
+#[derive(Clone)]
 pub enum Type {
     /// Nothing. Can only be function return type.
     Void,
@@ -189,7 +210,7 @@ pub enum Type {
 
     /// Pointer to given type.
     /// Example:
-    /// `*int` is `Pointer(Int32)`
+    /// `int *` is `Pointer(Int32)`
     Pointer(Box<Type>),
 
     /// Array of given type.
@@ -218,9 +239,52 @@ pub enum Type {
     Struct(String),
 }
 
+/// A typed identifier.
+/// `ty`: type
+/// `id`: identifier name
+/// Example: `int *x` is `{ ty: Pointer(Int32), id: "x" }`
+#[derive(Clone)]
+pub struct TypedIdent {
+    pub ty: Type,
+    pub id: Option<String>,
+}
+
+impl TypedIdent {
+    pub fn new(ty: Type, id: Option<String>) -> Self {
+        Self { ty, id }
+    }
+}
+
+fn atom_type(input: &mut &str) -> PResult<Type> {
+    alt((
+        "void".value(Type::Void),
+        "int".value(Type::Int32),
+        "float".value(Type::Float32),
+        "string".value(Type::String),
+        "char".value(Type::Char),
+        "bool".value(Type::Boolean),
+        ("enum", space1, ident1).map(|(_, _, ty)| Type::Enum(ty)),
+        ("union", space1, ident1).map(|(_, _, ty)| Type::Union(ty)),
+        ("struct", space1, ident1).map(|(_, _, ty)| Type::Struct(ty)),
+    ))
+    .parse_next(input)
+}
+
+fn typed(input: &mut &str) -> PResult<TypedIdent> {
+    alt((
+        (atom_type, space1, ident0).map(|(ty, _, id)| TypedIdent::new(ty, id)),
+        (atom_type, space1, "*", space0, ident0)
+            .map(|(ty, _, _, _, id)| TypedIdent::new(Type::Pointer(Box::new(ty)), id)),
+        (atom_type, space1, ident0, space0, bracket(number))
+            .map(|(ty, _, id, _, num)| TypedIdent::new(Type::Array(Box::new(ty), num), id)),
+    ))
+    .parse_next(input)
+}
+
 /// Unary operator type.
 /// Unlike action, target of unary operator does not need to be a left value.
 /// Example: `!`, `~`
+#[derive(Clone)]
 pub enum UnaryOp {
     /// `!`
     Not,
@@ -238,8 +302,22 @@ pub enum UnaryOp {
     Addr,
 }
 
+fn unary_op(input: &mut &str) -> PResult<UnaryOp> {
+    alt((
+        '!'.value(UnaryOp::Not),
+        '~'.value(UnaryOp::Inv),
+        '-'.value(UnaryOp::Neg),
+        "++".value(UnaryOp::Inc),
+        "--".value(UnaryOp::Dec),
+        '*'.value(UnaryOp::Ind),
+        '&'.value(UnaryOp::Addr),
+    ))
+    .parse_next(input)
+}
+
 /// Bianry operator type.
 /// Example: `+`, `-`
+#[derive(Clone)]
 pub enum BinaryOp {
     /// =
     Assign,
@@ -279,6 +357,100 @@ pub enum BinaryOp {
     All,
     /// ||
     Any,
+}
+
+fn binary_op(input: &mut &str) -> PResult<BinaryOp> {
+    alt((
+        '='.value(BinaryOp::Assign),
+        '+'.value(BinaryOp::Add),
+        '-'.value(BinaryOp::Sub),
+        '/'.value(BinaryOp::Div),
+        '%'.value(BinaryOp::Mod),
+        ">>".value(BinaryOp::Shr),
+        "<<".value(BinaryOp::Shl),
+        '&'.value(BinaryOp::And),
+        '|'.value(BinaryOp::Or),
+        '^'.value(BinaryOp::Xor),
+        '>'.value(BinaryOp::Gt),
+        '<'.value(BinaryOp::Lt),
+        ">=".value(BinaryOp::Ge),
+        "<=".value(BinaryOp::Le),
+        "==".value(BinaryOp::Eq),
+        "!=".value(BinaryOp::Ne),
+        "&&".value(BinaryOp::All),
+        "||".value(BinaryOp::Any),
+    ))
+    .parse_next(input)
+}
+
+fn ident0(input: &mut &str) -> PResult<Option<String>> {
+    // TODO
+    Ok(Some(String::from("")))
+}
+
+fn ident1(input: &mut &str) -> PResult<String> {
+    // TODO
+    Ok(String::from(""))
+}
+
+fn number(input: &mut &str) -> PResult<i32> {
+    // TODO
+    Ok(51419)
+}
+
+fn bracket<Input, Output, Error, InnerParser>(
+    mut parser: InnerParser,
+) -> impl Parser<Input, Output, Error>
+where
+    Input: Stream + StreamIsPartial + Compare<char>,
+    Error: ParserError<Input>,
+    InnerParser: Parser<Input, Output, Error>,
+    <Input as Stream>::Token: AsChar,
+{
+    trace("bracket", move |input: &mut Input| {
+        let _ = '['.parse_next(input)?;
+        let _ = space0(input)?;
+        let output = parser.parse_next(input)?;
+        let _ = space0(input)?;
+        let _ = ']'.parse_next(input)?;
+        Ok(output)
+    })
+}
+
+fn curly<Input, Output, Error, InnerParser>(
+    mut parser: InnerParser,
+) -> impl Parser<Input, Output, Error>
+where
+    Input: Stream + StreamIsPartial + Compare<char>,
+    Error: ParserError<Input>,
+    InnerParser: Parser<Input, Output, Error>,
+    <Input as Stream>::Token: AsChar,
+{
+    trace("curly", move |input: &mut Input| {
+        let _ = '{'.parse_next(input)?;
+        let _ = space0(input)?;
+        let output = parser.parse_next(input)?;
+        let _ = space0(input)?;
+        let _ = '}'.parse_next(input)?;
+        Ok(output)
+    })
+}
+
+fn pad<Input, Output, Error, InnerParser>(
+    mut parser: InnerParser,
+) -> impl Parser<Input, Output, Error>
+where
+    Input: Stream + StreamIsPartial + Compare<char>,
+    Error: ParserError<Input>,
+    InnerParser: Parser<Input, Output, Error>,
+    <Input as Stream>::Token: AsChar,
+{
+    trace("pad", move |input: &mut Input| {
+        let _ = space0(input)?;
+        let output = parser.parse_next(input)?;
+        let _ = space0(input)?;
+        Ok(output)
+    })
 }
 
 pub fn parse(_src: &str) -> Result<Program, FrontendError> {
