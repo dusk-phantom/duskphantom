@@ -15,7 +15,7 @@ impl MapEntry {
 }
 
 pub fn map_entry(input: &mut &str) -> PResult<MapEntry> {
-    (ident1, pad0(':'), expr)
+    (ident, pad0(':'), expr)
         .map(|(id, _, expr)| MapEntry::new(id, expr))
         .parse_next(input)
 }

@@ -24,6 +24,10 @@ pub enum Expr {
     /// Example: `point.x`
     Field(Box<Expr>, String),
 
+    /// Field of a pointed value.
+    /// Example: `point->x`
+    Select(Box<Expr>, String),
+
     /// A single 32-bit integer.
     /// Example: `8`
     Int32(i32),
@@ -61,16 +65,59 @@ pub enum Expr {
     Conditional(Box<Expr>, Box<Expr>, Box<Expr>),
 }
 
-pub fn expr(input: &mut &str) -> PResult<Expr> {
-    let atom = alt((
-        ident1.map(Expr::Var),
+pub fn vec_expr(input: &mut &str) -> PResult<Vec<Expr>> {
+    separated(1.., expr, pad0(',')).parse_next(input)
+}
+
+pub fn box_expr(input: &mut &str) -> PResult<Box<Expr>> {
+    expr.map(Box::new).parse_next(input)
+}
+
+pub fn atom(input: &mut &str) -> PResult<Expr> {
+    alt((
+        ident.map(Expr::Var),
         curly(separated(0.., expr, pad0(','))).map(Expr::Pack),
         curly(separated(0.., map_entry, pad0(','))).map(Expr::Map),
+        integer.map(Expr::Int32),
+        float.map(Expr::Float32),
+        string_lit.map(Expr::String),
+        char_lit.map(Expr::Char),
+        "false".value(Expr::Bool(false)),
+        "true".value(Expr::Bool(true)),
         paren(expr),
+    ))
+    .parse_next(input)
+}
+
+pub fn bind_rest(init: Expr, input: &mut &str) -> PResult<Expr> {
+    alt((
+        pre0(bracket(box_expr))
+            .flat_map(|x| |input| bind_rest(Expr::Index(Box::new(init), x), input)),
+        empty.value(init),
+    ))
+    .parse_next(input)
+}
+
+pub fn expr(input: &mut &str) -> PResult<Expr> {
+    // Bind: `head[a].b(c)->d`.
+    // Tail parsers return mutation on `head`.
+    // Closures should be wrapped in `BoxF` for equal sizes.
+    // Using `BoxF` can fix type inference as well.
+    let bind_tail = alt((
+        pre0(bracket(box_expr)).map(|x| BoxF::new(|acc| Expr::Index(acc, x))),
+        preceded(pad0('.'), ident).map(|x| BoxF::new(|acc| Expr::Field(acc, x))),
+        pre0(paren(vec_expr)).map(|x| BoxF::new(|acc| Expr::Call(acc, x))),
+        preceded(pad0("->"), ident).map(|x| BoxF::new(|acc| Expr::Select(acc, x))),
     ));
-    let field = lrec(atom, repeat(0.., preceded(pad0('.'), ident1)), Expr::Field);
-    let mut index = lrec(field, repeat(0.., pre0(bracket(expr))), |x, y| {
-        Expr::Index(x, Box::new(y))
-    });
-    index.parse_next(input)
+    let bind = lrec(atom, repeat(0.., bind_tail));
+
+    // Unary operator.
+    let unary_init = unary_op.map(|op| BoxF::new(|acc| Expr::Unary(op, acc)));
+    let unary = rrec(repeat(0.., unary_init), bind);
+
+    // Level-0 binary operator.
+    let binary_tail =
+        (binary_op_lv0, unary).map(|(op, x)| BoxF::new(|acc| Expr::Binary(op, acc, Box::new(x))));
+    let binary = lrec(unary, repeat(0.., binary_tail));
+    panic!("unimplemented")
 }
