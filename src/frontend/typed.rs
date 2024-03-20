@@ -61,20 +61,9 @@ pub fn atom_type(input: &mut &str) -> PResult<Type> {
         "string".value(Type::String),
         "char".value(Type::Char),
         "bool".value(Type::Boolean),
-        ("enum", space1, ident1).map(|(_, _, ty)| Type::Enum(ty)),
-        ("union", space1, ident1).map(|(_, _, ty)| Type::Union(ty)),
-        ("struct", space1, ident1).map(|(_, _, ty)| Type::Struct(ty)),
-    ))
-    .parse_next(input)
-}
-
-pub fn typed(input: &mut &str) -> PResult<TypedIdent> {
-    alt((
-        (atom_type, space1, ident0).map(|(ty, _, id)| TypedIdent::new(ty, id)),
-        (atom_type, space1, "*", space0, ident0)
-            .map(|(ty, _, _, _, id)| TypedIdent::new(Type::Pointer(Box::new(ty)), id)),
-        (atom_type, space1, ident0, space0, bracket(number))
-            .map(|(ty, _, id, _, num)| TypedIdent::new(Type::Array(Box::new(ty), num), id)),
+        ("enum", space1, ident).map(|(_, _, ty)| Type::Enum(ty)),
+        ("union", space1, ident).map(|(_, _, ty)| Type::Union(ty)),
+        ("struct", space1, ident).map(|(_, _, ty)| Type::Struct(ty)),
     ))
     .parse_next(input)
 }
