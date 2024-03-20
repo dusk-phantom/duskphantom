@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use serde_yaml;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     pub num_parallel_for_global_gen_asm: usize,
