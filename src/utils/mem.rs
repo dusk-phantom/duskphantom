@@ -11,12 +11,14 @@ impl<T> ObjPtr<T> {
     pub fn new(ptr: &T) -> ObjPtr<T> {
         ObjPtr(NonNull::new(ptr as *const _ as *mut _).unwrap())
     }
-
-    pub fn as_ref(&self) -> &T {
+}
+impl<T> AsRef<T> for ObjPtr<T> {
+    fn as_ref(&self) -> &T {
         unsafe { self.0.as_ref() }
     }
-
-    pub fn as_mut(&mut self) -> &mut T {
+}
+impl<T> AsMut<T> for ObjPtr<T> {
+    fn as_mut(&mut self) -> &mut T {
         unsafe { self.0.as_mut() }
     }
 }
@@ -36,7 +38,7 @@ impl<T> DerefMut for ObjPtr<T> {
 
 impl<T> Clone for ObjPtr<T> {
     fn clone(&self) -> Self {
-        ObjPtr(self.0.clone())
+        *self
     }
 }
 
@@ -75,12 +77,20 @@ where
     arena: typed_arena::Arena<std::pin::Pin<Box<T>>>,
 }
 
-impl<T> ObjPool<T> {
-    /// 构造一个新的内存分配器
-    pub fn new() -> Self {
+impl<T> Default for ObjPool<T>
+where
+    T: Sized,
+{
+    fn default() -> Self {
         Self {
             arena: typed_arena::Arena::new(),
         }
+    }
+}
+impl<T> ObjPool<T> {
+    /// 构造一个新的内存分配器
+    pub fn new() -> Self {
+        Default::default()
     }
 
     /// 分配一块内存存放obj
