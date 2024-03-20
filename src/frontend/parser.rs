@@ -1,32 +1,42 @@
 use super::*;
 
 pub fn ident(input: &mut &str) -> PResult<String> {
-    // TODO
-    Ok(String::from(""))
+    let head = one_of(('A'..='Z', 'a'..='z', '_')).parse_next(input)?;
+    let rest = take_while(0.., ('A'..='Z', 'a'..='z', '0'..='9', '_')).parse_next(input)?;
+    Ok(format!("{}{}", head, rest))
 }
 
 /// Parser of an integer.
 pub fn integer(input: &mut &str) -> PResult<i32> {
-    // TODO
-    Ok(51419)
+    take_while(1.., '0'..'9')
+        .map(|s: &str| s.parse().unwrap())
+        .parse_next(input)
 }
 
 /// Parser of a float.
 pub fn float(input: &mut &str) -> PResult<f32> {
-    // TODO
-    Ok(514.19)
+    let upper = take_while(1.., '0'..='9').parse_next(input)?;
+    let _ = pad0('.').parse_next(input)?;
+    let lower = take_while(1.., '0'..='9').parse_next(input)?;
+    Ok(format!("{}.{}", upper, lower).parse().unwrap())
 }
 
 /// Parser of a string literal.
 pub fn string_lit(input: &mut &str) -> PResult<String> {
-    // TODO
-    Ok("514.19".to_string())
+    // TODO escape
+    let _ = '"'.parse_next(input)?;
+    let content = take_until(0.., '"').parse_next(input)?;
+    let _ = '"'.parse_next(input)?;
+    Ok(content.to_string())
 }
 
 /// Parser of a char literal.
 pub fn char_lit(input: &mut &str) -> PResult<char> {
-    // TODO
-    Ok('c')
+    // TODO escape
+    let _ = '\''.parse_next(input)?;
+    let content = any.parse_next(input)?;
+    let _ = '\''.parse_next(input)?;
+    Ok(content)
 }
 
 /// Parser of something wrapped in `()`.
@@ -99,7 +109,7 @@ where
     InnerParser: Parser<Input, Output, Error>,
     <Input as Stream>::Token: AsChar,
 {
-    trace("pad", move |input: &mut Input| {
+    trace("pad0", move |input: &mut Input| {
         let _ = space0(input)?;
         let output = parser.parse_next(input)?;
         let _ = space0(input)?;
@@ -117,7 +127,7 @@ where
     InnerParser: Parser<Input, Output, Error>,
     <Input as Stream>::Token: AsChar,
 {
-    trace("pad", move |input: &mut Input| {
+    trace("pre0", move |input: &mut Input| {
         let _ = space0(input)?;
         let output = parser.parse_next(input)?;
         Ok(output)
@@ -134,7 +144,7 @@ where
     InnerParser: Parser<Input, Output, Error>,
     <Input as Stream>::Token: AsChar,
 {
-    trace("pad", move |input: &mut Input| {
+    trace("suf0", move |input: &mut Input| {
         let output = parser.parse_next(input)?;
         let _ = space0(input)?;
         Ok(output)
@@ -157,24 +167,6 @@ impl<T> BoxF<T> {
     }
 }
 
-/// Left recursion, function does not depend on tail parser.
-pub fn lrec_st<I, OI, OR, E, PI, PR, F>(head: PI, tail: PR, mut comb: F) -> impl Parser<I, OI, E>
-where
-    I: Stream + StreamIsPartial + Compare<char>,
-    E: ParserError<I>,
-    F: FnMut(Box<OI>, OR) -> OI,
-    PI: Parser<I, OI, E>,
-    PR: Parser<I, Vec<OR>, E>,
-{
-    (head, tail).map(move |(base, vec): (_, Vec<OR>)| {
-        let mut res = base;
-        for ix in vec {
-            res = comb(Box::new(res), ix);
-        }
-        res
-    })
-}
-
 /// Left recursion, function depends on tail parser.
 ///
 /// Different from the usual mutual-recursive implementation,
@@ -184,8 +176,9 @@ where
 /// I'm not using `Repeat::fold` because Rust compiler
 /// confuses about the ownership of its arguments.
 ///
-/// Writing mutual-recursive function for each operator is
-/// too verbose, so I made this function for simplicity.
+/// Writing mutual-recursive function for each operator is too verbose,
+/// and for left-recurse currying is required, bringing lifetime problems,
+/// so I made a procedual version for simplicity.
 ///
 /// `head`: parser of the FIRST element of left-recursive chain.
 /// `tail`: parser of ALL later elements, returning MUTATION on `head`.
@@ -200,24 +193,6 @@ where
         let mut res = base;
         for ix in vec {
             res = ix.apply(res);
-        }
-        res
-    })
-}
-
-/// Right recursion, function does not depend on init parser.
-pub fn rrec_st<I, OI, OL, E, PI, PL, F>(init: PI, last: PL, mut comb: F) -> impl Parser<I, OL, E>
-where
-    I: Stream + StreamIsPartial + Compare<char>,
-    E: ParserError<I>,
-    F: FnMut(OI, Box<OL>) -> OL,
-    PI: Parser<I, Vec<OI>, E>,
-    PL: Parser<I, OL, E>,
-{
-    (init, last).map(move |(vec, base): (Vec<OI>, _)| {
-        let mut res = base;
-        for ix in vec.into_iter().rev() {
-            res = comb(ix, Box::new(res));
         }
         res
     })

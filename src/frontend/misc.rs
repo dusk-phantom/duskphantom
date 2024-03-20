@@ -2,7 +2,7 @@ use super::*;
 
 /// A record of map assignment.
 /// Example: `x: 1`
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct MapEntry {
     pub id: String,
     pub expr: Expr,

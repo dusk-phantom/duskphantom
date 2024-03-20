@@ -1,5 +1,7 @@
 pub mod decl;
 pub mod expr;
+#[macro_use]
+mod macros;
 pub mod misc;
 pub mod oprt;
 pub mod parser;
@@ -30,5 +32,9 @@ pub use winnow::stream::AsChar;
 pub use winnow::stream::Compare;
 pub use winnow::stream::Stream;
 pub use winnow::stream::StreamIsPartial;
+pub use winnow::token::any;
+pub use winnow::token::one_of;
+pub use winnow::token::take_until;
+pub use winnow::token::take_while;
 pub use winnow::PResult;
 pub use winnow::Parser;
