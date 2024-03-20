@@ -26,3 +26,21 @@ impl Constant {
         }
     }
 }
+
+impl From<i32> for Constant {
+    fn from(i: i32) -> Self {
+        Self::Int(i)
+    }
+}
+
+impl From<f32> for Constant {
+    fn from(fl: f32) -> Self {
+        Self::Float(fl)
+    }
+}
+
+impl From<bool> for Constant {
+    fn from(b: bool) -> Self {
+        Self::Bool(b)
+    }
+}
