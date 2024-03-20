@@ -6,6 +6,7 @@ mod macros;
 pub mod constant;
 pub mod ir_builder;
 pub mod module;
+pub mod operand;
 pub mod value_type;
 
 pub use self::basic_block::{BBPtr, BasicBlock};
@@ -15,6 +16,7 @@ pub use self::module::Module;
 pub use constant::Constant;
 pub use function::Parameter;
 pub use ir_builder::IRBuilder;
+pub use operand::Operand;
 pub use value_type::ValueType;
 
 use crate::utils::mem::{ObjPool, ObjPtr};

@@ -41,7 +41,7 @@ impl IRBuilder {
     /// # use compiler::middle::ir::*;
     /// let mut ir_builder = IRBuilder::new();
     /// let ptr = ir_builder.get_alloca(ValueType::Int, 1);// %ptr = alloca i32
-    /// let load_0 = ir_builder.get_load(ValueType::Int, ptr);// %load_0 = load i32, ptr
+    /// let load_0 = ir_builder.get_load(ValueType::Int, Operand::Instruction(ptr));// %load_0 = load i32, ptr
     /// ```
     pub fn get_load(&mut self, value_type: ValueType, ptr: Operand) -> InstPtr {
         let mut inst = self.new_instruction(Box::new(Load {
@@ -67,8 +67,8 @@ impl IRBuilder {
     /// # use compiler::middle::ir::*;
     /// let mut ir_builder = IRBuilder::new();
     /// let ptr = ir_builder.get_alloca(ValueType::Int, 1);// %ptr = alloca i32
-    /// let value = ir_builder.get_int_const(1);// %value = 1
-    /// let store_0 = ir_builder.get_store(value, ptr);// store i32 %value, ptr %ptr
+    /// let value = Operand::Constant(1.into());// %value = 1
+    /// let store_0 = ir_builder.get_store(value, Operand::Instruction(ptr));// store i32 %value, ptr %ptr
     /// ```
     pub fn get_store(&mut self, value: Operand, ptr: Operand) -> InstPtr {
         let mut inst = self.new_instruction(Box::new(Store {
@@ -97,8 +97,8 @@ impl IRBuilder {
     /// # use compiler::middle::ir::*;
     /// let mut ir_builder = IRBuilder::new();
     /// let ptr = ir_builder.get_alloca(ValueType::Int, 1);// %ptr = alloca i32
-    /// let index = vec![ir_builder.get_int_const(1)];// %index = 1
-    /// let getelementptr_0 = ir_builder.get_getelementptr(ValueType::Int, ptr, index);// %getelementptr_0 = getelementptr i32, ptr %ptr, i32 %index
+    /// let index = vec![Operand::Constant(1.into())];// %index = 1
+    /// let getelementptr_0 = ir_builder.get_getelementptr(ValueType::Int, Operand::Instruction(ptr), index);// %getelementptr_0 = getelementptr i32, ptr %ptr, i32 %index
     /// ```
     pub fn get_getelementptr(
         &mut self,
