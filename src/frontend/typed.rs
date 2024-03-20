@@ -2,7 +2,7 @@ use super::*;
 
 /// A type.
 /// Example: *int
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Type {
     /// Nothing. Can only be function return type.
     Void,

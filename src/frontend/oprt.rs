@@ -3,7 +3,7 @@ use super::*;
 /// Unary operator type.
 /// Unlike action, target of unary operator does not need to be a left value.
 /// Example: `!`, `~`
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum UnaryOp {
     /// `!`
     Not,
@@ -42,7 +42,7 @@ pub fn unary_op(input: &mut &str) -> PResult<UnaryOp> {
 
 /// Bianry operator type.
 /// Example: `+`, `-`
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum BinaryOp {
     /// =
     Assign,
@@ -145,7 +145,7 @@ pub fn binary_op_lv9(input: &mut &str) -> PResult<BinaryOp> {
     "||".value(BinaryOp::Any).parse_next(input)
 }
 
-/// Level 11 operators, RIGHT TO LEFT
-pub fn binary_op_lv11(input: &mut &str) -> PResult<BinaryOp> {
+/// Level 10 operators, RIGHT TO LEFT
+pub fn binary_op_lv10(input: &mut &str) -> PResult<BinaryOp> {
     '='.value(BinaryOp::Assign).parse_next(input)
 }

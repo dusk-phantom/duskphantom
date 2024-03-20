@@ -1,8 +1,10 @@
+use crate::{gen_lrec_binary, gen_rrec_binary};
+
 use super::*;
 
 /// A term that can be evaluated.
 /// Example: `f("224")`
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Expr {
     /// A single variable.
     /// Example: `x`
@@ -65,59 +67,179 @@ pub enum Expr {
     Conditional(Box<Expr>, Box<Expr>, Box<Expr>),
 }
 
+/// Parse a vector of Expr.
 pub fn vec_expr(input: &mut &str) -> PResult<Vec<Expr>> {
     separated(1.., expr, pad0(',')).parse_next(input)
 }
 
+/// Parse a box of Expr.
+/// Like an `expr`, but returns the boxed version.
 pub fn box_expr(input: &mut &str) -> PResult<Box<Expr>> {
     expr.map(Box::new).parse_next(input)
 }
 
-pub fn atom(input: &mut &str) -> PResult<Expr> {
-    alt((
+/// Parse unary expressions separated by `*`, `/` and etc.
+pub fn unary(input: &mut &str) -> PResult<Expr> {
+    let atom = alt((
         ident.map(Expr::Var),
         curly(separated(0.., expr, pad0(','))).map(Expr::Pack),
         curly(separated(0.., map_entry, pad0(','))).map(Expr::Map),
-        integer.map(Expr::Int32),
         float.map(Expr::Float32),
+        integer.map(Expr::Int32),
         string_lit.map(Expr::String),
         char_lit.map(Expr::Char),
         "false".value(Expr::Bool(false)),
         "true".value(Expr::Bool(true)),
         paren(expr),
-    ))
-    .parse_next(input)
-}
+    ));
 
-pub fn bind_rest(init: Expr, input: &mut &str) -> PResult<Expr> {
-    alt((
-        pre0(bracket(box_expr))
-            .flat_map(|x| |input| bind_rest(Expr::Index(Box::new(init), x), input)),
-        empty.value(init),
-    ))
-    .parse_next(input)
-}
-
-pub fn expr(input: &mut &str) -> PResult<Expr> {
-    // Bind: `head[a].b(c)->d`.
+    // Access: `head[a].b(c)->d`.
     // Tail parsers return mutation on `head`.
     // Closures should be wrapped in `BoxF` for equal sizes.
-    // Using `BoxF` can fix type inference as well.
-    let bind_tail = alt((
+    // Wrapping all closures with `BoxF` can also fix type inference problems,
+    // because all closures have unique types, making `alt` report errors.
+    // TODO memoize
+    let access_tail = alt((
         pre0(bracket(box_expr)).map(|x| BoxF::new(|acc| Expr::Index(acc, x))),
         preceded(pad0('.'), ident).map(|x| BoxF::new(|acc| Expr::Field(acc, x))),
         pre0(paren(vec_expr)).map(|x| BoxF::new(|acc| Expr::Call(acc, x))),
         preceded(pad0("->"), ident).map(|x| BoxF::new(|acc| Expr::Select(acc, x))),
     ));
-    let bind = lrec(atom, repeat(0.., bind_tail));
+    let access = lrec(atom, repeat(0.., access_tail));
 
     // Unary operator.
-    let unary_init = unary_op.map(|op| BoxF::new(|acc| Expr::Unary(op, acc)));
-    let unary = rrec(repeat(0.., unary_init), bind);
+    let unary_init = suf0(unary_op).map(|op| BoxF::new(|acc| Expr::Unary(op, acc)));
+    rrec(repeat(0.., unary_init), access).parse_next(input)
+}
 
-    // Level-0 binary operator.
-    let binary_tail =
-        (binary_op_lv0, unary).map(|(op, x)| BoxF::new(|acc| Expr::Binary(op, acc, Box::new(x))));
-    let binary = lrec(unary, repeat(0.., binary_tail));
-    panic!("unimplemented")
+// Generate parser for each level of expressions,
+// featuring binary operators.
+gen_lrec_binary!(binary_lv0, binary_op_lv0, unary);
+gen_lrec_binary!(binary_lv1, binary_op_lv1, binary_lv0);
+gen_lrec_binary!(binary_lv2, binary_op_lv2, binary_lv1);
+gen_lrec_binary!(binary_lv3, binary_op_lv3, binary_lv2);
+gen_lrec_binary!(binary_lv4, binary_op_lv4, binary_lv3);
+gen_lrec_binary!(binary_lv5, binary_op_lv5, binary_lv4);
+gen_lrec_binary!(binary_lv6, binary_op_lv6, binary_lv5);
+gen_lrec_binary!(binary_lv7, binary_op_lv7, binary_lv6);
+gen_lrec_binary!(binary_lv8, binary_op_lv8, binary_lv7);
+gen_lrec_binary!(binary_lv9, binary_op_lv9, binary_lv8);
+
+/// Parse a conditional expression.
+pub fn conditional(input: &mut &str) -> PResult<Expr> {
+    // The first expression is memoized, so when there's no condition,
+    // there will not be re-parsing.
+    let base = binary_lv9.parse_next(input)?;
+    match (pad0('?'), conditional, pad0(':'), conditional).parse_next(input) {
+        Ok((_, pass, _, fail)) => Ok(Expr::Conditional(
+            Box::new(base),
+            Box::new(pass),
+            Box::new(fail),
+        )),
+        Err(_) => Ok(base),
+    }
+}
+
+// Generate parser for assignment operators,
+// which have the least associativity.
+gen_rrec_binary!(expr, binary_op_lv10, conditional);
+
+// Unit tests
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+
+    #[test]
+    fn test_minimal() {
+        let code = "80";
+        match integer.parse(code) {
+            Ok(result) => assert_eq!(result, 80),
+            Err(err) => panic!("failed to parse {}: {}", code, err),
+        }
+    }
+
+    #[test]
+    fn test_unary() {
+        let code = "622.4";
+        match unary.parse(code) {
+            Ok(result) => assert_eq!(result, Expr::Float32(622.4)),
+            Err(err) => panic!("failed to parse {}: {}", code, err),
+        }
+    }
+
+    #[test]
+    fn test_int() {
+        let code = "117";
+        match expr.parse(code) {
+            Ok(result) => assert_eq!(result, Expr::Int32(117)),
+            Err(err) => panic!("failed to parse {}: {}", code, err),
+        }
+    }
+
+    #[test]
+    fn test_plus() {
+        let code = "1+1";
+        match expr.parse(code) {
+            Ok(result) => assert_eq!(
+                result,
+                Expr::Binary(
+                    BinaryOp::Add,
+                    Box::new(Expr::Int32(1)),
+                    Box::new(Expr::Int32(1))
+                )
+            ),
+            Err(err) => panic!("failed to parse {}: {}", code, err),
+        }
+    }
+
+    #[test]
+    fn test_plus_padded() {
+        let code = "1 + 1";
+        match expr.parse(code) {
+            Ok(result) => assert_eq!(
+                result,
+                Expr::Binary(
+                    BinaryOp::Add,
+                    Box::new(Expr::Int32(1)),
+                    Box::new(Expr::Int32(1))
+                )
+            ),
+            Err(err) => panic!("failed to parse {}: {}", code, err),
+        }
+    }
+
+    #[test]
+    fn test_precedence() {
+        let code = "1 + 1 * 2 - 3";
+        match expr.parse(code) {
+            Ok(result) => assert_eq!(
+                result,
+                Expr::Binary(
+                    BinaryOp::Sub,
+                    Box::new(Expr::Binary(
+                        BinaryOp::Add,
+                        Box::new(Expr::Int32(1)),
+                        Box::new(Expr::Binary(
+                            BinaryOp::Mul,
+                            Box::new(Expr::Int32(1)),
+                            Box::new(Expr::Int32(2))
+                        ))
+                    )),
+                    Box::new(Expr::Int32(3)),
+                )
+            ),
+            Err(err) => panic!("failed to parse {}: {}", code, err),
+        }
+    }
+
+    #[test]
+    fn test_bracket_consistency() {
+        let code = "xy+85.2.x->y=!--!6=7%1?1?4:5:1?4:1";
+        let another = "(xy+ (( (85.2) .x) ->y)) =(! -(-!6)=(7 %1?(1?4:5):(1?4:1)))";
+        match (expr.parse(code), expr.parse(another)) {
+            (Ok(result), Ok(answer)) => assert_eq!(result, answer,),
+            (Err(err), _) => panic!("failed to parse {}: {}", code, err),
+            (_, Err(err)) => panic!("failed to parse {}: {}", another, err),
+        }
+    }
 }
