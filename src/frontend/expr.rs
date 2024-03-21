@@ -1,4 +1,4 @@
-use crate::{gen_lrec_binary, gen_rrec_binary};
+use crate::gen_lrec_binary;
 
 use super::*;
 
@@ -98,7 +98,6 @@ pub fn unary(input: &mut &str) -> PResult<Expr> {
     // Closures should be wrapped in `BoxF` for equal sizes.
     // Wrapping all closures with `BoxF` can also fix type inference problems,
     // because all closures have unique types, making `alt` report errors.
-    // TODO memoize
     let access_tail = alt((
         pre0(bracket(box_expr)).map(|x| BoxF::new(|acc| Expr::Index(acc, x))),
         preceded(pad0('.'), ident).map(|x| BoxF::new(|acc| Expr::Field(acc, x))),
@@ -129,20 +128,26 @@ gen_lrec_binary!(binary_lv9, binary_op_lv9, binary_lv8);
 pub fn conditional(input: &mut &str) -> PResult<Expr> {
     // The first expression is memoized, so when there's no condition,
     // there will not be re-parsing.
-    let base = binary_lv9.parse_next(input)?;
+    let cond = binary_lv9.parse_next(input)?;
     match (pad0('?'), conditional, pad0(':'), conditional).parse_next(input) {
         Ok((_, pass, _, fail)) => Ok(Expr::Conditional(
-            Box::new(base),
+            Box::new(cond),
             Box::new(pass),
             Box::new(fail),
         )),
-        Err(_) => Ok(base),
+        Err(_) => Ok(cond),
     }
 }
 
 // Generate parser for assignment operators,
 // which have the least associativity.
-gen_rrec_binary!(expr, binary_op_lv10, conditional);
+pub fn expr(input: &mut &str) -> PResult<Expr> {
+    let lhs = conditional.parse_next(input)?;
+    match (pad0(binary_op_lv10), expr).parse_next(input) {
+        Ok((op, rhs)) => Ok(Expr::Binary(op, Box::new(lhs), Box::new(rhs))),
+        Err(_) => Ok(lhs),
+    }
+}
 
 // Unit tests
 #[cfg(test)]

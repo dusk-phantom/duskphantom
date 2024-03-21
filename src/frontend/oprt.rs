@@ -46,6 +46,26 @@ pub fn unary_op(input: &mut &str) -> PResult<UnaryOp> {
 pub enum BinaryOp {
     /// =
     Assign,
+    /// +=
+    AssignAdd,
+    /// -=
+    AssignSub,
+    /// *=
+    AssignMul,
+    /// /=
+    AssignDiv,
+    /// %=
+    AssignMod,
+    /// >>=
+    AssignShr,
+    /// <<=
+    AssignShl,
+    /// &=
+    AssignAnd,
+    /// |=
+    AssignOr,
+    /// ^=
+    AssignXor,
     /// +
     Add,
     /// -
@@ -147,5 +167,18 @@ pub fn binary_op_lv9(input: &mut &str) -> PResult<BinaryOp> {
 
 /// Level 10 operators, RIGHT TO LEFT
 pub fn binary_op_lv10(input: &mut &str) -> PResult<BinaryOp> {
-    '='.value(BinaryOp::Assign).parse_next(input)
+    alt((
+        '='.value(BinaryOp::Assign),
+        "+=".value(BinaryOp::AssignAdd),
+        "-=".value(BinaryOp::AssignSub),
+        "*=".value(BinaryOp::AssignMul),
+        "/=".value(BinaryOp::AssignDiv),
+        "%=".value(BinaryOp::AssignMod),
+        ">>=".value(BinaryOp::AssignShr),
+        "<<=".value(BinaryOp::AssignShl),
+        "&=".value(BinaryOp::AssignAnd),
+        "|=".value(BinaryOp::AssignOr),
+        "^=".value(BinaryOp::AssignXor),
+    ))
+    .parse_next(input)
 }
