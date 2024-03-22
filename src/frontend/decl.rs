@@ -2,7 +2,7 @@ use super::*;
 
 /// A declaration.
 /// Example: `int x = 4;`
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Decl {
     /// A declaration of a variable, optionally with assignment.
     /// Example:
@@ -33,4 +33,8 @@ pub enum Decl {
     /// `struct numbers { int i; float f; }` is
     /// `Struct("numbers", vec![(Int32, "i"), (Float32, "f")])`
     Struct(String, Vec<(Type, String)>),
+}
+
+pub fn decl(input: &mut &str) -> PResult<Decl> {
+    todo!()
 }
