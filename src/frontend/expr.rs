@@ -69,7 +69,7 @@ pub enum Expr {
 
 /// Parse a vector of Expr.
 pub fn vec_expr(input: &mut &str) -> PResult<Vec<Expr>> {
-    separated(0.., expr, pad0(',')).parse_next(input)
+    separated(0.., expr, p(',')).parse_next(input)
 }
 
 /// Parse a box of Expr.
@@ -81,15 +81,15 @@ pub fn box_expr(input: &mut &str) -> PResult<Box<Expr>> {
 /// Parse unary expressions separated by `*`, `/` and etc.
 pub fn unary(input: &mut &str) -> PResult<Expr> {
     let atom = alt((
-        ident.map(Expr::Var),
-        curly(separated(0.., expr, pad0(','))).map(Expr::Pack),
-        curly(separated(0.., map_entry, pad0(','))).map(Expr::Map),
-        float.map(Expr::Float32),
-        int.map(Expr::Int32),
-        string_lit.map(Expr::String),
-        char_lit.map(Expr::Char),
-        "false".value(Expr::Bool(false)),
-        "true".value(Expr::Bool(true)),
+        p(ident).map(Expr::Var),
+        curly(separated(0.., expr, p(','))).map(Expr::Pack),
+        curly(separated(0.., map_entry, p(','))).map(Expr::Map),
+        p(float).map(Expr::Float32),
+        p(int).map(Expr::Int32),
+        p(string_lit).map(Expr::String),
+        p(char_lit).map(Expr::Char),
+        k("false").value(Expr::Bool(false)),
+        k("true").value(Expr::Bool(true)),
         paren(expr),
     ));
 
@@ -99,15 +99,15 @@ pub fn unary(input: &mut &str) -> PResult<Expr> {
     // Wrapping all closures with `BoxF` can also fix type inference problems,
     // because all closures have unique types, making `alt` report errors.
     let access_tail = alt((
-        pre0(bracket(box_expr)).map(|x| BoxF::new(|acc| Expr::Index(acc, x))),
-        preceded(pad0('.'), ident).map(|x| BoxF::new(|acc| Expr::Field(acc, x))),
-        pre0(paren(vec_expr)).map(|x| BoxF::new(|acc| Expr::Call(acc, x))),
-        preceded(pad0("->"), ident).map(|x| BoxF::new(|acc| Expr::Select(acc, x))),
+        bracket(box_expr).map(|x| BoxF::new(|acc| Expr::Index(acc, x))),
+        preceded(p('.'), p(ident)).map(|x| BoxF::new(|acc| Expr::Field(acc, x))),
+        paren(vec_expr).map(|x| BoxF::new(|acc| Expr::Call(acc, x))),
+        preceded(p("->"), p(ident)).map(|x| BoxF::new(|acc| Expr::Select(acc, x))),
     ));
     let access = lrec(atom, repeat(0.., access_tail));
 
     // Unary operator.
-    let unary_init = suf0(unary_op).map(|op| BoxF::new(|acc| Expr::Unary(op, acc)));
+    let unary_init = unary_op.map(|op| BoxF::new(|acc| Expr::Unary(op, acc)));
     rrec(repeat(0.., unary_init), access).parse_next(input)
 }
 
@@ -129,7 +129,7 @@ pub fn conditional(input: &mut &str) -> PResult<Expr> {
     // The first expression is memoized, so when there's no condition,
     // there will not be re-parsing.
     let cond = binary_lv9.parse_next(input)?;
-    match (pad0('?'), conditional, pad0(':'), conditional).parse_next(input) {
+    match (p('?'), conditional, p(':'), conditional).parse_next(input) {
         Ok((_, pass, _, fail)) => Ok(Expr::Conditional(
             Box::new(cond),
             Box::new(pass),
@@ -143,7 +143,7 @@ pub fn conditional(input: &mut &str) -> PResult<Expr> {
 // which have the least associativity.
 pub fn expr(input: &mut &str) -> PResult<Expr> {
     let lhs = conditional.parse_next(input)?;
-    match (pad0(binary_op_lv10), expr).parse_next(input) {
+    match (p(binary_op_lv10), expr).parse_next(input) {
         Ok((op, rhs)) => Ok(Expr::Binary(op, Box::new(lhs), Box::new(rhs))),
         Err(_) => Ok(lhs),
     }
@@ -198,8 +198,8 @@ pub mod tests_expr {
     }
 
     #[test]
-    fn test_plus_padded() {
-        let code = "1 + 1";
+    fn test_space() {
+        let code = "1  +  1";
         match expr.parse(code) {
             Ok(result) => assert_eq!(
                 result,
@@ -238,8 +238,8 @@ pub mod tests_expr {
     }
 
     #[test]
-    fn test_bracket_consistency() {
-        let code = "xy+85.2.x->y=!--!6=7%1?1?4:5:1?4:1";
+    fn test_consistency() {
+        let code = "xy + 85.2 .  x -> y =!- -! 6=7  % 1 ? 1 ? 4 : 5 : 1 ? 4 : 1";
         let another = "(xy+ (( (85.2) .x) ->y)) =(! -(-!6)=(7 %1?(1?4:5):(1?4:1)))";
         match (expr.parse(code), expr.parse(another)) {
             (Ok(result), Ok(answer)) => assert_eq!(result, answer,),

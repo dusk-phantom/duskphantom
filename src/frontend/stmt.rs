@@ -63,13 +63,13 @@ pub fn vec_stmt(input: &mut &str) -> PResult<Vec<Stmt>> {
 
 pub fn atom_stmt(input: &mut &str) -> PResult<Stmt> {
     alt((
-        "break".value(Stmt::Break),
-        "continue".value(Stmt::Continue),
+        k("break").value(Stmt::Break),
+        k("continue").value(Stmt::Continue),
         decl.map(Stmt::Decl),
-        terminated(expr, pad0(';')).map(Stmt::Expr),
-        ("if", paren(expr), box_stmt, opt((pad0("else"), box_stmt)))
+        (expr, p(';')).map(|(e, _)| Stmt::Expr(e)),
+        (k("if"), paren(expr), box_stmt, opt((k("else"), box_stmt)))
             .map(|(_, cond, pass, fail)| Stmt::If(cond, pass, fail.map(|(_, s)| s))),
-        preceded(("return", space1), opt(expr)).map(Stmt::Return),
+        (k("return"), opt(expr)).map(|(_, e)| Stmt::Return(e)),
         curly(vec_stmt).map(Stmt::Block),
     ))
     .parse_next(input)
