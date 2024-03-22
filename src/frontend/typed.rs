@@ -32,9 +32,9 @@ pub enum Type {
     /// `int x[4]` is `Array(Int32, 4)`
     Array(Box<Type>, i32),
 
-    /// Function pointer to given type.
+    /// Function to given type.
     /// Example:
-    /// `void (*x)(int)` is `Function(Void, [Int32])`
+    /// `void (*x)(int)` is `Pointer(Function(Void, [Int32]))`
     Function(Box<Type>, Vec<Type>),
 
     /// Enum of given name.
