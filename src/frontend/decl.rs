@@ -14,7 +14,7 @@ pub enum Decl {
     /// Example:
     /// `void f(int x)` is `Func(Void, "f", [(Int32, (Some("x"))], None)`
     /// `void f() { ... }` is `Func(Void, "f", [], Some(...))`
-    Func(Type, String, Vec<(Type, Option<String>)>, Option<Vec<Stmt>>),
+    Func(Type, String, Option<Vec<Stmt>>),
 
     /// A declaration of an enum.
     /// Example:
@@ -36,5 +36,7 @@ pub enum Decl {
 }
 
 pub fn decl(input: &mut &str) -> PResult<Decl> {
-    todo!()
+    alt(((typed_ident, opt((p('='), expr)))
+        .verify_map(|(ti, op)| ti.id.map(|id| Decl::Var(ti.ty, id, op.map(|(_, e)| e)))),))
+    .parse_next(input)
 }

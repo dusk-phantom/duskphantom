@@ -54,21 +54,36 @@ pub enum Stmt {
 }
 
 pub fn box_stmt(input: &mut &str) -> PResult<Box<Stmt>> {
-    todo!()
+    stmt.map(Box::new).parse_next(input)
 }
 
 pub fn vec_stmt(input: &mut &str) -> PResult<Vec<Stmt>> {
-    todo!()
+    repeat(0.., stmt).parse_next(input)
 }
 
-pub fn atom_stmt(input: &mut &str) -> PResult<Stmt> {
+/// Expression with semicolon.
+pub fn expr_sc(input: &mut &str) -> PResult<Expr> {
+    (expr, p(';')).map(|(e, _)| e).parse_next(input)
+}
+
+/// Decl or Expr.
+pub fn decl_or_expr(input: &mut &str) -> PResult<Either<Decl, Expr>> {
+    alt((decl.map(Either::Left), expr_sc.map(Either::Right))).parse_next(input)
+}
+
+pub fn stmt(input: &mut &str) -> PResult<Stmt> {
     alt((
         k("break").value(Stmt::Break),
         k("continue").value(Stmt::Continue),
         decl.map(Stmt::Decl),
-        (expr, p(';')).map(|(e, _)| Stmt::Expr(e)),
+        expr_sc.map(Stmt::Expr),
         (k("if"), paren(expr), box_stmt, opt((k("else"), box_stmt)))
             .map(|(_, cond, pass, fail)| Stmt::If(cond, pass, fail.map(|(_, s)| s))),
+        (k("while"), paren(expr), box_stmt).map(|(_, cond, body)| Stmt::While(cond, body)),
+        (k("do"), box_stmt, k("while"), paren(expr))
+            .map(|(_, body, _, cond)| Stmt::DoWhile(body, cond)),
+        (k("for"), paren((decl_or_expr, expr_sc, expr)), box_stmt)
+            .map(|(_, (a, b, c), s)| Stmt::For(a, b, c, s)),
         (k("return"), opt(expr)).map(|(_, e)| Stmt::Return(e)),
         curly(vec_stmt).map(Stmt::Block),
     ))
