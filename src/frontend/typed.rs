@@ -238,6 +238,21 @@ pub mod tests_typed {
     }
 
     #[test]
+    fn test_usage() {
+        let code = "*(int)";
+        match usage.parse(code) {
+            Ok(result) => assert_eq!(
+                result,
+                IdentUsage::Pointer(Box::new(IdentUsage::Call(
+                    Box::new(IdentUsage::Nothing),
+                    vec![Type::Int32],
+                )))
+            ),
+            Err(err) => panic!("failed to parse {}: {}", code, err),
+        }
+    }
+
+    #[test]
     fn test_pointer_function() {
         let code = "int *(int)";
         match single_type.parse(code) {
@@ -248,6 +263,15 @@ pub mod tests_typed {
                     vec![Type::Int32],
                 )
             ),
+            Err(err) => panic!("failed to parse {}: {}", code, err),
+        }
+    }
+
+    #[test]
+    fn test_vec_minimal() {
+        let code = "int";
+        match vec_type.parse(code) {
+            Ok(result) => assert_eq!(result, vec![Type::Int32,]),
             Err(err) => panic!("failed to parse {}: {}", code, err),
         }
     }
