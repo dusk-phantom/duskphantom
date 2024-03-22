@@ -1,9 +1,22 @@
 use super::*;
 
-pub fn ident(input: &mut &str) -> PResult<String> {
+/// Parser of a word that begins with letter,
+/// and continues with letters or numbers.
+/// For example, `int`, `x114ee`
+pub fn word(input: &mut &str) -> PResult<String> {
     let head = one_of(('A'..='Z', 'a'..='z', '_')).parse_next(input)?;
     let rest = take_while(0.., ('A'..='Z', 'a'..='z', '0'..='9', '_')).parse_next(input)?;
     Ok(format!("{}{}", head, rest))
+}
+
+/// List of all keywords.
+const KEYWORD: [&'static str; 11] = [
+    "void", "int", "float", "string", "char", "bool", "struct", "enum", "union", "false", "true",
+];
+
+/// Parser of an identifier, a word which is not a keyword.
+pub fn ident(input: &mut &str) -> PResult<String> {
+    word.verify(|x| !KEYWORD.contains(&x)).parse_next(input)
 }
 
 /// Parser of an integer.
