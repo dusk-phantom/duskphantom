@@ -69,7 +69,7 @@ pub enum Expr {
 
 /// Parse a vector of Expr.
 pub fn vec_expr(input: &mut &str) -> PResult<Vec<Expr>> {
-    separated(1.., expr, pad0(',')).parse_next(input)
+    separated(0.., expr, pad0(',')).parse_next(input)
 }
 
 /// Parse a box of Expr.
@@ -85,7 +85,7 @@ pub fn unary(input: &mut &str) -> PResult<Expr> {
         curly(separated(0.., expr, pad0(','))).map(Expr::Pack),
         curly(separated(0.., map_entry, pad0(','))).map(Expr::Map),
         float.map(Expr::Float32),
-        integer.map(Expr::Int32),
+        int.map(Expr::Int32),
         string_lit.map(Expr::String),
         char_lit.map(Expr::Char),
         "false".value(Expr::Bool(false)),
@@ -151,13 +151,13 @@ pub fn expr(input: &mut &str) -> PResult<Expr> {
 
 // Unit tests
 #[cfg(test)]
-pub mod tests {
+pub mod tests_expr {
     use super::*;
 
     #[test]
     fn test_minimal() {
         let code = "80";
-        match integer.parse(code) {
+        match int.parse(code) {
             Ok(result) => assert_eq!(result, 80),
             Err(err) => panic!("failed to parse {}: {}", code, err),
         }
