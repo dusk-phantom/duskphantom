@@ -10,8 +10,9 @@ pub fn word(input: &mut &str) -> PResult<String> {
 }
 
 /// List of all keywords.
-const KEYWORD: [&'static str; 11] = [
+const KEYWORD: [&'static str; 12] = [
     "void", "int", "float", "string", "char", "bool", "struct", "enum", "union", "false", "true",
+    "sizeof",
 ];
 
 /// Parser of an identifier, a word which is not a keyword.
@@ -29,7 +30,7 @@ pub fn int(input: &mut &str) -> PResult<i32> {
 /// Parser of a float.
 pub fn float(input: &mut &str) -> PResult<f32> {
     let upper = take_while(0.., '0'..='9').parse_next(input)?;
-    let _ = pad0('.').parse_next(input)?;
+    let _ = '.'.parse_next(input)?;
     let lower = take_while(1.., '0'..='9').parse_next(input)?;
     Ok(format!("{}.{}", upper, lower).parse().unwrap())
 }
@@ -61,13 +62,12 @@ where
     Error: ParserError<Input>,
     InnerParser: Parser<Input, Output, Error>,
     <Input as Stream>::Token: AsChar,
+    <Input as winnow::stream::Stream>::Token: Clone,
 {
     trace("paren", move |input: &mut Input| {
-        let _ = '('.parse_next(input)?;
-        let _ = space0(input)?;
+        let _ = p('(').parse_next(input)?;
         let output = parser.parse_next(input)?;
-        let _ = space0(input)?;
-        let _ = ')'.parse_next(input)?;
+        let _ = p(')').parse_next(input)?;
         Ok(output)
     })
 }
@@ -81,13 +81,12 @@ where
     Error: ParserError<Input>,
     InnerParser: Parser<Input, Output, Error>,
     <Input as Stream>::Token: AsChar,
+    <Input as winnow::stream::Stream>::Token: Clone,
 {
     trace("bracket", move |input: &mut Input| {
-        let _ = '['.parse_next(input)?;
-        let _ = space0(input)?;
+        let _ = p('[').parse_next(input)?;
         let output = parser.parse_next(input)?;
-        let _ = space0(input)?;
-        let _ = ']'.parse_next(input)?;
+        let _ = p(']').parse_next(input)?;
         Ok(output)
     })
 }
@@ -101,54 +100,18 @@ where
     Error: ParserError<Input>,
     InnerParser: Parser<Input, Output, Error>,
     <Input as Stream>::Token: AsChar,
+    <Input as winnow::stream::Stream>::Token: Clone,
 {
     trace("curly", move |input: &mut Input| {
-        let _ = '{'.parse_next(input)?;
-        let _ = space0(input)?;
+        let _ = p('{').parse_next(input)?;
         let output = parser.parse_next(input)?;
-        let _ = space0(input)?;
-        let _ = '}'.parse_next(input)?;
-        Ok(output)
-    })
-}
-
-/// Parser of something padded with zero or more spaces .
-pub fn pad0<Input, Output, Error, InnerParser>(
-    mut parser: InnerParser,
-) -> impl Parser<Input, Output, Error>
-where
-    Input: Stream + StreamIsPartial + Compare<char>,
-    Error: ParserError<Input>,
-    InnerParser: Parser<Input, Output, Error>,
-    <Input as Stream>::Token: AsChar,
-{
-    trace("pad0", move |input: &mut Input| {
-        let _ = space0(input)?;
-        let output = parser.parse_next(input)?;
-        let _ = space0(input)?;
-        Ok(output)
-    })
-}
-
-/// Parser of something starting with zero or more spaces.
-pub fn pre0<Input, Output, Error, InnerParser>(
-    mut parser: InnerParser,
-) -> impl Parser<Input, Output, Error>
-where
-    Input: Stream + StreamIsPartial + Compare<char>,
-    Error: ParserError<Input>,
-    InnerParser: Parser<Input, Output, Error>,
-    <Input as Stream>::Token: AsChar,
-{
-    trace("pre0", move |input: &mut Input| {
-        let _ = space0(input)?;
-        let output = parser.parse_next(input)?;
+        let _ = p('}').parse_next(input)?;
         Ok(output)
     })
 }
 
 /// Parser of something ending with zero or more spaces.
-pub fn suf0<Input, Output, Error, InnerParser>(
+pub fn p<Input, Output, Error, InnerParser>(
     mut parser: InnerParser,
 ) -> impl Parser<Input, Output, Error>
 where
@@ -156,10 +119,31 @@ where
     Error: ParserError<Input>,
     InnerParser: Parser<Input, Output, Error>,
     <Input as Stream>::Token: AsChar,
+    <Input as winnow::stream::Stream>::Token: Clone,
 {
-    trace("suf0", move |input: &mut Input| {
+    trace("padded", move |input: &mut Input| {
         let output = parser.parse_next(input)?;
-        let _ = space0(input)?;
+        let _ = multispace0(input)?;
+        Ok(output)
+    })
+}
+
+/// Parser of a keyword.
+pub fn k<'s, Output, Error, InnerParser>(
+    mut parser: InnerParser,
+) -> impl Parser<&'s str, Output, Error>
+where
+    Error: ParserError<&'s str>,
+    InnerParser: Parser<&'s str, Output, Error>,
+{
+    trace("keyword", move |input: &mut &'s str| {
+        let output = parser.parse_next(input)?;
+
+        // The next character after a keyword can not connect with the keyword
+        let _ = alt((peek(any), empty.value(' ')))
+            .verify(|x: &char| !x.is_alphanum() && *x != '_')
+            .parse_next(input)?;
+        let _ = multispace0(input)?;
         Ok(output)
     })
 }

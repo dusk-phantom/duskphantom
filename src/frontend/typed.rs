@@ -55,15 +55,15 @@ pub enum Type {
 
 pub fn atom_type(input: &mut &str) -> PResult<Type> {
     alt((
-        "void".value(Type::Void),
-        "int".value(Type::Int32),
-        "float".value(Type::Float32),
-        "string".value(Type::String),
-        "char".value(Type::Char),
-        "bool".value(Type::Boolean),
-        ("enum", space1, ident).map(|(_, _, ty)| Type::Enum(ty)),
-        ("union", space1, ident).map(|(_, _, ty)| Type::Union(ty)),
-        ("struct", space1, ident).map(|(_, _, ty)| Type::Struct(ty)),
+        k("void").value(Type::Void),
+        k("int").value(Type::Int32),
+        k("float").value(Type::Float32),
+        k("string").value(Type::String),
+        k("char").value(Type::Char),
+        k("bool").value(Type::Boolean),
+        (k("enum"), ident).map(|(_, ty)| Type::Enum(ty)),
+        (k("union"), ident).map(|(_, ty)| Type::Union(ty)),
+        (k("struct"), ident).map(|(_, ty)| Type::Struct(ty)),
     ))
     .parse_next(input)
 }
@@ -97,16 +97,16 @@ pub enum IdentUsage {
 /// Parser of an IdentUsage.
 pub fn usage(input: &mut &str) -> PResult<IdentUsage> {
     let atom = alt((
-        ident.map(IdentUsage::Var),
+        p(ident).map(IdentUsage::Var),
         paren(usage),
         empty.value(IdentUsage::Nothing),
     ));
     let access_tail = alt((
-        pre0(bracket(int)).map(|x| BoxF::new(move |acc| IdentUsage::Index(acc, x))),
-        pre0(paren(vec_type)).map(|x| BoxF::new(|acc| IdentUsage::Call(acc, x))),
+        bracket(p(int)).map(|x| BoxF::new(move |acc| IdentUsage::Index(acc, x))),
+        paren(vec_type).map(|x| BoxF::new(|acc| IdentUsage::Call(acc, x))),
     ));
     let access = lrec(atom, repeat(0.., access_tail));
-    let unary_init = suf0('*').map(|_op| BoxF::new(|acc| IdentUsage::Pointer(acc)));
+    let unary_init = p('*').map(|_op| BoxF::new(|acc| IdentUsage::Pointer(acc)));
     rrec(repeat(0.., unary_init), access).parse_next(input)
 }
 
@@ -141,7 +141,6 @@ pub fn acc_usage(ty: Type, usage: IdentUsage) -> TypedIdent {
 /// Parser of a TypedIdent.
 pub fn typed_ident(input: &mut &str) -> PResult<TypedIdent> {
     let ty = atom_type.parse_next(input)?;
-    let _ = space0.parse_next(input)?;
     let us = usage.parse_next(input)?;
     Ok(acc_usage(ty, us))
 }
@@ -158,7 +157,7 @@ pub fn box_type(input: &mut &str) -> PResult<Box<Type>> {
 
 /// Parser of a vector of type.
 pub fn vec_type(input: &mut &str) -> PResult<Vec<Type>> {
-    separated(0.., single_type, pad0(',')).parse_next(input)
+    separated(0.., single_type, p(',')).parse_next(input)
 }
 
 // Unit tests
@@ -176,9 +175,9 @@ pub mod tests_typed {
     }
 
     #[test]
-    fn test_argname_function_pointer() {
+    fn test_space() {
         // Pointer to a function.
-        let code = "int (*)(int u)";
+        let code = "int  (  *  )  (  int  u  )";
         match single_type.parse(code) {
             Ok(result) => assert_eq!(
                 result,

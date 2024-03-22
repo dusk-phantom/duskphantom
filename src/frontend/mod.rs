@@ -2,7 +2,6 @@ pub mod decl;
 pub mod expr;
 #[macro_use]
 mod macros;
-pub mod lexer;
 pub mod misc;
 pub mod oprt;
 pub mod parser;
@@ -12,7 +11,6 @@ pub mod typed;
 
 pub use self::decl::*;
 pub use self::expr::*;
-pub use self::lexer::*;
 pub use self::misc::*;
 pub use self::oprt::*;
 pub use self::parser::*;
@@ -40,9 +38,11 @@ pub use winnow::dispatch;
 pub use winnow::error::ParserError;
 pub use winnow::stream::AsChar;
 pub use winnow::stream::Compare;
+pub use winnow::stream::SliceLen;
 pub use winnow::stream::Stream;
 pub use winnow::stream::StreamIsPartial;
 pub use winnow::token::any;
+pub use winnow::token::literal;
 pub use winnow::token::one_of;
 pub use winnow::token::take_until;
 pub use winnow::token::take_while;
