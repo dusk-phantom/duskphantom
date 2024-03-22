@@ -7,7 +7,7 @@ pub fn ident(input: &mut &str) -> PResult<String> {
 }
 
 /// Parser of an integer.
-pub fn integer(input: &mut &str) -> PResult<i32> {
+pub fn int(input: &mut &str) -> PResult<i32> {
     take_while(1.., '0'..'9')
         .map(|s: &str| s.parse().unwrap())
         .parse_next(input)
@@ -179,6 +179,8 @@ impl<T> BoxF<T> {
 /// Writing mutual-recursive function for each operator is too verbose,
 /// and for left-recurse currying is required, bringing lifetime problems,
 /// so I made a procedual version for simplicity.
+///
+/// Note that `lrec` has built-in memoization, so parsing would be O(n).
 ///
 /// `head`: parser of the FIRST element of left-recursive chain.
 /// `tail`: parser of ALL later elements, returning MUTATION on `head`.
