@@ -55,15 +55,15 @@ pub enum Type {
 
 pub fn atom_type(input: &mut &str) -> PResult<Type> {
     alt((
-        k("void").value(Type::Void),
-        k("int").value(Type::Int32),
-        k("float").value(Type::Float32),
-        k("string").value(Type::String),
-        k("char").value(Type::Char),
-        k("bool").value(Type::Boolean),
-        (k("enum"), ident).map(|(_, ty)| Type::Enum(ty)),
-        (k("union"), ident).map(|(_, ty)| Type::Union(ty)),
-        (k("struct"), ident).map(|(_, ty)| Type::Struct(ty)),
+        keyword("void").value(Type::Void),
+        keyword("int").value(Type::Int32),
+        keyword("float").value(Type::Float32),
+        keyword("string").value(Type::String),
+        keyword("char").value(Type::Char),
+        keyword("bool").value(Type::Boolean),
+        (keyword("enum"), ident).map(|(_, ty)| Type::Enum(ty)),
+        (keyword("union"), ident).map(|(_, ty)| Type::Union(ty)),
+        (keyword("struct"), ident).map(|(_, ty)| Type::Struct(ty)),
     ))
     .parse_next(input)
 }
@@ -97,16 +97,16 @@ pub enum IdentUsage {
 /// Parser of an IdentUsage.
 pub fn usage(input: &mut &str) -> PResult<IdentUsage> {
     let atom = alt((
-        p(ident).map(IdentUsage::Var),
+        pad(ident).map(IdentUsage::Var),
         paren(usage),
         empty.value(IdentUsage::Nothing),
     ));
     let access_tail = alt((
-        bracket(p(int)).map(|x| BoxF::new(move |acc| IdentUsage::Index(acc, x))),
+        bracket(pad(int)).map(|x| BoxF::new(move |acc| IdentUsage::Index(acc, x))),
         paren(vec_typed).map(|x| BoxF::new(|acc| IdentUsage::Call(acc, x))),
     ));
     let access = lrec(atom, repeat(0.., access_tail));
-    let unary_init = p('*').map(|_op| BoxF::new(|acc| IdentUsage::Pointer(acc)));
+    let unary_init = pad('*').map(|_op| BoxF::new(|acc| IdentUsage::Pointer(acc)));
     rrec(repeat(0.., unary_init), access).parse_next(input)
 }
 
@@ -157,7 +157,7 @@ pub fn box_type(input: &mut &str) -> PResult<Box<Type>> {
 
 /// Parser of a vector of type.
 pub fn vec_typed(input: &mut &str) -> PResult<Vec<TypedIdent>> {
-    separated(0.., typed_ident, p(',')).parse_next(input)
+    separated(0.., typed_ident, pad(',')).parse_next(input)
 }
 
 // Unit tests

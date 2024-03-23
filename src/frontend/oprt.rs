@@ -27,17 +27,18 @@ pub enum UnaryOp {
 
 pub fn unary_op(input: &mut &str) -> PResult<UnaryOp> {
     dispatch! { peek(any);
-        '!' => p('!').value(UnaryOp::Not),
-        '~' => p('~').value(UnaryOp::Inv),
+        '!' => pad('!').value(UnaryOp::Not),
+        '~' => pad('~').value(UnaryOp::Inv),
         '-' => alt((
-            p("--").value(UnaryOp::Dec),
-            p('-').value(UnaryOp::Neg),
+            pad("--").value(UnaryOp::Dec),
+            pad('-').value(UnaryOp::Neg),
         )),
-        '+' => p("++").value(UnaryOp::Inc),
-        '*' => p('*').value(UnaryOp::Ind),
-        '&' => p('&').value(UnaryOp::Addr),
-        's' => k("sizeof").value(UnaryOp::Sizeof),
-        '(' => paren(atom_type).map(|ty| UnaryOp::Cast(ty)),
+        '+' => pad("++").value(UnaryOp::Inc),
+        '*' => pad('*').value(UnaryOp::Ind),
+        '&' => pad('&').value(UnaryOp::Addr),
+        's' => keyword("sizeof").value(UnaryOp::Sizeof),
+        '(' => paren(single_type)
+            .map(|ty| UnaryOp::Cast(ty)),
         _ => fail,
     }
     .parse_next(input)
@@ -109,10 +110,10 @@ pub enum BinaryOp {
 
 /// Level 0 operators, left to right
 pub fn binary_op_lv0(input: &mut &str) -> PResult<BinaryOp> {
-    dispatch! { any;
-        '*' => p(empty).value(BinaryOp::Mul),
-        '/' => p(empty).value(BinaryOp::Div),
-        '%' => p(empty).value(BinaryOp::Mod),
+    dispatch! { peek(any);
+        '*' => pad('*').value(BinaryOp::Mul),
+        '/' => pad('/').value(BinaryOp::Div),
+        '%' => pad('%').value(BinaryOp::Mod),
         _ => fail,
     }
     .parse_next(input)
@@ -120,24 +121,28 @@ pub fn binary_op_lv0(input: &mut &str) -> PResult<BinaryOp> {
 
 /// Level 1 operators, left to right
 pub fn binary_op_lv1(input: &mut &str) -> PResult<BinaryOp> {
-    alt((p('+').value(BinaryOp::Add), p('-').value(BinaryOp::Sub))).parse_next(input)
+    alt((pad('+').value(BinaryOp::Add), pad('-').value(BinaryOp::Sub))).parse_next(input)
 }
 
 /// Level 2 operators, left to right
 pub fn binary_op_lv2(input: &mut &str) -> PResult<BinaryOp> {
-    alt((p(">>").value(BinaryOp::Shr), p("<<").value(BinaryOp::Shl))).parse_next(input)
+    alt((
+        pad(">>").value(BinaryOp::Shr),
+        pad("<<").value(BinaryOp::Shl),
+    ))
+    .parse_next(input)
 }
 
 /// Level 3 operators, left to right
 pub fn binary_op_lv3(input: &mut &str) -> PResult<BinaryOp> {
-    dispatch! { any;
+    dispatch! { peek(any);
         '>' => alt((
-            p('=').value(BinaryOp::Ge),
-            p(empty).value(BinaryOp::Gt),
+            pad(">=").value(BinaryOp::Ge),
+            pad('>').value(BinaryOp::Gt),
         )),
         '<' => alt((
-            p('=').value(BinaryOp::Le),
-            p(empty).value(BinaryOp::Lt),
+            pad("<=").value(BinaryOp::Le),
+            pad('<').value(BinaryOp::Lt),
         )),
         _ => fail,
     }
@@ -146,48 +151,48 @@ pub fn binary_op_lv3(input: &mut &str) -> PResult<BinaryOp> {
 
 /// Level 4 operators, left to right
 pub fn binary_op_lv4(input: &mut &str) -> PResult<BinaryOp> {
-    alt((p("==").value(BinaryOp::Eq), p("!=").value(BinaryOp::Ne))).parse_next(input)
+    alt((pad("==").value(BinaryOp::Eq), pad("!=").value(BinaryOp::Ne))).parse_next(input)
 }
 
 /// Level 5 operators, left to right
 pub fn binary_op_lv5(input: &mut &str) -> PResult<BinaryOp> {
-    p('&').value(BinaryOp::And).parse_next(input)
+    pad('&').value(BinaryOp::And).parse_next(input)
 }
 
 /// Level 6 operators, left to right
 pub fn binary_op_lv6(input: &mut &str) -> PResult<BinaryOp> {
-    p('^').value(BinaryOp::Xor).parse_next(input)
+    pad('^').value(BinaryOp::Xor).parse_next(input)
 }
 
 /// Level 7 operators, left to right
 pub fn binary_op_lv7(input: &mut &str) -> PResult<BinaryOp> {
-    p('|').value(BinaryOp::Or).parse_next(input)
+    pad('|').value(BinaryOp::Or).parse_next(input)
 }
 
 /// Level 8 operators, left to right
 pub fn binary_op_lv8(input: &mut &str) -> PResult<BinaryOp> {
-    p("&&").value(BinaryOp::All).parse_next(input)
+    pad("&&").value(BinaryOp::All).parse_next(input)
 }
 
 /// Level 9 operators, left to right
 pub fn binary_op_lv9(input: &mut &str) -> PResult<BinaryOp> {
-    p("||").value(BinaryOp::Any).parse_next(input)
+    pad("||").value(BinaryOp::Any).parse_next(input)
 }
 
 /// Level 10 operators, RIGHT TO LEFT
 pub fn binary_op_lv10(input: &mut &str) -> PResult<BinaryOp> {
-    dispatch! { any;
-        '=' => p(empty).value(BinaryOp::Assign),
-        '+' => p('=').value(BinaryOp::AssignAdd),
-        '-' => p('=').value(BinaryOp::AssignSub),
-        '*' => p('=').value(BinaryOp::AssignMul),
-        '/' => p('=').value(BinaryOp::AssignDiv),
-        '%' => p('=').value(BinaryOp::AssignMod),
-        '>' => p(">=").value(BinaryOp::AssignShr),
-        '<' => p("<=").value(BinaryOp::AssignShl),
-        '&' => p('=').value(BinaryOp::AssignAnd),
-        '|' => p('=').value(BinaryOp::AssignOr),
-        '^' => p('=').value(BinaryOp::AssignXor),
+    dispatch! { peek(any);
+        '=' => pad('=').value(BinaryOp::Assign),
+        '+' => pad("+=").value(BinaryOp::AssignAdd),
+        '-' => pad("-=").value(BinaryOp::AssignSub),
+        '*' => pad("*=").value(BinaryOp::AssignMul),
+        '/' => pad("/=").value(BinaryOp::AssignDiv),
+        '%' => pad("%=").value(BinaryOp::AssignMod),
+        '>' => pad(">>=").value(BinaryOp::AssignShr),
+        '<' => pad("<<=").value(BinaryOp::AssignShl),
+        '&' => pad("&=").value(BinaryOp::AssignAnd),
+        '|' => pad("|=").value(BinaryOp::AssignOr),
+        '^' => pad("^=").value(BinaryOp::AssignXor),
         _ => fail,
     }
     .parse_next(input)

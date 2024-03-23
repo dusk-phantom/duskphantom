@@ -5,6 +5,10 @@ use super::*;
 /// Example: `continue`
 #[derive(Clone, PartialEq, Debug)]
 pub enum Stmt {
+    /// A statement of nothing.
+    /// Example: `;`
+    Nothing,
+
     /// A declaration as statement.
     /// Example:
     /// `int x;` is `Decl(Var(Int32, "x"))`
@@ -63,7 +67,7 @@ pub fn vec_stmt(input: &mut &str) -> PResult<Vec<Stmt>> {
 
 /// Expression with semicolon.
 pub fn expr_sc(input: &mut &str) -> PResult<Expr> {
-    (expr, p(';')).map(|(e, _)| e).parse_next(input)
+    (expr, cut_err(pad(";"))).map(|(e, _)| e).parse_next(input)
 }
 
 /// Decl or Expr.
@@ -72,20 +76,26 @@ pub fn decl_or_expr(input: &mut &str) -> PResult<Either<Decl, Expr>> {
 }
 
 pub fn stmt(input: &mut &str) -> PResult<Stmt> {
+    let disp = dispatch! { peek(any);
+        'b' => (keyword("break"), cut_err(pad(";"))).value(Stmt::Break),
+        'c' => (keyword("continue"), cut_err(pad(";"))).value(Stmt::Continue),
+        'i' => (keyword("if"), cut_err((paren(expr), box_stmt, opt((keyword("else"), box_stmt)))))
+            .map(|(_, (cond, pass, fail))| Stmt::If(cond, pass, fail.map(|(_, s)| s))),
+        'w' => (keyword("while"), cut_err((paren(expr), box_stmt))).map(|(_, (cond, body))| Stmt::While(cond, body)),
+        'd' => (keyword("do"), cut_err((box_stmt, keyword("while"), paren(expr), pad(";"))))
+            .map(|(_, (body, _, cond, _))| Stmt::DoWhile(body, cond)),
+        'f' => (keyword("for"), cut_err((paren((decl_or_expr, expr_sc, expr)), box_stmt)))
+            .map(|(_, ((a, b, c), s))| Stmt::For(a, b, c, s)),
+        'r' => (keyword("return"), cut_err((opt(expr), pad(";"))))
+            .map(|(_, (e, _))| Stmt::Return(e)),
+        '{' => curly(cut_err(vec_stmt)).map(Stmt::Block),
+        _ => fail
+    };
     alt((
-        k("break").value(Stmt::Break),
-        k("continue").value(Stmt::Continue),
+        disp,
         decl.map(Stmt::Decl),
         expr_sc.map(Stmt::Expr),
-        (k("if"), paren(expr), box_stmt, opt((k("else"), box_stmt)))
-            .map(|(_, cond, pass, fail)| Stmt::If(cond, pass, fail.map(|(_, s)| s))),
-        (k("while"), paren(expr), box_stmt).map(|(_, cond, body)| Stmt::While(cond, body)),
-        (k("do"), box_stmt, k("while"), paren(expr))
-            .map(|(_, body, _, cond)| Stmt::DoWhile(body, cond)),
-        (k("for"), paren((decl_or_expr, expr_sc, expr)), box_stmt)
-            .map(|(_, (a, b, c), s)| Stmt::For(a, b, c, s)),
-        (k("return"), opt(expr)).map(|(_, e)| Stmt::Return(e)),
-        curly(vec_stmt).map(Stmt::Block),
+        pad(";").value(Stmt::Nothing),
     ))
     .parse_next(input)
 }

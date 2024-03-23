@@ -82,6 +82,12 @@ fn bench_prefix(c: &mut Criterion) {
 criterion_group! {
     name = benches;
     config = Criterion::default();
-    targets = bench_rrec
+    targets =
+        bench_select,
+        bench_rrec,
+        bench_lrec,
+        bench_xoreq,
+        bench_add,
+        bench_prefix,
 }
 criterion_main!(benches);
