@@ -32,17 +32,26 @@ pub struct Fmm(f64);
 pub struct Label(String);
 
 // 基于 Reg::new(id, is_usual) 的寄存器定义重写如上代码
+
+/// always zero register
 pub const REG_ZERO: Reg = Reg::new(0, true);
+/// return address register
 pub const REG_RA: Reg = Reg::new(1, true);
+/// stack pointer register
 pub const REG_SP: Reg = Reg::new(2, true);
+/// global pointer register
 pub const REG_GP: Reg = Reg::new(3, true);
+/// thread pointer register
 pub const REG_TP: Reg = Reg::new(4, true);
+/// temporary register
 pub const REG_T0: Reg = Reg::new(5, true);
 pub const REG_T1: Reg = Reg::new(6, true);
 pub const REG_T2: Reg = Reg::new(7, true);
-pub const REG_S0: Reg = Reg::new(8, true); //栈帧寄存器
-pub const REG_S1: Reg = Reg::new(9, true); //保留寄存器
-pub const REG_A0: Reg = Reg::new(10, true); //返回值寄存器 以及 函数参数寄存器
+
+pub const REG_S0: Reg = Reg::new(8, true);
+pub const REG_S1: Reg = Reg::new(9, true);
+// argument register
+pub const REG_A0: Reg = Reg::new(10, true);
 pub const REG_A1: Reg = Reg::new(11, true);
 pub const REG_A2: Reg = Reg::new(12, true);
 pub const REG_A3: Reg = Reg::new(13, true);
@@ -263,19 +272,19 @@ impl Operand {
 
 #[derive(Clone)]
 pub enum Inst {
-    // 运算类型指令
+    // algebraic operation
     Add(AddInst),
     Mul(MulInst),
     Div(DivInst),
-    SLL(SllInst), //逻辑左移
-    SRL(SrlInst), //逻辑右移
+    SLL(SllInst),
+    SRL(SrlInst),
     Neg(NegInst),
-    // 数据移动指令
+    // data transfer operation
     Mv(MvInst),
     Ld(LdInst),
     Sd(SdInst),
     La(LaInst),
-    // 控制流指令
+    // control flow operation
     Jmp(JmpInst),
     Branch(BranchInst),
     Call(CallInst),
@@ -301,7 +310,7 @@ pub struct MvInst(Operand, Operand);
 #[derive(Clone)]
 pub struct LdInst(Operand, Operand, Operand);
 #[derive(Clone)]
-// to_store , offset , base
+/// (to_store , offset , base)
 pub struct SdInst(Operand, Operand, Operand);
 #[derive(Clone)]
 pub struct LaInst(Operand, Operand);
@@ -382,9 +391,9 @@ impl DivInst {
         let rhs = self.2.gen_asm();
         format!("div {},{},{}", dst, lhs, rhs)
     }
-    pub fn optimize(&self) -> Vec<Inst> {
-        //TODO, 判断是否有优化必要
-        vec![Inst::Div(self.to_owned())]
+    pub fn optimize(&self) -> Option<Vec<Inst>> {
+        todo!("判断是否有优化必要,如果有,返回优化产生的指令");
+        None
     }
 }
 impl SllInst {
