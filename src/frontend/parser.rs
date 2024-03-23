@@ -10,9 +10,9 @@ pub fn word(input: &mut &str) -> PResult<String> {
 }
 
 /// List of all keywords.
-const KEYWORD: [&'static str; 12] = [
+const KEYWORD: [&'static str; 20] = [
     "void", "int", "float", "string", "char", "bool", "struct", "enum", "union", "false", "true",
-    "sizeof",
+    "sizeof", "break", "continue", "return", "if", "else", "do", "while", "for",
 ];
 
 /// Parser of an identifier, a word which is not a keyword.
@@ -53,89 +53,88 @@ pub fn char_lit(input: &mut &str) -> PResult<char> {
     Ok(content)
 }
 
+/// Parser of blank.
+pub fn blank(input: &mut &str) -> PResult<()> {
+    (multispace0, alt((line_comment, block_comment, empty)))
+        .value(())
+        .parse_next(input)
+}
+
+/// Parser of blank beginning with line comment.
+pub fn line_comment(input: &mut &str) -> PResult<()> {
+    ("//", take_until(0.., '\n'), blank)
+        .value(())
+        .parse_next(input)
+}
+
+/// Parser of blank beginning with block comment.
+pub fn block_comment(input: &mut &str) -> PResult<()> {
+    ("/*", take_until(0.., "*/"), blank)
+        .value(())
+        .parse_next(input)
+}
+
 /// Parser of something wrapped in `()`.
-pub fn paren<Input, Output, Error, InnerParser>(
+pub fn paren<'s, Output, InnerParser>(
     mut parser: InnerParser,
-) -> impl Parser<Input, Output, Error>
+) -> impl Parser<&'s str, Output, ContextError>
 where
-    Input: Stream + StreamIsPartial + Compare<char>,
-    Error: ParserError<Input>,
-    InnerParser: Parser<Input, Output, Error>,
-    <Input as Stream>::Token: AsChar,
-    <Input as winnow::stream::Stream>::Token: Clone,
+    InnerParser: Parser<&'s str, Output, ContextError>,
 {
-    trace("paren", move |input: &mut Input| {
-        let _ = p('(').parse_next(input)?;
+    trace("paren", move |input: &mut &'s str| {
+        let _ = pad("(").parse_next(input)?;
         let output = parser.parse_next(input)?;
-        let _ = p(')').parse_next(input)?;
+        let _ = pad(")").parse_next(input)?;
         Ok(output)
     })
 }
 
 /// Parser of something wrapped in `[]`.
-pub fn bracket<Input, Output, Error, InnerParser>(
+pub fn bracket<'s, Output, InnerParser>(
     mut parser: InnerParser,
-) -> impl Parser<Input, Output, Error>
+) -> impl Parser<&'s str, Output, ContextError>
 where
-    Input: Stream + StreamIsPartial + Compare<char>,
-    Error: ParserError<Input>,
-    InnerParser: Parser<Input, Output, Error>,
-    <Input as Stream>::Token: AsChar,
-    <Input as winnow::stream::Stream>::Token: Clone,
+    InnerParser: Parser<&'s str, Output, ContextError>,
 {
-    trace("bracket", move |input: &mut Input| {
-        let _ = p('[').parse_next(input)?;
+    trace("bracket", move |input: &mut &'s str| {
+        let _ = pad("[").parse_next(input)?;
         let output = parser.parse_next(input)?;
-        let _ = p(']').parse_next(input)?;
+        let _ = pad("]").parse_next(input)?;
         Ok(output)
     })
 }
 
 /// Parser of something wrapped in `{}`.
-pub fn curly<Input, Output, Error, InnerParser>(
+pub fn curly<'s, Output, InnerParser>(
     mut parser: InnerParser,
-) -> impl Parser<Input, Output, Error>
+) -> impl Parser<&'s str, Output, ContextError>
 where
-    Input: Stream + StreamIsPartial + Compare<char>,
-    Error: ParserError<Input>,
-    InnerParser: Parser<Input, Output, Error>,
-    <Input as Stream>::Token: AsChar,
-    <Input as winnow::stream::Stream>::Token: Clone,
+    InnerParser: Parser<&'s str, Output, ContextError>,
 {
-    trace("curly", move |input: &mut Input| {
-        let _ = p('{').parse_next(input)?;
+    trace("curly", move |input: &mut &'s str| {
+        let _ = pad("{").parse_next(input)?;
         let output = parser.parse_next(input)?;
-        let _ = p('}').parse_next(input)?;
+        let _ = pad("}").parse_next(input)?;
         Ok(output)
     })
 }
 
 /// Parser of something ending with zero or more spaces.
-pub fn p<Input, Output, Error, InnerParser>(
+pub fn pad<'s, Output, InnerParser>(
     mut parser: InnerParser,
-) -> impl Parser<Input, Output, Error>
+) -> impl Parser<&'s str, Output, ContextError>
 where
-    Input: Stream + StreamIsPartial + Compare<char>,
-    Error: ParserError<Input>,
-    InnerParser: Parser<Input, Output, Error>,
-    <Input as Stream>::Token: AsChar,
-    <Input as winnow::stream::Stream>::Token: Clone,
+    InnerParser: Parser<&'s str, Output, ContextError>,
 {
-    trace("padded", move |input: &mut Input| {
+    trace("pad", move |input: &mut &'s str| {
         let output = parser.parse_next(input)?;
-        let _ = multispace0(input)?;
+        let _ = blank(input)?;
         Ok(output)
     })
 }
 
 /// Parser of a keyword.
-pub fn k<'s, Output, Error, InnerParser>(
-    mut parser: InnerParser,
-) -> impl Parser<&'s str, Output, Error>
-where
-    Error: ParserError<&'s str>,
-    InnerParser: Parser<&'s str, Output, Error>,
-{
+pub fn keyword<'s>(mut parser: &'static str) -> impl Parser<&'s str, &'s str, ContextError> {
     trace("keyword", move |input: &mut &'s str| {
         let output = parser.parse_next(input)?;
 
@@ -143,7 +142,7 @@ where
         let _ = alt((peek(any), empty.value(' ')))
             .verify(|x: &char| !x.is_alphanum() && *x != '_')
             .parse_next(input)?;
-        let _ = multispace0(input)?;
+        let _ = blank(input)?;
         Ok(output)
     })
 }
@@ -170,14 +169,13 @@ impl<T> BoxF<T> {
 /// this implementation generates all closures first,
 /// and then apply the result continuously.
 ///
-/// I'm not using `Repeat::fold` because Rust compiler
-/// confuses about the ownership of its arguments.
-///
 /// Writing mutual-recursive function for each operator is too verbose,
 /// and for left-recurse currying is required, bringing lifetime problems,
 /// so I made a procedual version for simplicity.
 ///
 /// Note that `lrec` has built-in memoization, so parsing would be O(n).
+/// Benchmark results show that lrec / rrec has slightly better performance
+/// than hand-writter recursive version.
 ///
 /// `head`: parser of the FIRST element of left-recursive chain.
 /// `tail`: parser of ALL later elements, returning MUTATION on `head`.
