@@ -146,8 +146,7 @@ pub fn conditional(input: &mut &str) -> PResult<Expr> {
     }
 }
 
-// Generate parser for assignment operators,
-// which have the least associativity.
+/// Parse a complete expression.
 pub fn expr(input: &mut &str) -> PResult<Expr> {
     let lhs = conditional.parse_next(input)?;
     match (binary_op_lv10, expr).parse_next(input) {
