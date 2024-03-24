@@ -33,3 +33,7 @@ jobs:
         run: |
           cargo build --verbose
           cargo test --verbose
+      # - name: Check code formatting
+      #   run: cargo fmt --all -- --check
+      # - name: Check for clippy warnings
+      #   run: cargo clippy --all-targets --all-features -- -D warnings
