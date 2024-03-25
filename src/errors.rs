@@ -22,7 +22,7 @@ pub enum CompilerError {
 pub enum FrontendError {
     // 解析错误
     #[error("parse error")]
-    ParseError,
+    ParseError(String),
     // 优化错误
     #[error("optimize error")]
     OptimizeError,
@@ -58,8 +58,8 @@ pub fn handle_error(err: &CompilerError) {
             eprintln!("err: {}", err);
         }
         CompilerError::FrontendError(err) => match err {
-            FrontendError::ParseError => {
-                eprintln!("msg: parse error");
+            FrontendError::ParseError(msg) => {
+                eprintln!("msg: parse error: {}", msg);
             }
             FrontendError::OptimizeError => {
                 eprintln!("msg: optimize error");
