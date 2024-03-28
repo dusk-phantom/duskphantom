@@ -1,7 +1,9 @@
 use super::*;
 pub mod binary_inst;
+pub mod extend_inst;
 pub mod head;
 pub mod memory_op_inst;
+pub mod misc_inst;
 pub mod terminator_inst;
 pub mod unary_inst;
 
