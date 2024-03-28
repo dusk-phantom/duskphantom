@@ -2,6 +2,73 @@ use std::collections::HashMap;
 
 use super::*;
 
+impl IRBuilder {
+    pub fn get_icmp(
+        &mut self,
+        op: ICmpOp,
+        comp_type: ValueType,
+        lhs: Operand,
+        rhs: Operand,
+    ) -> InstPtr {
+        let mut inst = self.new_instruction(Box::new(ICmp {
+            op,
+            comp_type,
+            manager: InstManager::new(),
+        }));
+        unsafe {
+            inst.get_manager_mut().add_operand(lhs);
+            inst.get_manager_mut().add_operand(rhs);
+        };
+        inst
+    }
+
+    pub fn get_fcmp(
+        &mut self,
+        op: FCmpOp,
+        comp_type: ValueType,
+        lhs: Operand,
+        rhs: Operand,
+    ) -> InstPtr {
+        let mut inst = self.new_instruction(Box::new(FCmp {
+            op,
+            comp_type,
+            manager: InstManager::new(),
+        }));
+        unsafe {
+            inst.get_manager_mut().add_operand(lhs);
+            inst.get_manager_mut().add_operand(rhs);
+        };
+        inst
+    }
+
+    pub fn get_phi(&mut self, ty: ValueType, incoming_values: Vec<(Operand, BBPtr)>) -> InstPtr {
+        let mut inst = self.new_instruction(Box::new(Phi {
+            ty,
+            incoming_values: incoming_values.clone(),
+            manager: InstManager::new(),
+        }));
+        for (val, _) in &incoming_values {
+            unsafe {
+                inst.get_manager_mut().add_operand(val.clone());
+            }
+        }
+        inst
+    }
+
+    pub fn get_call(&mut self, func: FunPtr, args: Vec<Operand>) -> InstPtr {
+        let mut inst = self.new_instruction(Box::new(Call {
+            func,
+            manager: InstManager::new(),
+        }));
+        for arg in args {
+            unsafe {
+                inst.get_manager_mut().add_operand(arg);
+            }
+        }
+        inst
+    }
+}
+
 pub enum ICmpOp {
     Eq,
     Ne,
@@ -195,6 +262,30 @@ impl Instruction for Phi {
             res.push_str(&format!("[{}, {}], ", op, bb.as_ref()));
         }
         res.split_off(res.len() - 2);
+        res
+    }
+}
+
+pub struct Call {
+    pub func: FunPtr,
+    manager: InstManager,
+}
+
+impl Display for Call {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "%call_{}", self.get_id())
+    }
+}
+
+impl Instruction for Call {
+    gen_common_code!(Call, Call);
+    fn gen_llvm_ir(&self) -> String {
+        let mut res = format!("{} = call {} @{}(", self, self.get_type(), &self.func.name);
+        for op in self.get_operand() {
+            res.push_str(&format!("{}, ", op));
+        }
+        res.split_off(res.len() - 2);
+        res.push(')');
         res
     }
 }
