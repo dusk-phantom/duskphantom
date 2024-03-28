@@ -155,6 +155,12 @@ impl BasicBlock {
     }
 }
 
+impl Display for BasicBlock {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "%{}", self.name)
+    }
+}
+
 impl Extend<InstPtr> for BasicBlock {
     fn extend<T: IntoIterator<Item = InstPtr>>(&mut self, iter: T) {
         iter.into_iter().for_each(|inst| {
