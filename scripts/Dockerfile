@@ -21,5 +21,3 @@ RUN mkdir /app
 WORKDIR /app
 VOLUME ["/app"]
 
-# 执行脚本
-CMD ["/bin/bash" ,"/app/task.sh"]
