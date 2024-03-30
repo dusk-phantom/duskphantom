@@ -30,7 +30,7 @@ pub enum Type {
     /// Array of given type.
     /// Example:
     /// `int x[4]` is `Array(Int32, 4)`
-    Array(Box<Type>, i32),
+    Array(Box<Type>, usize),
 
     /// Function to given type.
     /// Example:
@@ -83,7 +83,7 @@ pub enum IdentUsage {
 
     /// Array indexing.
     /// Example: `x[8]`
-    Index(Box<IdentUsage>, i32),
+    Index(Box<IdentUsage>, usize),
 
     /// A function call.
     /// Example: `f(x, y)`
@@ -102,7 +102,7 @@ pub fn usage(input: &mut &str) -> PResult<IdentUsage> {
         empty.value(IdentUsage::Nothing),
     ));
     let access_tail = alt((
-        bracket(pad(int)).map(|x| BoxF::new(move |acc| IdentUsage::Index(acc, x))),
+        bracket(pad(usize)).map(|x| BoxF::new(move |acc| IdentUsage::Index(acc, x))),
         paren(vec_typed).map(|x| BoxF::new(|acc| IdentUsage::Call(acc, x))),
     ));
     let access = lrec(atom, repeat(0.., access_tail));

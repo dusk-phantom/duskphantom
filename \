@@ -1,0 +1,95 @@
+use crate::{errors::MiddelError, frontend, utils::mem::ObjPtr};
+use ir::ir_builder::IRBuilder;
+
+mod analysis;
+pub mod ir;
+mod transform;
+
+use std::pin::Pin;
+pub struct Program {
+    pub module: ir::Module,
+    pub mem_pool: Pin<Box<IRBuilder>>,
+}
+
+pub fn gen(program: &frontend::Program) -> Result<Program, MiddelError> {
+    let mut result = Program::new();
+    for decl in program.module.iter() {}
+}
+
+fn gen_name(base: &'static str) -> String {
+    base.to_string()
+}
+
+fn gen_type(ty: frontend::Type) -> ir::ValueType {
+    match ty {
+        frontend::Type::Void => ir::ValueType::Void,
+        frontend::Type::Int32 => ir::ValueType::Int,
+        frontend::Type::Float32 => ir::ValueType::Float,
+        frontend::Type::String => todo!("string is not supported"),
+        frontend::Type::Char => todo!("char is not supported"),
+        frontend::Type::Boolean => ir::ValueType::Bool,
+        frontend::Type::Pointer(ty) => ir::ValueType::Pointer(Box::new(gen_type(ty))),
+        frontend::Type::Array(ty, n) => ir::ValueType::Array(Box::new(gen_type(ty)), n),
+        frontend::Type::Function(_, _) => todo!(),
+        frontend::Type::Enum(_) => todo!(),
+        frontend::Type::Union(_) => todo!(),
+        frontend::Type::Struct(_) => todo!(),
+    }
+}
+
+fn gen_decl(decl: &frontend::Decl, program: &mut Program) -> Option<MiddelError> {
+    match decl {
+        frontend::Decl::Var(ty, id, op) => todo!("global is not supported"),
+        frontend::Decl::Func(ty, id, op) => {
+            if let (Some(stmt), frontend::Type::Function(to, from)) = (op, ty) {
+                let mut fptr = program.mem_pool.new_function(id, ty);
+            } else {
+                None
+            }
+        }
+
+        frontend::Decl::Enum(_, _) => todo!(),
+        frontend::Decl::Union(_, _) => todo!(),
+        frontend::Decl::Struct(_, _) => todo!(),
+    }
+}
+
+fn gen_stmt(stmt: &frontend::Stmt, program: &mut Program) -> (ir::BBPtr, ir::BBPtr) {
+    match stmt {
+        frontend::Stmt::Nothing => {
+            let bb = program.mem_pool.new_basicblock(gen_name("nothing"));
+            (bb, bb)
+        }
+        frontend::Stmt::Decl(_) => todo!(),
+        frontend::Stmt::Expr(_) => todo!(),
+        frontend::Stmt::If(_, _, _) => todo!(),
+        frontend::Stmt::While(_, _) => todo!(),
+        frontend::Stmt::DoWhile(_, _) => todo!(),
+        frontend::Stmt::For(_, _, _, _) => todo!(),
+        frontend::Stmt::Break => todo!(),
+        frontend::Stmt::Continue => todo!(),
+        frontend::Stmt::Return(_) => todo!(),
+        frontend::Stmt::Block(_) => todo!(),
+    }
+}
+
+pub fn optimize(program: &mut Program) {
+    todo!()
+}
+
+impl Program {
+    pub fn new() -> Self {
+        let program_mem_pool = Box::pin(IRBuilder::new());
+        let mem_pool: ObjPtr<IRBuilder> = ObjPtr::new(&program_mem_pool);
+        Self {
+            mem_pool: program_mem_pool,
+            module: ir::Module::new(mem_pool),
+        }
+    }
+}
+
+impl Drop for Program {
+    fn drop(&mut self) {
+        self.mem_pool.clear();
+    }
+}

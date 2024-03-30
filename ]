@@ -72,11 +72,7 @@ fn gen_decl(decl: &frontend::Decl, program: &mut Program) -> Option<MiddelError>
     }
 }
 
-fn gen_expr(
-    expr: &frontend::Expr,
-    program: &mut Program,
-    ty: &ir::ValueType,
-) -> (ir::InstPtr, ir::BBPtr, ir::BBPtr) {
+fn gen_expr(expr: &frontend::Expr, program: &mut Program, id: Option<String>) -> String {
     match expr {
         frontend::Expr::Var(_) => todo!(),
         frontend::Expr::Pack(_) => todo!(),
@@ -96,27 +92,12 @@ fn gen_expr(
     }
 }
 
-fn gen_inner_decl(decl: &frontend::Decl, program: &mut Program) -> (ir::BBPtr, ir::BBPtr) {
+fn gen_inner_decl(decl: &frontend::Decl, program: &mut Program) -> String {
     match decl {
-        frontend::Decl::Var(ty, _, op) => {
+        frontend::Decl::Var(ty, id, op) => {
             if let Some(expr) = op {
-                let mty = gen_type(ty);
-                let (expr_ptr, entry, mut exit) = gen_expr(expr, program, &mty);
-                let load = program
-                    .mem_pool
-                    .get_load(mty.clone(), ir::Operand::Instruction(expr_ptr));
-                let alloca = program.mem_pool.get_alloca(mty.clone(), 1);
-                let store = program.mem_pool.get_store(
-                    ir::Operand::Instruction(load),
-                    ir::Operand::Instruction(alloca),
-                );
-                exit.push_back(load);
-                exit.push_back(alloca);
-                exit.push_back(store);
-                (entry, exit)
-            } else {
-                let bb = program.mem_pool.new_basicblock(unique_debug("nothing"));
-                (bb, bb)
+                gen_expr(expr, program, Some(*id));
+                *id
             }
         }
         frontend::Decl::Func(_, _, _) => todo!(),
@@ -132,7 +113,7 @@ fn gen_stmt(stmt: &frontend::Stmt, program: &mut Program) -> (ir::BBPtr, ir::BBP
             let bb = program.mem_pool.new_basicblock(unique_debug("nothing"));
             (bb, bb)
         }
-        frontend::Stmt::Decl(decl) => todo!(),
+        frontend::Stmt::Decl(_) => todo!(),
         frontend::Stmt::Expr(_) => todo!(),
         frontend::Stmt::If(_, _, _) => todo!(),
         frontend::Stmt::While(_, _) => todo!(),
