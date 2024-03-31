@@ -12,12 +12,12 @@ path = "src/lib.rs"
 name = "compiler"
 path = "src/main.rs"
 
-# 使用clang作为前端,自身实现后端
+# 使用clang作为前端,使用llc作为后端
 [[bin]]
 name = "compiler-cl"
 path = "src/main_clang_llc.rs"
 
-# 使用clang作为前端,使用llc作为后端
+# 使用clang作为前端,自身实现后端
 [[bin]]
 name = "compiler-cs"
 path = "src/main_clang_self.rs"
@@ -50,5 +50,5 @@ harness = false
 
 # 特性管理
 [features]
-default = []
+# default = ["clang_embeded"] # 解除该行注释获取基于clang的前后端
 clang_embeded = ["llvm-ir"]
