@@ -1,22 +1,26 @@
-#[derive(Clone)]
+use llvm_ir::{constant::Float, name};
+
+use super::gen_asm::GenTool;
+
+#[derive(Clone, Debug)]
 pub enum Var {
     Prim(PrimVar),
     Str(Str),
     Arr(ArrVar),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum PrimVar {
     IntVar(IntVar),
     FloatVar(FloatVar),
 }
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct IntVar {
     pub name: String,
     pub init: Option<i64>,
     pub is_const: bool,
 }
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Str {
     pub name: String,
     pub init: Option<String>,
@@ -27,13 +31,13 @@ impl Str {
         String::new()
     }
 }
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct FloatVar {
     pub name: String,
     pub init: Option<f64>,
     pub is_const: bool,
 }
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ArrVar {
     pub name: String,
     pub size: usize,
@@ -49,8 +53,14 @@ impl ArrVar {
 }
 impl PrimVar {
     pub fn gen_asm(&self) -> String {
+        // match self {
+        //     IntVar(i) => {
+        //         let n=i.n
+        //         // GenTool::gen_word(, val)
+        //     }
+        //     FloatVar(f) => {}
+        // }
         // TODO
-
         String::new()
     }
 }
