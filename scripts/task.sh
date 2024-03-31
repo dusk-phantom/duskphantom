@@ -62,7 +62,8 @@ function edited_files() {
         fi
     done
 }
-function gcc_compile(){
+
+function all_edited_files(){
     # 遍历sy文件夹中的所有文件,取出基础文件名
     # 遍历in文件夹中的所有文件,取出基础文件名,
     # 合并两个基础文件名列表,去除重复部分
@@ -73,13 +74,20 @@ function gcc_compile(){
     in_edited_base_names=$(edited_files in in)
     # 3. 合并两个基础文件名列表,去除重复部分
     edited_base_names=$(echo $sy_edited_base_names $in_edited_base_names | tr ' ' '\n' | sort | uniq)
+    for base_name in $edited_base_names; do
+        echo $base_name
+    done
+}
 
+
+function gcc_compile(){
+    edited_base_names=$@
     # 测试代码
     for base_name in $edited_base_names; do
         echo "test $base_name" >> log
         # 使用 riscv64-linux-gnu-gcc-12 编译 sy/$base_name.sy 文件 为 asm/$base_name.s 文件
         # 并且把标准输出、标准错误输出,输出到log文件夹中的$base_name.log文件中
-        riscv64-linux-gnu-gcc-12 -x c sy/$base_name.sy -S -o asm/$base_name.s 2>logs/$base_name.log
+        riscv64-linux-gnu-gcc-12 -x c sy/$base_name.sy -Llib -lsysy -S -o asm/$base_name.s 2>logs/$base_name.log
         # 如果编译成功,则编译 asm/$base_name.s 文件 为 exec/$base_name 文件
         # 并且把标准输出、标准错误输出,输出到log文件夹中的$base_name.log文件中
         if [ $? -eq 0 ]; then
@@ -105,13 +113,7 @@ function gcc_compile(){
     done
 }
 function compiler_compile(){
-    # 1. 遍历sy文件夹中的所有文件,取出基础文件名
-    sy_edited_base_names=$(edited_files sy sy)
-    # 2. 遍历in文件夹中的所有文件,取出基础文件名,
-    in_edited_base_names=$(edited_files in in)
-    # 3. 合并两个基础文件名列表,去除重复部分
-    edited_base_names=$(echo $sy_edited_base_names $in_edited_base_names | tr ' ' '\n' | sort | uniq)
-
+    edited_base_names=$@
     # 测试代码
     for base_name in $edited_base_names; do
         echo "test $base_name" >> my_logs/log
@@ -143,6 +145,7 @@ function compiler_compile(){
     done
 }
 function compare(){
+    edited_base_names=$@
     echo "##################### " >> diff.log
     for base_name in $edited_base_names; do
         echo "test $base_name" >> diff.log
@@ -164,9 +167,11 @@ fi
 
 log_start
 init_project
-gcc_compile
-compiler_compile
-compare
-
+to_test_files=$(all_edited_files)
+gcc_compile $to_test_files
+if [ -f "./compiler" ]; then
+    compiler_compile $to_test_files
+    compare $to_test_files
+fi
 echo "task.sh: end"
 
