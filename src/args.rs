@@ -16,7 +16,7 @@ pub fn get_args() -> Args {
         .arg(arg!(-S --asm "output asm file"))
         .arg(arg!(-o --output <FILE> "output asm file").default_value("a.s"))
         .arg(arg!(-O --optimized "optimization level"))
-        .arg(arg!(-l --llvm <FILE> "output llvm ir file"))
+        .arg(arg!(-l --llvm [FILE] "output llvm ir file"))
         .get_matches();
     let sy_path = matches.value_of("src").map(|s| s.to_string());
     let output_path = matches.value_of("output").unwrap().to_string();
