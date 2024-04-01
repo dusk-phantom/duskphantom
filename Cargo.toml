@@ -52,3 +52,9 @@ harness = false
 [features]
 # default = ["clang_embeded"] # 解除该行注释获取基于clang的前后端
 clang_embeded = ["llvm-ir"]
+
+[profile.release]
+lto = true
+codegen-units = 1 # 提交参赛代码的时候该行设置为1
+strip = true
+opt-level = 3
