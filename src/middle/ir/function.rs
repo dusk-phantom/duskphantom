@@ -55,6 +55,19 @@ impl Function {
     pub fn bfs_iter_rev(&self) -> BFSIteratorRev {
         BFSIteratorRev::from(self.exit.unwrap())
     }
+
+    pub fn gen_llvm_ir(&self) -> String {
+        let mut ir = format!("define {} @{}(", self.return_type, self.name);
+        for param in self.params.iter() {
+            ir += &format!("{}, ", param);
+        }
+        ir = ir.split_off(ir.len() - 2);
+        ir += ") {\n";
+        self.bfs_iter().for_each(|bb| {
+            ir += &bb.gen_llvm_ir();
+        });
+        ir + "\n}\n"
+    }
 }
 
 define_graph_iterator!(BFSIterator, VecDeque<BBPtr>, pop_front, get_succ_bb);
