@@ -261,7 +261,7 @@ impl Instruction for Phi {
         for (op, bb) in self.get_incoming_values() {
             res.push_str(&format!("[{}, {}], ", op, bb.as_ref()));
         }
-        res.split_off(res.len() - 2);
+        res.truncate(res.len() - 2);
         res
     }
 }
@@ -284,7 +284,7 @@ impl Instruction for Call {
         for op in self.get_operand() {
             res.push_str(&format!("{}, ", op));
         }
-        res.split_off(res.len() - 2);
+        res.truncate(res.len() - 2);
         res.push(')');
         res
     }
