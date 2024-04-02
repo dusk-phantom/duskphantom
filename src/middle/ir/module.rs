@@ -21,4 +21,15 @@ impl Module {
             global_variables,
         }
     }
+
+    pub fn gen_llvm_ir(&self) -> String {
+        let mut ir = String::new();
+        for global in self.global_variables.iter() {
+            ir.push_str(&global.gen_llvm_ir());
+        }
+        for fun in &self.functions {
+            ir.push_str(&fun.gen_llvm_ir());
+        }
+        ir
+    }
 }
