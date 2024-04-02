@@ -151,7 +151,12 @@ impl BasicBlock {
     }
 
     pub fn gen_llvm_ir(&self) -> String {
-        todo!()
+        let mut ir = String::new();
+        ir += &format!("{}:\n", self);
+        for inst in self.iter() {
+            ir += &inst.gen_llvm_ir();
+        }
+        ir + "\n"
     }
 }
 
