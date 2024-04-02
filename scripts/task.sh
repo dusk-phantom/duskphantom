@@ -91,7 +91,7 @@ function gcc_compile(){
         # 如果编译成功,则编译 asm/$base_name.s 文件 为 exec/$base_name 文件
         # 并且把标准输出、标准错误输出,输出到log文件夹中的$base_name.log文件中
         if [ $? -eq 0 ]; then
-            riscv64-linux-gnu-gcc-12 asm/$base_name.s -Llib -lsysy -o exec/$base_name 2>>logs/$base_name.log
+            riscv64-linux-gnu-gcc-12 asm/$base_name.s -Llib -lsysy -march=rv64gc -o exec/$base_name 2>>logs/$base_name.log
         fi
         # 如果编译仍然成功
         # 则判断 in/$base_name.in 文件是否存在,
