@@ -127,9 +127,24 @@ impl<'a> FunctionKit<'a> {
                 // Insert created declaration to environment
                 self.gen_stml_decl(decl)
             }
-            frontend::Stmt::Expr(expr) => {
-                // Evaluate expression but discard its result
-                self.gen_stmt_expr(expr).map(|_| ())
+            frontend::Stmt::Expr(op, expr) => {
+                // Evaluate expression
+                let operand = self.gen_stmt_expr(expr)?;
+                match op {
+                    // Exist left value, add result to env
+                    Some(lval) => match lval {
+                        frontend::LVal::Nothing => todo!(),
+                        frontend::LVal::Var(id) => {
+                            self.env.insert(id.clone(), operand);
+                            Ok(())
+                        }
+                        frontend::LVal::Index(_, _) => todo!(),
+                        frontend::LVal::Call(_, _) => todo!(),
+                        frontend::LVal::Pointer(_) => todo!(),
+                    },
+                    // No left value, discard result
+                    None => Ok(()),
+                }
             }
             frontend::Stmt::If(_, _, _) => todo!(),
             frontend::Stmt::While(_, _) => todo!(),
@@ -192,38 +207,6 @@ impl<'a> FunctionKit<'a> {
                 let lop = self.gen_stmt_expr(lhs)?;
                 let rop = self.gen_stmt_expr(rhs)?;
                 match op {
-                    frontend::BinaryOp::Assign => {
-                        // Get correct value type
-                        let lty = lop.get_type();
-                        let rty = rop.get_type();
-
-                        // Ensure left and right operands have the same type
-                        if lty != rty {
-                            return Err(MiddelError::GenError);
-                        }
-
-                        // Load RHS
-                        let load = self.program.mem_pool.get_load(lty, rop);
-                        self.exit.push_back(load);
-
-                        // Store in LHS
-                        let store = self
-                            .program
-                            .mem_pool
-                            .get_store(ir::Operand::Instruction(load), lop.clone());
-                        self.exit.push_back(store);
-                        Ok(lop)
-                    }
-                    frontend::BinaryOp::AssignAdd => todo!(),
-                    frontend::BinaryOp::AssignSub => todo!(),
-                    frontend::BinaryOp::AssignMul => todo!(),
-                    frontend::BinaryOp::AssignDiv => todo!(),
-                    frontend::BinaryOp::AssignMod => todo!(),
-                    frontend::BinaryOp::AssignShr => todo!(),
-                    frontend::BinaryOp::AssignShl => todo!(),
-                    frontend::BinaryOp::AssignAnd => todo!(),
-                    frontend::BinaryOp::AssignOr => todo!(),
-                    frontend::BinaryOp::AssignXor => todo!(),
                     frontend::BinaryOp::Add => todo!(),
                     frontend::BinaryOp::Sub => todo!(),
                     frontend::BinaryOp::Mul => todo!(),

@@ -16,8 +16,8 @@ pub enum Stmt {
 
     /// An expression as statement.
     /// Example:
-    /// `x++;` is `Expr(UnaryOperator(...))`
-    Expr(Expr),
+    /// `y = x++;` is `Expr(Val("y"), UnaryOperator(...))`
+    Expr(Option<LVal>, Expr),
 
     /// A conditional branch.
     /// If the third argument is None, it means there's no else block.
@@ -94,7 +94,7 @@ pub fn stmt(input: &mut &str) -> PResult<Stmt> {
     alt((
         disp,
         decl.map(Stmt::Decl),
-        expr_sc.map(Stmt::Expr),
+        (opt(terminated(lval, pad("="))), expr_sc).map(|(lval, expr)| Stmt::Expr(lval, expr)),
         pad(";").value(Stmt::Nothing),
     ))
     .parse_next(input)
