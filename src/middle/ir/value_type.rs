@@ -27,3 +27,26 @@ impl std::fmt::Debug for ValueType {
         write!(f, "{}", self)
     }
 }
+
+impl ValueType {
+    pub fn is_basic_type(&self) -> bool {
+        match self {
+            ValueType::Void | ValueType::Int | ValueType::Float | ValueType::Bool => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_pointer(&self) -> bool {
+        match self {
+            ValueType::Pointer(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_array(&self) -> bool {
+        match self {
+            ValueType::Array(_, _) => true,
+            _ => false,
+        }
+    }
+}

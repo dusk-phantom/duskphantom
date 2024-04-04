@@ -4,8 +4,7 @@ use super::*;
 pub enum Operand {
     Constant(Constant),
 
-    // Todo
-    Global,
+    Global(GlobalPtr),
     Parametr(Parameter),
 
     Instruction(InstPtr),
@@ -15,7 +14,7 @@ impl Display for Operand {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Operand::Constant(c) => write!(f, "{}", c),
-            Operand::Global => write!(f, "global"),
+            Operand::Global(g) => write!(f, "{}", g),
             Operand::Parametr(p) => write!(f, "{}", p),
             Operand::Instruction(inst) => write!(f, "{}", inst),
         }

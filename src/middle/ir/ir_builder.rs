@@ -4,6 +4,7 @@ pub struct IRBuilder {
     fun_pool: ObjPool<Function>,
     bb_pool: ObjPool<BasicBlock>,
     inst_pool: ObjPool<Box<dyn Instruction>>,
+    gvar_pool: ObjPool<GlobalVariable>,
     inst_id: usize,
 }
 
@@ -13,8 +14,25 @@ impl IRBuilder {
             fun_pool: ObjPool::new(),
             bb_pool: ObjPool::new(),
             inst_pool: ObjPool::new(),
+            gvar_pool: ObjPool::new(),
             inst_id: 0,
         }
+    }
+
+    /// Allocate a space for global variable, return a pointer to this space.
+    pub fn new_global_variable(
+        &mut self,
+        name: String,
+        value_type: ValueType,
+        variable_or_constant: bool,
+        initializer: Vec<Constant>,
+    ) -> GlobalPtr {
+        self.gvar_pool.alloc(GlobalVariable::new(
+            name,
+            value_type,
+            variable_or_constant,
+            initializer,
+        ))
     }
 
     /// Allocate a space for func, return a pointer to this space.
