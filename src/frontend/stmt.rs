@@ -23,7 +23,7 @@ pub enum Stmt {
     /// If the third argument is None, it means there's no else block.
     /// Example:
     /// `if (x == 4) ... else ...` is `If(Binary(...), ..., ...)`
-    If(Expr, Box<Stmt>, Option<Box<Stmt>>),
+    If(Expr, Box<Stmt>, Box<Stmt>),
 
     /// A while-loop.
     /// Example:
@@ -80,7 +80,7 @@ pub fn stmt(input: &mut &str) -> PResult<Stmt> {
         'b' => (keyword("break"), cut_err(pad(";"))).value(Stmt::Break),
         'c' => (keyword("continue"), cut_err(pad(";"))).value(Stmt::Continue),
         'i' => (keyword("if"), cut_err((paren(expr), box_stmt, opt((keyword("else"), box_stmt)))))
-            .map(|(_, (cond, pass, fail))| Stmt::If(cond, pass, fail.map(|(_, s)| s))),
+            .map(|(_, (cond, pass, fail))| Stmt::If(cond, pass, fail.map_or(Stmt::Block(vec![]).into(), |(_, s)| s))),
         'w' => (keyword("while"), cut_err((paren(expr), box_stmt))).map(|(_, (cond, body))| Stmt::While(cond, body)),
         'd' => (keyword("do"), cut_err((box_stmt, keyword("while"), paren(expr), pad(";"))))
             .map(|(_, (body, _, cond, _))| Stmt::DoWhile(body, cond)),
