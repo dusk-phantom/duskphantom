@@ -47,28 +47,6 @@ pub fn unary_op(input: &mut &str) -> PResult<UnaryOp> {
 /// Example: `+`, `-`
 #[derive(Clone, PartialEq, Debug)]
 pub enum BinaryOp {
-    /// =
-    Assign,
-    /// +=
-    AssignAdd,
-    /// -=
-    AssignSub,
-    /// *=
-    AssignMul,
-    /// /=
-    AssignDiv,
-    /// %=
-    AssignMod,
-    /// >>=
-    AssignShr,
-    /// <<=
-    AssignShl,
-    /// &=
-    AssignAnd,
-    /// |=
-    AssignOr,
-    /// ^=
-    AssignXor,
     /// +
     Add,
     /// -
@@ -176,23 +154,4 @@ pub fn binary_op_lv8(input: &mut &str) -> PResult<BinaryOp> {
 /// Level 9 operators, left to right
 pub fn binary_op_lv9(input: &mut &str) -> PResult<BinaryOp> {
     pad("||").value(BinaryOp::Any).parse_next(input)
-}
-
-/// Level 10 operators, RIGHT TO LEFT
-pub fn binary_op_lv10(input: &mut &str) -> PResult<BinaryOp> {
-    dispatch! { peek(any);
-        '=' => pad('=').value(BinaryOp::Assign),
-        '+' => pad("+=").value(BinaryOp::AssignAdd),
-        '-' => pad("-=").value(BinaryOp::AssignSub),
-        '*' => pad("*=").value(BinaryOp::AssignMul),
-        '/' => pad("/=").value(BinaryOp::AssignDiv),
-        '%' => pad("%=").value(BinaryOp::AssignMod),
-        '>' => pad(">>=").value(BinaryOp::AssignShr),
-        '<' => pad("<<=").value(BinaryOp::AssignShl),
-        '&' => pad("&=").value(BinaryOp::AssignAnd),
-        '|' => pad("|=").value(BinaryOp::AssignOr),
-        '^' => pad("^=").value(BinaryOp::AssignXor),
-        _ => fail,
-    }
-    .parse_next(input)
 }
