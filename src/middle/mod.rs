@@ -13,11 +13,12 @@ pub struct Program {
 
 pub fn gen(program: &frontend::Program) -> Result<Program, MiddelError> {
     let mut result = Program::new();
-    let _ = ProgramKit {
+    ProgramKit {
         program: &mut result,
         env: HashMap::new(),
+        ctx: HashMap::new(),
     }
-    .gen(program);
+    .gen(program)?;
     Ok(result)
 }
 
@@ -41,18 +42,21 @@ fn translate_type(ty: &frontend::Type) -> ir::ValueType {
 
 /// Kit for translating a program to middle IR.
 struct ProgramKit<'a> {
-    program: &'a mut Program,
     env: HashMap<String, ir::Operand>,
+    ctx: HashMap<String, ir::ValueType>,
+    program: &'a mut Program,
 }
 
-// Kit for translating a function to middle IR.
+/// Kit for translating a function to middle IR.
 struct FunctionKit<'a> {
-    program: &'a mut Program,
     env: HashMap<String, ir::Operand>,
+    ctx: HashMap<String, ir::ValueType>,
+    program: &'a mut Program,
     entry: ir::BBPtr,
     exit: ir::BBPtr,
 }
 
+/// A program kit (top level) can generate declarations
 impl<'a> ProgramKit<'a> {
     pub fn gen(mut self, program: &frontend::Program) -> Result<(), MiddelError> {
         for decl in program.module.iter() {
@@ -90,6 +94,7 @@ impl<'a> ProgramKit<'a> {
                     let mut kit = FunctionKit {
                         program: self.program,
                         env: self.env.clone(),
+                        ctx: self.ctx.clone(),
                         entry: bb,
                         exit: bb,
                     };
@@ -107,16 +112,19 @@ impl<'a> ProgramKit<'a> {
         }
     }
 
+    /// Generate a unique debug name for a basic block
+    fn unique_debug(&self, base: &'static str) -> String {
+        base.to_string()
+    }
+}
+
+/// A function kit can generate statements
+impl<'a> FunctionKit<'a> {
+    /// Generate a unique debug name for a basic block
     fn unique_debug(&self, base: &'static str) -> String {
         base.to_string()
     }
 
-    fn unique_name(&self) -> String {
-        "".to_string()
-    }
-}
-
-impl<'a> FunctionKit<'a> {
     /// Generate a statement into the program
     /// `exit`: previous exit node of a function
     /// Returns: new exit node of a function
@@ -124,17 +132,28 @@ impl<'a> FunctionKit<'a> {
         match stmt {
             frontend::Stmt::Nothing => Ok(()),
             frontend::Stmt::Decl(decl) => {
-                // Insert created declaration to environment
-                self.gen_stml_decl(decl)
+                // Generate declaration
+                self.gen_decl(decl)
             }
             frontend::Stmt::Expr(op, expr) => {
-                // Evaluate expression
-                let operand = self.gen_stmt_expr(expr)?;
+                // Generate expression
+                let operand = self.gen_expr(expr)?;
                 match op {
-                    // Exist left value, add result to env
+                    // Exist left value, try add result to env
                     Some(lval) => match lval {
                         frontend::LVal::Nothing => todo!(),
                         frontend::LVal::Var(id) => {
+                            // Make sure variable is declared
+                            let Some(ty) = self.ctx.get(id) else {
+                                return Err(MiddelError::GenError);
+                            };
+
+                            // Typecheck, TODO type cast
+                            if operand.get_type() != *ty {
+                                return Err(MiddelError::GenError);
+                            }
+
+                            // Add result to env
                             self.env.insert(id.clone(), operand);
                             Ok(())
                         }
@@ -146,7 +165,49 @@ impl<'a> FunctionKit<'a> {
                     None => Ok(()),
                 }
             }
-            frontend::Stmt::If(_, _, _) => todo!(),
+            frontend::Stmt::If(cond, then, alt) => {
+                // Evaluate condition
+                let operand = self.gen_expr(cond)?;
+
+                // Add br instruction
+                let ir::Operand::Instruction(inst) = operand else {
+                    todo!("make get_br accept operand")
+                };
+                let br = self.program.mem_pool.get_br(Some(inst));
+                self.exit.push_back(br);
+
+                // Allocate basic blocks
+                let then_name = self.unique_debug("then");
+                let mut then_bb = self.program.mem_pool.new_basicblock(then_name);
+                let alt_name = self.unique_debug("alt");
+                let mut alt_bb = self.program.mem_pool.new_basicblock(alt_name);
+                let final_name = self.unique_debug("final");
+                let final_bb = self.program.mem_pool.new_basicblock(final_name);
+                self.exit.set_true_bb(then_bb);
+                self.exit.set_false_bb(alt_bb);
+                then_bb.set_true_bb(final_bb);
+                alt_bb.set_true_bb(final_bb);
+                self.exit = final_bb;
+
+                // Generate instructions for branches
+                FunctionKit {
+                    program: self.program,
+                    env: self.env.clone(),
+                    ctx: self.ctx.clone(),
+                    entry: then_bb,
+                    exit: then_bb,
+                }
+                .gen_stmt(then)?;
+                FunctionKit {
+                    program: self.program,
+                    env: self.env.clone(),
+                    ctx: self.ctx.clone(),
+                    entry: alt_bb,
+                    exit: alt_bb,
+                }
+                .gen_stmt(alt)?;
+                Ok(())
+            }
             frontend::Stmt::While(_, _) => todo!(),
             frontend::Stmt::DoWhile(_, _) => todo!(),
             frontend::Stmt::For(_, _, _, _) => todo!(),
@@ -160,21 +221,26 @@ impl<'a> FunctionKit<'a> {
     /// Generate a declaration as a statement into the program
     /// `exit`: previous exit node of the function
     /// Returns: declaration name, declared variable, new exit node of the function
-    fn gen_stml_decl(&mut self, decl: &frontend::Decl) -> Result<(), MiddelError> {
+    fn gen_decl(&mut self, decl: &frontend::Decl) -> Result<(), MiddelError> {
         match decl {
             frontend::Decl::Var(ty, id, op) => {
                 let mty = translate_type(ty);
+
+                // Add type to context
+                self.ctx.insert(id.clone(), mty.clone());
                 if let Some(expr) = op {
-                    // Directly generate expression
-                    let operand = self.gen_stmt_expr(expr)?;
-                    // Add to environment
+                    // Generate expression
+                    let operand = self.gen_expr(expr)?;
+
+                    // Typecheck, TODO type cast
+                    if operand.get_type() != mty {
+                        return Err(MiddelError::GenError);
+                    }
+
+                    // Add value to environment
                     self.env.insert(id.clone(), operand);
                     Ok(())
                 } else {
-                    // Alloc variable
-                    let alloca = self.program.mem_pool.get_alloca(mty.clone(), 1);
-                    self.exit.push_back(alloca);
-                    // Ok((id.clone(), ir::Operand::Instruction(alloca), *exit))
                     Ok(())
                 }
             }
@@ -188,9 +254,17 @@ impl<'a> FunctionKit<'a> {
     /// Generate a expression as a statement into the program
     /// `exit`: previous exit node of the function
     /// Returns: calculated variable, new exit node of the function
-    fn gen_stmt_expr(&mut self, expr: &frontend::Expr) -> Result<ir::Operand, MiddelError> {
+    fn gen_expr(&mut self, expr: &frontend::Expr) -> Result<ir::Operand, MiddelError> {
         match expr {
-            frontend::Expr::Var(x) => Ok(self.env[x].clone()),
+            frontend::Expr::Var(x) => {
+                // Ensure variable is defined
+                let Some(operand) = self.env.get(x) else {
+                    return Err(MiddelError::GenError);
+                };
+
+                // Clone the operand and return, this clones the underlying value or InstPtr
+                Ok(operand.clone())
+            }
             frontend::Expr::Pack(_) => todo!(),
             frontend::Expr::Map(_) => todo!(),
             frontend::Expr::Index(_, _) => todo!(),
@@ -204,10 +278,14 @@ impl<'a> FunctionKit<'a> {
             frontend::Expr::Call(_, _) => todo!(),
             frontend::Expr::Unary(_, _) => todo!(),
             frontend::Expr::Binary(op, lhs, rhs) => {
-                let lop = self.gen_stmt_expr(lhs)?;
-                let rop = self.gen_stmt_expr(rhs)?;
+                let lop = self.gen_expr(lhs)?;
+                let rop = self.gen_expr(rhs)?;
                 match op {
-                    frontend::BinaryOp::Add => todo!(),
+                    frontend::BinaryOp::Add => {
+                        // Add "add" instruction, operand is the result of the instruction
+                        let add = self.program.mem_pool.get_add(lop, rop);
+                        Ok(ir::Operand::Instruction(add))
+                    }
                     frontend::BinaryOp::Sub => todo!(),
                     frontend::BinaryOp::Mul => todo!(),
                     frontend::BinaryOp::Div => todo!(),
