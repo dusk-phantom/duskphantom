@@ -12,13 +12,11 @@ pub struct Program {
 }
 
 pub fn gen(program: &frontend::Program) -> Result<Program, MiddelError> {
-    let mut result = Program::new();
-    let _ = ProgramKit {
-        program: &mut result,
+    ProgramKit {
+        program: Program::new(),
         env: HashMap::new(),
     }
-    .gen(program);
-    Ok(result)
+    .gen(program)
 }
 
 /// Translate a frontend type to IR value type
@@ -40,30 +38,29 @@ fn translate_type(ty: &frontend::Type) -> ir::ValueType {
 }
 
 /// Kit for translating a program to middle IR.
-struct ProgramKit<'a> {
-    program: &'a mut Program,
+struct ProgramKit {
+    program: Program,
     env: HashMap<String, ir::Operand>,
 }
 
 // Kit for translating a function to middle IR.
 struct FunctionKit<'a> {
-    program: &'a mut Program,
-    env: HashMap<String, ir::Operand>,
+    program: &'a mut ProgramKit,
     entry: ir::BBPtr,
     exit: ir::BBPtr,
 }
 
-impl<'a> ProgramKit<'a> {
-    pub fn gen(mut self, program: &frontend::Program) -> Result<(), MiddelError> {
+impl ProgramKit {
+    pub fn gen(mut self, program: &frontend::Program) -> Result<Program, MiddelError> {
         for decl in program.module.iter() {
-            self.gen_decl(decl)?;
+            self.gen_decl(decl);
         }
-        Ok(())
+        Ok(self.program)
     }
 
     /// Generate a declaration into the program
     /// Fails when declaration does not have a name
-    fn gen_decl(&mut self, decl: &frontend::Decl) -> Result<(), MiddelError> {
+    fn gen_decl(&mut self, decl: &frontend::Decl) -> Option<MiddelError> {
         match decl {
             frontend::Decl::Var(_, _, _) => todo!(),
             frontend::Decl::Func(ty, id, op) => {
@@ -77,7 +74,7 @@ impl<'a> ProgramKit<'a> {
                     // Fill parameters
                     for param in params.iter() {
                         fptr.params.push(ir::Parameter {
-                            name: param.id.clone().map_or(Err(MiddelError::GenError), Ok)?,
+                            name: param.id.clone()?,
                             value_type: translate_type(&param.ty),
                         })
                     }
@@ -86,7 +83,7 @@ impl<'a> ProgramKit<'a> {
                     let fname = self.unique_debug("entry");
 
                     // Build function
-                    let bb = self.program.mem_pool.new_basicblock(fname);
+                    let mut bb = self.program.mem_pool.new_basicblock(fname);
                     let mut kit = FunctionKit {
                         program: self.program,
                         env: self.env.clone(),
@@ -96,9 +93,9 @@ impl<'a> ProgramKit<'a> {
                     kit.gen_stmt(stmt)?;
                     fptr.entry = Some(kit.entry);
                     fptr.exit = Some(kit.exit);
-                    Ok(())
+                    None
                 } else {
-                    Ok(())
+                    None
                 }
             }
             frontend::Decl::Enum(_, _) => todo!(),
@@ -116,20 +113,23 @@ impl<'a> ProgramKit<'a> {
     }
 }
 
-impl<'a> FunctionKit<'a> {
+impl FunctionKit {
     /// Generate a statement into the program
     /// `exit`: previous exit node of a function
     /// Returns: new exit node of a function
-    fn gen_stmt(&mut self, stmt: &frontend::Stmt) -> Result<(), MiddelError> {
+    fn gen_stmt(&mut self, stmt: &frontend::Stmt) -> Option<MiddelError> {
         match stmt {
-            frontend::Stmt::Nothing => Ok(()),
+            frontend::Stmt::Nothing => None,
             frontend::Stmt::Decl(decl) => {
                 // Insert created declaration to environment
                 self.gen_stml_decl(decl)
             }
             frontend::Stmt::Expr(expr) => {
                 // Evaluate expression but discard its result
-                self.gen_stmt_expr(expr).map(|_| ())
+                match self.gen_stmt_expr(expr) {
+                    Ok(_) => None,
+                    Err(err) => Some(err),
+                }
             }
             frontend::Stmt::If(_, _, _) => todo!(),
             frontend::Stmt::While(_, _) => todo!(),
@@ -145,20 +145,24 @@ impl<'a> FunctionKit<'a> {
     /// Generate a declaration as a statement into the program
     /// `exit`: previous exit node of the function
     /// Returns: declaration name, declared variable, new exit node of the function
-    fn gen_stml_decl(&mut self, decl: &frontend::Decl) -> Result<(), MiddelError> {
+    fn gen_stml_decl(&mut self, decl: &frontend::Decl) -> Option<MiddelError> {
         match decl {
             frontend::Decl::Var(ty, id, op) => {
                 let mty = translate_type(ty);
                 if let Some(expr) = op {
                     // Directly generate expression
-                    self.gen_stmt_expr(expr).map(|_| ())
+                    let result = self.gen_stmt_expr(expr);
+                    match result {
+                        Ok(_) => None,
+                        Err(err) => Some(err),
+                    }
                     // Ok((id.clone(), operand, new_exit))
                 } else {
                     // Alloc variable
                     let alloca = self.program.mem_pool.get_alloca(mty.clone(), 1);
                     self.exit.push_back(alloca);
                     // Ok((id.clone(), ir::Operand::Instruction(alloca), *exit))
-                    Ok(())
+                    None
                 }
             }
             frontend::Decl::Func(_, _, _) => todo!(),
