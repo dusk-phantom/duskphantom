@@ -98,7 +98,7 @@ macro_rules! define_inst_type_enum {
 /// impl BinaryInst trait automatically.
 #[macro_export]
 macro_rules! impl_binary_inst {
-    ($type:ident, $operand_type:expr,$func: ident, $lhs:ident, $rhs: ident) => {
+    ($type:ident, $operand_type:expr,$func: ident, $lhs:ident, $rhs: ident, $value_type: ident) => {
         /// If you want to make a new binary inst,
         /// please use the IRBuilder to create it.
         pub struct $type {
@@ -151,7 +151,7 @@ macro_rules! impl_binary_inst {
             /// Get a new inst instruction with operands.
             pub fn $func(&mut self, $lhs: Operand, $rhs: Operand) -> InstPtr {
                 let mut inst = self.new_instruction(Box::new($type {
-                    manager: InstManager::new(),
+                    manager: InstManager::new($value_type),
                 }));
                 unsafe {
                     inst.get_manager_mut().add_operand($lhs);

@@ -13,7 +13,7 @@ impl IRBuilder {
         let mut inst = self.new_instruction(Box::new(ICmp {
             op,
             comp_type,
-            manager: InstManager::new(),
+            manager: InstManager::new(ValueType::Bool),
         }));
         unsafe {
             inst.get_manager_mut().add_operand(lhs);
@@ -32,7 +32,7 @@ impl IRBuilder {
         let mut inst = self.new_instruction(Box::new(FCmp {
             op,
             comp_type,
-            manager: InstManager::new(),
+            manager: InstManager::new(ValueType::Bool),
         }));
         unsafe {
             inst.get_manager_mut().add_operand(lhs);
@@ -43,9 +43,8 @@ impl IRBuilder {
 
     pub fn get_phi(&mut self, ty: ValueType, incoming_values: Vec<(Operand, BBPtr)>) -> InstPtr {
         let mut inst = self.new_instruction(Box::new(Phi {
-            ty,
             incoming_values: incoming_values.clone(),
-            manager: InstManager::new(),
+            manager: InstManager::new(ty),
         }));
         for (val, _) in &incoming_values {
             unsafe {
@@ -58,7 +57,7 @@ impl IRBuilder {
     pub fn get_call(&mut self, func: FunPtr, args: Vec<Operand>) -> InstPtr {
         let mut inst = self.new_instruction(Box::new(Call {
             func,
-            manager: InstManager::new(),
+            manager: InstManager::new(func.return_type.clone()),
         }));
         for arg in args {
             unsafe {
@@ -226,7 +225,6 @@ impl Instruction for FCmp {
 }
 
 pub struct Phi {
-    pub ty: ValueType,
     incoming_values: Vec<(Operand, BBPtr)>,
     manager: InstManager,
 }
@@ -257,7 +255,7 @@ impl Display for Phi {
 impl Instruction for Phi {
     gen_common_code!(Phi, Phi);
     fn gen_llvm_ir(&self) -> String {
-        let mut res = format!("{} = phi {} ", self, self.ty);
+        let mut res = format!("{} = phi {} ", self, self.get_value_type());
         for (op, bb) in self.get_incoming_values() {
             res.push_str(&format!("[{}, {}], ", op, bb.as_ref()));
         }

@@ -11,7 +11,7 @@ pub struct Br {
 impl IRBuilder {
     pub fn get_ret(&mut self, return_value: Option<InstPtr>) -> InstPtr {
         let mut ret = self.new_instruction(Box::new(Ret {
-            manager: InstManager::new(),
+            manager: InstManager::new(return_value.map_or(ValueType::Void, |x| x.get_value_type())),
         }));
         if let Some(return_value) = return_value {
             unsafe {
@@ -24,7 +24,7 @@ impl IRBuilder {
 
     pub fn get_br(&mut self, cond: Option<InstPtr>) -> InstPtr {
         let mut br = self.new_instruction(Box::new(Br {
-            manager: InstManager::new(),
+            manager: InstManager::new(ValueType::Void),
         }));
         if let Some(cond) = cond {
             unsafe { br.get_manager_mut().add_operand(Operand::Instruction(cond)) };

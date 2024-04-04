@@ -5,7 +5,7 @@ use super::*;
 impl IRBuilder {
     pub fn get_zext(&mut self, src: Operand) -> InstPtr {
         let mut inst = self.new_instruction(Box::new(ZextTo {
-            manager: InstManager::new(),
+            manager: InstManager::new(ValueType::Int),
         }));
         unsafe {
             inst.get_manager_mut().add_operand(src);
@@ -15,7 +15,7 @@ impl IRBuilder {
 
     pub fn get_sext(&mut self, src: Operand) -> InstPtr {
         let mut inst = self.new_instruction(Box::new(SextTo {
-            manager: InstManager::new(),
+            manager: InstManager::new(ValueType::Int),
         }));
         unsafe {
             inst.get_manager_mut().add_operand(src);
