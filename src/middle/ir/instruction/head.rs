@@ -6,7 +6,7 @@ pub struct Head {
 impl IRBuilder {
     pub fn new_head(&mut self) -> InstPtr {
         self.new_instruction(Box::new(Head {
-            manager: InstManager::new(),
+            manager: InstManager::new(ValueType::Void),
         }))
     }
 }

@@ -20,9 +20,9 @@ impl IRBuilder {
     /// ```
     pub fn get_alloca(&mut self, value_type: ValueType, num_elements: usize) -> InstPtr {
         self.new_instruction(Box::new(Alloca {
-            value_type,
+            value_type: value_type.clone(),
             num_elements,
-            manager: InstManager::new(),
+            manager: InstManager::new(ValueType::Pointer(Box::new(value_type))),
         }))
     }
 
@@ -45,8 +45,7 @@ impl IRBuilder {
     /// ```
     pub fn get_load(&mut self, value_type: ValueType, ptr: Operand) -> InstPtr {
         let mut inst = self.new_instruction(Box::new(Load {
-            value_type,
-            manager: InstManager::new(),
+            manager: InstManager::new(value_type),
         }));
         unsafe { inst.get_manager_mut().add_operand(ptr) };
         inst
@@ -72,7 +71,7 @@ impl IRBuilder {
     /// ```
     pub fn get_store(&mut self, value: Operand, ptr: Operand) -> InstPtr {
         let mut inst = self.new_instruction(Box::new(Store {
-            manager: InstManager::new(),
+            manager: InstManager::new(ValueType::Void),
         }));
         unsafe {
             inst.get_manager_mut().add_operand(value);
@@ -107,8 +106,8 @@ impl IRBuilder {
         index: Vec<Operand>,
     ) -> InstPtr {
         let mut inst = self.new_instruction(Box::new(GetElementPtr {
-            element_type,
-            manager: InstManager::new(),
+            element_type: element_type.clone(),
+            manager: InstManager::new(ValueType::Pointer(Box::new(element_type))),
         }));
         unsafe {
             inst.get_manager_mut().add_operand(ptr);
@@ -153,8 +152,6 @@ impl Instruction for Alloca {
 }
 
 pub struct Load {
-    /// The type of the value to be loaded
-    pub value_type: ValueType,
     manager: InstManager,
 }
 
@@ -186,7 +183,7 @@ impl Instruction for Load {
         format!(
             "{} = load {}, ptr {}",
             self,
-            self.value_type,
+            self.get_value_type(),
             self.get_operand()[0]
         )
     }
@@ -238,9 +235,9 @@ impl Instruction for Store {
         format!(
             "store {} {}, ptr {}",
             match &self.get_operand()[0] {
-                Operand::Instruction(inst) => format!("{}", inst.get_type()),
+                Operand::Instruction(inst) => format!("{}", inst.get_value_type()),
                 Operand::Constant(c) => format!("{}", c.get_type()),
-                Operand::Parametr(param) => format!("{}", param.get_type()),
+                Operand::Parametr(param) => format!("{}", param.value_type),
                 _ => panic!("Invalid operand type"),
             },
             self.get_operand()[0],

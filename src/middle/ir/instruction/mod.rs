@@ -407,7 +407,7 @@ pub struct InstManager {
 }
 
 impl InstManager {
-    pub fn new() -> Self {
+    pub fn new(value_type: ValueType) -> Self {
         Self {
             id: None,
             user: vec![],
@@ -415,7 +415,7 @@ impl InstManager {
             prev: None,
             next: None,
             parent_bb: None,
-            value_type: ValueType::Void,
+            value_type,
             self_ptr: None,
         }
     }
@@ -424,16 +424,26 @@ impl InstManager {
 impl InstManager {
     pub unsafe fn set_operand(&mut self, index: usize, mut operand: Operand) {
         if let Operand::Instruction(mut inst) = self.operand[index] {
-            inst.get_user_mut()
-                .retain(|&user| user != self.self_ptr.unwrap());
-            inst.get_user_mut().push(self.self_ptr.unwrap());
+            let user = inst.get_user_mut();
+            user.iter()
+                .position(|x| x == &self.self_ptr.unwrap())
+                .map(|x| user.swap_remove(x));
         }
         self.operand[index] = operand;
     }
 
     pub unsafe fn add_operand(&mut self, mut operand: Operand) {
-        if let Operand::Instruction(mut operand) = operand {
-            operand.get_user_mut().push(self.self_ptr.unwrap());
+        match operand {
+            Operand::Instruction(mut inst) => {
+                inst.get_user_mut().push(self.self_ptr.unwrap());
+            }
+            Operand::Parametr(mut param) => {
+                param.add_user(self.self_ptr.unwrap());
+            }
+            Operand::Global(mut global) => {
+                global.add_user(self.self_ptr.unwrap());
+            }
+            _ => {}
         }
         self.operand.push(operand);
     }
