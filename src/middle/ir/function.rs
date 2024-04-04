@@ -19,7 +19,7 @@ pub struct Function {
     pub return_type: ValueType,
 
     /// BasicBlock of function parameters
-    pub params: Vec<Parameter>,
+    pub params: Vec<ParaPtr>,
 }
 
 impl Function {
@@ -59,7 +59,7 @@ impl Function {
     pub fn gen_llvm_ir(&self) -> String {
         let mut ir = format!("define {} @{}(", self.return_type, self.name);
         for param in self.params.iter() {
-            ir += &format!("{}, ", param);
+            ir += &format!("{}, ", param.as_ref());
         }
         ir = ir.split_off(ir.len() - 2);
         ir += ") {\n";
@@ -75,10 +75,18 @@ define_graph_iterator!(BFSIteratorRev, VecDeque<BBPtr>, pop_front, get_pred_bb);
 define_graph_iterator!(DFSIterator, Vec<BBPtr>, pop, get_succ_bb);
 define_graph_iterator!(DFSIteratorRev, Vec<BBPtr>, pop, get_pred_bb);
 
+pub type ParaPtr = ObjPtr<Parameter>;
+impl Display for ParaPtr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "%{}", self.name)
+    }
+}
+
 #[derive(Clone)]
 pub struct Parameter {
     pub name: String,
     pub value_type: ValueType,
+    user: Vec<InstPtr>,
 }
 
 impl Display for Parameter {
@@ -88,7 +96,26 @@ impl Display for Parameter {
 }
 
 impl Parameter {
-    pub fn get_type(&self) -> ValueType {
-        self.value_type.clone()
+    pub fn new(name: String, value_type: ValueType) -> Self {
+        Self {
+            name,
+            value_type,
+            user: Vec::new(),
+        }
+    }
+
+    pub fn get_user(&self) -> &[InstPtr] {
+        &self.user
+    }
+
+    pub unsafe fn add_user(&mut self, inst: InstPtr) {
+        self.user.push(inst);
+    }
+
+    pub unsafe fn remove_user(&mut self, inst: InstPtr) {
+        self.user
+            .iter()
+            .position(|x| *x == inst)
+            .map(|i| self.user.swap_remove(i));
     }
 }

@@ -58,4 +58,19 @@ impl GlobalVariable {
                 + "]"
         )
     }
+
+    pub fn get_user(&self) -> &[InstPtr] {
+        &self.user
+    }
+
+    pub unsafe fn add_user(&mut self, inst: InstPtr) {
+        self.user.push(inst);
+    }
+
+    pub unsafe fn remove_user(&mut self, inst: InstPtr) {
+        self.user
+            .iter()
+            .position(|x| *x == inst)
+            .map(|x| self.user.swap_remove(x));
+    }
 }
