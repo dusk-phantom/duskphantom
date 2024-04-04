@@ -151,8 +151,10 @@ impl<'a> FunctionKit<'a> {
                 let mty = translate_type(ty);
                 if let Some(expr) = op {
                     // Directly generate expression
-                    self.gen_stmt_expr(expr).map(|_| ())
-                    // Ok((id.clone(), operand, new_exit))
+                    let operand = self.gen_stmt_expr(expr)?;
+                    // Add to environment
+                    self.env.insert(id.clone(), operand);
+                    Ok(())
                 } else {
                     // Alloc variable
                     let alloca = self.program.mem_pool.get_alloca(mty.clone(), 1);
