@@ -5,7 +5,7 @@ pub enum Operand {
     Constant(Constant),
 
     Global(GlobalPtr),
-    Parametr(Parameter),
+    Parametr(ParaPtr),
 
     Instruction(InstPtr),
 }
@@ -33,8 +33,8 @@ impl From<InstPtr> for Operand {
     }
 }
 
-impl From<Parameter> for Operand {
-    fn from(param: Parameter) -> Self {
+impl From<ParaPtr> for Operand {
+    fn from(param: ParaPtr) -> Self {
         Self::Parametr(param)
     }
 }

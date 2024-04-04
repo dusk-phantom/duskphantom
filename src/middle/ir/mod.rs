@@ -11,11 +11,10 @@ pub mod operand;
 pub mod value_type;
 
 pub use self::basic_block::{BBPtr, BasicBlock};
-pub use self::function::{FunPtr, Function};
+pub use self::function::{FunPtr, Function, ParaPtr, Parameter};
 pub use self::instruction::{InstPtr, Instruction};
 pub use self::module::Module;
 pub use constant::Constant;
-pub use function::Parameter;
 pub use global_variable::{GlobalPtr, GlobalVariable};
 pub use ir_builder::IRBuilder;
 pub use operand::Operand;
