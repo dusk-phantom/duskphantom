@@ -5,6 +5,7 @@ pub struct IRBuilder {
     bb_pool: ObjPool<BasicBlock>,
     inst_pool: ObjPool<Box<dyn Instruction>>,
     gvar_pool: ObjPool<GlobalVariable>,
+    param_pool: ObjPool<Parameter>,
     inst_id: usize,
 }
 
@@ -15,6 +16,7 @@ impl IRBuilder {
             bb_pool: ObjPool::new(),
             inst_pool: ObjPool::new(),
             gvar_pool: ObjPool::new(),
+            param_pool: ObjPool::new(),
             inst_id: 0,
         }
     }
@@ -76,6 +78,11 @@ impl IRBuilder {
             inst.get_manager_mut().set_self_ptr(ic);
         }
         inst
+    }
+
+    /// Allocate a space for parameter, return a pointer to this space.
+    pub fn new_parameter(&mut self, name: String, value_type: ValueType) -> ParaPtr {
+        self.param_pool.alloc(Parameter::new(name, value_type))
     }
 }
 
