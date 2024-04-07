@@ -16,6 +16,7 @@ pub fn gen(program: &frontend::Program) -> Result<Program, MiddelError> {
     ProgramKit {
         program: &mut result,
         env: HashMap::new(),
+        fenv: HashMap::new(),
         ctx: HashMap::new(),
     }
     .gen(program)?;
@@ -43,6 +44,7 @@ fn translate_type(ty: &frontend::Type) -> ir::ValueType {
 /// Kit for translating a program to middle IR.
 struct ProgramKit<'a> {
     env: HashMap<String, ir::Operand>,
+    fenv: HashMap<String, ir::FunPtr>,
     ctx: HashMap<String, ir::ValueType>,
     program: &'a mut Program,
 }
@@ -50,10 +52,66 @@ struct ProgramKit<'a> {
 /// Kit for translating a function to middle IR.
 struct FunctionKit<'a> {
     env: HashMap<String, ir::Operand>,
+    fenv: HashMap<String, ir::FunPtr>,
     ctx: HashMap<String, ir::ValueType>,
     program: &'a mut Program,
     entry: ir::BBPtr,
     exit: ir::BBPtr,
+}
+
+fn repeat_vec<T>(vec: Vec<T>, n: usize) -> Vec<T>
+where
+    T: Clone, // The elements of the Vec must implement the Clone trait
+{
+    let mut result = Vec::new();
+    for _ in 0..n {
+        result.extend(vec.clone());
+    }
+    result
+}
+
+fn type_to_const(ty: &frontend::Type) -> Result<Vec<ir::Constant>, MiddelError> {
+    match ty {
+        frontend::Type::Void => todo!(),
+        frontend::Type::Int32 => Ok(vec![ir::Constant::Int(0)]),
+        frontend::Type::Float32 => Ok(vec![ir::Constant::Float(0.0)]),
+        frontend::Type::String => todo!(),
+        frontend::Type::Char => todo!(),
+        frontend::Type::Boolean => Ok(vec![ir::Constant::Bool(false)]),
+        frontend::Type::Pointer(_) => todo!(),
+        frontend::Type::Array(ty, num) => Ok(repeat_vec(type_to_const(ty)?, *num)),
+        frontend::Type::Function(_, _) => Err(MiddelError::GenError),
+        frontend::Type::Enum(_) => todo!(),
+        frontend::Type::Union(_) => todo!(),
+        frontend::Type::Struct(_) => todo!(),
+    }
+}
+
+fn expr_to_const(val: &frontend::Expr) -> Result<Vec<ir::Constant>, MiddelError> {
+    match val {
+        frontend::Expr::Var(_) => todo!(),
+        frontend::Expr::Pack(pack) => pack
+            .iter()
+            // Convert inner expression to constant value
+            .map(expr_to_const)
+            // Collect as a large result
+            .collect::<Result<Vec<Vec<_>>, _>>()
+            // Flatten inner vec
+            .map(|v| v.into_iter().flatten().collect()),
+        frontend::Expr::Map(_) => todo!(),
+        frontend::Expr::Index(_, _) => todo!(),
+        frontend::Expr::Field(_, _) => todo!(),
+        frontend::Expr::Select(_, _) => todo!(),
+        frontend::Expr::Int32(i) => Ok(vec![ir::Constant::Int(*i)]),
+        frontend::Expr::Float32(f) => Ok(vec![ir::Constant::Float(*f)]),
+        frontend::Expr::String(_) => todo!(),
+        frontend::Expr::Char(_) => todo!(),
+        frontend::Expr::Bool(b) => Ok(vec![ir::Constant::Bool(*b)]),
+        frontend::Expr::Call(_, _) => todo!(),
+        frontend::Expr::Unary(_, _) => todo!(),
+        frontend::Expr::Binary(_, _, _) => todo!(),
+        frontend::Expr::Conditional(_, _, _) => todo!(),
+    }
 }
 
 /// A program kit (top level) can generate declarations
@@ -69,7 +127,28 @@ impl<'a> ProgramKit<'a> {
     /// Fails when declaration does not have a name
     fn gen_decl(&mut self, decl: &frontend::Decl) -> Result<(), MiddelError> {
         match decl {
-            frontend::Decl::Var(_, _, _) => todo!(),
+            frontend::Decl::Var(ty, id, val) => {
+                // Get global variable
+                let gval = match val {
+                    Some(v) => self.program.mem_pool.new_global_variable(
+                        id.clone(),
+                        translate_type(ty),
+                        // TODO support variable
+                        false,
+                        expr_to_const(v)?,
+                    ),
+                    None => self.program.mem_pool.new_global_variable(
+                        id.clone(),
+                        translate_type(ty),
+                        true,
+                        type_to_const(ty)?,
+                    ),
+                };
+
+                // Add global variable to environment
+                self.env.insert(id.clone(), ir::Operand::Global(gval));
+                Ok(())
+            }
             frontend::Decl::Func(ty, id, op) => {
                 if let (Some(stmt), frontend::Type::Function(return_ty, params)) = (op, ty) {
                     // Get function type
@@ -80,10 +159,11 @@ impl<'a> ProgramKit<'a> {
 
                     // Fill parameters
                     for param in params.iter() {
-                        fptr.params.push(ir::Parameter {
-                            name: param.id.clone().map_or(Err(MiddelError::GenError), Ok)?,
-                            value_type: translate_type(&param.ty),
-                        })
+                        let param = self.program.mem_pool.new_parameter(
+                            param.id.clone().map_or(Err(MiddelError::GenError), Ok)?,
+                            translate_type(&param.ty),
+                        );
+                        fptr.params.push(param);
                     }
 
                     // Get function block name
@@ -94,6 +174,7 @@ impl<'a> ProgramKit<'a> {
                     let mut kit = FunctionKit {
                         program: self.program,
                         env: self.env.clone(),
+                        fenv: self.fenv.clone(),
                         ctx: self.ctx.clone(),
                         entry: bb,
                         exit: bb,
@@ -101,6 +182,9 @@ impl<'a> ProgramKit<'a> {
                     kit.gen_stmt(stmt)?;
                     fptr.entry = Some(kit.entry);
                     fptr.exit = Some(kit.exit);
+
+                    // Add function to environment
+                    self.fenv.insert(id.clone(), fptr);
                     Ok(())
                 } else {
                     Ok(())
@@ -193,6 +277,7 @@ impl<'a> FunctionKit<'a> {
                 FunctionKit {
                     program: self.program,
                     env: self.env.clone(),
+                    fenv: self.fenv.clone(),
                     ctx: self.ctx.clone(),
                     entry: then_bb,
                     exit: then_bb,
@@ -201,6 +286,7 @@ impl<'a> FunctionKit<'a> {
                 FunctionKit {
                     program: self.program,
                     env: self.env.clone(),
+                    fenv: self.fenv.clone(),
                     ctx: self.ctx.clone(),
                     entry: alt_bb,
                     exit: alt_bb,
