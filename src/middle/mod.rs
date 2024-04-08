@@ -57,6 +57,8 @@ struct FunctionKit<'a> {
     program: &'a mut Program,
     entry: ir::BBPtr,
     exit: ir::BBPtr,
+    break_to: Option<ir::BBPtr>,
+    continue_to: Option<ir::BBPtr>,
 }
 
 fn repeat_vec<T>(vec: Vec<T>, n: usize) -> Vec<T>
@@ -178,6 +180,8 @@ impl<'a> ProgramKit<'a> {
                         ctx: self.ctx.clone(),
                         entry: bb,
                         exit: bb,
+                        break_to: None,
+                        continue_to: None,
                     };
                     kit.gen_stmt(stmt)?;
                     fptr.entry = Some(kit.entry);
@@ -250,30 +254,36 @@ impl<'a> FunctionKit<'a> {
                 }
             }
             frontend::Stmt::If(cond, then, alt) => {
-                // Evaluate condition
-                let operand = self.gen_expr(cond)?;
-
-                // Add br instruction
-                let ir::Operand::Instruction(inst) = operand else {
-                    todo!("make get_br accept operand")
-                };
-                let br = self.program.mem_pool.get_br(Some(inst));
-                self.exit.push_back(br);
-
                 // Allocate basic blocks
+                let cond_name = self.unique_debug("cond");
+                let mut cond_bb = self.program.mem_pool.new_basicblock(cond_name);
                 let then_name = self.unique_debug("then");
                 let mut then_bb = self.program.mem_pool.new_basicblock(then_name);
                 let alt_name = self.unique_debug("alt");
                 let mut alt_bb = self.program.mem_pool.new_basicblock(alt_name);
                 let final_name = self.unique_debug("final");
                 let final_bb = self.program.mem_pool.new_basicblock(final_name);
-                self.exit.set_true_bb(then_bb);
-                self.exit.set_false_bb(alt_bb);
+
+                // Route basic blocks
+                cond_bb.set_true_bb(then_bb);
+                cond_bb.set_false_bb(alt_bb);
                 then_bb.set_true_bb(final_bb);
                 alt_bb.set_true_bb(final_bb);
-                self.exit = final_bb;
+                self.exit.set_true_bb(cond_bb);
 
-                // Generate instructions for branches
+                // Add br to exit block, jump to condition block
+                self.exit.push_back(self.program.mem_pool.get_br(None));
+                self.exit = cond_bb;
+
+                // Add condition and br to condition block
+                let operand = self.gen_expr(cond)?;
+                let ir::Operand::Instruction(inst) = operand else {
+                    todo!("make get_br accept operand")
+                };
+                let br = self.program.mem_pool.get_br(Some(inst));
+                cond_bb.push_back(br);
+
+                // Add statements and br to then branch
                 FunctionKit {
                     program: self.program,
                     env: self.env.clone(),
@@ -281,8 +291,13 @@ impl<'a> FunctionKit<'a> {
                     ctx: self.ctx.clone(),
                     entry: then_bb,
                     exit: then_bb,
+                    break_to: None,
+                    continue_to: None,
                 }
                 .gen_stmt(then)?;
+                then_bb.push_back(self.program.mem_pool.get_br(None));
+
+                // Add statements and br to alt branch
                 FunctionKit {
                     program: self.program,
                     env: self.env.clone(),
@@ -290,15 +305,137 @@ impl<'a> FunctionKit<'a> {
                     ctx: self.ctx.clone(),
                     entry: alt_bb,
                     exit: alt_bb,
+                    break_to: None,
+                    continue_to: None,
                 }
                 .gen_stmt(alt)?;
+                alt_bb.push_back(self.program.mem_pool.get_br(None));
+
+                // Increment exit
+                self.exit = final_bb;
                 Ok(())
             }
-            frontend::Stmt::While(_, _) => todo!(),
-            frontend::Stmt::DoWhile(_, _) => todo!(),
+            frontend::Stmt::While(cond, body) => {
+                // Allocate basic blocks
+                let cond_name = self.unique_debug("cond");
+                let mut cond_bb = self.program.mem_pool.new_basicblock(cond_name);
+                let body_name = self.unique_debug("body");
+                let mut body_bb = self.program.mem_pool.new_basicblock(body_name);
+                let final_name = self.unique_debug("final");
+                let final_bb = self.program.mem_pool.new_basicblock(final_name);
+
+                // Route basic blocks
+                cond_bb.set_true_bb(body_bb);
+                cond_bb.set_false_bb(final_bb);
+                body_bb.set_true_bb(cond_bb);
+                self.exit.set_true_bb(cond_bb);
+
+                // Add br to exit block, jump to condition block
+                self.exit.push_back(self.program.mem_pool.get_br(None));
+                self.exit = cond_bb;
+
+                // Add condition and br to condition block
+                let operand = self.gen_expr(cond)?;
+                let ir::Operand::Instruction(inst) = operand else {
+                    todo!("make get_br accept operand")
+                };
+                let br = self.program.mem_pool.get_br(Some(inst));
+                cond_bb.push_back(br);
+
+                // Add statements and br to body block
+                FunctionKit {
+                    program: self.program,
+                    env: self.env.clone(),
+                    fenv: self.fenv.clone(),
+                    ctx: self.ctx.clone(),
+                    entry: body_bb,
+                    exit: body_bb,
+                    break_to: Some(final_bb),
+                    continue_to: Some(cond_bb),
+                }.gen_stmt(body)?;
+                body_bb.push_back(self.program.mem_pool.get_br(None));
+
+                // Increment exit
+                self.exit = final_bb;
+                Ok(())
+            },
+            frontend::Stmt::DoWhile(body, cond) => {
+                // Allocate basic blocks
+                let body_name = self.unique_debug("body");
+                let mut body_bb = self.program.mem_pool.new_basicblock(body_name);
+                let cond_name = self.unique_debug("cond");
+                let mut cond_bb = self.program.mem_pool.new_basicblock(cond_name);
+                let final_name = self.unique_debug("final");
+                let final_bb = self.program.mem_pool.new_basicblock(final_name);
+
+                // Route basic blocks
+                body_bb.set_true_bb(cond_bb);
+                cond_bb.set_true_bb(body_bb);
+                cond_bb.set_false_bb(final_bb);
+                self.exit.set_true_bb(body_bb);
+
+                // Add br to exit block, jump to condition block
+                self.exit.push_back(self.program.mem_pool.get_br(None));
+                self.exit = cond_bb;
+
+                // Add condition and br to condition block
+                let operand = self.gen_expr(cond)?;
+                let ir::Operand::Instruction(inst) = operand else {
+                    todo!("make get_br accept operand")
+                };
+                let br = self.program.mem_pool.get_br(Some(inst));
+                cond_bb.push_back(br);
+
+                // Add statements and br to body block
+                FunctionKit {
+                    program: self.program,
+                    env: self.env.clone(),
+                    fenv: self.fenv.clone(),
+                    ctx: self.ctx.clone(),
+                    entry: body_bb,
+                    exit: body_bb,
+                    break_to: Some(final_bb),
+                    continue_to: Some(cond_bb),
+                }.gen_stmt(body)?; 
+                body_bb.push_back(self.program.mem_pool.get_br(None));
+
+                // Increment exit
+                self.exit = final_bb;
+                Ok(())
+            },
             frontend::Stmt::For(_, _, _, _) => todo!(),
-            frontend::Stmt::Break => todo!(),
-            frontend::Stmt::Continue => todo!(),
+            frontend::Stmt::Break => {
+                // Add br instruction to exit block
+                // TODO make condition constant False
+                let br = self.program.mem_pool.get_br(None);
+                self.exit.push_back(br);
+
+                // When break statement appears, break_to must not be None
+                let Some(break_to) = self.break_to else {
+                    return Err(MiddelError::GenError);
+                };
+
+                // A break can only appear in non-condition block
+                // So it is safe to set false branch to break_to
+                self.exit.set_false_bb(break_to);
+                Ok(())
+            },
+            frontend::Stmt::Continue => {
+                // Add br instruction to exit block
+                // TODO make condition constant False
+                let br = self.program.mem_pool.get_br(None);
+                self.exit.push_back(br);
+
+                // When continue statement appears, continue_to must not be None
+                let Some(continue_to) = self.continue_to else {
+                    return Err(MiddelError::GenError);
+                };
+
+                // A continue can only appear in non-condition block
+                // So it is safe to set false branch to continue_to
+                self.exit.set_false_bb(continue_to);
+                Ok(())
+            },
             frontend::Stmt::Return(_) => todo!(),
             frontend::Stmt::Block(_) => todo!(),
         }
