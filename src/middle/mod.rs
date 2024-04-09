@@ -436,8 +436,31 @@ impl<'a> FunctionKit<'a> {
                 self.exit.set_false_bb(continue_to);
                 Ok(())
             },
-            frontend::Stmt::Return(_) => todo!(),
-            frontend::Stmt::Block(_) => todo!(),
+            frontend::Stmt::Return(expr) => {
+                // Add returned result to exit block
+                let return_value = match expr {
+                    Some(expr) => {
+                        let operand = self.gen_expr(expr)?;
+                        let ir::Operand::Instruction(inst) = operand else {
+                            todo!("make get_br accept operand")
+                        };
+                        Some(inst)
+                    }
+                    None => None
+                };
+
+                // Add ret instruction to exit block
+                let ret = self.program.mem_pool.get_ret(return_value);
+                self.exit.push_back(ret);
+                Ok(())
+            },
+            frontend::Stmt::Block(stmts) => {
+                // Add statements to current block
+                for stmt in stmts.iter() {
+                    self.gen_stmt(stmt)?;
+                }
+                Ok(())
+            },
         }
     }
 
@@ -488,13 +511,14 @@ impl<'a> FunctionKit<'a> {
                 // Clone the operand and return, this clones the underlying value or InstPtr
                 Ok(operand.clone())
             }
+            // Some memcpy operation is required to process arrays
             frontend::Expr::Pack(_) => todo!(),
             frontend::Expr::Map(_) => todo!(),
             frontend::Expr::Index(_, _) => todo!(),
             frontend::Expr::Field(_, _) => todo!(),
             frontend::Expr::Select(_, _) => todo!(),
-            frontend::Expr::Int32(_) => todo!(),
-            frontend::Expr::Float32(_) => todo!(),
+            frontend::Expr::Int32(x) => Ok(ir::Operand::Constant(ir::Constant::Int(*x))),
+            frontend::Expr::Float32(x) => Ok(ir::Operand::Constant(ir::Constant::Float(*x))),
             frontend::Expr::String(_) => todo!(),
             frontend::Expr::Char(_) => todo!(),
             frontend::Expr::Bool(_) => todo!(),
@@ -509,23 +533,102 @@ impl<'a> FunctionKit<'a> {
                         let add = self.program.mem_pool.get_add(lop, rop);
                         Ok(ir::Operand::Instruction(add))
                     }
-                    frontend::BinaryOp::Sub => todo!(),
-                    frontend::BinaryOp::Mul => todo!(),
-                    frontend::BinaryOp::Div => todo!(),
-                    frontend::BinaryOp::Mod => todo!(),
+                    frontend::BinaryOp::Sub => {
+                        // Add "sub" instruction, operand is the result of the instruction
+                        let sub = self.program.mem_pool.get_sub(lop, rop);
+                        Ok(ir::Operand::Instruction(sub))
+                    }
+                    frontend::BinaryOp::Mul => {
+                        // Add "mul" instruction, operand is the result of the instruction
+                        let mul = self.program.mem_pool.get_mul(lop, rop);
+                        Ok(ir::Operand::Instruction(mul))
+                    }
+                    frontend::BinaryOp::Div => {
+                        // Add "div" instruction, operand is the result of the instruction
+                        let div = self.program.mem_pool.get_sdiv(lop, rop);
+                        Ok(ir::Operand::Instruction(div))
+                    }
+                    frontend::BinaryOp::Mod => {
+                        // Add "mod" instruction, operand is the result of the instruction
+                        let rem = self.program.mem_pool.get_srem(lop, rop);
+                        Ok(ir::Operand::Instruction(rem))
+                    }
+                    // Bitwise operation on int is not required
                     frontend::BinaryOp::Shr => todo!(),
                     frontend::BinaryOp::Shl => todo!(),
                     frontend::BinaryOp::And => todo!(),
                     frontend::BinaryOp::Or => todo!(),
                     frontend::BinaryOp::Xor => todo!(),
-                    frontend::BinaryOp::Gt => todo!(),
-                    frontend::BinaryOp::Lt => todo!(),
-                    frontend::BinaryOp::Ge => todo!(),
-                    frontend::BinaryOp::Le => todo!(),
-                    frontend::BinaryOp::Eq => todo!(),
-                    frontend::BinaryOp::Ne => todo!(),
-                    frontend::BinaryOp::All => todo!(),
-                    frontend::BinaryOp::Any => todo!(),
+                    frontend::BinaryOp::Gt => {
+                        // Add "icmp" instruction, operand is the result of the instruction
+                        let inst = self.program.mem_pool.get_icmp(
+                            ir::instruction::misc_inst::ICmpOp::Sgt, 
+                            ir::ValueType::Int, 
+                            lop, 
+                            rop,
+                        );
+                        Ok(ir::Operand::Instruction(inst))
+                    }
+                    frontend::BinaryOp::Lt => {
+                        // Add "icmp" instruction, operand is the result of the instruction
+                        let inst = self.program.mem_pool.get_icmp(
+                            ir::instruction::misc_inst::ICmpOp::Slt, 
+                            ir::ValueType::Int, 
+                            lop, 
+                            rop,
+                        );
+                        Ok(ir::Operand::Instruction(inst))
+                    }
+                    frontend::BinaryOp::Ge => {
+                        // Add "icmp" instruction, operand is the result of the instruction
+                        let inst = self.program.mem_pool.get_icmp(
+                            ir::instruction::misc_inst::ICmpOp::Sge, 
+                            ir::ValueType::Int, 
+                            lop, 
+                            rop,
+                        );
+                        Ok(ir::Operand::Instruction(inst))
+                    }
+                    frontend::BinaryOp::Le => {
+                        // Add "icmp" instruction, operand is the result of the instruction
+                        let inst = self.program.mem_pool.get_icmp(
+                            ir::instruction::misc_inst::ICmpOp::Sle, 
+                            ir::ValueType::Int, 
+                            lop, 
+                            rop,
+                        );
+                        Ok(ir::Operand::Instruction(inst))
+                    }
+                    frontend::BinaryOp::Eq => {
+                        // Add "icmp" instruction, operand is the result of the instruction
+                        let inst = self.program.mem_pool.get_icmp(
+                            ir::instruction::misc_inst::ICmpOp::Eq, 
+                            ir::ValueType::Int, 
+                            lop, 
+                            rop,
+                        );
+                        Ok(ir::Operand::Instruction(inst))
+                    }
+                    frontend::BinaryOp::Ne => {
+                        // Add "icmp" instruction, operand is the result of the instruction
+                        let inst = self.program.mem_pool.get_icmp(
+                            ir::instruction::misc_inst::ICmpOp::Ne, 
+                            ir::ValueType::Int, 
+                            lop, 
+                            rop,
+                        );
+                        Ok(ir::Operand::Instruction(inst))
+                    }
+                    frontend::BinaryOp::All => {
+                        // Add "and" instruction, operand is the result of the instruction
+                        let and = self.program.mem_pool.get_and(lop, rop);
+                        Ok(ir::Operand::Instruction(and))
+                    }
+                    frontend::BinaryOp::Any => {
+                        // Add "or" instruction, operand is the result of the instruction
+                        let or = self.program.mem_pool.get_or(lop, rop);
+                        Ok(ir::Operand::Instruction(or))
+                    }
                 }
             }
             frontend::Expr::Conditional(_, _, _) => todo!(),
