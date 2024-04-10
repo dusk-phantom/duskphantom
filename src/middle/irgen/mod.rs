@@ -351,11 +351,8 @@ impl<'a> FunctionKit<'a> {
                 self.exit = cond_bb;
 
                 // Add condition and br to condition block
-                let value = self.gen_expr(cond)?;
-                let Operand::Instruction(inst) = value.load(self) else {
-                    todo!("make get_br accept operand")
-                };
-                let br = self.program.mem_pool.get_br(Some(inst));
+                let operand = self.gen_expr(cond)?.load(self);
+                let br = self.program.mem_pool.get_br(Some(operand));
                 cond_bb.push_back(br);
 
                 // Add statements and br to then branch
@@ -410,11 +407,8 @@ impl<'a> FunctionKit<'a> {
                 self.exit = cond_bb;
 
                 // Add condition and br to condition block
-                let value = self.gen_expr(cond)?;
-                let Operand::Instruction(inst) = value.load(self) else {
-                    todo!("make get_br accept operand")
-                };
-                let br = self.program.mem_pool.get_br(Some(inst));
+                let operand = self.gen_expr(cond)?.load(self);
+                let br = self.program.mem_pool.get_br(Some(operand));
                 cond_bb.push_back(br);
 
                 // Add statements and br to body block
@@ -455,11 +449,8 @@ impl<'a> FunctionKit<'a> {
                 self.exit = cond_bb;
 
                 // Add condition and br to condition block
-                let value = self.gen_expr(cond)?;
-                let Operand::Instruction(inst) = value.load(self) else {
-                    todo!("make get_br accept operand")
-                };
-                let br = self.program.mem_pool.get_br(Some(inst));
+                let operand = self.gen_expr(cond)?.load(self);
+                let br = self.program.mem_pool.get_br(Some(operand));
                 cond_bb.push_back(br);
 
                 // Add statements and br to body block
