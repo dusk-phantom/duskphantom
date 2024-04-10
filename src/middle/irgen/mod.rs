@@ -39,8 +39,8 @@ fn translate_type(ty: &Type) -> ValueType {
     }
 }
 
-/// A value can be an operand, or a pointer to an operand.
-/// An operand can not be assigned to, while a pointed value can.
+/// A value can be an operand, or a pointer to an operand
+/// An operand can not be assigned to, while a pointed value can
 #[derive(Clone)]
 enum Value {
     Operand(Operand),
@@ -64,6 +64,7 @@ impl Into<Value> for Constant {
 
 /// A value can be loaded or assigned, and has type
 impl Value {
+    /// Get the type of a value
     pub fn get_type(&self) -> ValueType {
         match self {
             Value::Operand(op) => op.get_type(),
@@ -75,6 +76,7 @@ impl Value {
         }
     }
 
+    /// Load the value as an operand
     pub fn load<'a>(self, kit: &mut FunctionKit<'a>) -> Operand {
         let ty = self.get_type();
         match self {
@@ -88,6 +90,7 @@ impl Value {
         }
     }
 
+    /// Assign an operand to this value
     pub fn assign<'a>(self, kit: &mut FunctionKit<'a>, op: Operand) -> Result<(), MiddelError> {
         match self {
             Value::Operand(_) => Err(MiddelError::GenError),
@@ -101,7 +104,7 @@ impl Value {
     }
 }
 
-/// Kit for translating a program to middle IR.
+/// Kit for translating a program to middle IR
 struct ProgramKit<'a> {
     env: HashMap<String, Value>,
     fenv: HashMap<String, FunPtr>,
@@ -109,7 +112,7 @@ struct ProgramKit<'a> {
     program: &'a mut middle::Program,
 }
 
-/// Kit for translating a function to middle IR.
+/// Kit for translating a function to middle IR
 struct FunctionKit<'a> {
     env: HashMap<String, Value>,
     fenv: HashMap<String, FunPtr>,
@@ -121,9 +124,10 @@ struct FunctionKit<'a> {
     continue_to: Option<BBPtr>,
 }
 
+/// Repeat a vector for `n` times
 fn repeat_vec<T>(vec: Vec<T>, n: usize) -> Vec<T>
 where
-    T: Clone, // The elements of the Vec must implement the Clone trait
+    T: Clone,
 {
     let mut result = Vec::new();
     for _ in 0..n {
@@ -132,6 +136,7 @@ where
     result
 }
 
+/// Convert a type to its default constant
 fn type_to_const(ty: &Type) -> Result<Vec<Constant>, MiddelError> {
     match ty {
         Type::Void => todo!(),
@@ -149,6 +154,7 @@ fn type_to_const(ty: &Type) -> Result<Vec<Constant>, MiddelError> {
     }
 }
 
+/// Convert a constant expression to a constant
 fn expr_to_const(val: &Expr) -> Result<Vec<Constant>, MiddelError> {
     match val {
         Expr::Var(_) => todo!(),
