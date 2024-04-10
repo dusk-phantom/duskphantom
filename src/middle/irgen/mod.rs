@@ -86,11 +86,12 @@ impl Value {
     }
 
     pub fn load<'a>(self, kit: &mut FunctionKit<'a>) -> Operand {
+        let ty = self.get_type();
         match self {
             Value::Operand(op) => op,
             Value::Pointer(op) => {
                 // Add instruction to exit
-                let inst = kit.program.mem_pool.get_load(op.get_type(), op);
+                let inst = kit.program.mem_pool.get_load(ty, op);
                 kit.exit.push_back(inst);
                 inst.into()
             }
@@ -738,7 +739,7 @@ mod tests {
         assert_eq!(
             llvm_ir,
             // TODO line break?
-            "n() {\n%entry:\n%alloca_1 = alloca i32 i32store i32 1, ptr %alloca_1%alloca_3 = alloca i32 i32store i32 2, ptr %alloca_3%alloca_5 = alloca i32 i32%load_6 = load i32*, ptr %alloca_1%load_7 = load i32*, ptr %alloca_3%Add_8 = add i32, %load_6, %load_7store i32 %Add_8, ptr %alloca_5%load_10 = load i32*, ptr %alloca_5ret %load_10\n\n}\n"
+            "n() {\n%entry:\n%alloca_1 = alloca i32 i32store i32 1, ptr %alloca_1%alloca_3 = alloca i32 i32store i32 2, ptr %alloca_3%alloca_5 = alloca i32 i32%load_6 = load i32, ptr %alloca_1%load_7 = load i32, ptr %alloca_3%Add_8 = add i32, %load_6, %load_7store i32 %Add_8, ptr %alloca_5%load_10 = load i32, ptr %alloca_5ret %load_10\n\n}\n"
         );
     }
 
