@@ -1,6 +1,14 @@
 use std::collections::HashMap;
 
-use crate::{errors::MiddelError, frontend, middle, middle::ir};
+use crate::{
+    errors::MiddelError,
+    frontend::{self, BinaryOp, Decl, Expr, Stmt, Type},
+    middle,
+};
+
+use super::ir::{
+    instruction::misc_inst::ICmpOp, BBPtr, Constant, FunPtr, GlobalPtr, Operand, ValueType,
+};
 
 /// Generate middle IR from a frontend AST
 pub fn gen(program: &frontend::Program) -> Result<middle::Program, MiddelError> {
@@ -16,41 +24,110 @@ pub fn gen(program: &frontend::Program) -> Result<middle::Program, MiddelError> 
 }
 
 /// Translate a frontend type to IR value type
-fn translate_type(ty: &frontend::Type) -> ir::ValueType {
+fn translate_type(ty: &Type) -> ValueType {
     match ty {
-        frontend::Type::Void => ir::ValueType::Void,
-        frontend::Type::Int32 => ir::ValueType::Int,
-        frontend::Type::Float32 => ir::ValueType::Float,
-        frontend::Type::String => todo!(),
-        frontend::Type::Char => todo!(),
-        frontend::Type::Boolean => ir::ValueType::Bool,
-        frontend::Type::Pointer(ty) => ir::ValueType::Pointer(Box::new(translate_type(ty))),
-        frontend::Type::Array(ty, n) => ir::ValueType::Array(Box::new(translate_type(ty)), *n),
-        frontend::Type::Function(_, _) => todo!(),
-        frontend::Type::Enum(_) => todo!(),
-        frontend::Type::Union(_) => todo!(),
-        frontend::Type::Struct(_) => todo!(),
+        Type::Void => ValueType::Void,
+        Type::Int32 => ValueType::Int,
+        Type::Float32 => ValueType::Float,
+        Type::String => todo!(),
+        Type::Char => todo!(),
+        Type::Boolean => ValueType::Bool,
+        Type::Pointer(ty) => ValueType::Pointer(Box::new(translate_type(ty))),
+        Type::Array(ty, n) => ValueType::Array(Box::new(translate_type(ty)), *n),
+        Type::Function(_, _) => todo!(),
+        Type::Enum(_) => todo!(),
+        Type::Union(_) => todo!(),
+        Type::Struct(_) => todo!(),
+    }
+}
+
+/// A value can be an operand, or a pointer to an operand.
+/// An operand can not be assigned to, while a pointed value can.
+#[derive(Clone)]
+enum Value {
+    Operand(Operand),
+    Pointer(Operand),
+}
+
+/// A value can be allocated with type and kit
+fn alloc<'a>(ty: ValueType, kit: &mut FunctionKit<'a>) -> Value {
+    // Add instruction to exit
+    let inst = kit.program.mem_pool.get_alloca(ty, 1);
+    kit.exit.push_back(inst);
+    Value::Pointer(inst.into())
+}
+
+/// TODO put this code to global ptr
+/// A global variable can be converted to an operand
+impl Into<Operand> for GlobalPtr {
+    fn into(self) -> Operand {
+        Operand::Global(self)
+    }
+}
+
+/// A constant can be converted to a value
+impl Into<Value> for Constant {
+    fn into(self) -> Value {
+        Value::Operand(Operand::Constant(self))
+    }
+}
+
+/// A value can be loaded or assigned, and has type
+impl Value {
+    pub fn get_type(&self) -> ValueType {
+        match self {
+            Value::Operand(op) => op.get_type(),
+            Value::Pointer(op) => match op.get_type() {
+                // Inside `Pointer` is the pointer to given value
+                ValueType::Pointer(ty) => *ty,
+                _ => todo!(),
+            },
+        }
+    }
+
+    pub fn load<'a>(self, kit: &mut FunctionKit<'a>) -> Operand {
+        match self {
+            Value::Operand(op) => op,
+            Value::Pointer(op) => {
+                // Add instruction to exit
+                let inst = kit.program.mem_pool.get_load(op.get_type(), op);
+                kit.exit.push_back(inst);
+                inst.into()
+            }
+        }
+    }
+
+    pub fn assign<'a>(self, kit: &mut FunctionKit<'a>, op: Operand) -> Result<(), MiddelError> {
+        match self {
+            Value::Operand(_) => Err(MiddelError::GenError),
+            Value::Pointer(ptr) => {
+                // Add instruction to exit
+                let inst = kit.program.mem_pool.get_store(op, ptr);
+                kit.exit.push_back(inst);
+                Ok(())
+            }
+        }
     }
 }
 
 /// Kit for translating a program to middle IR.
 struct ProgramKit<'a> {
-    env: HashMap<String, ir::Operand>,
-    fenv: HashMap<String, ir::FunPtr>,
-    ctx: HashMap<String, ir::ValueType>,
+    env: HashMap<String, Value>,
+    fenv: HashMap<String, FunPtr>,
+    ctx: HashMap<String, ValueType>,
     program: &'a mut middle::Program,
 }
 
 /// Kit for translating a function to middle IR.
 struct FunctionKit<'a> {
-    env: HashMap<String, ir::Operand>,
-    fenv: HashMap<String, ir::FunPtr>,
-    ctx: HashMap<String, ir::ValueType>,
+    env: HashMap<String, Value>,
+    fenv: HashMap<String, FunPtr>,
+    ctx: HashMap<String, ValueType>,
     program: &'a mut middle::Program,
-    entry: ir::BBPtr,
-    exit: ir::BBPtr,
-    break_to: Option<ir::BBPtr>,
-    continue_to: Option<ir::BBPtr>,
+    entry: BBPtr,
+    exit: BBPtr,
+    break_to: Option<BBPtr>,
+    continue_to: Option<BBPtr>,
 }
 
 fn repeat_vec<T>(vec: Vec<T>, n: usize) -> Vec<T>
@@ -64,27 +141,27 @@ where
     result
 }
 
-fn type_to_const(ty: &frontend::Type) -> Result<Vec<ir::Constant>, MiddelError> {
+fn type_to_const(ty: &Type) -> Result<Vec<Constant>, MiddelError> {
     match ty {
-        frontend::Type::Void => todo!(),
-        frontend::Type::Int32 => Ok(vec![ir::Constant::Int(0)]),
-        frontend::Type::Float32 => Ok(vec![ir::Constant::Float(0.0)]),
-        frontend::Type::String => todo!(),
-        frontend::Type::Char => todo!(),
-        frontend::Type::Boolean => Ok(vec![ir::Constant::Bool(false)]),
-        frontend::Type::Pointer(_) => todo!(),
-        frontend::Type::Array(ty, num) => Ok(repeat_vec(type_to_const(ty)?, *num)),
-        frontend::Type::Function(_, _) => Err(MiddelError::GenError),
-        frontend::Type::Enum(_) => todo!(),
-        frontend::Type::Union(_) => todo!(),
-        frontend::Type::Struct(_) => todo!(),
+        Type::Void => todo!(),
+        Type::Int32 => Ok(vec![Constant::Int(0)]),
+        Type::Float32 => Ok(vec![Constant::Float(0.0)]),
+        Type::String => todo!(),
+        Type::Char => todo!(),
+        Type::Boolean => Ok(vec![Constant::Bool(false)]),
+        Type::Pointer(_) => todo!(),
+        Type::Array(ty, num) => Ok(repeat_vec(type_to_const(ty)?, *num)),
+        Type::Function(_, _) => Err(MiddelError::GenError),
+        Type::Enum(_) => todo!(),
+        Type::Union(_) => todo!(),
+        Type::Struct(_) => todo!(),
     }
 }
 
-fn expr_to_const(val: &frontend::Expr) -> Result<Vec<ir::Constant>, MiddelError> {
+fn expr_to_const(val: &Expr) -> Result<Vec<Constant>, MiddelError> {
     match val {
-        frontend::Expr::Var(_) => todo!(),
-        frontend::Expr::Pack(pack) => pack
+        Expr::Var(_) => todo!(),
+        Expr::Pack(pack) => pack
             .iter()
             // Convert inner expression to constant value
             .map(expr_to_const)
@@ -92,19 +169,19 @@ fn expr_to_const(val: &frontend::Expr) -> Result<Vec<ir::Constant>, MiddelError>
             .collect::<Result<Vec<Vec<_>>, _>>()
             // Flatten inner vec
             .map(|v| v.into_iter().flatten().collect()),
-        frontend::Expr::Map(_) => todo!(),
-        frontend::Expr::Index(_, _) => todo!(),
-        frontend::Expr::Field(_, _) => todo!(),
-        frontend::Expr::Select(_, _) => todo!(),
-        frontend::Expr::Int32(i) => Ok(vec![ir::Constant::Int(*i)]),
-        frontend::Expr::Float32(f) => Ok(vec![ir::Constant::Float(*f)]),
-        frontend::Expr::String(_) => todo!(),
-        frontend::Expr::Char(_) => todo!(),
-        frontend::Expr::Bool(b) => Ok(vec![ir::Constant::Bool(*b)]),
-        frontend::Expr::Call(_, _) => todo!(),
-        frontend::Expr::Unary(_, _) => todo!(),
-        frontend::Expr::Binary(_, _, _) => todo!(),
-        frontend::Expr::Conditional(_, _, _) => todo!(),
+        Expr::Map(_) => todo!(),
+        Expr::Index(_, _) => todo!(),
+        Expr::Field(_, _) => todo!(),
+        Expr::Select(_, _) => todo!(),
+        Expr::Int32(i) => Ok(vec![Constant::Int(*i)]),
+        Expr::Float32(f) => Ok(vec![Constant::Float(*f)]),
+        Expr::String(_) => todo!(),
+        Expr::Char(_) => todo!(),
+        Expr::Bool(b) => Ok(vec![Constant::Bool(*b)]),
+        Expr::Call(_, _) => todo!(),
+        Expr::Unary(_, _) => todo!(),
+        Expr::Binary(_, _, _) => todo!(),
+        Expr::Conditional(_, _, _) => todo!(),
     }
 }
 
@@ -119,9 +196,9 @@ impl<'a> ProgramKit<'a> {
 
     /// Generate a declaration into the program
     /// Fails when declaration does not have a name
-    fn gen_decl(&mut self, decl: &frontend::Decl) -> Result<(), MiddelError> {
+    fn gen_decl(&mut self, decl: &Decl) -> Result<(), MiddelError> {
         match decl {
-            frontend::Decl::Var(ty, id, val) => {
+            Decl::Var(ty, id, val) => {
                 // Get global variable
                 let gval = match val {
                     Some(v) => self.program.mem_pool.new_global_variable(
@@ -140,14 +217,15 @@ impl<'a> ProgramKit<'a> {
                 };
 
                 // Add global variable to environment
-                self.env.insert(id.clone(), ir::Operand::Global(gval));
+                // TODO how to set global variable?
+                self.env.insert(id.clone(), Value::Operand(gval.into()));
 
                 // Add global variable to program
                 self.program.module.global_variables.push(gval);
                 Ok(())
             }
-            frontend::Decl::Func(ty, id, op) => {
-                if let (Some(stmt), frontend::Type::Function(return_ty, params)) = (op, ty) {
+            Decl::Func(ty, id, op) => {
+                if let (Some(stmt), Type::Function(return_ty, params)) = (op, ty) {
                     // Get function type
                     let fty = translate_type(return_ty);
 
@@ -190,9 +268,9 @@ impl<'a> ProgramKit<'a> {
                     Ok(())
                 }
             }
-            frontend::Decl::Enum(_, _) => todo!(),
-            frontend::Decl::Union(_, _) => todo!(),
-            frontend::Decl::Struct(_, _) => todo!(),
+            Decl::Enum(_, _) => todo!(),
+            Decl::Union(_, _) => todo!(),
+            Decl::Struct(_, _) => todo!(),
         }
     }
 
@@ -212,33 +290,33 @@ impl<'a> FunctionKit<'a> {
     /// Generate a statement into the program
     /// `exit`: previous exit node of a function
     /// Returns: new exit node of a function
-    fn gen_stmt(&mut self, stmt: &frontend::Stmt) -> Result<(), MiddelError> {
+    fn gen_stmt(&mut self, stmt: &Stmt) -> Result<(), MiddelError> {
         match stmt {
-            frontend::Stmt::Nothing => Ok(()),
-            frontend::Stmt::Decl(decl) => {
+            Stmt::Nothing => Ok(()),
+            Stmt::Decl(decl) => {
                 // Generate declaration
                 self.gen_decl(decl)
             }
-            frontend::Stmt::Expr(op, expr) => {
+            Stmt::Expr(opt_lval, expr) => {
                 // Generate expression
-                let operand = self.gen_expr(expr)?;
-                match op {
+                let operand = self.gen_expr(expr)?.load(self);
+                match opt_lval {
                     // Exist left value, try add result to env
                     Some(lval) => match lval {
                         frontend::LVal::Nothing => todo!(),
                         frontend::LVal::Var(id) => {
-                            // Make sure variable is declared
-                            let Some(ty) = self.ctx.get(id) else {
+                            // Make sure variable can be assigned
+                            let Some(val @ Value::Pointer(_)) = self.env.get(id) else {
                                 return Err(MiddelError::GenError);
                             };
 
                             // Typecheck, TODO type cast
-                            if operand.get_type() != *ty {
+                            if operand.get_type() != val.get_type() {
                                 return Err(MiddelError::GenError);
                             }
 
-                            // Add result to env
-                            self.env.insert(id.clone(), operand);
+                            // Assign to value
+                            val.clone().assign(self, operand)?;
                             Ok(())
                         }
                         frontend::LVal::Index(_, _) => todo!(),
@@ -249,7 +327,7 @@ impl<'a> FunctionKit<'a> {
                     None => Ok(()),
                 }
             }
-            frontend::Stmt::If(cond, then, alt) => {
+            Stmt::If(cond, then, alt) => {
                 // Allocate basic blocks
                 let cond_name = self.unique_debug("cond");
                 let mut cond_bb = self.program.mem_pool.new_basicblock(cond_name);
@@ -272,8 +350,8 @@ impl<'a> FunctionKit<'a> {
                 self.exit = cond_bb;
 
                 // Add condition and br to condition block
-                let operand = self.gen_expr(cond)?;
-                let ir::Operand::Instruction(inst) = operand else {
+                let value = self.gen_expr(cond)?;
+                let Operand::Instruction(inst) = value.load(self) else {
                     todo!("make get_br accept operand")
                 };
                 let br = self.program.mem_pool.get_br(Some(inst));
@@ -311,7 +389,7 @@ impl<'a> FunctionKit<'a> {
                 self.exit = final_bb;
                 Ok(())
             }
-            frontend::Stmt::While(cond, body) => {
+            Stmt::While(cond, body) => {
                 // Allocate basic blocks
                 let cond_name = self.unique_debug("cond");
                 let mut cond_bb = self.program.mem_pool.new_basicblock(cond_name);
@@ -331,8 +409,8 @@ impl<'a> FunctionKit<'a> {
                 self.exit = cond_bb;
 
                 // Add condition and br to condition block
-                let operand = self.gen_expr(cond)?;
-                let ir::Operand::Instruction(inst) = operand else {
+                let value = self.gen_expr(cond)?;
+                let Operand::Instruction(inst) = value.load(self) else {
                     todo!("make get_br accept operand")
                 };
                 let br = self.program.mem_pool.get_br(Some(inst));
@@ -348,14 +426,15 @@ impl<'a> FunctionKit<'a> {
                     exit: body_bb,
                     break_to: Some(final_bb),
                     continue_to: Some(cond_bb),
-                }.gen_stmt(body)?;
+                }
+                .gen_stmt(body)?;
                 body_bb.push_back(self.program.mem_pool.get_br(None));
 
                 // Increment exit
                 self.exit = final_bb;
                 Ok(())
-            },
-            frontend::Stmt::DoWhile(body, cond) => {
+            }
+            Stmt::DoWhile(body, cond) => {
                 // Allocate basic blocks
                 let body_name = self.unique_debug("body");
                 let mut body_bb = self.program.mem_pool.new_basicblock(body_name);
@@ -375,8 +454,8 @@ impl<'a> FunctionKit<'a> {
                 self.exit = cond_bb;
 
                 // Add condition and br to condition block
-                let operand = self.gen_expr(cond)?;
-                let ir::Operand::Instruction(inst) = operand else {
+                let value = self.gen_expr(cond)?;
+                let Operand::Instruction(inst) = value.load(self) else {
                     todo!("make get_br accept operand")
                 };
                 let br = self.program.mem_pool.get_br(Some(inst));
@@ -392,15 +471,16 @@ impl<'a> FunctionKit<'a> {
                     exit: body_bb,
                     break_to: Some(final_bb),
                     continue_to: Some(cond_bb),
-                }.gen_stmt(body)?; 
+                }
+                .gen_stmt(body)?;
                 body_bb.push_back(self.program.mem_pool.get_br(None));
 
                 // Increment exit
                 self.exit = final_bb;
                 Ok(())
-            },
-            frontend::Stmt::For(_, _, _, _) => todo!(),
-            frontend::Stmt::Break => {
+            }
+            Stmt::For(_, _, _, _) => todo!(),
+            Stmt::Break => {
                 // Add br instruction to exit block
                 // TODO make condition constant False
                 let br = self.program.mem_pool.get_br(None);
@@ -415,8 +495,8 @@ impl<'a> FunctionKit<'a> {
                 // So it is safe to set false branch to break_to
                 self.exit.set_false_bb(break_to);
                 Ok(())
-            },
-            frontend::Stmt::Continue => {
+            }
+            Stmt::Continue => {
                 // Add br instruction to exit block
                 // TODO make condition constant False
                 let br = self.program.mem_pool.get_br(None);
@@ -431,74 +511,77 @@ impl<'a> FunctionKit<'a> {
                 // So it is safe to set false branch to continue_to
                 self.exit.set_false_bb(continue_to);
                 Ok(())
-            },
-            frontend::Stmt::Return(expr) => {
+            }
+            Stmt::Return(expr) => {
                 // Add returned result to exit block
                 let return_value = match expr {
                     Some(expr) => {
-                        let operand = self.gen_expr(expr)?;
-                        let ir::Operand::Instruction(inst) = operand else {
+                        let value = self.gen_expr(expr)?;
+                        let Operand::Instruction(inst) = value.load(self) else {
                             todo!("make get_br accept operand")
                         };
                         Some(inst)
                     }
-                    None => None
+                    None => None,
                 };
 
                 // Add ret instruction to exit block
                 let ret = self.program.mem_pool.get_ret(return_value);
                 self.exit.push_back(ret);
                 Ok(())
-            },
-            frontend::Stmt::Block(stmts) => {
+            }
+            Stmt::Block(stmts) => {
                 // Add statements to current block
                 for stmt in stmts.iter() {
                     self.gen_stmt(stmt)?;
                 }
                 Ok(())
-            },
+            }
         }
     }
 
     /// Generate a declaration as a statement into the program
     /// `exit`: previous exit node of the function
     /// Returns: declaration name, declared variable, new exit node of the function
-    fn gen_decl(&mut self, decl: &frontend::Decl) -> Result<(), MiddelError> {
+    fn gen_decl(&mut self, decl: &Decl) -> Result<(), MiddelError> {
         match decl {
-            frontend::Decl::Var(ty, id, op) => {
-                let mty = translate_type(ty);
-
+            Decl::Var(raw_ty, id, op) => {
                 // Add type to context
-                self.ctx.insert(id.clone(), mty.clone());
+                let ty = translate_type(raw_ty);
+                self.ctx.insert(id.clone(), ty.clone());
+
+                // Allocate space for variable, add to environment
+                let val = alloc(ty.clone(), self);
+                self.env.insert(id.clone(), val.clone());
+
+                // Assign to the variable if it is defined
                 if let Some(expr) = op {
                     // Generate expression
-                    let operand = self.gen_expr(expr)?;
+                    let operand = self.gen_expr(expr)?.load(self);
 
                     // Typecheck, TODO type cast
-                    if operand.get_type() != mty {
+                    if operand.get_type() != ty {
                         return Err(MiddelError::GenError);
                     }
 
-                    // Add value to environment
-                    self.env.insert(id.clone(), operand);
-                    Ok(())
-                } else {
-                    Ok(())
-                }
+                    // Assign operand to value
+                    val.assign(self, operand)?;
+                };
+                Ok(())
             }
-            frontend::Decl::Func(_, _, _) => todo!(),
-            frontend::Decl::Enum(_, _) => todo!(),
-            frontend::Decl::Union(_, _) => todo!(),
-            frontend::Decl::Struct(_, _) => todo!(),
+            Decl::Func(_, _, _) => todo!(),
+            Decl::Enum(_, _) => todo!(),
+            Decl::Union(_, _) => todo!(),
+            Decl::Struct(_, _) => todo!(),
         }
     }
 
     /// Generate a expression as a statement into the program
     /// `exit`: previous exit node of the function
     /// Returns: calculated variable, new exit node of the function
-    fn gen_expr(&mut self, expr: &frontend::Expr) -> Result<ir::Operand, MiddelError> {
+    fn gen_expr(&mut self, expr: &Expr) -> Result<Value, MiddelError> {
         match expr {
-            frontend::Expr::Var(x) => {
+            Expr::Var(x) => {
                 // Ensure variable is defined
                 let Some(operand) = self.env.get(x) else {
                     return Err(MiddelError::GenError);
@@ -508,139 +591,127 @@ impl<'a> FunctionKit<'a> {
                 Ok(operand.clone())
             }
             // Some memcpy operation is required to process arrays
-            frontend::Expr::Pack(_) => todo!(),
-            frontend::Expr::Map(_) => todo!(),
-            frontend::Expr::Index(_, _) => todo!(),
-            frontend::Expr::Field(_, _) => todo!(),
-            frontend::Expr::Select(_, _) => todo!(),
-            frontend::Expr::Int32(x) => Ok(ir::Operand::Constant(ir::Constant::Int(*x))),
-            frontend::Expr::Float32(x) => Ok(ir::Operand::Constant(ir::Constant::Float(*x))),
-            frontend::Expr::String(_) => todo!(),
-            frontend::Expr::Char(_) => todo!(),
-            frontend::Expr::Bool(_) => todo!(),
-            frontend::Expr::Call(_, _) => todo!(),
-            frontend::Expr::Unary(_, _) => todo!(),
-            frontend::Expr::Binary(op, lhs, rhs) => {
-                let lop = self.gen_expr(lhs)?;
-                let rop = self.gen_expr(rhs)?;
+            Expr::Pack(_) => todo!(),
+            Expr::Map(_) => todo!(),
+            Expr::Index(_, _) => todo!(),
+            Expr::Field(_, _) => todo!(),
+            Expr::Select(_, _) => todo!(),
+            Expr::Int32(x) => Ok(Constant::Int(*x).into()),
+            Expr::Float32(x) => Ok(Constant::Float(*x).into()),
+            Expr::String(_) => todo!(),
+            Expr::Char(_) => todo!(),
+            Expr::Bool(_) => todo!(),
+            Expr::Call(_, _) => todo!(),
+            Expr::Unary(_, _) => todo!(),
+            Expr::Binary(op, lhs, rhs) => {
+                let lop = self.gen_expr(lhs)?.load(self);
+                let rop = self.gen_expr(rhs)?.load(self);
                 match op {
-                    frontend::BinaryOp::Add => {
+                    BinaryOp::Add => {
                         // Add "add" instruction, operand is the result of the instruction
                         let inst = self.program.mem_pool.get_add(lop, rop);
                         self.exit.push_back(inst);
-                        Ok(ir::Operand::Instruction(inst))
+                        Ok(Value::Operand(inst.into()))
                     }
-                    frontend::BinaryOp::Sub => {
+                    BinaryOp::Sub => {
                         // Add "inst" instruction, operand is the result of the instruction
                         let inst = self.program.mem_pool.get_sub(lop, rop);
                         self.exit.push_back(inst);
-                        Ok(ir::Operand::Instruction(inst))
+                        Ok(Value::Operand(inst.into()))
                     }
-                    frontend::BinaryOp::Mul => {
+                    BinaryOp::Mul => {
                         // Add "inst" instruction, operand is the result of the instruction
                         let inst = self.program.mem_pool.get_mul(lop, rop);
                         self.exit.push_back(inst);
-                        Ok(ir::Operand::Instruction(inst))
+                        Ok(Value::Operand(inst.into()))
                     }
-                    frontend::BinaryOp::Div => {
+                    BinaryOp::Div => {
                         // Add "inst" instruction, operand is the result of the instruction
                         let inst = self.program.mem_pool.get_sdiv(lop, rop);
                         self.exit.push_back(inst);
-                        Ok(ir::Operand::Instruction(inst))
+                        Ok(Value::Operand(inst.into()))
                     }
-                    frontend::BinaryOp::Mod => {
+                    BinaryOp::Mod => {
                         // Add "inst" instruction, operand is the result of the instruction
                         let inst = self.program.mem_pool.get_srem(lop, rop);
                         self.exit.push_back(inst);
-                        Ok(ir::Operand::Instruction(inst))
+                        Ok(Value::Operand(inst.into()))
                     }
                     // Bitwise operation on int is not required
-                    frontend::BinaryOp::Shr => todo!(),
-                    frontend::BinaryOp::Shl => todo!(),
-                    frontend::BinaryOp::And => todo!(),
-                    frontend::BinaryOp::Or => todo!(),
-                    frontend::BinaryOp::Xor => todo!(),
-                    frontend::BinaryOp::Gt => {
+                    BinaryOp::Shr => todo!(),
+                    BinaryOp::Shl => todo!(),
+                    BinaryOp::And => todo!(),
+                    BinaryOp::Or => todo!(),
+                    BinaryOp::Xor => todo!(),
+                    BinaryOp::Gt => {
                         // Add "icmp" instruction, operand is the result of the instruction
-                        let inst = self.program.mem_pool.get_icmp(
-                            ir::instruction::misc_inst::ICmpOp::Sgt, 
-                            ir::ValueType::Int, 
-                            lop, 
-                            rop,
-                        );
+                        let inst =
+                            self.program
+                                .mem_pool
+                                .get_icmp(ICmpOp::Sgt, ValueType::Int, lop, rop);
                         self.exit.push_back(inst);
-                        Ok(ir::Operand::Instruction(inst))
+                        Ok(Value::Operand(inst.into()))
                     }
-                    frontend::BinaryOp::Lt => {
+                    BinaryOp::Lt => {
                         // Add "icmp" instruction, operand is the result of the instruction
-                        let inst = self.program.mem_pool.get_icmp(
-                            ir::instruction::misc_inst::ICmpOp::Slt, 
-                            ir::ValueType::Int, 
-                            lop, 
-                            rop,
-                        );
+                        let inst =
+                            self.program
+                                .mem_pool
+                                .get_icmp(ICmpOp::Slt, ValueType::Int, lop, rop);
                         self.exit.push_back(inst);
-                        Ok(ir::Operand::Instruction(inst))
+                        Ok(Value::Operand(inst.into()))
                     }
-                    frontend::BinaryOp::Ge => {
+                    BinaryOp::Ge => {
                         // Add "icmp" instruction, operand is the result of the instruction
-                        let inst = self.program.mem_pool.get_icmp(
-                            ir::instruction::misc_inst::ICmpOp::Sge, 
-                            ir::ValueType::Int, 
-                            lop, 
-                            rop,
-                        );
+                        let inst =
+                            self.program
+                                .mem_pool
+                                .get_icmp(ICmpOp::Sge, ValueType::Int, lop, rop);
                         self.exit.push_back(inst);
-                        Ok(ir::Operand::Instruction(inst))
+                        Ok(Value::Operand(inst.into()))
                     }
-                    frontend::BinaryOp::Le => {
+                    BinaryOp::Le => {
                         // Add "icmp" instruction, operand is the result of the instruction
-                        let inst = self.program.mem_pool.get_icmp(
-                            ir::instruction::misc_inst::ICmpOp::Sle, 
-                            ir::ValueType::Int, 
-                            lop, 
-                            rop,
-                        );
+                        let inst =
+                            self.program
+                                .mem_pool
+                                .get_icmp(ICmpOp::Sle, ValueType::Int, lop, rop);
                         self.exit.push_back(inst);
-                        Ok(ir::Operand::Instruction(inst))
+                        Ok(Value::Operand(inst.into()))
                     }
-                    frontend::BinaryOp::Eq => {
+                    BinaryOp::Eq => {
                         // Add "icmp" instruction, operand is the result of the instruction
-                        let inst = self.program.mem_pool.get_icmp(
-                            ir::instruction::misc_inst::ICmpOp::Eq, 
-                            ir::ValueType::Int, 
-                            lop, 
-                            rop,
-                        );
+                        let inst =
+                            self.program
+                                .mem_pool
+                                .get_icmp(ICmpOp::Eq, ValueType::Int, lop, rop);
                         self.exit.push_back(inst);
-                        Ok(ir::Operand::Instruction(inst))
+                        Ok(Value::Operand(inst.into()))
                     }
-                    frontend::BinaryOp::Ne => {
+                    BinaryOp::Ne => {
                         // Add "icmp" instruction, operand is the result of the instruction
-                        let inst = self.program.mem_pool.get_icmp(
-                            ir::instruction::misc_inst::ICmpOp::Ne, 
-                            ir::ValueType::Int, 
-                            lop, 
-                            rop,
-                        );
+                        let inst =
+                            self.program
+                                .mem_pool
+                                .get_icmp(ICmpOp::Ne, ValueType::Int, lop, rop);
                         self.exit.push_back(inst);
-                        Ok(ir::Operand::Instruction(inst))
+                        Ok(Value::Operand(inst.into()))
                     }
-                    frontend::BinaryOp::All => {
+                    BinaryOp::All => {
                         // Add "and" instruction, operand is the result of the instruction
-                        let and = self.program.mem_pool.get_and(lop, rop);
-                        self.exit.push_back(and);
-                        Ok(ir::Operand::Instruction(and))
+                        let inst = self.program.mem_pool.get_and(lop, rop);
+                        self.exit.push_back(inst);
+                        Ok(Value::Operand(inst.into()))
                     }
-                    frontend::BinaryOp::Any => {
+                    BinaryOp::Any => {
                         // Add "or" instruction, operand is the result of the instruction
-                        let or = self.program.mem_pool.get_or(lop, rop);
-                        self.exit.push_back(or);
-                        Ok(ir::Operand::Instruction(or))
+                        let inst = self.program.mem_pool.get_or(lop, rop);
+                        self.exit.push_back(inst);
+                        Ok(Value::Operand(inst.into()))
                     }
                 }
             }
-            frontend::Expr::Conditional(_, _, _) => todo!(),
+            Expr::Conditional(_, _, _) => todo!(),
         }
     }
 }
@@ -651,7 +722,7 @@ mod tests {
     use crate::frontend::program::parse;
 
     #[test]
-    fn test_gen() {
+    fn test_normal() {
         let code = r#"
             int main() {
                 int a = 1;
@@ -664,6 +735,39 @@ mod tests {
         assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Int32, \"a\", Some(Int32(1)))), Decl(Var(Int32, \"b\", Some(Int32(2)))), Decl(Var(Int32, \"c\", Some(Binary(Add, Var(\"a\"), Var(\"b\"))))), Return(Some(Var(\"c\")))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
-        assert_eq!(llvm_ir, "n() {\n%entry:\n%Add_1 = add i32, 1, 2ret %Add_1\n\n}\n");
+        assert_eq!(
+            llvm_ir,
+            // TODO line break?
+            "n() {\n%entry:\n%alloca_1 = alloca i32 i32store i32 1, ptr %alloca_1%alloca_3 = alloca i32 i32store i32 2, ptr %alloca_3%alloca_5 = alloca i32 i32%load_6 = load i32*, ptr %alloca_1%load_7 = load i32*, ptr %alloca_3%Add_8 = add i32, %load_6, %load_7store i32 %Add_8, ptr %alloca_5%load_10 = load i32*, ptr %alloca_5ret %load_10\n\n}\n"
+        );
+    }
+
+    #[test]
+    fn test_if() {
+        let code = r#"
+            int main() {
+                int a = 1;
+                int b = 2;
+                if (a < b) {
+                    a = 3;
+                } else {
+                    a = 4;
+                }
+                return a;
+            }
+        "#;
+        let program = parse(code).unwrap();
+        assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Int32, \"a\", Some(Int32(1)))), Decl(Var(Int32, \"b\", Some(Int32(2)))), If(Binary(Lt, Var(\"a\"), Var(\"b\")), Block([Expr(Some(Var(\"a\")), Int32(3))]), Block([Expr(Some(Var(\"a\")), Int32(4))])), Return(Some(Var(\"a\")))])))] }");
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_eq!(
+            llvm_ir,
+            "n() {
+%entry:
+%Add_1 = add i32, 1, 2ret %Add_1
+
+}
+"
+        );
     }
 }
