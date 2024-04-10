@@ -464,7 +464,6 @@ impl<'a> FunctionKit<'a> {
             Stmt::For(_, _, _, _) => todo!(),
             Stmt::Break => {
                 // Add br instruction to exit block
-                // TODO make condition constant False
                 let br = self.program.mem_pool.get_br(None);
                 self.exit.push_back(br);
 
@@ -473,14 +472,12 @@ impl<'a> FunctionKit<'a> {
                     return Err(MiddelError::GenError);
                 };
 
-                // A break can only appear in non-condition block
-                // So it is safe to set false branch to break_to
-                self.exit.set_false_bb(break_to);
+                // Rewrite next block to break destination
+                self.exit.set_true_bb(break_to);
                 Ok(())
             }
             Stmt::Continue => {
                 // Add br instruction to exit block
-                // TODO make condition constant False
                 let br = self.program.mem_pool.get_br(None);
                 self.exit.push_back(br);
 
@@ -489,9 +486,8 @@ impl<'a> FunctionKit<'a> {
                     return Err(MiddelError::GenError);
                 };
 
-                // A continue can only appear in non-condition block
-                // So it is safe to set false branch to continue_to
-                self.exit.set_false_bb(continue_to);
+                // Rewrite next block to continue destination
+                self.exit.set_true_bb(continue_to);
                 Ok(())
             }
             Stmt::Return(expr) => {
@@ -717,9 +713,10 @@ mod tests {
         assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Int32, \"a\", Some(Int32(1)))), Decl(Var(Int32, \"b\", Some(Int32(2)))), Decl(Var(Int32, \"c\", Some(Binary(Add, Var(\"a\"), Var(\"b\"))))), Return(Some(Var(\"c\")))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
+        // No constant folding, because a variable can be re-assigned in SysY
+        // This behaviour is consistent with `clang -S -emit-llvm xxx.c`
         assert_eq!(
             llvm_ir,
-            // TODO line break?
             "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 1, ptr %alloca_1\n%alloca_3 = alloca i32\nstore i32 2, ptr %alloca_3\n%alloca_5 = alloca i32\n%load_6 = load i32, ptr %alloca_1\n%load_7 = load i32, ptr %alloca_3\n%Add_8 = add i32, %load_6, %load_7\nstore i32 %Add_8, ptr %alloca_5\n%load_10 = load i32, ptr %alloca_5\nret %load_10\n\n\n}\n"
         );
     }
@@ -747,4 +744,79 @@ mod tests {
             "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 1, ptr %alloca_1\n%alloca_3 = alloca i32\nstore i32 2, ptr %alloca_3\nbr label %cond\n\n%cond:\n%load_10 = load i32, ptr %alloca_1\n%load_11 = load i32, ptr %alloca_3\n%icmp_12 = icmp slt i32 %load_10, %load_11\nbr i1 %icmp_12, label %then, label %alt\n\n%then:\nstore i32 3, ptr %alloca_1\nbr label %final\n\n%alt:\nstore i32 4, ptr %alloca_1\nbr label %final\n\n%final:\n%load_18 = load i32, ptr %alloca_1\nret %load_18\n\n\n}\n"
         );
     }
+
+    #[test]
+    fn test_while() {
+        let code = r#"
+            int main() {
+                int a = 0;
+                while (a < 10) {
+                    a = a + 1;
+                }
+                return a;
+            }
+        "#;
+        let program = parse(code).unwrap();
+        assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Int32, \"a\", Some(Int32(0)))), While(Binary(Lt, Var(\"a\"), Int32(10)), Block([Expr(Some(Var(\"a\")), Binary(Add, Var(\"a\"), Int32(1)))])), Return(Some(Var(\"a\")))])))] }");
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 0, ptr %alloca_1\nbr label %cond\n\n%cond:\n%load_7 = load i32, ptr %alloca_1\n%icmp_8 = icmp slt i32 %load_7, 10\nbr i1 %icmp_8, label %body, label %final\n\n%body:\n%load_10 = load i32, ptr %alloca_1\n%Add_11 = add i32, %load_10, 1\nstore i32 %Add_11, ptr %alloca_1\nbr label %cond\n\n%final:\n%load_14 = load i32, ptr %alloca_1\nret %load_14\n\n\n}\n");
+    }
+
+    #[test]
+    fn test_do_while() {
+        let code = r#"
+            int main() {
+                int a = 0;
+                do {
+                    a = a + 1;
+                } while (a < 10);
+                return a;
+            }
+        "#;
+        let program = parse(code).unwrap();
+        assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Int32, \"a\", Some(Int32(0)))), DoWhile(Block([Expr(Some(Var(\"a\")), Binary(Add, Var(\"a\"), Int32(1)))]), Binary(Lt, Var(\"a\"), Int32(10))), Return(Some(Var(\"a\")))])))] }");
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 0, ptr %alloca_1\nbr label %body\n\n%body:\n%load_10 = load i32, ptr %alloca_1\n%Add_11 = add i32, %load_10, 1\nstore i32 %Add_11, ptr %alloca_1\nbr label %cond\n\n%cond:\n%load_7 = load i32, ptr %alloca_1\n%icmp_8 = icmp slt i32 %load_7, 10\nbr i1 %icmp_8, label %body, label %final\n\n%final:\n%load_14 = load i32, ptr %alloca_1\nret %load_14\n\n\n}\n");
+    }
+
+    #[test]
+    fn test_break() {
+        let code = r#"
+            int main() {
+                int a = 0;
+                while (a < 10) {
+                    a = a + 1;
+                    break;
+                }
+                return a;
+            }
+        "#;
+        let program = parse(code).unwrap();
+        assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Int32, \"a\", Some(Int32(0)))), While(Binary(Lt, Var(\"a\"), Int32(10)), Block([Expr(Some(Var(\"a\")), Binary(Add, Var(\"a\"), Int32(1))), Break])), Return(Some(Var(\"a\")))])))] }");
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        // There are two `br` in `%body` block
+        // Not preventing this can make `irgen` code simpler
+        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 0, ptr %alloca_1\nbr label %cond\n\n%cond:\n%load_7 = load i32, ptr %alloca_1\n%icmp_8 = icmp slt i32 %load_7, 10\nbr i1 %icmp_8, label %body, label %final\n\n%body:\n%load_10 = load i32, ptr %alloca_1\n%Add_11 = add i32, %load_10, 1\nstore i32 %Add_11, ptr %alloca_1\nbr label %final\nbr label %final\n\n%final:\n%load_15 = load i32, ptr %alloca_1\nret %load_15\n\n\n}\n");
+    }
+
+    // #[test]
+    // fn test_template() {
+    //     let code = r#"
+    //         int main() {
+    //             int a = 0;
+    //             while (a < 10) {
+    //                 a = a + 1;
+    //             }
+    //             return a;
+    //         }
+    //     "#;
+    //     let program = parse(code).unwrap();
+    //     assert_eq!(format!("{:?}", program), "");
+    //     let result = gen(&program).unwrap();
+    //     let llvm_ir = result.module.gen_llvm_ir();
+    //     assert_eq!(llvm_ir, "");
+    // }
 }
