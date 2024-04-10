@@ -38,3 +38,9 @@ impl From<ParaPtr> for Operand {
         Self::Parametr(param)
     }
 }
+
+impl From<GlobalPtr> for Operand {
+    fn from(gvar: GlobalPtr) -> Self {
+        Self::Global(gvar)
+    }
+}

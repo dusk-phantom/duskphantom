@@ -155,6 +155,7 @@ impl BasicBlock {
         ir += &format!("{}:\n", self);
         for inst in self.iter() {
             ir += &inst.gen_llvm_ir();
+            ir += "\n";
         }
         ir + "\n"
     }

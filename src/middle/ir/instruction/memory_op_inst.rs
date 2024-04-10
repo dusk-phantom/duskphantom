@@ -139,13 +139,13 @@ impl Instruction for Alloca {
     gen_common_code!(Alloca, Alloca);
     fn gen_llvm_ir(&self) -> String {
         format!(
-            "{} = alloca {} {}",
+            "{} = alloca {}{}",
             self,
             self.value_type,
             if self.num_elements == 1 {
-                self.value_type.to_string()
+                "".to_string()
             } else {
-                format!(", i32 {}", self.num_elements)
+                format!(" , i32 {}", self.num_elements)
             }
         )
     }
