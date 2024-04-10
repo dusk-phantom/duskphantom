@@ -58,10 +58,12 @@ impl Function {
 
     pub fn gen_llvm_ir(&self) -> String {
         let mut ir = format!("define {} @{}(", self.return_type, self.name);
-        for param in self.params.iter() {
-            ir += &format!("{}, ", param.as_ref());
+        if self.params.len() != 0 {
+            for param in self.params.iter() {
+                ir += &format!("{}, ", param.as_ref());
+            }
+            let _ = ir.split_off(ir.len() - 2);
         }
-        ir = ir.split_off(ir.len() - 2);
         ir += ") {\n";
         self.bfs_iter().for_each(|bb| {
             ir += &bb.gen_llvm_ir();
