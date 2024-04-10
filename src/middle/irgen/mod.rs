@@ -6,9 +6,7 @@ use crate::{
     middle,
 };
 
-use super::ir::{
-    instruction::misc_inst::ICmpOp, BBPtr, Constant, FunPtr, GlobalPtr, Operand, ValueType,
-};
+use super::ir::{instruction::misc_inst::ICmpOp, BBPtr, Constant, FunPtr, Operand, ValueType};
 
 /// Generate middle IR from a frontend AST
 pub fn gen(program: &frontend::Program) -> Result<middle::Program, MiddelError> {
@@ -55,14 +53,6 @@ fn alloc<'a>(ty: ValueType, kit: &mut FunctionKit<'a>) -> Value {
     let inst = kit.program.mem_pool.get_alloca(ty, 1);
     kit.exit.push_back(inst);
     Value::Pointer(inst.into())
-}
-
-/// TODO put this code to global ptr
-/// A global variable can be converted to an operand
-impl Into<Operand> for GlobalPtr {
-    fn into(self) -> Operand {
-        Operand::Global(self)
-    }
 }
 
 /// A constant can be converted to a value
@@ -730,7 +720,7 @@ mod tests {
         assert_eq!(
             llvm_ir,
             // TODO line break?
-            "n() {\n%entry:\n%alloca_1 = alloca i32 i32store i32 1, ptr %alloca_1%alloca_3 = alloca i32 i32store i32 2, ptr %alloca_3%alloca_5 = alloca i32 i32%load_6 = load i32, ptr %alloca_1%load_7 = load i32, ptr %alloca_3%Add_8 = add i32, %load_6, %load_7store i32 %Add_8, ptr %alloca_5%load_10 = load i32, ptr %alloca_5ret %load_10\n\n}\n"
+            "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 1, ptr %alloca_1\n%alloca_3 = alloca i32\nstore i32 2, ptr %alloca_3\n%alloca_5 = alloca i32\n%load_6 = load i32, ptr %alloca_1\n%load_7 = load i32, ptr %alloca_3\n%Add_8 = add i32, %load_6, %load_7\nstore i32 %Add_8, ptr %alloca_5\n%load_10 = load i32, ptr %alloca_5\nret %load_10\n\n\n}\n"
         );
     }
 
@@ -754,12 +744,7 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         assert_eq!(
             llvm_ir,
-            "n() {
-%entry:
-%Add_1 = add i32, 1, 2ret %Add_1
-
-}
-"
+            "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 1, ptr %alloca_1\n%alloca_3 = alloca i32\nstore i32 2, ptr %alloca_3\nbr label %cond\n\n%cond:\n%load_10 = load i32, ptr %alloca_1\n%load_11 = load i32, ptr %alloca_3\n%icmp_12 = icmp slt i32 %load_10, %load_11\nbr i1 %icmp_12, label %then, label %alt\n\n%then:\nstore i32 3, ptr %alloca_1\nbr label %final\n\n%alt:\nstore i32 4, ptr %alloca_1\nbr label %final\n\n%final:\n%load_18 = load i32, ptr %alloca_1\nret %load_18\n\n\n}\n"
         );
     }
 }
