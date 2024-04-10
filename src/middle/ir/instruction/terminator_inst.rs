@@ -22,13 +22,13 @@ impl IRBuilder {
         ret
     }
 
-    pub fn get_br(&mut self, cond: Option<InstPtr>) -> InstPtr {
+    pub fn get_br(&mut self, cond: Option<Operand>) -> InstPtr {
         let mut br = self.new_instruction(Box::new(Br {
             manager: InstManager::new(ValueType::Void),
         }));
-        if let Some(cond) = cond {
-            unsafe { br.get_manager_mut().add_operand(Operand::Instruction(cond)) };
-        }
+        cond.map(|x| unsafe {
+            br.get_manager_mut().add_operand(x);
+        });
         br
     }
 }
