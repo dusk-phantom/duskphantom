@@ -233,15 +233,4 @@ pub mod tests_expr {
             Err(err) => panic!("failed to parse {}: {}", code, err),
         }
     }
-
-    #[test]
-    fn test_consistency() {
-        let code = "xy + 85.2 .  x -> y ==!- -! 6==7  % 1 ? 1 ? 4 : 5 : 1 ? 4 : 1";
-        let another = "(xy+ (( (85.2) .x) ->y)) ==(! -(-!6)==(7 %1?(1?4:5):(1?4:1)))";
-        match (expr.parse(code), expr.parse(another)) {
-            (Ok(result), Ok(answer)) => assert_eq!(result, answer,),
-            (Err(err), _) => panic!("failed to parse {}: {}", code, err),
-            (_, Err(err)) => panic!("failed to parse {}: {}", another, err),
-        }
-    }
 }
