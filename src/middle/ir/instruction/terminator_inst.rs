@@ -80,9 +80,9 @@ impl Instruction for Br {
     gen_common_code!(Br, Br);
     #[inline]
     fn gen_llvm_ir(&self) -> String {
+        let parent_bb = self.get_parent_bb().unwrap();
+        let next_bb = parent_bb.get_succ_bb();
         if self.is_cond_br() {
-            let parent_bb = self.get_parent_bb().unwrap();
-            let next_bb = parent_bb.get_succ_bb();
             format!(
                 "br i1 {}, label %{}, label %{}",
                 self.get_cond(),
@@ -90,7 +90,7 @@ impl Instruction for Br {
                 next_bb[1].name
             )
         } else {
-            format!("br label %{}", self.manager.operand[0])
+            format!("br label %{}", next_bb[0].name)
         }
     }
 }
