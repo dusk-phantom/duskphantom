@@ -54,6 +54,8 @@ define_inst_type_enum!(
     // Conversion Operations
     ZextTo,
     SextTo,
+    ItoFp,
+    FpToI,
     // Other Operations
     ICmp,
     FCmp,
