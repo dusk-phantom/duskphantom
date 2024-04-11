@@ -21,6 +21,80 @@ pub fn gen(program: &frontend::Program) -> Result<middle::Program, MiddelError> 
     Ok(result)
 }
 
+/// Convenient methods for operand
+impl Operand {
+    /// Get the type of an operand
+    fn get_type(&self) -> ValueType {
+        match self {
+            Operand::Constant(c) => c.get_type(),
+            // Type of global var identifier (@gvar) is pointer
+            Operand::Global(g) => ValueType::Pointer(g.value_type.clone().into()),
+            Operand::Parametr(p) => p.value_type.clone(),
+            Operand::Instruction(inst) => inst.get_value_type(),
+        }
+    }
+
+    /// Convert the type of an operand to another
+    fn conv<'a>(&mut self, kit: &mut FunctionKit<'a>) {
+        todo!()
+    }
+
+    /// Unify the types of two operands
+    fn unify<'a>(a: &mut Self, b: &mut Self, kit: &mut FunctionKit<'a>) {
+        let a_ty = a.get_type();
+        let b_ty = b.get_type();
+        let max_ty = a_ty.max_with(&b_ty);
+        todo!()
+    }
+}
+
+/// Convenient methods for value type
+impl ValueType {
+    /// If a value type can be converted to a number, returns true
+    fn is_num(&self) -> bool {
+        match self {
+            ValueType::Bool => true,
+            ValueType::Int => true,
+            ValueType::Float => true,
+            _ => false,
+        }
+    }
+
+    /// Convert a numeric value type to its percision level
+    /// Higher is more percise
+    fn to_percision_level(&self) -> i32 {
+        match self {
+            ValueType::Bool => 1,
+            ValueType::Int => 2,
+            ValueType::Float => 3,
+            _ => 0,
+        }
+    }
+
+    /// Convert a percision level to a value type
+    fn from_percision_level(level: i32) -> Self {
+        match level {
+            1 => ValueType::Bool,
+            2 => ValueType::Int,
+            3 => ValueType::Float,
+            _ => ValueType::Void,
+        }
+    }
+
+    /// Max this type with another type
+    /// Return more precise one
+    fn max_with(&self, b: &Self) -> Result<Self, MiddelError> {
+        if self.is_num() && b.is_num() {
+            let a_lv = self.to_percision_level();
+            let b_lv = b.to_percision_level();
+            let max_lv = if a_lv > b_lv { a_lv } else { b_lv };
+            Ok(ValueType::from_percision_level(max_lv))
+        } else {
+            Err(MiddelError::GenError)
+        }
+    }
+}
+
 /// Translate a frontend type to IR value type
 fn translate_type(ty: &Type) -> ValueType {
     match ty {
@@ -62,10 +136,10 @@ impl Into<Value> for Constant {
     }
 }
 
-/// A value can be loaded or assigned, and has type
+/// Convenient operations on a value
 impl Value {
     /// Get the type of a value
-    pub fn get_type(&self) -> ValueType {
+    fn get_type(&self) -> ValueType {
         match self {
             Value::Operand(op) => op.get_type(),
             Value::Pointer(op) => match op.get_type() {
@@ -77,7 +151,7 @@ impl Value {
     }
 
     /// Load the value as an operand
-    pub fn load<'a>(self, kit: &mut FunctionKit<'a>) -> Operand {
+    fn load<'a>(self, kit: &mut FunctionKit<'a>) -> Operand {
         let ty = self.get_type();
         match self {
             Value::Operand(op) => op,
@@ -90,8 +164,41 @@ impl Value {
         }
     }
 
+    /// Shift the underlying pointer (if exists)
+    /// Element of index is [shift by whole, shift by primary element, ...]
+    /// For example, getelementptr([2, 8]) on a pointer to an array [n x i32]
+    /// shifts it by (2 * n + 8) * sizeof i32.
+    /// DO NOT FORGET THE FIRST INDEX
+    fn getelementptr<'a>(
+        self,
+        kit: &mut FunctionKit<'a>,
+        index: Vec<Operand>,
+    ) -> Result<Value, MiddelError> {
+        let ty = self.get_type();
+        match self {
+            Value::Operand(op) => Err(MiddelError::GenError),
+            Value::Pointer(op) => {
+                // Get sub type of pointer
+                let sub_ty = match ty {
+                    ValueType::Array(sub_ty, _) => sub_ty,
+                    _ => {
+                        return Err(MiddelError::GenError);
+                    }
+                };
+
+                // Add instruction to exit
+                let inst = kit.program.mem_pool.get_getelementptr(ty, op, index);
+                kit.exit.push_back(inst);
+
+                // Construct new value
+                // Type of pointer is shrinked (as "get element" states)
+                todo!();
+            }
+        }
+    }
+
     /// Assign an operand to this value
-    pub fn assign<'a>(self, kit: &mut FunctionKit<'a>, op: Operand) -> Result<(), MiddelError> {
+    fn assign<'a>(self, kit: &mut FunctionKit<'a>, op: Operand) -> Result<(), MiddelError> {
         match self {
             Value::Operand(_) => Err(MiddelError::GenError),
             Value::Pointer(ptr) => {
@@ -184,7 +291,7 @@ fn expr_to_const(val: &Expr) -> Result<Vec<Constant>, MiddelError> {
 
 /// A program kit (top level) can generate declarations
 impl<'a> ProgramKit<'a> {
-    pub fn gen(mut self, program: &frontend::Program) -> Result<(), MiddelError> {
+    fn gen(mut self, program: &frontend::Program) -> Result<(), MiddelError> {
         for decl in program.module.iter() {
             self.gen_decl(decl)?;
         }
@@ -201,8 +308,8 @@ impl<'a> ProgramKit<'a> {
                     Some(v) => self.program.mem_pool.new_global_variable(
                         id.clone(),
                         translate_type(ty),
-                        // TODO support variable
-                        false,
+                        // This global variable is mutable
+                        true,
                         expr_to_const(v)?,
                     ),
                     None => self.program.mem_pool.new_global_variable(
@@ -213,9 +320,8 @@ impl<'a> ProgramKit<'a> {
                     ),
                 };
 
-                // Add global variable to environment
-                // TODO how to set global variable?
-                self.env.insert(id.clone(), Value::Operand(gval.into()));
+                // Add global variable (pointer) to environment
+                self.env.insert(id.clone(), Value::Pointer(gval.into()));
 
                 // Add global variable to program
                 self.program.module.global_variables.push(gval);
@@ -577,7 +683,12 @@ impl<'a> FunctionKit<'a> {
             // Some memcpy operation is required to process arrays
             Expr::Pack(_) => todo!(),
             Expr::Map(_) => todo!(),
-            Expr::Index(_, _) => todo!(),
+            Expr::Index(x, v) => {
+                // Generate arguments
+                let ix = self.gen_expr(v)?.load(self);
+                self.gen_expr(x)?
+                    .getelementptr(self, vec![Constant::Int(0).into(), ix])
+            }
             Expr::Field(_, _) => todo!(),
             Expr::Select(_, _) => todo!(),
             Expr::Int32(x) => Ok(Constant::Int(*x).into()),
@@ -588,8 +699,11 @@ impl<'a> FunctionKit<'a> {
             Expr::Call(_, _) => todo!(),
             Expr::Unary(_, _) => todo!(),
             Expr::Binary(op, lhs, rhs) => {
+                // Generate arguments
                 let lop = self.gen_expr(lhs)?.load(self);
                 let rop = self.gen_expr(rhs)?.load(self);
+
+                // Apply operation
                 match op {
                     BinaryOp::Add => {
                         // Add "add" instruction, operand is the result of the instruction
@@ -806,6 +920,23 @@ mod tests {
         // There are two `br` in `%body` block
         // Not preventing this can make `irgen` code simpler
         assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 0, ptr %alloca_1\nbr label %cond\n\n%cond:\n%load_7 = load i32, ptr %alloca_1\n%icmp_8 = icmp slt i32 %load_7, 10\nbr i1 %icmp_8, label %body, label %final\n\n%body:\n%load_10 = load i32, ptr %alloca_1\n%Add_11 = add i32, %load_10, 1\nstore i32 %Add_11, ptr %alloca_1\nbr label %final\nbr label %final\n\n%final:\n%load_15 = load i32, ptr %alloca_1\nret %load_15\n\n\n}\n");
+    }
+
+    #[test]
+    fn test_global_variable() {
+        let code = r#"
+            int x = 4;
+            int y = 8;
+            int main() {
+                x = x + y;
+                return x;
+            }
+        "#;
+        let program = parse(code).unwrap();
+        assert_eq!(format!("{:?}", program), "Program { module: [Var(Int32, \"x\", Some(Int32(4))), Var(Int32, \"y\", Some(Int32(8))), Func(Function(Int32, []), \"main\", Some(Block([Expr(Some(Var(\"x\")), Binary(Add, Var(\"x\"), Var(\"y\"))), Return(Some(Var(\"x\")))])))] }");
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_eq!(llvm_ir, "@x = dso_local global i32 [4]\n@y = dso_local global i32 [8]\ndefine i32 @main() {\n%entry:\n%load_1 = load i32, ptr @x\n%load_2 = load i32, ptr @y\n%Add_3 = add i32, %load_1, %load_2\nstore i32 %Add_3, ptr @x\n%load_5 = load i32, ptr @x\nret %load_5\n\n\n}\n");
     }
 
     // #[test]
