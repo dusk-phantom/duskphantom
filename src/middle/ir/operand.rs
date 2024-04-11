@@ -20,16 +20,6 @@ impl Display for Operand {
         }
     }
 }
-impl Operand {
-    pub fn get_type(&self) -> ValueType {
-        match self {
-            Operand::Constant(c) => c.get_type(),
-            Operand::Global(g) => g.value_type.clone(),
-            Operand::Parametr(p) => p.value_type.clone(),
-            Operand::Instruction(inst) => inst.get_value_type(),
-        }
-    }
-}
 
 impl Operand {
     pub fn get_type(&self) -> ValueType {
