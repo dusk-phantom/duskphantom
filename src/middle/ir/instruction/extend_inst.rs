@@ -135,6 +135,17 @@ pub struct FpToI {
     manager: InstManager,
 }
 
+impl FpToI {
+    /// Get the operand which will be converted
+    pub fn get_src(&self) -> &Operand {
+        &self.get_operand()[0]
+    }
+    /// Set the operand which will be converted
+    pub unsafe fn set_src(&mut self, src: Operand) {
+        self.manager.set_operand(0, src);
+    }
+}
+
 impl Display for FpToI {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "%fptoi_{}", self.get_id())
