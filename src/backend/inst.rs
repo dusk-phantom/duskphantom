@@ -393,7 +393,6 @@ impl DivInst {
     }
     pub fn optimize(&self) -> Option<Vec<Inst>> {
         todo!("判断是否有优化必要,如果有,返回优化产生的指令");
-        None
     }
 }
 impl SllInst {
