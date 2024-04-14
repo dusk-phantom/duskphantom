@@ -21,6 +21,18 @@ impl Display for Operand {
     }
 }
 
+impl Operand {
+    pub fn get_type(&self) -> ValueType {
+        match self {
+            Operand::Constant(c) => c.get_type(),
+            // Type of global var identifier (@gvar) is pointer
+            Operand::Global(g) => ValueType::Pointer(g.value_type.clone().into()),
+            Operand::Parametr(p) => p.value_type.clone(),
+            Operand::Instruction(inst) => inst.get_value_type(),
+        }
+    }
+}
+
 impl From<Constant> for Operand {
     fn from(c: Constant) -> Self {
         Self::Constant(c)
