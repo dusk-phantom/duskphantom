@@ -23,17 +23,6 @@ pub fn gen(program: &frontend::Program) -> Result<middle::Program, MiddelError> 
 
 /// Convenient methods for operand
 impl Operand {
-    /// Get the type of an operand
-    fn get_type(&self) -> ValueType {
-        match self {
-            Operand::Constant(c) => c.get_type(),
-            // Type of global var identifier (@gvar) is pointer
-            Operand::Global(g) => ValueType::Pointer(g.value_type.clone().into()),
-            Operand::Parametr(p) => p.value_type.clone(),
-            Operand::Instruction(inst) => inst.get_value_type(),
-        }
-    }
-
     /// Convert the type of an operand to another
     fn conv<'a>(self, ty: ValueType, kit: &mut FunctionKit<'a>) -> Result<Operand, MiddelError> {
         let from_ty = self.get_type();
@@ -636,11 +625,7 @@ impl<'a> FunctionKit<'a> {
                 // Add returned result to exit block
                 let return_value = match expr {
                     Some(expr) => {
-                        let value = self.gen_expr(expr)?;
-                        let Operand::Instruction(inst) = value.load(self) else {
-                            todo!("make get_ret accept operand")
-                        };
-                        Some(inst)
+                        Some(self.gen_expr(expr)?.load(self).conv(self.return_type.clone(), self)?)
                     }
                     None => None,
                 };
@@ -1076,7 +1061,7 @@ mod tests {
         assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Int32, \"x\", Some(Int32(1)))), Decl(Var(Float32, \"y\", Some(Float32(2.0)))), Decl(Var(Float32, \"z\", Some(Binary(Add, Var(\"x\"), Var(\"y\"))))), Return(Some(Var(\"z\")))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
-        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 1, ptr %alloca_1\n%alloca_3 = alloca float\nstore float 2, ptr %alloca_3\n%alloca_5 = alloca float\n%load_6 = load i32, ptr %alloca_1\n%load_7 = load float, ptr %alloca_3\n%itofp_8 = sitofp i32 %load_6 to float\n%FAdd_9 = fadd float, %itofp_8, %load_7\nstore float %FAdd_9, ptr %alloca_5\n%load_11 = load float, ptr %alloca_5\nret %load_11\n\n\n}\n");
+        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 1, ptr %alloca_1\n%alloca_3 = alloca float\nstore float 2, ptr %alloca_3\n%alloca_5 = alloca float\n%load_6 = load i32, ptr %alloca_1\n%load_7 = load float, ptr %alloca_3\n%itofp_8 = sitofp i32 %load_6 to float\n%FAdd_9 = fadd float, %itofp_8, %load_7\nstore float %FAdd_9, ptr %alloca_5\n%load_11 = load float, ptr %alloca_5\n%fptoi_12 = fptosi float %load_11 to i32\nret %fptoi_12\n\n\n}\n");
     }
 
     // #[test]
