@@ -35,16 +35,47 @@ impl Operand {
     }
 
     /// Convert the type of an operand to another
-    fn conv<'a>(&mut self, kit: &mut FunctionKit<'a>) {
-        todo!()
+    fn conv<'a>(self, ty: ValueType, kit: &mut FunctionKit<'a>) -> Result<Operand, MiddelError> {
+        let from_ty = self.get_type();
+        if from_ty == ty {
+            return Ok(self);
+        }
+        match (from_ty, ty) {
+            (ValueType::Int, ValueType::Float) => {
+                // Direct convert
+                let inst = kit.program.mem_pool.get_itofp(self);
+                kit.exit.push_back(inst);
+                Ok(inst.into())
+            }
+            (ValueType::Float, ValueType::Int) => {
+                // Direct convert
+                let inst = kit.program.mem_pool.get_fptoi(self);
+                kit.exit.push_back(inst);
+                Ok(inst.into())
+            }
+            (ValueType::Bool, ValueType::Int) => {
+                // Direct convert
+                let inst = kit.program.mem_pool.get_zext(self);
+                kit.exit.push_back(inst);
+                Ok(inst.into())
+            }
+            (ValueType::Bool, ValueType::Float) => {
+                // Convert to int first and then float
+                let inst = kit.program.mem_pool.get_zext(self);
+                let inst = kit.program.mem_pool.get_itofp(inst.into());
+                kit.exit.push_back(inst);
+                Ok(inst.into())
+            }
+            _ => Err(MiddelError::GenError),
+        }
     }
 
     /// Unify the types of two operands
-    fn unify<'a>(a: &mut Self, b: &mut Self, kit: &mut FunctionKit<'a>) {
+    fn unify<'a>(a: Self, b: Self, kit: &mut FunctionKit<'a>) -> Result<(Self, Self), MiddelError> {
         let a_ty = a.get_type();
         let b_ty = b.get_type();
-        let max_ty = a_ty.max_with(&b_ty);
-        todo!()
+        let max_ty = a_ty.max_with(&b_ty)?;
+        Ok((a.conv(max_ty.clone(), kit)?, b.conv(max_ty, kit)?))
     }
 }
 
@@ -178,21 +209,13 @@ impl Value {
         match self {
             Value::Operand(op) => Err(MiddelError::GenError),
             Value::Pointer(op) => {
-                // Get sub type of pointer
-                let sub_ty = match ty {
-                    ValueType::Array(sub_ty, _) => sub_ty,
-                    _ => {
-                        return Err(MiddelError::GenError);
-                    }
-                };
-
                 // Add instruction to exit
                 let inst = kit.program.mem_pool.get_getelementptr(ty, op, index);
                 kit.exit.push_back(inst);
 
                 // Construct new value
-                // Type of pointer is shrinked (as "get element" states)
-                todo!();
+                // TODO Type of pointer is shrinked (as "get element" states)
+                Ok(Value::Pointer(inst.into()))
             }
         }
     }
@@ -229,6 +252,7 @@ struct FunctionKit<'a> {
     exit: BBPtr,
     break_to: Option<BBPtr>,
     continue_to: Option<BBPtr>,
+    return_type: ValueType,
 }
 
 /// Repeat a vector for `n` times
@@ -333,7 +357,7 @@ impl<'a> ProgramKit<'a> {
                     let fty = translate_type(return_ty);
 
                     // Create function
-                    let mut fptr = self.program.mem_pool.new_function(id.clone(), fty);
+                    let mut fptr = self.program.mem_pool.new_function(id.clone(), fty.clone());
 
                     // Fill parameters
                     for param in params.iter() {
@@ -356,6 +380,7 @@ impl<'a> ProgramKit<'a> {
                         exit: bb,
                         break_to: None,
                         continue_to: None,
+                        return_type: fty,
                     };
                     kit.gen_stmt(stmt)?;
                     fptr.entry = Some(kit.entry);
@@ -408,18 +433,19 @@ impl<'a> FunctionKit<'a> {
                     Some(lval) => match lval {
                         frontend::LVal::Nothing => todo!(),
                         frontend::LVal::Var(id) => {
-                            // Make sure variable can be assigned
-                            let Some(val @ Value::Pointer(_)) = self.env.get(id) else {
-                                return Err(MiddelError::GenError);
+                            // Find variable in environment
+                            let val = {
+                                let Some(v @ Value::Pointer(_)) = self.env.get(id) else {
+                                    return Err(MiddelError::GenError);
+                                };
+                                v.clone()
                             };
 
-                            // Typecheck, TODO type cast
-                            if operand.get_type() != val.get_type() {
-                                return Err(MiddelError::GenError);
-                            }
+                            // Type check and type cast
+                            let operand = operand.conv(val.get_type(), self)?;
 
                             // Assign to value
-                            val.clone().assign(self, operand)?;
+                            val.assign(self, operand)?;
                             Ok(())
                         }
                         frontend::LVal::Index(_, _) => todo!(),
@@ -467,6 +493,7 @@ impl<'a> FunctionKit<'a> {
                     exit: then_bb,
                     break_to: None,
                     continue_to: None,
+                    return_type: self.return_type.clone(),
                 }
                 .gen_stmt(then)?;
                 then_bb.push_back(self.program.mem_pool.get_br(None));
@@ -481,6 +508,7 @@ impl<'a> FunctionKit<'a> {
                     exit: alt_bb,
                     break_to: None,
                     continue_to: None,
+                    return_type: self.return_type.clone(),
                 }
                 .gen_stmt(alt)?;
                 alt_bb.push_back(self.program.mem_pool.get_br(None));
@@ -523,6 +551,7 @@ impl<'a> FunctionKit<'a> {
                     exit: body_bb,
                     break_to: Some(final_bb),
                     continue_to: Some(cond_bb),
+                    return_type: self.return_type.clone(),
                 }
                 .gen_stmt(body)?;
                 body_bb.push_back(self.program.mem_pool.get_br(None));
@@ -565,6 +594,7 @@ impl<'a> FunctionKit<'a> {
                     exit: body_bb,
                     break_to: Some(final_bb),
                     continue_to: Some(cond_bb),
+                    return_type: self.return_type.clone(),
                 }
                 .gen_stmt(body)?;
                 body_bb.push_back(self.program.mem_pool.get_br(None));
@@ -608,7 +638,7 @@ impl<'a> FunctionKit<'a> {
                     Some(expr) => {
                         let value = self.gen_expr(expr)?;
                         let Operand::Instruction(inst) = value.load(self) else {
-                            todo!("make get_br accept operand")
+                            todo!("make get_ret accept operand")
                         };
                         Some(inst)
                     }
@@ -649,10 +679,8 @@ impl<'a> FunctionKit<'a> {
                     // Generate expression
                     let operand = self.gen_expr(expr)?.load(self);
 
-                    // Typecheck, TODO type cast
-                    if operand.get_type() != ty {
-                        return Err(MiddelError::GenError);
-                    }
+                    // Type check and type cast
+                    let operand = operand.conv(ty.clone(), self)?;
 
                     // Assign operand to value
                     val.assign(self, operand)?;
@@ -698,118 +726,213 @@ impl<'a> FunctionKit<'a> {
             Expr::Bool(_) => todo!(),
             Expr::Call(_, _) => todo!(),
             Expr::Unary(_, _) => todo!(),
-            Expr::Binary(op, lhs, rhs) => {
-                // Generate arguments
-                let lop = self.gen_expr(lhs)?.load(self);
-                let rop = self.gen_expr(rhs)?.load(self);
+            Expr::Binary(op, lhs, rhs) => self.gen_binary(op, lhs, rhs),
+            Expr::Conditional(_, _, _) => todo!(),
+        }
+    }
 
-                // Apply operation
-                match op {
-                    BinaryOp::Add => {
-                        // Add "add" instruction, operand is the result of the instruction
+    /// Generate a binary expression
+    fn gen_binary(&mut self, op: &BinaryOp, lhs: &Box<Expr>, rhs: &Box<Expr>) -> Result<Value, MiddelError> {
+        // Generate arguments
+        let lop = self.gen_expr(lhs)?.load(self);
+        let rop = self.gen_expr(rhs)?.load(self);
+
+        // Apply operation
+        match op {
+            BinaryOp::Add => {
+                // Unify operand types
+                let (lop, rop) = Operand::unify(lop, rop, self)?;
+                let ty = lop.get_type();
+
+                // Add "add" instruction, operand is the result of the instruction
+                match ty {
+                    ValueType::Int => {
                         let inst = self.program.mem_pool.get_add(lop, rop);
                         self.exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
-                    BinaryOp::Sub => {
-                        // Add "inst" instruction, operand is the result of the instruction
+                    ValueType::Float => {
+                        let inst = self.program.mem_pool.get_fadd(lop, rop);
+                        self.exit.push_back(inst);
+                        Ok(Value::Operand(inst.into()))
+                    }
+                    _ => Err(MiddelError::GenError),
+                }
+            }
+            BinaryOp::Sub => {
+                // Unify operand types
+                let (lop, rop) = Operand::unify(lop, rop, self)?;
+                let ty = lop.get_type();
+
+                // Add "sub" instruction, operand is the result of the instruction
+                match ty {
+                    ValueType::Int => {
                         let inst = self.program.mem_pool.get_sub(lop, rop);
                         self.exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
-                    BinaryOp::Mul => {
-                        // Add "inst" instruction, operand is the result of the instruction
+                    ValueType::Float => {
+                        let inst = self.program.mem_pool.get_fsub(lop, rop);
+                        self.exit.push_back(inst);
+                        Ok(Value::Operand(inst.into()))
+                    }
+                    _ => Err(MiddelError::GenError),
+                }
+            }
+            BinaryOp::Mul => {
+                // Unify operand types
+                let (lop, rop) = Operand::unify(lop, rop, self)?;
+                let ty = lop.get_type();
+                
+                // Add "mul" instruction, operand is the result of the instruction
+                match ty {
+                    ValueType::Int => {
                         let inst = self.program.mem_pool.get_mul(lop, rop);
                         self.exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
-                    BinaryOp::Div => {
-                        // Add "inst" instruction, operand is the result of the instruction
+                    ValueType::Float => {
+                        let inst = self.program.mem_pool.get_fmul(lop, rop);
+                        self.exit.push_back(inst);
+                        Ok(Value::Operand(inst.into()))
+                    }
+                    _ => Err(MiddelError::GenError),
+                }
+            }
+            BinaryOp::Div => {
+                // Unify operand types
+                let (lop, rop) = Operand::unify(lop, rop, self)?;
+                let ty = lop.get_type();
+                
+                // Add "div" instruction, operand is the result of the instruction
+                match ty {
+                    ValueType::Int => {
                         let inst = self.program.mem_pool.get_sdiv(lop, rop);
                         self.exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
-                    BinaryOp::Mod => {
-                        // Add "inst" instruction, operand is the result of the instruction
-                        let inst = self.program.mem_pool.get_srem(lop, rop);
+                    ValueType::Float => {
+                        let inst = self.program.mem_pool.get_fdiv(lop, rop);
                         self.exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
-                    // Bitwise operation on int is not required
-                    BinaryOp::Shr => todo!(),
-                    BinaryOp::Shl => todo!(),
-                    BinaryOp::And => todo!(),
-                    BinaryOp::Or => todo!(),
-                    BinaryOp::Xor => todo!(),
-                    BinaryOp::Gt => {
-                        // Add "icmp" instruction, operand is the result of the instruction
-                        let inst =
-                            self.program
-                                .mem_pool
-                                .get_icmp(ICmpOp::Sgt, ValueType::Int, lop, rop);
-                        self.exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
-                    }
-                    BinaryOp::Lt => {
-                        // Add "icmp" instruction, operand is the result of the instruction
-                        let inst =
-                            self.program
-                                .mem_pool
-                                .get_icmp(ICmpOp::Slt, ValueType::Int, lop, rop);
-                        self.exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
-                    }
-                    BinaryOp::Ge => {
-                        // Add "icmp" instruction, operand is the result of the instruction
-                        let inst =
-                            self.program
-                                .mem_pool
-                                .get_icmp(ICmpOp::Sge, ValueType::Int, lop, rop);
-                        self.exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
-                    }
-                    BinaryOp::Le => {
-                        // Add "icmp" instruction, operand is the result of the instruction
-                        let inst =
-                            self.program
-                                .mem_pool
-                                .get_icmp(ICmpOp::Sle, ValueType::Int, lop, rop);
-                        self.exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
-                    }
-                    BinaryOp::Eq => {
-                        // Add "icmp" instruction, operand is the result of the instruction
-                        let inst =
-                            self.program
-                                .mem_pool
-                                .get_icmp(ICmpOp::Eq, ValueType::Int, lop, rop);
-                        self.exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
-                    }
-                    BinaryOp::Ne => {
-                        // Add "icmp" instruction, operand is the result of the instruction
-                        let inst =
-                            self.program
-                                .mem_pool
-                                .get_icmp(ICmpOp::Ne, ValueType::Int, lop, rop);
-                        self.exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
-                    }
-                    BinaryOp::All => {
-                        // Add "and" instruction, operand is the result of the instruction
-                        let inst = self.program.mem_pool.get_and(lop, rop);
-                        self.exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
-                    }
-                    BinaryOp::Any => {
-                        // Add "or" instruction, operand is the result of the instruction
-                        let inst = self.program.mem_pool.get_or(lop, rop);
-                        self.exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
-                    }
+                    _ => Err(MiddelError::GenError),
                 }
             }
-            Expr::Conditional(_, _, _) => todo!(),
+            BinaryOp::Mod => {
+                // Convert operands to int
+                let lop = lop.conv(ValueType::Int, self)?;
+                let rop = rop.conv(ValueType::Int, self)?;
+
+                // Add "srem" instruction, operand is the result of the instruction
+                let inst = self.program.mem_pool.get_srem(lop, rop);
+                self.exit.push_back(inst);
+                Ok(Value::Operand(inst.into()))
+            }
+            // Bitwise operation on int is not required
+            BinaryOp::Shr => todo!(),
+            BinaryOp::Shl => todo!(),
+            BinaryOp::And => todo!(),
+            BinaryOp::Or => todo!(),
+            BinaryOp::Xor => todo!(),
+            BinaryOp::Gt => {
+                // Unify operand types
+                let (lop, rop) = Operand::unify(lop, rop, self)?;
+                let ty = lop.get_type();
+
+                // Add "icmp" instruction, operand is the result of the instruction
+                let inst =
+                    self.program
+                        .mem_pool
+                        .get_icmp(ICmpOp::Sgt, ty, lop, rop);
+                self.exit.push_back(inst);
+                Ok(Value::Operand(inst.into()))
+            }
+            BinaryOp::Lt => {
+                // Unify operand types
+                let (lop, rop) = Operand::unify(lop, rop, self)?;
+                let ty = lop.get_type();
+
+                // Add "icmp" instruction, operand is the result of the instruction
+                let inst =
+                    self.program
+                        .mem_pool
+                        .get_icmp(ICmpOp::Slt, ty, lop, rop);
+                self.exit.push_back(inst);
+                Ok(Value::Operand(inst.into()))
+            }
+            BinaryOp::Ge => {
+                // Unify operand types
+                let (lop, rop) = Operand::unify(lop, rop, self)?;
+                let ty = lop.get_type();
+
+                // Add "icmp" instruction, operand is the result of the instruction
+                let inst =
+                    self.program
+                        .mem_pool
+                        .get_icmp(ICmpOp::Sge, ty, lop, rop);
+                self.exit.push_back(inst);
+                Ok(Value::Operand(inst.into()))
+            }
+            BinaryOp::Le => {
+                // Unify operand types
+                let (lop, rop) = Operand::unify(lop, rop, self)?;
+                let ty = lop.get_type();
+
+                // Add "icmp" instruction, operand is the result of the instruction
+                let inst =
+                    self.program
+                        .mem_pool
+                        .get_icmp(ICmpOp::Sle, ty, lop, rop);
+                self.exit.push_back(inst);
+                Ok(Value::Operand(inst.into()))
+            }
+            BinaryOp::Eq => {
+                // Unify operand types
+                let (lop, rop) = Operand::unify(lop, rop, self)?;
+                let ty = lop.get_type();
+
+                // Add "icmp" instruction, operand is the result of the instruction
+                let inst =
+                    self.program
+                        .mem_pool
+                        .get_icmp(ICmpOp::Eq, ty, lop, rop);
+                self.exit.push_back(inst);
+                Ok(Value::Operand(inst.into()))
+            }
+            BinaryOp::Ne => {
+                // Unify operand types
+                let (lop, rop) = Operand::unify(lop, rop, self)?;
+                let ty = lop.get_type();
+
+                // Add "icmp" instruction, operand is the result of the instruction
+                let inst =
+                    self.program
+                        .mem_pool
+                        .get_icmp(ICmpOp::Ne, ty, lop, rop);
+                self.exit.push_back(inst);
+                Ok(Value::Operand(inst.into()))
+            }
+            BinaryOp::All => {
+                // Convert operands to bool
+                let lop = lop.conv(ValueType::Bool, self)?;
+                let rop = rop.conv(ValueType::Bool, self)?;
+
+                // Add "and" instruction, operand is the result of the instruction
+                let inst = self.program.mem_pool.get_and(lop, rop);
+                self.exit.push_back(inst);
+                Ok(Value::Operand(inst.into()))
+            }
+            BinaryOp::Any => {
+                // Convert operands to bool
+                let lop = lop.conv(ValueType::Bool, self)?;
+                let rop = rop.conv(ValueType::Bool, self)?;
+
+                // Add "or" instruction, operand is the result of the instruction
+                let inst = self.program.mem_pool.get_or(lop, rop);
+                self.exit.push_back(inst);
+                Ok(Value::Operand(inst.into()))
+            }
         }
     }
 }
@@ -937,6 +1060,23 @@ mod tests {
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
         assert_eq!(llvm_ir, "@x = dso_local global i32 [4]\n@y = dso_local global i32 [8]\ndefine i32 @main() {\n%entry:\n%load_1 = load i32, ptr @x\n%load_2 = load i32, ptr @y\n%Add_3 = add i32, %load_1, %load_2\nstore i32 %Add_3, ptr @x\n%load_5 = load i32, ptr @x\nret %load_5\n\n\n}\n");
+    }
+
+    #[test]
+    fn test_conv() {
+        let code = r#"
+            int main() {
+                int x = 1;
+                float y = 2.0;
+                float z = x + y;
+                return z;
+            }
+        "#;
+        let program = parse(code).unwrap();
+        assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Int32, \"x\", Some(Int32(1)))), Decl(Var(Float32, \"y\", Some(Float32(2.0)))), Decl(Var(Float32, \"z\", Some(Binary(Add, Var(\"x\"), Var(\"y\"))))), Return(Some(Var(\"z\")))])))] }");
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 1, ptr %alloca_1\n%alloca_3 = alloca float\nstore float 2, ptr %alloca_3\n%alloca_5 = alloca float\n%load_6 = load i32, ptr %alloca_1\n%load_7 = load float, ptr %alloca_3\n%itofp_8 = sitofp i32 %load_6 to float\n%FAdd_9 = fadd float, %itofp_8, %load_7\nstore float %FAdd_9, ptr %alloca_5\n%load_11 = load float, ptr %alloca_5\nret %load_11\n\n\n}\n");
     }
 
     // #[test]
