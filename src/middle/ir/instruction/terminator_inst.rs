@@ -9,16 +9,13 @@ pub struct Br {
 }
 
 impl IRBuilder {
-    pub fn get_ret(&mut self, return_value: Option<InstPtr>) -> InstPtr {
+    pub fn get_ret(&mut self, return_value: Option<Operand>) -> InstPtr {
         let mut ret = self.new_instruction(Box::new(Ret {
-            manager: InstManager::new(return_value.map_or(ValueType::Void, |x| x.get_value_type())),
+            manager: InstManager::new(return_value.map_or(ValueType::Void, |x| x.get_type())),
         }));
-        if let Some(return_value) = return_value {
-            unsafe {
-                ret.get_manager_mut()
-                    .add_operand(Operand::Instruction(return_value))
-            };
-        }
+        return_value.map(|x| unsafe {
+            ret.get_manager_mut().add_operand(x);
+        });
         ret
     }
 
