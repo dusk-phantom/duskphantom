@@ -25,7 +25,7 @@ pub struct FunctionKit<'a> {
 /// A function kit can generate statements
 impl<'a> FunctionKit<'a> {
     /// Generate a new function kit
-    pub fn divide(&mut self, entry: BBPtr, break_to: Option<BBPtr>, continue_to: Option<BBPtr>) -> FunctionKit {
+    pub fn gen_function_kit(&mut self, entry: BBPtr, break_to: Option<BBPtr>, continue_to: Option<BBPtr>) -> FunctionKit {
         FunctionKit {
             program: self.program,
             env: self.env.clone(),
@@ -79,9 +79,9 @@ impl<'a> FunctionKit<'a> {
                             val.assign(self, operand)?;
                             Ok(())
                         }
-                        frontend::LVal::Index(_, _) =>  Err(MiddelError::GenError),
-                        frontend::LVal::Call(_, _) =>  Err(MiddelError::GenError),
-                        frontend::LVal::Pointer(_) =>  Err(MiddelError::GenError),
+                        frontend::LVal::Index(_, _) => Err(MiddelError::GenError),
+                        frontend::LVal::Call(_, _) => Err(MiddelError::GenError),
+                        frontend::LVal::Pointer(_) => Err(MiddelError::GenError),
                     },
                     // No left value, discard result
                     None => Ok(()),
@@ -116,11 +116,11 @@ impl<'a> FunctionKit<'a> {
 
                 // Add statements and br to then branch
                 // Retain break_to and continue_to
-                self.divide(then_bb, self.break_to, self.continue_to).gen_stmt(then)?;
+                self.gen_function_kit(then_bb, self.break_to, self.continue_to).gen_stmt(then)?;
                 then_bb.push_back(self.program.mem_pool.get_br(None));
 
                 // Add statements and br to alt branch
-                self.divide(alt_bb, self.break_to, self.continue_to).gen_stmt(alt)?;
+                self.gen_function_kit(alt_bb, self.break_to, self.continue_to).gen_stmt(alt)?;
                 alt_bb.push_back(self.program.mem_pool.get_br(None));
 
                 // Increment exit
@@ -152,7 +152,7 @@ impl<'a> FunctionKit<'a> {
                 cond_bb.push_back(br);
 
                 // Add statements and br to body block
-                self.divide(body_bb, Some(final_bb), Some(cond_bb)).gen_stmt(body)?;
+                self.gen_function_kit(body_bb, Some(final_bb), Some(cond_bb)).gen_stmt(body)?;
                 body_bb.push_back(self.program.mem_pool.get_br(None));
 
                 // Increment exit
@@ -184,14 +184,14 @@ impl<'a> FunctionKit<'a> {
                 cond_bb.push_back(br);
 
                 // Add statements and br to body block
-                self.divide(body_bb, Some(final_bb), Some(cond_bb)).gen_stmt(body)?;
+                self.gen_function_kit(body_bb, Some(final_bb), Some(cond_bb)).gen_stmt(body)?;
                 body_bb.push_back(self.program.mem_pool.get_br(None));
 
                 // Increment exit
                 self.exit = final_bb;
                 Ok(())
             }
-            Stmt::For(_, _, _, _) =>  Err(MiddelError::GenError),
+            Stmt::For(_, _, _, _) => Err(MiddelError::GenError),
             Stmt::Break => {
                 // Add br instruction to exit block
                 let br = self.program.mem_pool.get_br(None);
@@ -269,10 +269,10 @@ impl<'a> FunctionKit<'a> {
                 };
                 Ok(())
             }
-            Decl::Func(_, _, _) =>  Err(MiddelError::GenError),
-            Decl::Enum(_, _) =>  Err(MiddelError::GenError),
-            Decl::Union(_, _) =>  Err(MiddelError::GenError),
-            Decl::Struct(_, _) =>  Err(MiddelError::GenError),
+            Decl::Func(_, _, _) => Err(MiddelError::GenError),
+            Decl::Enum(_, _) => Err(MiddelError::GenError),
+            Decl::Union(_, _) => Err(MiddelError::GenError),
+            Decl::Struct(_, _) => Err(MiddelError::GenError),
         }
     }
 
@@ -289,25 +289,44 @@ impl<'a> FunctionKit<'a> {
                 Ok(operand.clone())
             }
             // Some memory copy operation is required to process arrays
-            Expr::Pack(_) =>  Err(MiddelError::GenError),
-            Expr::Map(_) =>  Err(MiddelError::GenError),
+            Expr::Pack(_) => Err(MiddelError::GenError),
+            Expr::Map(_) => Err(MiddelError::GenError),
             Expr::Index(x, v) => {
                 // Generate arguments
                 let ix = self.gen_expr(v)?.load(self);
                 self.gen_expr(x)?
                     .get_element_ptr(self, vec![Constant::Int(0).into(), ix])
             }
-            Expr::Field(_, _) =>  Err(MiddelError::GenError),
-            Expr::Select(_, _) =>  Err(MiddelError::GenError),
+            Expr::Field(_, _) => Err(MiddelError::GenError),
+            Expr::Select(_, _) => Err(MiddelError::GenError),
             Expr::Int32(x) => Ok(Constant::Int(*x).into()),
             Expr::Float32(x) => Ok(Constant::Float(*x).into()),
-            Expr::String(_) =>  Err(MiddelError::GenError),
-            Expr::Char(_) =>  Err(MiddelError::GenError),
-            Expr::Bool(_) =>  Err(MiddelError::GenError),
-            Expr::Call(_, _) =>  Err(MiddelError::GenError),
-            Expr::Unary(_, _) =>  Err(MiddelError::GenError),
+            Expr::String(_) => Err(MiddelError::GenError),
+            Expr::Char(_) => Err(MiddelError::GenError),
+            Expr::Bool(_) => Err(MiddelError::GenError),
+            Expr::Call(func, args) => {
+                // Generate arguments
+                let mut operands = Vec::new();
+                for arg in args.iter() {
+                    operands.push(self.gen_expr(arg)?.load(self));
+                }
+
+                // Ensure function is a defined variable
+                let Expr::Var(func) = *func.clone() else {
+                    return Err(MiddelError::GenError);
+                };
+                let Some(fun) = self.fun_env.get(&func) else {
+                    return Err(MiddelError::GenError);
+                };
+
+                // Call the function
+                let inst = self.program.mem_pool.get_call(*fun, operands);
+                self.exit.push_back(inst);
+                Ok(Value::Operand(inst.into()))
+            },
+            Expr::Unary(_, _) => Err(MiddelError::GenError),
             Expr::Binary(op, lhs, rhs) => self.gen_binary(op, lhs, rhs),
-            Expr::Conditional(_, _, _) =>  Err(MiddelError::GenError),
+            Expr::Conditional(_, _, _) => Err(MiddelError::GenError),
         }
     }
 

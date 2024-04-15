@@ -48,10 +48,7 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         // No constant folding, because a variable can be re-assigned in SysY
         // This behaviour is consistent with `clang -S -emit-llvm xxx.c`
-        assert_eq!(
-            llvm_ir,
-            "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 1, ptr %alloca_1\n%alloca_3 = alloca i32\nstore i32 2, ptr %alloca_3\n%alloca_5 = alloca i32\n%load_6 = load i32, ptr %alloca_1\n%load_7 = load i32, ptr %alloca_3\n%Add_8 = add i32, %load_6, %load_7\nstore i32 %Add_8, ptr %alloca_5\n%load_10 = load i32, ptr %alloca_5\nret %load_10\n\n\n}\n"
-        );
+        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 1, ptr %alloca_1\n%alloca_3 = alloca i32\nstore i32 2, ptr %alloca_3\n%alloca_5 = alloca i32\n%load_6 = load i32, ptr %alloca_1\n%load_7 = load i32, ptr %alloca_3\n%Add_8 = add i32, %load_6, %load_7\nstore i32 %Add_8, ptr %alloca_5\n%load_10 = load i32, ptr %alloca_5\nret %load_10\n\n\n}\n");
     }
 
     #[test]
@@ -72,10 +69,7 @@ mod tests {
         assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Int32, \"a\", Some(Int32(1)))), Decl(Var(Int32, \"b\", Some(Int32(2)))), If(Binary(Lt, Var(\"a\"), Var(\"b\")), Block([Expr(Some(Var(\"a\")), Int32(3))]), Block([Expr(Some(Var(\"a\")), Int32(4))])), Return(Some(Var(\"a\")))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
-        assert_eq!(
-            llvm_ir,
-            "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 1, ptr %alloca_1\n%alloca_3 = alloca i32\nstore i32 2, ptr %alloca_3\nbr label %cond\n\n%cond:\n%load_10 = load i32, ptr %alloca_1\n%load_11 = load i32, ptr %alloca_3\n%icmp_12 = icmp slt i32 %load_10, %load_11\nbr i1 %icmp_12, label %then, label %alt\n\n%then:\nstore i32 3, ptr %alloca_1\nbr label %final\n\n%alt:\nstore i32 4, ptr %alloca_1\nbr label %final\n\n%final:\n%load_18 = load i32, ptr %alloca_1\nret %load_18\n\n\n}\n"
-        );
+        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 1, ptr %alloca_1\n%alloca_3 = alloca i32\nstore i32 2, ptr %alloca_3\nbr label %cond0\n\n%cond0:\n%load_10 = load i32, ptr %alloca_1\n%load_11 = load i32, ptr %alloca_3\n%icmp_12 = icmp slt i32 %load_10, %load_11\nbr i1 %icmp_12, label %then1, label %alt2\n\n%then1:\nstore i32 3, ptr %alloca_1\nbr label %final3\n\n%alt2:\nstore i32 4, ptr %alloca_1\nbr label %final3\n\n%final3:\n%load_18 = load i32, ptr %alloca_1\nret %load_18\n\n\n}\n");
     }
 
     #[test]
@@ -93,7 +87,7 @@ mod tests {
         assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Int32, \"a\", Some(Int32(0)))), While(Binary(Lt, Var(\"a\"), Int32(10)), Block([Expr(Some(Var(\"a\")), Binary(Add, Var(\"a\"), Int32(1)))])), Return(Some(Var(\"a\")))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
-        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 0, ptr %alloca_1\nbr label %cond\n\n%cond:\n%load_7 = load i32, ptr %alloca_1\n%icmp_8 = icmp slt i32 %load_7, 10\nbr i1 %icmp_8, label %body, label %final\n\n%body:\n%load_10 = load i32, ptr %alloca_1\n%Add_11 = add i32, %load_10, 1\nstore i32 %Add_11, ptr %alloca_1\nbr label %cond\n\n%final:\n%load_14 = load i32, ptr %alloca_1\nret %load_14\n\n\n}\n");
+        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 0, ptr %alloca_1\nbr label %cond0\n\n%cond0:\n%load_7 = load i32, ptr %alloca_1\n%icmp_8 = icmp slt i32 %load_7, 10\nbr i1 %icmp_8, label %body1, label %final2\n\n%body1:\n%load_10 = load i32, ptr %alloca_1\n%Add_11 = add i32, %load_10, 1\nstore i32 %Add_11, ptr %alloca_1\nbr label %cond0\n\n%final2:\n%load_14 = load i32, ptr %alloca_1\nret %load_14\n\n\n}\n");
     }
 
     #[test]
@@ -111,7 +105,7 @@ mod tests {
         assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Int32, \"a\", Some(Int32(0)))), DoWhile(Block([Expr(Some(Var(\"a\")), Binary(Add, Var(\"a\"), Int32(1)))]), Binary(Lt, Var(\"a\"), Int32(10))), Return(Some(Var(\"a\")))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
-        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 0, ptr %alloca_1\nbr label %body\n\n%body:\n%load_10 = load i32, ptr %alloca_1\n%Add_11 = add i32, %load_10, 1\nstore i32 %Add_11, ptr %alloca_1\nbr label %cond\n\n%cond:\n%load_7 = load i32, ptr %alloca_1\n%icmp_8 = icmp slt i32 %load_7, 10\nbr i1 %icmp_8, label %body, label %final\n\n%final:\n%load_14 = load i32, ptr %alloca_1\nret %load_14\n\n\n}\n");
+        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 0, ptr %alloca_1\nbr label %body0\n\n%body0:\n%load_10 = load i32, ptr %alloca_1\n%Add_11 = add i32, %load_10, 1\nstore i32 %Add_11, ptr %alloca_1\nbr label %cond1\n\n%cond1:\n%load_7 = load i32, ptr %alloca_1\n%icmp_8 = icmp slt i32 %load_7, 10\nbr i1 %icmp_8, label %body0, label %final2\n\n%final2:\n%load_14 = load i32, ptr %alloca_1\nret %load_14\n\n\n}\n");
     }
 
     #[test]
@@ -132,7 +126,7 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         // There are two `br` in `%body` block
         // Not preventing this can make `irgen` code simpler
-        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 0, ptr %alloca_1\nbr label %cond\n\n%cond:\n%load_7 = load i32, ptr %alloca_1\n%icmp_8 = icmp slt i32 %load_7, 10\nbr i1 %icmp_8, label %body, label %final\n\n%body:\n%load_10 = load i32, ptr %alloca_1\n%Add_11 = add i32, %load_10, 1\nstore i32 %Add_11, ptr %alloca_1\nbr label %final\nbr label %final\n\n%final:\n%load_15 = load i32, ptr %alloca_1\nret %load_15\n\n\n}\n");
+        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 0, ptr %alloca_1\nbr label %cond0\n\n%cond0:\n%load_7 = load i32, ptr %alloca_1\n%icmp_8 = icmp slt i32 %load_7, 10\nbr i1 %icmp_8, label %body1, label %final2\n\n%body1:\n%load_10 = load i32, ptr %alloca_1\n%Add_11 = add i32, %load_10, 1\nstore i32 %Add_11, ptr %alloca_1\nbr label %final2\nbr label %final2\n\n%final2:\n%load_15 = load i32, ptr %alloca_1\nret %load_15\n\n\n}\n");
     }
 
     #[test]
@@ -151,7 +145,7 @@ mod tests {
         assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Int32, \"a\", Some(Int32(0)))), While(Binary(Lt, Var(\"a\"), Int32(10)), Block([Expr(Some(Var(\"a\")), Binary(Add, Var(\"a\"), Int32(1))), Continue])), Return(Some(Var(\"a\")))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
-        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 0, ptr %alloca_1\nbr label %cond\n\n%cond:\n%load_7 = load i32, ptr %alloca_1\n%icmp_8 = icmp slt i32 %load_7, 10\nbr i1 %icmp_8, label %body, label %final\n\n%body:\n%load_10 = load i32, ptr %alloca_1\n%Add_11 = add i32, %load_10, 1\nstore i32 %Add_11, ptr %alloca_1\nbr label %cond\nbr label %cond\n\n%final:\n%load_15 = load i32, ptr %alloca_1\nret %load_15\n\n\n}\n");
+        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 0, ptr %alloca_1\nbr label %cond0\n\n%cond0:\n%load_7 = load i32, ptr %alloca_1\n%icmp_8 = icmp slt i32 %load_7, 10\nbr i1 %icmp_8, label %body1, label %final2\n\n%body1:\n%load_10 = load i32, ptr %alloca_1\n%Add_11 = add i32, %load_10, 1\nstore i32 %Add_11, ptr %alloca_1\nbr label %cond0\nbr label %cond0\n\n%final2:\n%load_15 = load i32, ptr %alloca_1\nret %load_15\n\n\n}\n");
     }
 
     #[test]
@@ -209,5 +203,51 @@ mod tests {
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
         assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 1, ptr %alloca_1\n%alloca_3 = alloca float\nstore float 2, ptr %alloca_3\n%alloca_5 = alloca float\n%load_6 = load i32, ptr %alloca_1\n%load_7 = load float, ptr %alloca_3\n%itofp_8 = sitofp i32 %load_6 to float\n%FAdd_9 = fadd float, %itofp_8, %load_7\nstore float %FAdd_9, ptr %alloca_5\n%load_11 = load float, ptr %alloca_5\n%fptoi_12 = fptosi float %load_11 to i32\nret %fptoi_12\n\n\n}\n");
+    }
+
+    #[test]
+    fn test_zext() {
+        let code = r#"
+            int main() {
+                return 3 > 1;
+            }
+        "#;
+        let program = parse(code).unwrap();
+        assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Return(Some(Binary(Gt, Int32(3), Int32(1))))])))] }");
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%icmp_1 = icmp sgt i32 3, 1\n%zext_2 = zext i1 %icmp_1 to i32\nret %zext_2\n\n\n}\n");
+    }
+
+    #[test]
+    fn test_param() {
+        let code = r#"
+            int main(int arg) {
+                return arg;
+            }
+        "#;
+        let program = parse(code).unwrap();
+        assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, [TypedIdent { ty: Int32, id: Some(\"arg\") }]), \"main\", Some(Block([Return(Some(Var(\"arg\")))])))] }");
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_eq!(llvm_ir, "define i32 @main(i32 arg) {\n%entry:\n%alloca_1 = alloca i32\nstore i32 %arg, ptr %alloca_1\n%load_3 = load i32, ptr %alloca_1\nret %load_3\n\n\n}\n");
+    }
+
+    #[test]
+    fn test_call() {
+        let code = r#"
+            int main() {
+                return f(1);
+            }
+
+            int f(int x) {
+                return x + 1;
+            }
+        "#;
+        let program = parse(code).unwrap();
+        assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Return(Some(Call(Var(\"f\"), [Int32(1)])))]))), Func(Function(Int32, [TypedIdent { ty: Int32, id: Some(\"x\") }]), \"f\", Some(Block([Return(Some(Binary(Add, Var(\"x\"), Int32(1))))])))] }");
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%call_1 = call call @f(1)\nret %call_1\n\n\n}\ndefine i32 @f(i32 x) {\n%entry:\n%alloca_4 = alloca i32\nstore i32 %x, ptr %alloca_4\n%load_6 = load i32, ptr %alloca_4\n%Add_7 = add i32, %load_6, 1\nret %Add_7\n\n\n}\n");
     }
 }
