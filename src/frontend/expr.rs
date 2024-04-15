@@ -132,26 +132,17 @@ gen_lrec_binary!(binary_lv8, binary_op_lv8, binary_lv7);
 gen_lrec_binary!(binary_lv9, binary_op_lv9, binary_lv8);
 
 /// Parse a conditional expression.
-pub fn conditional(input: &mut &str) -> PResult<Expr> {
+pub fn expr(input: &mut &str) -> PResult<Expr> {
     // The first expression is memoized, so when there's no condition,
     // there will not be re-parsing.
     let cond = binary_lv9.parse_next(input)?;
-    match (pad("?"), conditional, pad(":"), conditional).parse_next(input) {
+    match (pad("?"), expr, pad(":"), expr).parse_next(input) {
         Ok((_, pass, _, fail)) => Ok(Expr::Conditional(
             Box::new(cond),
             Box::new(pass),
             Box::new(fail),
         )),
         Err(_) => Ok(cond),
-    }
-}
-
-/// Parse a complete expression.
-pub fn expr(input: &mut &str) -> PResult<Expr> {
-    let lhs = conditional.parse_next(input)?;
-    match (binary_op_lv10, expr).parse_next(input) {
-        Ok((op, rhs)) => Ok(Expr::Binary(op, Box::new(lhs), Box::new(rhs))),
-        Err(_) => Ok(lhs),
     }
 }
 
@@ -240,17 +231,6 @@ pub mod tests_expr {
                 )
             ),
             Err(err) => panic!("failed to parse {}: {}", code, err),
-        }
-    }
-
-    #[test]
-    fn test_consistency() {
-        let code = "xy + 85.2 .  x -> y =!- -! 6=7  % 1 ? 1 ? 4 : 5 : 1 ? 4 : 1";
-        let another = "(xy+ (( (85.2) .x) ->y)) =(! -(-!6)=(7 %1?(1?4:5):(1?4:1)))";
-        match (expr.parse(code), expr.parse(another)) {
-            (Ok(result), Ok(answer)) => assert_eq!(result, answer,),
-            (Err(err), _) => panic!("failed to parse {}: {}", code, err),
-            (_, Err(err)) => panic!("failed to parse {}: {}", another, err),
         }
     }
 }

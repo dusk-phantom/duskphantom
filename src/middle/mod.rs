@@ -3,6 +3,7 @@ use ir::ir_builder::IRBuilder;
 
 mod analysis;
 pub mod ir;
+mod irgen;
 mod transform;
 
 use std::pin::Pin;
@@ -12,10 +13,10 @@ pub struct Program {
 }
 
 pub fn gen(program: &frontend::Program) -> Result<Program, MiddelError> {
-    todo!()
+    irgen::gen(program)
 }
 
-pub fn optimize(program: &mut Program) {
+pub fn optimize(_program: &mut Program) {
     todo!()
 }
 
