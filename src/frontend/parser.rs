@@ -10,7 +10,7 @@ pub fn word(input: &mut &str) -> PResult<String> {
 }
 
 /// List of all keywords.
-const KEYWORD: [&'static str; 20] = [
+const KEYWORD: [&str; 20] = [
     "void", "int", "float", "string", "char", "bool", "struct", "enum", "union", "false", "true",
     "sizeof", "break", "continue", "return", "if", "else", "do", "while", "for",
 ];
@@ -22,7 +22,7 @@ pub fn ident(input: &mut &str) -> PResult<String> {
 
 /// Parser of an integer.
 pub fn int(input: &mut &str) -> PResult<i32> {
-    take_while(1.., '0'..'9')
+    take_while(1.., '0'..='9')
         .map(|s: &str| s.parse().unwrap())
         .parse_next(input)
 }
@@ -128,7 +128,7 @@ where
 {
     trace("pad", move |input: &mut &'s str| {
         let output = parser.parse_next(input)?;
-        let _ = blank(input)?;
+        blank(input)?;
         Ok(output)
     })
 }
@@ -142,7 +142,7 @@ pub fn keyword<'s>(mut parser: &'static str) -> impl Parser<&'s str, &'s str, Co
         let _ = alt((peek(any), empty.value(' ')))
             .verify(|x: &char| !x.is_alphanum() && *x != '_')
             .parse_next(input)?;
-        let _ = blank(input)?;
+        blank(input)?;
         Ok(output)
     })
 }

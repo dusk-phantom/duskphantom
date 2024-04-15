@@ -37,8 +37,7 @@ pub fn unary_op(input: &mut &str) -> PResult<UnaryOp> {
         '*' => pad('*').value(UnaryOp::Ind),
         '&' => pad('&').value(UnaryOp::Addr),
         's' => keyword("sizeof").value(UnaryOp::Sizeof),
-        '(' => paren(single_type)
-            .map(|ty| UnaryOp::Cast(ty)),
+        '(' => paren(single_type).map(UnaryOp::Cast),
         _ => fail,
     }
     .parse_next(input)
