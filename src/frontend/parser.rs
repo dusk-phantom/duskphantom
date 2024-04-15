@@ -29,7 +29,7 @@ pub fn int(input: &mut &str) -> PResult<i32> {
 
 /// Parser of a usize.
 pub fn usize(input: &mut &str) -> PResult<usize> {
-    take_while(1.., '0'..'9')
+    take_while(1.., '0'..='9')
         .map(|s: &str| s.parse().unwrap())
         .parse_next(input)
 }
