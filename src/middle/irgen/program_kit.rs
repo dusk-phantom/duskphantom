@@ -22,6 +22,9 @@ impl<'a> ProgramKit<'a> {
         for decl in program.module.iter() {
             self.gen_decl(decl)?;
         }
+        for decl in program.module.iter() {
+            self.gen_impl(decl)?;
+        }
         Ok(())
     }
 
@@ -54,56 +57,79 @@ impl<'a> ProgramKit<'a> {
                 self.program.module.global_variables.push(global_val);
                 Ok(())
             }
-            Decl::Func(ty, id, op) => {
-                if let (Some(stmt), Type::Function(return_ty, params)) = (op, ty) {
+            Decl::Func(Type::Function(return_ty, _), id, _) => {
                     // Get function type
                     let fty = value_type::translate_type(return_ty);
 
                     // Create function
-                    let mut fun_ptr = self.program.mem_pool.new_function(id.clone(), fty.clone());
-
-                    // Fill parameters
-                    for param in params.iter() {
-                        let param = self.program.mem_pool.new_parameter(
-                            param.id.clone().ok_or(MiddelError::GenError)?,
-                            value_type::translate_type(&param.ty),
-                        );
-                        fun_ptr.params.push(param);
-                    }
-
-                    // Build function
-                    let fun_name = "entry".to_string();
-                    let bb = self.program.mem_pool.new_basicblock(fun_name);
-                    let mut counter: usize = 0;
-                    let mut kit = FunctionKit {
-                        program: self.program,
-                        env: self.env.clone(),
-                        fun_env: self.fun_env.clone(),
-                        ctx: self.ctx.clone(),
-                        entry: bb,
-                        exit: bb,
-                        break_to: None,
-                        continue_to: None,
-                        return_type: fty,
-                        counter: &mut counter,
-                    };
-                    kit.gen_stmt(stmt)?;
-                    fun_ptr.entry = Some(kit.entry);
-                    fun_ptr.exit = Some(kit.exit);
+                    let fun_ptr = self.program.mem_pool.new_function(id.clone(), fty.clone());
 
                     // Add function to environment
                     self.fun_env.insert(id.clone(), fun_ptr);
 
-                    // Add function to programs
+                    // Add function to program
                     self.program.module.functions.push(fun_ptr);
                     Ok(())
-                } else {
-                    Ok(())
-                }
             }
-            Decl::Enum(_, _) => Err(MiddelError::GenError),
-            Decl::Union(_, _) => Err(MiddelError::GenError),
-            Decl::Struct(_, _) => Err(MiddelError::GenError),
+            _ => Err(MiddelError::GenError),
+        }
+    }
+
+    /// Generate an implementation into the program
+    pub fn gen_impl(&mut self, decl: &Decl) -> Result<(), MiddelError> {
+        match decl {
+            Decl::Func(Type::Function(_, params), id, Some(stmt)) => {
+                // Clone function env before mutating it
+                let cloned_fun_env = self.fun_env.clone();
+
+                // Get function and its type
+                let fun_ptr = self.fun_env.get_mut(id).ok_or(MiddelError::GenError)?;
+                let fty = fun_ptr.return_type.clone();
+
+                // Create basic block
+                let entry_name = "entry".to_string();
+                let mut entry = self.program.mem_pool.new_basicblock(entry_name);
+
+                // Fill parameters
+                for param in params.iter() {
+                    let param = self.program.mem_pool.new_parameter(
+                        param.id.clone().ok_or(MiddelError::GenError)?,
+                        value_type::translate_type(&param.ty),
+                    );
+
+                    // Add parameter to function
+                    fun_ptr.params.push(param);
+
+                    // Add parameter to entry
+                    let alloc = self.program.mem_pool.get_alloca(param.value_type.clone(), 1);
+                    let store = self.program.mem_pool.get_store(param.into(), alloc.into());
+                    entry.push_back(alloc);
+                    entry.push_back(store);
+
+                    // Add parameter to env
+                    self.env.insert(param.name.clone(), Value::Pointer(alloc.into()));
+                }
+
+                // Build function
+                let mut counter: usize = 0;
+                let mut kit = FunctionKit {
+                    program: self.program,
+                    env: self.env.clone(),
+                    fun_env: cloned_fun_env,
+                    ctx: self.ctx.clone(),
+                    entry,
+                    exit: entry,
+                    break_to: None,
+                    continue_to: None,
+                    return_type: fty,
+                    counter: &mut counter,
+                };
+                kit.gen_stmt(stmt)?;
+                fun_ptr.entry = Some(kit.entry);
+                fun_ptr.exit = Some(kit.exit);
+                Ok(())
+            }
+            _ => Ok(()),
         }
     }
 }
