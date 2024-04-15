@@ -248,6 +248,24 @@ mod tests {
         assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Return(Some(Call(Var(\"f\"), [Int32(1)])))]))), Func(Function(Int32, [TypedIdent { ty: Int32, id: Some(\"x\") }]), \"f\", Some(Block([Return(Some(Binary(Add, Var(\"x\"), Int32(1))))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
-        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%call_1 = call call @f(1)\nret %call_1\n\n\n}\ndefine i32 @f(i32 x) {\n%entry:\n%alloca_4 = alloca i32\nstore i32 %x, ptr %alloca_4\n%load_6 = load i32, ptr %alloca_4\n%Add_7 = add i32, %load_6, 1\nret %Add_7\n\n\n}\n");
+        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%call_1 = call i32 @f(i32 1)\nret %call_1\n\n\n}\ndefine i32 @f(i32 x) {\n%entry:\n%alloca_4 = alloca i32\nstore i32 %x, ptr %alloca_4\n%load_6 = load i32, ptr %alloca_4\n%Add_7 = add i32, %load_6, 1\nret %Add_7\n\n\n}\n");
+    }
+
+    #[test]
+    fn test_nested_call() {
+        let code = r#"
+            int main() {
+                return f(f(1));
+            }
+
+            int f(int x) {
+                return x + 1;
+            }
+        "#;
+        let program = parse(code).unwrap();
+        assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Return(Some(Call(Var(\"f\"), [Call(Var(\"f\"), [Int32(1)])])))]))), Func(Function(Int32, [TypedIdent { ty: Int32, id: Some(\"x\") }]), \"f\", Some(Block([Return(Some(Binary(Add, Var(\"x\"), Int32(1))))])))] }");
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%call_1 = call i32 @f(i32 1)\n%call_2 = call i32 @f(i32 %call_1)\nret %call_2\n\n\n}\ndefine i32 @f(i32 x) {\n%entry:\n%alloca_5 = alloca i32\nstore i32 %x, ptr %alloca_5\n%load_7 = load i32, ptr %alloca_5\n%Add_8 = add i32, %load_7, 1\nret %Add_8\n\n\n}\n");
     }
 }
