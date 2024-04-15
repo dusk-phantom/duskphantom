@@ -278,9 +278,9 @@ impl Display for Call {
 impl Instruction for Call {
     gen_common_code!(Call, Call);
     fn gen_llvm_ir(&self) -> String {
-        let mut res = format!("{} = call {} @{}(", self, self.get_type(), &self.func.name);
+        let mut res = format!("{} = call {} @{}(", self, self.get_value_type(), &self.func.name);
         for op in self.get_operand() {
-            res.push_str(&format!("{}, ", op));
+            res.push_str(&format!("{} {}, ", op.get_type(), op));
         }
         res.truncate(res.len() - 2);
         res.push(')');
