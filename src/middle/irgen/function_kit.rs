@@ -1,21 +1,45 @@
+use std::collections::HashMap;
 use crate::errors::MiddelError;
-use crate::frontend;
+use crate::{frontend, middle};
 use crate::frontend::{BinaryOp, Decl, Expr, Stmt};
-use crate::middle::ir::{Constant, Operand, ValueType};
+use crate::middle::ir::{BBPtr, Constant, FunPtr, Operand, ValueType};
 use crate::middle::ir::instruction::misc_inst::ICmpOp;
-use crate::middle::irgen;
-use crate::middle::irgen::{FunctionKit, Value};
+use crate::middle::irgen::{value, value_type};
+use crate::middle::irgen::value::Value;
+
+/// Kit for translating a function to middle IR
+pub struct FunctionKit<'a> {
+    pub env: HashMap<String, Value>,
+    pub fun_env: HashMap<String, FunPtr>,
+    pub ctx: HashMap<String, ValueType>,
+    pub program: &'a mut middle::Program,
+    pub entry: BBPtr,
+    pub exit: BBPtr,
+    pub break_to: Option<BBPtr>,
+    pub continue_to: Option<BBPtr>,
+    pub return_type: ValueType,
+}
+
 
 /// A function kit can generate statements
 impl<'a> FunctionKit<'a> {
-    /// Generate a unique debug name for a basic block
-    pub fn unique_debug(&self, base: &'static str) -> String {
-        base.to_string()
+    /// Generate a new function kit
+    pub fn divide(&mut self, entry: BBPtr, break_to: Option<BBPtr>, continue_to: Option<BBPtr>) -> FunctionKit {
+        FunctionKit {
+            program: self.program,
+            env: self.env.clone(),
+            fun_env: self.fun_env.clone(),
+            ctx: self.ctx.clone(),
+            entry,
+            // Default exit is entry
+            exit: entry,
+            break_to,
+            continue_to,
+            return_type: self.return_type.clone(),
+        }
     }
 
     /// Generate a statement into the program
-    /// `exit`: previous exit node of a function
-    /// Returns: new exit node of a function
     pub fn gen_stmt(&mut self, stmt: &Stmt) -> Result<(), MiddelError> {
         match stmt {
             Stmt::Nothing => Ok(()),
@@ -23,13 +47,13 @@ impl<'a> FunctionKit<'a> {
                 // Generate declaration
                 self.gen_decl(decl)
             }
-            Stmt::Expr(opt_lval, expr) => {
+            Stmt::Expr(opt_left_val, expr) => {
                 // Generate expression
                 let operand = self.gen_expr(expr)?.load(self);
-                match opt_lval {
-                    // Exist left value, try add result to env
-                    Some(lval) => match lval {
-                        frontend::LVal::Nothing => todo!(),
+                match opt_left_val {
+                    // Exist left value, try to add result to env
+                    Some(left_val) => match left_val {
+                        frontend::LVal::Nothing => Err(MiddelError::GenError),
                         frontend::LVal::Var(id) => {
                             // Find variable in environment
                             let val = {
@@ -46,9 +70,9 @@ impl<'a> FunctionKit<'a> {
                             val.assign(self, operand)?;
                             Ok(())
                         }
-                        frontend::LVal::Index(_, _) => todo!(),
-                        frontend::LVal::Call(_, _) => todo!(),
-                        frontend::LVal::Pointer(_) => todo!(),
+                        frontend::LVal::Index(_, _) =>  Err(MiddelError::GenError),
+                        frontend::LVal::Call(_, _) =>  Err(MiddelError::GenError),
+                        frontend::LVal::Pointer(_) =>  Err(MiddelError::GenError),
                     },
                     // No left value, discard result
                     None => Ok(()),
@@ -56,13 +80,13 @@ impl<'a> FunctionKit<'a> {
             }
             Stmt::If(cond, then, alt) => {
                 // Allocate basic blocks
-                let cond_name = self.unique_debug("cond");
+                let cond_name = "cond".to_string();
                 let mut cond_bb = self.program.mem_pool.new_basicblock(cond_name);
-                let then_name = self.unique_debug("then");
+                let then_name = "then".to_string();
                 let mut then_bb = self.program.mem_pool.new_basicblock(then_name);
-                let alt_name = self.unique_debug("alt");
+                let alt_name = "alt".to_string();
                 let mut alt_bb = self.program.mem_pool.new_basicblock(alt_name);
-                let final_name = self.unique_debug("final");
+                let final_name = "final".to_string();
                 let final_bb = self.program.mem_pool.new_basicblock(final_name);
 
                 // Route basic blocks
@@ -82,33 +106,11 @@ impl<'a> FunctionKit<'a> {
                 cond_bb.push_back(br);
 
                 // Add statements and br to then branch
-                FunctionKit {
-                    program: self.program,
-                    env: self.env.clone(),
-                    fun_env: self.fun_env.clone(),
-                    ctx: self.ctx.clone(),
-                    entry: then_bb,
-                    exit: then_bb,
-                    break_to: None,
-                    continue_to: None,
-                    return_type: self.return_type.clone(),
-                }
-                .gen_stmt(then)?;
+                self.divide(then_bb, None, None).gen_stmt(then)?;
                 then_bb.push_back(self.program.mem_pool.get_br(None));
 
                 // Add statements and br to alt branch
-                FunctionKit {
-                    program: self.program,
-                    env: self.env.clone(),
-                    fun_env: self.fun_env.clone(),
-                    ctx: self.ctx.clone(),
-                    entry: alt_bb,
-                    exit: alt_bb,
-                    break_to: None,
-                    continue_to: None,
-                    return_type: self.return_type.clone(),
-                }
-                .gen_stmt(alt)?;
+                self.divide(alt_bb, None, None).gen_stmt(alt)?;
                 alt_bb.push_back(self.program.mem_pool.get_br(None));
 
                 // Increment exit
@@ -117,11 +119,11 @@ impl<'a> FunctionKit<'a> {
             }
             Stmt::While(cond, body) => {
                 // Allocate basic blocks
-                let cond_name = self.unique_debug("cond");
+                let cond_name = "cond".to_string();
                 let mut cond_bb = self.program.mem_pool.new_basicblock(cond_name);
-                let body_name = self.unique_debug("body");
+                let body_name = "body".to_string();
                 let mut body_bb = self.program.mem_pool.new_basicblock(body_name);
-                let final_name = self.unique_debug("final");
+                let final_name = "final".to_string();
                 let final_bb = self.program.mem_pool.new_basicblock(final_name);
 
                 // Route basic blocks
@@ -140,18 +142,7 @@ impl<'a> FunctionKit<'a> {
                 cond_bb.push_back(br);
 
                 // Add statements and br to body block
-                FunctionKit {
-                    program: self.program,
-                    env: self.env.clone(),
-                    fun_env: self.fun_env.clone(),
-                    ctx: self.ctx.clone(),
-                    entry: body_bb,
-                    exit: body_bb,
-                    break_to: Some(final_bb),
-                    continue_to: Some(cond_bb),
-                    return_type: self.return_type.clone(),
-                }
-                .gen_stmt(body)?;
+                self.divide(body_bb, Some(final_bb), Some(cond_bb)).gen_stmt(body)?;
                 body_bb.push_back(self.program.mem_pool.get_br(None));
 
                 // Increment exit
@@ -160,11 +151,11 @@ impl<'a> FunctionKit<'a> {
             }
             Stmt::DoWhile(body, cond) => {
                 // Allocate basic blocks
-                let body_name = self.unique_debug("body");
+                let body_name = "body".to_string();
                 let mut body_bb = self.program.mem_pool.new_basicblock(body_name);
-                let cond_name = self.unique_debug("cond");
+                let cond_name = "cond".to_string();
                 let mut cond_bb = self.program.mem_pool.new_basicblock(cond_name);
-                let final_name = self.unique_debug("final");
+                let final_name = "final".to_string();
                 let final_bb = self.program.mem_pool.new_basicblock(final_name);
 
                 // Route basic blocks
@@ -201,7 +192,7 @@ impl<'a> FunctionKit<'a> {
                 self.exit = final_bb;
                 Ok(())
             }
-            Stmt::For(_, _, _, _) => todo!(),
+            Stmt::For(_, _, _, _) =>  Err(MiddelError::GenError),
             Stmt::Break => {
                 // Add br instruction to exit block
                 let br = self.program.mem_pool.get_br(None);
@@ -255,17 +246,15 @@ impl<'a> FunctionKit<'a> {
     }
 
     /// Generate a declaration as a statement into the program
-    /// `exit`: previous exit node of the function
-    /// Returns: declaration name, declared variable, new exit node of the function
     pub fn gen_decl(&mut self, decl: &Decl) -> Result<(), MiddelError> {
         match decl {
             Decl::Var(raw_ty, id, op) => {
                 // Add type to context
-                let ty = irgen::translate_type(raw_ty);
+                let ty = value_type::translate_type(raw_ty);
                 self.ctx.insert(id.clone(), ty.clone());
 
                 // Allocate space for variable, add to environment
-                let val = irgen::alloc(ty.clone(), self);
+                let val = value::alloc(ty.clone(), self);
                 self.env.insert(id.clone(), val.clone());
 
                 // Assign to the variable if it is defined
@@ -281,16 +270,14 @@ impl<'a> FunctionKit<'a> {
                 };
                 Ok(())
             }
-            Decl::Func(_, _, _) => todo!(),
-            Decl::Enum(_, _) => todo!(),
-            Decl::Union(_, _) => todo!(),
-            Decl::Struct(_, _) => todo!(),
+            Decl::Func(_, _, _) =>  Err(MiddelError::GenError),
+            Decl::Enum(_, _) =>  Err(MiddelError::GenError),
+            Decl::Union(_, _) =>  Err(MiddelError::GenError),
+            Decl::Struct(_, _) =>  Err(MiddelError::GenError),
         }
     }
 
-    /// Generate a expression as a statement into the program
-    /// `exit`: previous exit node of the function
-    /// Returns: calculated variable, new exit node of the function
+    /// Generate an expression as a statement into the program
     pub fn gen_expr(&mut self, expr: &Expr) -> Result<Value, MiddelError> {
         match expr {
             Expr::Var(x) => {
@@ -302,26 +289,26 @@ impl<'a> FunctionKit<'a> {
                 // Clone the operand and return, this clones the underlying value or InstPtr
                 Ok(operand.clone())
             }
-            // Some memcpy operation is required to process arrays
-            Expr::Pack(_) => todo!(),
-            Expr::Map(_) => todo!(),
+            // Some memory copy operation is required to process arrays
+            Expr::Pack(_) =>  Err(MiddelError::GenError),
+            Expr::Map(_) =>  Err(MiddelError::GenError),
             Expr::Index(x, v) => {
                 // Generate arguments
                 let ix = self.gen_expr(v)?.load(self);
                 self.gen_expr(x)?
-                    .getelementptr(self, vec![Constant::Int(0).into(), ix])
+                    .get_element_ptr(self, vec![Constant::Int(0).into(), ix])
             }
-            Expr::Field(_, _) => todo!(),
-            Expr::Select(_, _) => todo!(),
+            Expr::Field(_, _) =>  Err(MiddelError::GenError),
+            Expr::Select(_, _) =>  Err(MiddelError::GenError),
             Expr::Int32(x) => Ok(Constant::Int(*x).into()),
             Expr::Float32(x) => Ok(Constant::Float(*x).into()),
-            Expr::String(_) => todo!(),
-            Expr::Char(_) => todo!(),
-            Expr::Bool(_) => todo!(),
-            Expr::Call(_, _) => todo!(),
-            Expr::Unary(_, _) => todo!(),
+            Expr::String(_) =>  Err(MiddelError::GenError),
+            Expr::Char(_) =>  Err(MiddelError::GenError),
+            Expr::Bool(_) =>  Err(MiddelError::GenError),
+            Expr::Call(_, _) =>  Err(MiddelError::GenError),
+            Expr::Unary(_, _) =>  Err(MiddelError::GenError),
             Expr::Binary(op, lhs, rhs) => self.gen_binary(op, lhs, rhs),
-            Expr::Conditional(_, _, _) => todo!(),
+            Expr::Conditional(_, _, _) =>  Err(MiddelError::GenError),
         }
     }
 
@@ -418,17 +405,17 @@ impl<'a> FunctionKit<'a> {
                 let lop = lop.conv(ValueType::Int, self)?;
                 let rop = rop.conv(ValueType::Int, self)?;
 
-                // Add "srem" instruction, operand is the result of the instruction
+                // Add "signed rem" instruction, operand is the result of the instruction
                 let inst = self.program.mem_pool.get_srem(lop, rop);
                 self.exit.push_back(inst);
                 Ok(Value::Operand(inst.into()))
             }
             // Bitwise operation on int is not required
-            BinaryOp::Shr => todo!(),
-            BinaryOp::Shl => todo!(),
-            BinaryOp::And => todo!(),
-            BinaryOp::Or => todo!(),
-            BinaryOp::Xor => todo!(),
+            BinaryOp::Shr => Err(MiddelError::GenError),
+            BinaryOp::Shl => Err(MiddelError::GenError),
+            BinaryOp::And => Err(MiddelError::GenError),
+            BinaryOp::Or => Err(MiddelError::GenError),
+            BinaryOp::Xor => Err(MiddelError::GenError),
             BinaryOp::Gt => {
                 // Unify operand types
                 let (lop, rop) = Operand::unify(lop, rop, self)?;

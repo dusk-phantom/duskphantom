@@ -1,10 +1,10 @@
 use crate::errors::MiddelError;
 use crate::middle::ir::{Operand, ValueType};
-use crate::middle::irgen::FunctionKit;
+use crate::middle::irgen::function_kit::FunctionKit;
 
 /// Convenient methods for operand
 impl Operand {
-    /// Convert the type of an operand to another
+    /// Convert the type of operand to another
     pub fn conv(self, ty: ValueType, kit: &mut FunctionKit) -> Result<Operand, MiddelError> {
         let from_ty = self.get_type();
         if from_ty == ty {
