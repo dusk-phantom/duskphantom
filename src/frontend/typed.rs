@@ -106,7 +106,7 @@ pub fn usage(input: &mut &str) -> PResult<IdentUsage> {
         paren(vec_typed).map(|x| BoxF::new(|acc| IdentUsage::Call(acc, x))),
     ));
     let access = lrec(atom, repeat(0.., access_tail));
-    let unary_init = pad('*').map(|_op| BoxF::new(|acc| IdentUsage::Pointer(acc)));
+    let unary_init = pad('*').map(|_op| BoxF::new(IdentUsage::Pointer));
     rrec(repeat(0.., unary_init), access).parse_next(input)
 }
 
