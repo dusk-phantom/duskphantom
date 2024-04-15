@@ -30,7 +30,7 @@ pub enum Type {
     /// Array of given type.
     /// Example:
     /// `int x[4]` is `Array(Int32, 4)`
-    Array(Box<Type>, i32),
+    Array(Box<Type>, usize),
 
     /// Function to given type.
     /// Example:
@@ -68,10 +68,11 @@ pub fn atom_type(input: &mut &str) -> PResult<Type> {
     .parse_next(input)
 }
 
-/// An identifier with usage of its type.
+/// A left value is an identifier with usage of its type.
+/// If identifier is not null, it can be assigned to.
 /// Example: `(*f)(int)` indicates that `f` should be used as `(*f)(some_int)`.
 #[derive(Clone, PartialEq, Debug)]
-pub enum IdentUsage {
+pub enum LVal {
     /// Nothing.
     /// Used when there's no target of usage.
     /// Example: `*(int)` has core `Nothing`.
@@ -83,30 +84,30 @@ pub enum IdentUsage {
 
     /// Array indexing.
     /// Example: `x[8]`
-    Index(Box<IdentUsage>, i32),
+    Index(Box<LVal>, usize),
 
     /// A function call.
     /// Example: `f(x, y)`
-    Call(Box<IdentUsage>, Vec<TypedIdent>),
+    Call(Box<LVal>, Vec<TypedIdent>),
 
     /// Application of indirection.
     /// Example: `*x`
-    Pointer(Box<IdentUsage>),
+    Pointer(Box<LVal>),
 }
 
-/// Parser of an IdentUsage.
-pub fn usage(input: &mut &str) -> PResult<IdentUsage> {
+/// Parser of an left value.
+pub fn lval(input: &mut &str) -> PResult<LVal> {
     let atom = alt((
-        pad(ident).map(IdentUsage::Var),
-        paren(usage),
-        empty.value(IdentUsage::Nothing),
+        pad(ident).map(LVal::Var),
+        paren(lval),
+        empty.value(LVal::Nothing),
     ));
     let access_tail = alt((
-        bracket(pad(int)).map(|x| BoxF::new(move |acc| IdentUsage::Index(acc, x))),
-        paren(vec_typed).map(|x| BoxF::new(|acc| IdentUsage::Call(acc, x))),
+        bracket(pad(usize)).map(|x| BoxF::new(move |acc| LVal::Index(acc, x))),
+        paren(vec_typed).map(|x| BoxF::new(|acc| LVal::Call(acc, x))),
     ));
     let access = lrec(atom, repeat(0.., access_tail));
-    let unary_init = pad('*').map(|_op| BoxF::new(|acc| IdentUsage::Pointer(acc)));
+    let unary_init = pad('*').map(|_op| BoxF::new(LVal::Pointer));
     rrec(repeat(0.., unary_init), access).parse_next(input)
 }
 
@@ -128,21 +129,21 @@ impl TypedIdent {
 
 /// Accumulate usage to type, so that it becomes a TypedIdent.
 /// For example, `int (*x)(float)` becomes `{int (*)(float), x}`
-pub fn acc_usage(ty: Type, usage: IdentUsage) -> TypedIdent {
+pub fn acc_lval(ty: Type, usage: LVal) -> TypedIdent {
     match usage {
-        IdentUsage::Nothing => TypedIdent::new(ty, None),
-        IdentUsage::Var(id) => TypedIdent::new(ty, Some(id)),
-        IdentUsage::Index(inner, ix) => acc_usage(Type::Array(Box::new(ty), ix), *inner),
-        IdentUsage::Call(inner, arg) => acc_usage(Type::Function(Box::new(ty), arg), *inner),
-        IdentUsage::Pointer(inner) => acc_usage(Type::Pointer(Box::new(ty)), *inner),
+        LVal::Nothing => TypedIdent::new(ty, None),
+        LVal::Var(id) => TypedIdent::new(ty, Some(id)),
+        LVal::Index(inner, ix) => acc_lval(Type::Array(Box::new(ty), ix), *inner),
+        LVal::Call(inner, arg) => acc_lval(Type::Function(Box::new(ty), arg), *inner),
+        LVal::Pointer(inner) => acc_lval(Type::Pointer(Box::new(ty)), *inner),
     }
 }
 
 /// Parser of a TypedIdent.
 pub fn typed_ident(input: &mut &str) -> PResult<TypedIdent> {
     let ty = atom_type.parse_next(input)?;
-    let us = usage.parse_next(input)?;
-    Ok(acc_usage(ty, us))
+    let us = lval.parse_next(input)?;
+    Ok(acc_lval(ty, us))
 }
 
 /// Parser of a single type.
@@ -239,11 +240,11 @@ pub mod tests_typed {
     #[test]
     fn test_usage() {
         let code = "*(int)";
-        match usage.parse(code) {
+        match lval.parse(code) {
             Ok(result) => assert_eq!(
                 result,
-                IdentUsage::Pointer(Box::new(IdentUsage::Call(
-                    Box::new(IdentUsage::Nothing),
+                LVal::Pointer(Box::new(LVal::Call(
+                    Box::new(LVal::Nothing),
                     vec![TypedIdent::new(Type::Int32, None)],
                 )))
             ),
