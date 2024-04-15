@@ -74,6 +74,7 @@ impl<'a> ProgramKit<'a> {
                     // Build function
                     let fun_name = "entry".to_string();
                     let bb = self.program.mem_pool.new_basicblock(fun_name);
+                    let mut counter: usize = 0;
                     let mut kit = FunctionKit {
                         program: self.program,
                         env: self.env.clone(),
@@ -84,6 +85,7 @@ impl<'a> ProgramKit<'a> {
                         break_to: None,
                         continue_to: None,
                         return_type: fty,
+                        counter: &mut counter,
                     };
                     kit.gen_stmt(stmt)?;
                     fun_ptr.entry = Some(kit.entry);
