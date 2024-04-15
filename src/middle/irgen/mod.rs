@@ -24,7 +24,7 @@ pub fn gen(program: &frontend::Program) -> Result<middle::Program, MiddelError> 
 /// Convenient methods for operand
 impl Operand {
     /// Convert the type of an operand to another
-    fn conv<'a>(self, ty: ValueType, kit: &mut FunctionKit<'a>) -> Result<Operand, MiddelError> {
+    fn conv(self, ty: ValueType, kit: &mut FunctionKit) -> Result<Operand, MiddelError> {
         let from_ty = self.get_type();
         if from_ty == ty {
             return Ok(self);
@@ -60,7 +60,7 @@ impl Operand {
     }
 
     /// Unify the types of two operands
-    fn unify<'a>(a: Self, b: Self, kit: &mut FunctionKit<'a>) -> Result<(Self, Self), MiddelError> {
+    fn unify(a: Self, b: Self, kit: &mut FunctionKit) -> Result<(Self, Self), MiddelError> {
         let a_ty = a.get_type();
         let b_ty = b.get_type();
         let max_ty = a_ty.max_with(&b_ty)?;
@@ -72,12 +72,7 @@ impl Operand {
 impl ValueType {
     /// If a value type can be converted to a number, returns true
     fn is_num(&self) -> bool {
-        match self {
-            ValueType::Bool => true,
-            ValueType::Int => true,
-            ValueType::Float => true,
-            _ => false,
-        }
+        matches!(self, ValueType::Bool | ValueType::Int | ValueType::Float)
     }
 
     /// Convert a numeric value type to its percision level
@@ -142,7 +137,7 @@ enum Value {
 }
 
 /// A value can be allocated with type and kit
-fn alloc<'a>(ty: ValueType, kit: &mut FunctionKit<'a>) -> Value {
+fn alloc(ty: ValueType, kit: &mut FunctionKit) -> Value {
     // Add instruction to exit
     let inst = kit.program.mem_pool.get_alloca(ty, 1);
     kit.exit.push_back(inst);
@@ -150,9 +145,9 @@ fn alloc<'a>(ty: ValueType, kit: &mut FunctionKit<'a>) -> Value {
 }
 
 /// A constant can be converted to a value
-impl Into<Value> for Constant {
-    fn into(self) -> Value {
-        Value::Operand(Operand::Constant(self))
+impl From<Constant> for Value {
+    fn from(val: Constant) -> Self {
+        Value::Operand(Operand::Constant(val))
     }
 }
 
@@ -171,7 +166,7 @@ impl Value {
     }
 
     /// Load the value as an operand
-    fn load<'a>(self, kit: &mut FunctionKit<'a>) -> Operand {
+    fn load(self, kit: &mut FunctionKit) -> Operand {
         let ty = self.get_type();
         match self {
             Value::Operand(op) => op,
@@ -189,14 +184,14 @@ impl Value {
     /// For example, getelementptr([2, 8]) on a pointer to an array [n x i32]
     /// shifts it by (2 * n + 8) * sizeof i32.
     /// DO NOT FORGET THE FIRST INDEX
-    fn getelementptr<'a>(
+    fn getelementptr(
         self,
-        kit: &mut FunctionKit<'a>,
+        kit: &mut FunctionKit,
         index: Vec<Operand>,
     ) -> Result<Value, MiddelError> {
         let ty = self.get_type();
         match self {
-            Value::Operand(op) => Err(MiddelError::GenError),
+            Value::Operand(_) => Err(MiddelError::GenError),
             Value::Pointer(op) => {
                 // Add instruction to exit
                 let inst = kit.program.mem_pool.get_getelementptr(ty, op, index);
@@ -210,7 +205,7 @@ impl Value {
     }
 
     /// Assign an operand to this value
-    fn assign<'a>(self, kit: &mut FunctionKit<'a>, op: Operand) -> Result<(), MiddelError> {
+    fn assign(self, kit: &mut FunctionKit, op: Operand) -> Result<(), MiddelError> {
         match self {
             Value::Operand(_) => Err(MiddelError::GenError),
             Value::Pointer(ptr) => {
@@ -351,7 +346,7 @@ impl<'a> ProgramKit<'a> {
                     // Fill parameters
                     for param in params.iter() {
                         let param = self.program.mem_pool.new_parameter(
-                            param.id.clone().map_or(Err(MiddelError::GenError), Ok)?,
+                            param.id.clone().ok_or(MiddelError::GenError)?,
                             translate_type(&param.ty),
                         );
                         fptr.params.push(param);
@@ -717,7 +712,7 @@ impl<'a> FunctionKit<'a> {
     }
 
     /// Generate a binary expression
-    fn gen_binary(&mut self, op: &BinaryOp, lhs: &Box<Expr>, rhs: &Box<Expr>) -> Result<Value, MiddelError> {
+    fn gen_binary(&mut self, op: &BinaryOp, lhs: &Expr, rhs: &Expr) -> Result<Value, MiddelError> {
         // Generate arguments
         let lop = self.gen_expr(lhs)?.load(self);
         let rop = self.gen_expr(rhs)?.load(self);
