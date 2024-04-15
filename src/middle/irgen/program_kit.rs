@@ -1,8 +1,20 @@
+use std::collections::HashMap;
 use crate::errors::MiddelError;
-use crate::frontend;
+use crate::{frontend, middle};
 use crate::frontend::{Decl, Type};
-use crate::middle::irgen;
-use crate::middle::irgen::{FunctionKit, ProgramKit, Value};
+use crate::middle::ir::{FunPtr, ValueType};
+use crate::middle::irgen::{constant, value_type};
+use crate::middle::irgen::function_kit::FunctionKit;
+use crate::middle::irgen::value::Value;
+
+/// Kit for translating a program to middle IR
+pub struct ProgramKit<'a> {
+    pub env: HashMap<String, Value>,
+    pub fun_env: HashMap<String, FunPtr>,
+    pub ctx: HashMap<String, ValueType>,
+    pub program: &'a mut middle::Program,
+}
+
 
 /// A program kit (top level) can generate declarations
 impl<'a> ProgramKit<'a> {
@@ -19,49 +31,49 @@ impl<'a> ProgramKit<'a> {
         match decl {
             Decl::Var(ty, id, val) => {
                 // Get global variable
-                let gval = match val {
+                let global_val = match val {
                     Some(v) => self.program.mem_pool.new_global_variable(
                         id.clone(),
-                        irgen::translate_type(ty),
+                        value_type::translate_type(ty),
                         // This global variable is mutable
                         true,
-                        irgen::expr_to_const(v)?,
+                        constant::expr_to_const(v)?,
                     ),
                     None => self.program.mem_pool.new_global_variable(
                         id.clone(),
-                        irgen::translate_type(ty),
+                        value_type::translate_type(ty),
                         true,
-                        irgen::type_to_const(ty)?,
+                        constant::type_to_const(ty)?,
                     ),
                 };
 
                 // Add global variable (pointer) to environment
-                self.env.insert(id.clone(), Value::Pointer(gval.into()));
+                self.env.insert(id.clone(), Value::Pointer(global_val.into()));
 
                 // Add global variable to program
-                self.program.module.global_variables.push(gval);
+                self.program.module.global_variables.push(global_val);
                 Ok(())
             }
             Decl::Func(ty, id, op) => {
                 if let (Some(stmt), Type::Function(return_ty, params)) = (op, ty) {
                     // Get function type
-                    let fty = irgen::translate_type(return_ty);
+                    let fty = value_type::translate_type(return_ty);
 
                     // Create function
-                    let mut fptr = self.program.mem_pool.new_function(id.clone(), fty.clone());
+                    let mut fun_ptr = self.program.mem_pool.new_function(id.clone(), fty.clone());
 
                     // Fill parameters
                     for param in params.iter() {
                         let param = self.program.mem_pool.new_parameter(
                             param.id.clone().ok_or(MiddelError::GenError)?,
-                            irgen::translate_type(&param.ty),
+                            value_type::translate_type(&param.ty),
                         );
-                        fptr.params.push(param);
+                        fun_ptr.params.push(param);
                     }
 
                     // Build function
-                    let fname = self.unique_debug("entry");
-                    let bb = self.program.mem_pool.new_basicblock(fname);
+                    let fun_name = "entry".to_string();
+                    let bb = self.program.mem_pool.new_basicblock(fun_name);
                     let mut kit = FunctionKit {
                         program: self.program,
                         env: self.env.clone(),
@@ -74,27 +86,22 @@ impl<'a> ProgramKit<'a> {
                         return_type: fty,
                     };
                     kit.gen_stmt(stmt)?;
-                    fptr.entry = Some(kit.entry);
-                    fptr.exit = Some(kit.exit);
+                    fun_ptr.entry = Some(kit.entry);
+                    fun_ptr.exit = Some(kit.exit);
 
                     // Add function to environment
-                    self.fun_env.insert(id.clone(), fptr);
+                    self.fun_env.insert(id.clone(), fun_ptr);
 
                     // Add function to programs
-                    self.program.module.functions.push(fptr);
+                    self.program.module.functions.push(fun_ptr);
                     Ok(())
                 } else {
                     Ok(())
                 }
             }
-            Decl::Enum(_, _) => todo!(),
-            Decl::Union(_, _) => todo!(),
-            Decl::Struct(_, _) => todo!(),
+            Decl::Enum(_, _) => Err(MiddelError::GenError),
+            Decl::Union(_, _) => Err(MiddelError::GenError),
+            Decl::Struct(_, _) => Err(MiddelError::GenError),
         }
-    }
-
-    /// Generate a unique debug name for a basic block
-    pub fn unique_debug(&self, base: &'static str) -> String {
-        base.to_string()
     }
 }

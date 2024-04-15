@@ -1,8 +1,8 @@
 use crate::errors::MiddelError;
 use crate::middle::ir::{Constant, Operand, ValueType};
-use crate::middle::irgen::FunctionKit;
+use crate::middle::irgen::function_kit::FunctionKit;
 
-/// A value can be an operand, or a pointer to an operand
+/// A value can be an operand, or a pointer to an operand.
 /// An operand can not be assigned to, while a pointed value can
 #[derive(Clone)]
 pub enum Value {
@@ -27,14 +27,14 @@ impl From<Constant> for Value {
 
 /// Convenient operations on a value
 impl Value {
-    /// Get the type of a value
+    /// Get the type of value
     pub fn get_type(&self) -> ValueType {
         match self {
             Value::Operand(op) => op.get_type(),
             Value::Pointer(op) => match op.get_type() {
                 // Inside `Pointer` is the pointer to given value
                 ValueType::Pointer(ty) => *ty,
-                _ => todo!(),
+                _ => panic!("invalid pointer generated, whose content is not a pointer"),
             },
         }
     }
@@ -55,10 +55,10 @@ impl Value {
 
     /// Shift the underlying pointer (if exists)
     /// Element of index is [shift by whole, shift by primary element, ...]
-    /// For example, getelementptr([2, 8]) on a pointer to an array [n x i32]
+    /// For example, get_element_ptr([2, 8]) on a pointer to an array [n x i32]
     /// shifts it by (2 * n + 8) * sizeof i32.
     /// DO NOT FORGET THE FIRST INDEX
-    pub fn getelementptr(
+    pub fn get_element_ptr(
         self,
         kit: &mut FunctionKit,
         index: Vec<Operand>,
@@ -72,7 +72,7 @@ impl Value {
                 kit.exit.push_back(inst);
 
                 // Construct new value
-                // TODO Type of pointer is shrinked (as "get element" states)
+                // TODO Type of pointer should be shrunk (as "get element" states)
                 Ok(Value::Pointer(inst.into()))
             }
         }
