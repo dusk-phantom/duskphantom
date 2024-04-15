@@ -95,7 +95,7 @@ pub enum LVal {
     Pointer(Box<LVal>),
 }
 
-/// Parser of an IdentUsage.
+/// Parser of an left value.
 pub fn lval(input: &mut &str) -> PResult<LVal> {
     let atom = alt((
         pad(ident).map(LVal::Var),
