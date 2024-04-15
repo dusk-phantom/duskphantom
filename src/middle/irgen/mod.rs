@@ -136,6 +136,48 @@ mod tests {
     }
 
     #[test]
+    fn test_continue() {
+        let code = r#"
+            int main() {
+                int a = 0;
+                while (a < 10) {
+                    a = a + 1;
+                    continue;
+                }
+                return a;
+            }
+        "#;
+        let program = parse(code).unwrap();
+        assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Int32, \"a\", Some(Int32(0)))), While(Binary(Lt, Var(\"a\"), Int32(10)), Block([Expr(Some(Var(\"a\")), Binary(Add, Var(\"a\"), Int32(1))), Continue])), Return(Some(Var(\"a\")))])))] }");
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 0, ptr %alloca_1\nbr label %cond\n\n%cond:\n%load_7 = load i32, ptr %alloca_1\n%icmp_8 = icmp slt i32 %load_7, 10\nbr i1 %icmp_8, label %body, label %final\n\n%body:\n%load_10 = load i32, ptr %alloca_1\n%Add_11 = add i32, %load_10, 1\nstore i32 %Add_11, ptr %alloca_1\nbr label %cond\nbr label %cond\n\n%final:\n%load_15 = load i32, ptr %alloca_1\nret %load_15\n\n\n}\n");
+    }
+
+    #[test]
+    fn test_control_flow() {
+        let code = r#"
+            int main() {
+                int a = 0;
+                while (a < 10) {
+                    a = a + 1;
+                    if (a == 5) {
+                        break;
+                    } else {
+                        continue;
+                    }
+                }
+                return a;
+            }
+        "#;
+        let program = parse(code).unwrap();
+        assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Int32, \"a\", Some(Int32(0)))), While(Binary(Lt, Var(\"a\"), Int32(10)), Block([Expr(Some(Var(\"a\")), Binary(Add, Var(\"a\"), Int32(1))), If(Binary(Eq, Var(\"a\"), Int32(5)), Block([Break]), Block([Continue]))])), Return(Some(Var(\"a\")))])))] }");
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 0, ptr %alloca_1\nbr label %cond0\n\n%cond0:\n%load_7 = load i32, ptr %alloca_1\n%icmp_8 = icmp slt i32 %load_7, 10\nbr i1 %icmp_8, label %body1, label %final2\n\n%body1:\n%load_10 = load i32, ptr %alloca_1\n%Add_11 = add i32, %load_10, 1\nstore i32 %Add_11, ptr %alloca_1\nbr label %cond3\nbr label %cond3\n\n%final2:\n%load_26 = load i32, ptr %alloca_1\nret %load_26\n\n%cond3:\n%load_18 = load i32, ptr %alloca_1\n%icmp_19 = icmp eq i32 %load_18, 5\nbr i1 %icmp_19, label %then4, label %alt5\n\n%then4:\nbr label %final2\nbr label %final2\n\n%alt5:\nbr label %cond0\nbr label %cond0\n\n\n}\n");
+    }
+
+    #[test]
     fn test_global_variable() {
         let code = r#"
             int x = 4;
@@ -168,22 +210,4 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 1, ptr %alloca_1\n%alloca_3 = alloca float\nstore float 2, ptr %alloca_3\n%alloca_5 = alloca float\n%load_6 = load i32, ptr %alloca_1\n%load_7 = load float, ptr %alloca_3\n%itofp_8 = sitofp i32 %load_6 to float\n%FAdd_9 = fadd float, %itofp_8, %load_7\nstore float %FAdd_9, ptr %alloca_5\n%load_11 = load float, ptr %alloca_5\n%fptoi_12 = fptosi float %load_11 to i32\nret %fptoi_12\n\n\n}\n");
     }
-
-    // #[test]
-    // fn test_template() {
-    //     let code = r#"
-    //         int main() {
-    //             int a = 0;
-    //             while (a < 10) {
-    //                 a = a + 1;
-    //             }
-    //             return a;
-    //         }
-    //     "#;
-    //     let program = parse(code).unwrap();
-    //     assert_eq!(format!("{:?}", program), "");
-    //     let result = gen(&program).unwrap();
-    //     let llvm_ir = result.module.gen_llvm_ir();
-    //     assert_eq!(llvm_ir, "");
-    // }
 }

@@ -18,6 +18,7 @@ pub struct FunctionKit<'a> {
     pub break_to: Option<BBPtr>,
     pub continue_to: Option<BBPtr>,
     pub return_type: ValueType,
+    pub counter: &'a mut usize,
 }
 
 
@@ -36,7 +37,15 @@ impl<'a> FunctionKit<'a> {
             break_to,
             continue_to,
             return_type: self.return_type.clone(),
+            counter: self.counter,
         }
+    }
+    
+    /// Generate a unique basic block name
+    pub fn unique_name(&mut self, base: &str) -> String {
+        let name = format!("{}{}", base, self.counter);
+        *self.counter += 1;
+        name
     }
 
     /// Generate a statement into the program
@@ -80,13 +89,13 @@ impl<'a> FunctionKit<'a> {
             }
             Stmt::If(cond, then, alt) => {
                 // Allocate basic blocks
-                let cond_name = "cond".to_string();
+                let cond_name = self.unique_name("cond");
                 let mut cond_bb = self.program.mem_pool.new_basicblock(cond_name);
-                let then_name = "then".to_string();
+                let then_name = self.unique_name("then");
                 let mut then_bb = self.program.mem_pool.new_basicblock(then_name);
-                let alt_name = "alt".to_string();
+                let alt_name = self.unique_name("alt");
                 let mut alt_bb = self.program.mem_pool.new_basicblock(alt_name);
-                let final_name = "final".to_string();
+                let final_name = self.unique_name("final");
                 let final_bb = self.program.mem_pool.new_basicblock(final_name);
 
                 // Route basic blocks
@@ -106,11 +115,12 @@ impl<'a> FunctionKit<'a> {
                 cond_bb.push_back(br);
 
                 // Add statements and br to then branch
-                self.divide(then_bb, None, None).gen_stmt(then)?;
+                // Retain break_to and continue_to
+                self.divide(then_bb, self.break_to, self.continue_to).gen_stmt(then)?;
                 then_bb.push_back(self.program.mem_pool.get_br(None));
 
                 // Add statements and br to alt branch
-                self.divide(alt_bb, None, None).gen_stmt(alt)?;
+                self.divide(alt_bb, self.break_to, self.continue_to).gen_stmt(alt)?;
                 alt_bb.push_back(self.program.mem_pool.get_br(None));
 
                 // Increment exit
@@ -119,11 +129,11 @@ impl<'a> FunctionKit<'a> {
             }
             Stmt::While(cond, body) => {
                 // Allocate basic blocks
-                let cond_name = "cond".to_string();
+                let cond_name = self.unique_name("cond");
                 let mut cond_bb = self.program.mem_pool.new_basicblock(cond_name);
-                let body_name = "body".to_string();
+                let body_name = self.unique_name("body");
                 let mut body_bb = self.program.mem_pool.new_basicblock(body_name);
-                let final_name = "final".to_string();
+                let final_name = self.unique_name("final");
                 let final_bb = self.program.mem_pool.new_basicblock(final_name);
 
                 // Route basic blocks
@@ -151,11 +161,11 @@ impl<'a> FunctionKit<'a> {
             }
             Stmt::DoWhile(body, cond) => {
                 // Allocate basic blocks
-                let body_name = "body".to_string();
+                let body_name = self.unique_name("body");
                 let mut body_bb = self.program.mem_pool.new_basicblock(body_name);
-                let cond_name = "cond".to_string();
+                let cond_name = self.unique_name("cond");
                 let mut cond_bb = self.program.mem_pool.new_basicblock(cond_name);
-                let final_name = "final".to_string();
+                let final_name = self.unique_name("final");
                 let final_bb = self.program.mem_pool.new_basicblock(final_name);
 
                 // Route basic blocks
@@ -174,18 +184,7 @@ impl<'a> FunctionKit<'a> {
                 cond_bb.push_back(br);
 
                 // Add statements and br to body block
-                FunctionKit {
-                    program: self.program,
-                    env: self.env.clone(),
-                    fun_env: self.fun_env.clone(),
-                    ctx: self.ctx.clone(),
-                    entry: body_bb,
-                    exit: body_bb,
-                    break_to: Some(final_bb),
-                    continue_to: Some(cond_bb),
-                    return_type: self.return_type.clone(),
-                }
-                .gen_stmt(body)?;
+                self.divide(body_bb, Some(final_bb), Some(cond_bb)).gen_stmt(body)?;
                 body_bb.push_back(self.program.mem_pool.get_br(None));
 
                 // Increment exit
