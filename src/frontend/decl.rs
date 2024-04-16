@@ -1,7 +1,5 @@
 use winnow::error::ErrMode;
 
-use crate::backend::func::Func;
-
 use super::*;
 
 /// A declaration.
