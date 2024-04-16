@@ -1,14 +1,29 @@
+use winnow::error::ErrMode;
+
+use crate::backend::func::Func;
+
 use super::*;
 
 /// A declaration.
 /// Example: `int x = 4;`
 #[derive(Clone, PartialEq, Debug)]
 pub enum Decl {
+    /// A declaration of a constant, optionally with assignment.
+    /// Example:
+    /// `const int x;` is `Const(Int32, x, None)`
+    /// `const int x = 4;` is `Const(Int32, x, Some(Int32(4)))`
+    Const(Type, String, Option<Expr>),
+
     /// A declaration of a variable, optionally with assignment.
     /// Example:
     /// `int x;` is `Var(Int32, x, None)`
     /// `int x = 4;` is `Var(Int32, x, Some(Int32(4)))`
     Var(Type, String, Option<Expr>),
+
+    /// Stacked declarations.
+    /// Example:
+    /// `int x = 1, y = 2;` is `Stack([Var(Int32, x, Some(Int32(1))), Var(Int32, y, Some(Int32(2)))])`
+    Stack(Vec<Decl>),
 
     /// A declaration of a function, optionally with implementation.
     /// Example:
@@ -35,26 +50,66 @@ pub enum Decl {
     Struct(String, Vec<TypedIdent>),
 }
 
+pub fn make_const(decl: Decl) -> Decl {
+    match decl {
+        Decl::Var(ty, id, expr) => Decl::Const(ty, id, expr),
+        _ => decl,
+    }
+}
+
 pub fn decl(input: &mut &str) -> PResult<Decl> {
-    // TODO declaration for enum / union / struct
-    let (ty, id) = typed_ident
-        .verify_map(|ti| ti.id.map(|id| (ti.ty, id)))
+    // Match const keyword.
+    let is_const = opt(keyword("const")).parse_next(input)?.is_some();
+
+    // Parse type.
+    let left_type = atom_type.parse_next(input)?;
+
+    // Parse lval and optional assignment expression.
+    let mut decls: Vec<Decl> = separated(1.., 
+        |input: &mut &str| assignment(input, left_type.clone()), 
+        pad(",")
+    ).parse_next(input)?;
+
+    // Require semicolon if the last declaration is not function implementation
+    if let Some(Decl::Func(_, _, Some(_))) = decls.last() {
+        // Do nothing
+    } else {
+        pad(';').parse_next(input)?;
+    }
+
+    // Make constant if necessary
+    if is_const {
+        decls = decls.into_iter().map(make_const).collect();
+    }
+
+    // Return declaration according to count
+    match decls.len() {
+        1 => Ok(decls.pop().unwrap()),
+        _ => Ok(Decl::Stack(decls)),
+    }
+}
+
+pub fn assignment(input: &mut &str, left_type: Type) -> PResult<Decl> {        
+    let left_val = lval
         .parse_next(input)?;
+    let typed_ident = acc_lval(left_type, left_val);
+    let Some(id) = typed_ident.id else {
+        return Err(ErrMode::Cut(ContextError::new()));
+    };
 
-    // Assign a variable.
-    if let Ok((_, (ex, _))) = (pad("="), cut_err((expr, pad(";")))).parse_next(input) {
-        return Ok(Decl::Var(ty, id, Some(ex)));
-    }
+    // Parse optional assignment.
+    if let Some(expr) = opt(preceded(pad("="), expr)).parse_next(input)? {
+        return Ok(Decl::Var(typed_ident.ty, id, Some(expr)));
+    };
 
-    // Implement a function.
-    if let Ok(st) = curly(vec_stmt).parse_next(input) {
-        return Ok(Decl::Func(ty, id, Some(Box::new(Stmt::Block(st)))));
-    }
+    // Parse optional function implementation.
+    if let Some(body) = opt(curly(vec_stmt)).parse_next(input)? {
+        return Ok(Decl::Func(typed_ident.ty, id, Some(Box::new(Stmt::Block(body)))));
+    };
 
-    // Pure declaration ends with `;`.
-    let _ = cut_err(pad(";")).parse_next(input)?;
-    match ty {
-        Type::Function(_, _) => Ok(Decl::Func(ty, id, None)),
-        _ => Ok(Decl::Var(ty, id, None)),
+    // Return declaration according to real type
+    match typed_ident.ty {
+        Type::Function(_, _) => Ok(Decl::Func(typed_ident.ty, id, None)),
+        _ => Ok(Decl::Var(typed_ident.ty, id, None)),
     }
 }

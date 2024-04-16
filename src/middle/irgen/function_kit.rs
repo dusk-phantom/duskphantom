@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use crate::errors::MiddelError;
 use crate::{frontend, middle};
-use crate::frontend::{BinaryOp, Decl, Expr, Stmt};
+use crate::frontend::{BinaryOp, Decl, Expr, Stmt, UnaryOp};
 use crate::middle::ir::{BBPtr, Constant, FunPtr, Operand, ValueType};
 use crate::middle::ir::instruction::misc_inst::ICmpOp;
 use crate::middle::irgen::{value, value_type};
@@ -110,7 +110,7 @@ impl<'a> FunctionKit<'a> {
                 self.exit = cond_bb;
 
                 // Add condition and br to condition block
-                let operand = self.gen_expr(cond)?.load(self);
+                let operand = self.gen_expr(cond)?.load(self).conv(ValueType::Bool, self)?;
                 let br = self.program.mem_pool.get_br(Some(operand));
                 cond_bb.push_back(br);
 
@@ -147,7 +147,7 @@ impl<'a> FunctionKit<'a> {
                 self.exit = cond_bb;
 
                 // Add condition and br to condition block
-                let operand = self.gen_expr(cond)?.load(self);
+                let operand = self.gen_expr(cond)?.load(self).conv(ValueType::Bool, self)?;
                 let br = self.program.mem_pool.get_br(Some(operand));
                 cond_bb.push_back(br);
 
@@ -179,7 +179,7 @@ impl<'a> FunctionKit<'a> {
                 self.exit = cond_bb;
 
                 // Add condition and br to condition block
-                let operand = self.gen_expr(cond)?.load(self);
+                let operand = self.gen_expr(cond)?.load(self).conv(ValueType::Bool, self)?;
                 let br = self.program.mem_pool.get_br(Some(operand));
                 cond_bb.push_back(br);
 
@@ -269,10 +269,14 @@ impl<'a> FunctionKit<'a> {
                 };
                 Ok(())
             }
-            Decl::Func(_, _, _) => Err(MiddelError::GenError),
-            Decl::Enum(_, _) => Err(MiddelError::GenError),
-            Decl::Union(_, _) => Err(MiddelError::GenError),
-            Decl::Struct(_, _) => Err(MiddelError::GenError),
+            Decl::Stack(decls) => {
+                // Generate each declaration
+                for decl in decls.iter() {
+                    self.gen_decl(decl)?;
+                }
+                Ok(())
+            }
+            _ => Err(MiddelError::GenError),
         }
     }
 
@@ -324,9 +328,64 @@ impl<'a> FunctionKit<'a> {
                 self.exit.push_back(inst);
                 Ok(Value::Operand(inst.into()))
             },
-            Expr::Unary(_, _) => Err(MiddelError::GenError),
+            Expr::Unary(op, expr) => self.gen_unary(op, expr),
             Expr::Binary(op, lhs, rhs) => self.gen_binary(op, lhs, rhs),
             Expr::Conditional(_, _, _) => Err(MiddelError::GenError),
+        }
+    }
+
+    /// Generate a unary expression
+    pub fn gen_unary(&mut self, op: &UnaryOp, expr: &Expr) -> Result<Value, MiddelError> {
+        // Generate argument
+        let operand = self.gen_expr(expr)?.load(self);
+
+        // Apply operation
+        match op {
+            UnaryOp::Neg => {
+                // Return 0 - x
+                let ty = operand.get_type();
+                match ty {
+                    ValueType::Int => {
+                        let inst = self.program.mem_pool.get_sub(Constant::Int(0).into(), operand);
+                        self.exit.push_back(inst);
+                        Ok(Value::Operand(inst.into()))
+                    }
+                    ValueType::Float => {
+                        let inst = self.program.mem_pool.get_fsub(Constant::Float(0.0).into(), operand);
+                        self.exit.push_back(inst);
+                        Ok(Value::Operand(inst.into()))
+                    }
+                    ValueType::Bool => {
+                        // Convert to int and then make negative
+                        let zext = self.program.mem_pool.get_zext(operand);
+                        let sub = self.program.mem_pool.get_sub(Constant::Int(0).into(), zext.into());
+                        self.exit.push_back(zext);
+                        self.exit.push_back(sub);
+                        Ok(Value::Operand(sub.into()))
+                    }
+                    _ => Err(MiddelError::GenError),
+                }
+            }
+            UnaryOp::Pos => {
+                // Return operand directly
+                let ty = operand.get_type();
+                match ty {
+                    ValueType::Int | ValueType::Float | ValueType::Bool => {
+                        Ok(Value::Operand(operand))
+                    }
+                    _ => Err(MiddelError::GenError),
+                }
+            }
+            UnaryOp::Not => {
+                // Convert operand to bool
+                let bool_op = operand.conv(ValueType::Bool, self)?;
+
+                // Add "xor" instruction
+                let inst = self.program.mem_pool.get_xor(bool_op, Constant::Bool(true).into());
+                self.exit.push_back(inst);
+                Ok(Value::Operand(inst.into()))
+            }
+            _ => Err(MiddelError::GenError),
         }
     }
 

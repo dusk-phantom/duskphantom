@@ -32,23 +32,27 @@ impl<'a> ProgramKit<'a> {
     /// Fails when declaration does not have a name
     pub fn gen_decl(&mut self, decl: &Decl) -> Result<(), MiddelError> {
         match decl {
-            Decl::Var(ty, id, val) => {
-                // Get global variable
-                let global_val = match val {
-                    Some(v) => self.program.mem_pool.new_global_variable(
-                        id.clone(),
-                        value_type::translate_type(ty),
-                        // This global variable is mutable
-                        true,
-                        constant::expr_to_const(v)?,
-                    ),
-                    None => self.program.mem_pool.new_global_variable(
-                        id.clone(),
-                        value_type::translate_type(ty),
-                        true,
-                        constant::type_to_const(ty)?,
-                    ),
+            Decl::Var(ty, id, val) | Decl::Const(ty, id, val) => {
+                // Get if value is global variable or constant
+                let is_global_variable: bool = match decl {
+                    Decl::Var(_, _, _) => true,
+                    Decl::Const(_, _, _) => false,
+                    _ => false,
                 };
+
+                // Get initializer
+                let initializer = match val {
+                    Some(v) => constant::expr_to_const(v)?,
+                    None => constant::type_to_const(ty)?,
+                };
+
+                // Get global variable
+                let global_val = self.program.mem_pool.new_global_variable(
+                    id.clone(),
+                    value_type::translate_type(ty),
+                    is_global_variable,
+                    initializer,
+                );
 
                 // Add global variable (pointer) to environment
                 self.env.insert(id.clone(), Value::Pointer(global_val.into()));
