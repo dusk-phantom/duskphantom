@@ -270,12 +270,54 @@ impl Operand {
     }
 }
 
+// 缺少浮点数的相关指令
+// fabs.s
+// fadd.s
+// flw
+// fsw
+// fcvt.l.s
+// fcvt.s.l
+// fcvt.s.lu
+// fcvt.s.w
+// fcvt.s.wu
+// fcvt.w.s
+// fcvt.wu.s
+// fdiv.s
+// fle.d
+// fle.s
+// flt.s
+// fmadd.s rd, rs1, rs2, rs3 // f[rd] = f[rs1] * f[rs2] + f[rs3]
+// fmax.s
+// fmin.s
+// fmsub.s
+// fmul.s
+// fmv.s
+// fmv.w.s
+// fmv.x.w
+// fneg.s
+// fnmadd.s  rd, rs1, rs2, rs3 // f[rd] = -(f[rs1] * f[rs2] + f[rs3])
+// fnmsub.s  rd, rs1, rs2, rs3 // f[rd] = -(f[rs1] * f[rs2] - f[rs3])
+// fsub.s
+
 #[derive(Clone)]
 pub enum Inst {
+    // 拓展
+    // sext.w
+
+    // li
     // algebraic operation
     Add(AddInst),
+
+    // xor
+    // xori
+
+    // subw
+    Sub(SubInst),
+
     Mul(MulInst),
     Div(DivInst),
+    Rem(RemInst),
+
     SLL(SllInst),
     SRL(SrlInst),
     Neg(NegInst),
@@ -288,38 +330,91 @@ pub enum Inst {
     Jmp(JmpInst),
     Branch(BranchInst),
     Call(CallInst),
+    // tail 尾调用
     Ret,
 }
 
+// addi
+// addiw
+// addw
+// and
+// andi
 #[derive(Clone)]
 pub struct AddInst(Operand, Operand, Operand);
+
+#[derive(Clone)]
+pub struct SubInst(Operand, Operand, Operand);
+
 #[derive(Clone)]
 pub struct MulInst(Operand, Operand, Operand);
+
+// rem
+#[derive(Clone)]
+pub struct RemInst(Operand, Operand, Operand);
+
 #[derive(Clone)]
 pub struct DivInst(Operand, Operand, Operand);
 
+// slli
+// slliw
+// sllw
 #[derive(Clone)]
 pub struct SllInst(Operand, Operand, Operand);
+
+// sra 算术右移
+// srai
+// sraiw
+// sraw
+// srli
+// srliw
+// srlw
 #[derive(Clone)]
 pub struct SrlInst(Operand, Operand, Operand);
+
+// ori
+// or
+// not
+// negw
 #[derive(Clone)]
 pub struct NegInst(Operand, Operand);
 
 #[derive(Clone)]
 pub struct MvInst(Operand, Operand);
+
+// lw
 #[derive(Clone)]
 pub struct LdInst(Operand, Operand, Operand);
-#[derive(Clone)]
+
 /// (to_store , offset , base)
+// sw
+#[derive(Clone)]
 pub struct SdInst(Operand, Operand, Operand);
+
+// lla
 #[derive(Clone)]
 pub struct LaInst(Operand, Operand);
+
+// j
+// jal
+// jalr
+// jr
 #[derive(Clone)]
 pub struct JmpInst(Operand);
+
 #[derive(Clone)]
 pub struct BranchInst(BranchOp, Operand, Operand, Operand);
 #[derive(Clone)]
 pub struct CallInst(Operand);
+
+// beqz
+// bgeu
+// bgez
+// bltu
+// bltz
+// bleu
+// blez
+// bgtu
+// bgtz
 #[derive(Clone)]
 pub enum BranchOp {
     Beq,
@@ -339,6 +434,15 @@ impl BranchOp {
             Self::Bgt => String::from("bgt"),
             Self::Bge => String::from("bge"),
         }
+    }
+}
+
+impl SubInst {
+    pub fn gen_asm(&self) -> String {
+        let dst = self.0.gen_asm();
+        let lhs = self.1.gen_asm();
+        let rhs = self.2.gen_asm();
+        format!("sub {},{},{}", dst, lhs, rhs)
     }
 }
 
@@ -384,6 +488,16 @@ impl MulInst {
         ret
     }
 }
+
+impl RemInst {
+    pub fn gen_asm(&self) -> String {
+        let dst = self.0.gen_asm();
+        let lhs = self.1.gen_asm();
+        let rhs = self.2.gen_asm();
+        format!("rem {},{},{}", dst, lhs, rhs)
+    }
+}
+
 impl DivInst {
     pub fn gen_asm(&self) -> String {
         let dst = self.0.gen_asm();
@@ -470,7 +584,9 @@ impl Inst {
     pub fn gen_asm(&self) -> String {
         match self {
             Inst::Add(inst) => inst.gen_asm(),
+            Inst::Sub(inst) => inst.gen_asm(),
             Inst::Mul(inst) => inst.gen_asm(),
+            Inst::Rem(inst) => inst.gen_asm(),
             Inst::Div(inst) => inst.gen_asm(),
             Inst::SLL(inst) => inst.gen_asm(),
             Inst::SRL(inst) => inst.gen_asm(),
