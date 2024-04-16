@@ -268,4 +268,59 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%call_1 = call i32 @f(i32 1)\n%call_2 = call i32 @f(i32 %call_1)\nret %call_2\n\n\n}\ndefine i32 @f(i32 x) {\n%entry:\n%alloca_5 = alloca i32\nstore i32 %x, ptr %alloca_5\n%load_7 = load i32, ptr %alloca_5\n%Add_8 = add i32, %load_7, 1\nret %Add_8\n\n\n}\n");
     }
+
+    #[test]
+    fn test_constant() {
+        let code = r#"
+            const float PI = 3.1415926;
+
+            int main() {
+                return PI;
+            }
+        "#;
+        let program = parse(code).unwrap();
+        assert_eq!(format!("{:?}", program), "Program { module: [Const(Float32, \"PI\", Some(Float32(3.1415925))), Func(Function(Int32, []), \"main\", Some(Block([Return(Some(Var(\"PI\")))])))] }");
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        // Constant folding is not avaliable yet
+        assert_eq!(llvm_ir, "@PI = dso_local constant float [3.1415925]\ndefine i32 @main() {\n%entry:\n%load_1 = load float, ptr @PI\n%fptoi_2 = fptosi float %load_1 to i32\nret %fptoi_2\n\n\n}\n");
+    }
+
+    #[test]
+    fn test_number_condition() {
+        let code = r#"
+            int main() {
+                float a = 5.4;
+                int b = 8;
+                int z = 0;
+                if (a) {
+                    z = 1;
+                }
+                if (b) {
+                    z = 2;
+                }
+                return z;
+            }
+        "#;
+        let program = parse(code).unwrap();
+        assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Float32, \"a\", Some(Float32(5.4)))), Decl(Var(Int32, \"b\", Some(Int32(8)))), Decl(Var(Int32, \"z\", Some(Int32(0)))), If(Var(\"a\"), Block([Expr(Some(Var(\"z\")), Int32(1))]), Block([])), If(Var(\"b\"), Block([Expr(Some(Var(\"z\")), Int32(2))]), Block([])), Return(Some(Var(\"z\")))])))] }");
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca float\nstore float 5.4, ptr %alloca_1\n%alloca_3 = alloca i32\nstore i32 8, ptr %alloca_3\n%alloca_5 = alloca i32\nstore i32 0, ptr %alloca_5\nbr label %cond0\n\n%cond0:\n%load_12 = load float, ptr %alloca_1\n%fcmp_13 = fcmp une float %load_12, 0\nbr i1 %fcmp_13, label %then1, label %alt2\n\n%then1:\nstore i32 1, ptr %alloca_5\nbr label %final3\n\n%alt2:\nbr label %final3\n\n%final3:\nbr label %cond4\n\n%cond4:\n%load_23 = load i32, ptr %alloca_3\n%icmp_24 = icmp ne i32 %load_23, 0\nbr i1 %icmp_24, label %then5, label %alt6\n\n%then5:\nstore i32 2, ptr %alloca_5\nbr label %final7\n\n%alt6:\nbr label %final7\n\n%final7:\n%load_29 = load i32, ptr %alloca_5\nret %load_29\n\n\n}\n");
+    }
+
+    #[test]
+    fn test_unary() {
+        let code = r#"
+            int main() {
+                int x = 1;
+                return !+-x;
+            }
+        "#;
+        let program = parse(code).unwrap();
+        assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Int32, \"x\", Some(Int32(1)))), Return(Some(Unary(Not, Unary(Pos, Unary(Neg, Var(\"x\"))))))])))] }");
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 1, ptr %alloca_1\n%load_3 = load i32, ptr %alloca_1\n%Sub_4 = sub i32, 0, %load_3\n%icmp_5 = icmp ne i32 %Sub_4, 0\n%Xor_6 = xor i1, %icmp_5, true\n%zext_7 = zext i1 %Xor_6 to i32\nret %zext_7\n\n\n}\n");
+    }
 }
