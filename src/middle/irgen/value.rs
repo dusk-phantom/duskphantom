@@ -41,26 +41,9 @@ impl Value {
     }
 
     /// Load the value as a constant
-    pub fn constant(self, target: ValueType) -> Result<Constant, MiddelError> {
-        // Load raw
-        let raw = match self {
+    pub fn constant(self) -> Result<Constant, MiddelError> {
+        match self {
             Value::Operand(Operand::Constant(c)) => Ok(c),
-            _ => Err(MiddelError::GenError),
-        }?;
-
-        // Return directly if type matches
-        if raw.get_type() == target {
-            return Ok(raw);
-        }
-
-        // Convert type if not match
-        match (raw, target) {
-            (Constant::Int(x), ValueType::Float) => Ok(Constant::Float(x as f32)),
-            (Constant::Float(x), ValueType::Int) => Ok(Constant::Int(x as i32)),
-            (Constant::Bool(x), ValueType::Int) => Ok(Constant::Int(x as i32)),
-            (Constant::Bool(x), ValueType::Float) => Ok(Constant::Float(x as i32 as f32)),
-            (Constant::Int(x), ValueType::Bool) => Ok(Constant::Bool(x != 0)),
-            (Constant::Float(x), ValueType::Bool) => Ok(Constant::Bool(x != 0.0)),
             _ => Err(MiddelError::GenError),
         }
     }

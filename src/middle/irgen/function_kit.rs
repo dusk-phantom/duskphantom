@@ -416,7 +416,7 @@ impl<'a> FunctionKit<'a> {
         let rhs_val = self.gen_expr(rhs)?;
 
         // Calculate maximum type for operator polymorphism
-        let max_ty = lhs_val.get_type().clone().max_with(&rhs_val.get_type());
+        let max_ty = lhs_val.get_type().max_with(&rhs_val.get_type());
 
         // Apply operation
         match op {
@@ -689,4 +689,3 @@ impl<'a> FunctionKit<'a> {
         }
     }
 }
-
