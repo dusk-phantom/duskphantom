@@ -20,6 +20,12 @@ pub fn optimize(_program: &mut Program) {
     todo!()
 }
 
+impl Default for Program {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Program {
     pub fn new() -> Self {
         let program_mem_pool = Box::pin(IRBuilder::new());

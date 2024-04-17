@@ -9,6 +9,12 @@ pub struct IRBuilder {
     inst_id: usize,
 }
 
+impl Default for IRBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl IRBuilder {
     pub fn new() -> Self {
         Self {
@@ -74,6 +80,8 @@ impl IRBuilder {
         let id = self.new_inst_id();
         unsafe {
             inst.get_manager_mut().set_id(id);
+            // FIXME: not sure if this inst's clone can be replaced by inst, need to check
+            #[allow(clippy::clone_on_copy)]
             let ic = inst.clone();
             inst.get_manager_mut().set_self_ptr(ic);
         }

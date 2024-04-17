@@ -11,9 +11,13 @@ pub struct Br {
 impl IRBuilder {
     pub fn get_ret(&mut self, return_value: Option<Operand>) -> InstPtr {
         let mut ret = self.new_instruction(Box::new(Ret {
-            manager: InstManager::new(return_value.as_ref().map_or(ValueType::Void, |x| x.get_type())),
+            manager: InstManager::new(
+                return_value
+                    .as_ref()
+                    .map_or(ValueType::Void, |x| x.get_type()),
+            ),
         }));
-        return_value.map(|x| unsafe {
+        return_value.into_iter().for_each(|x| unsafe {
             ret.get_manager_mut().add_operand(x);
         });
         ret
@@ -23,16 +27,18 @@ impl IRBuilder {
         let mut br = self.new_instruction(Box::new(Br {
             manager: InstManager::new(ValueType::Void),
         }));
-        cond.map(|x| unsafe {
-            br.get_manager_mut().add_operand(x);
-        });
+        if let Some(x) = cond {
+            unsafe {
+                br.get_manager_mut().add_operand(x);
+            }
+        }
         br
     }
 }
 
 impl Ret {
     pub fn is_void(&self) -> bool {
-        self.manager.operand.len() == 0
+        self.manager.operand.is_empty()
     }
 
     pub fn get_return_value(&self) -> &Operand {
@@ -66,7 +72,7 @@ impl Instruction for Ret {
     #[inline]
     fn gen_llvm_ir(&self) -> String {
         if self.is_void() {
-            format!("ret void")
+            "ret void".to_string()
         } else {
             format!("ret {}", self.get_return_value())
         }

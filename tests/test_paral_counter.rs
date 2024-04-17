@@ -7,7 +7,7 @@ pub mod tests {
     #[test]
     fn test_paral_counter() {
         let start = 0;
-        let end = 1000_000;
+        let end = 1_000_000;
         let counter = ParalCounter::new(0, end);
         // 开启多个线程,每个线程分配id,收集最终id
         let mut ids: HashSet<usize> = HashSet::with_capacity(end - start + 1);
@@ -20,7 +20,7 @@ pub mod tests {
                 while let Some(id) = counter.get_id() {
                     ids.insert(id);
                 }
-                return ids;
+                ids
             });
             handles.push(handle);
         }

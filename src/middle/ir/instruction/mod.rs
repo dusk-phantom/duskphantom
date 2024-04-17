@@ -424,7 +424,10 @@ impl InstManager {
 }
 
 impl InstManager {
-    pub unsafe fn set_operand(&mut self, index: usize, mut operand: Operand) {
+    /// # Safety
+    ///
+    /// FIXME: explain why it is unsafe,and describe the safety requirements
+    pub unsafe fn set_operand(&mut self, index: usize, operand: Operand) {
         if let Operand::Instruction(mut inst) = self.operand[index] {
             let user = inst.get_user_mut();
             user.iter()
@@ -434,7 +437,10 @@ impl InstManager {
         self.operand[index] = operand;
     }
 
-    pub unsafe fn add_operand(&mut self, mut operand: Operand) {
+    /// # Safety
+    ///
+    /// FIXME: explain why it is unsafe,and describe the safety requirements
+    pub unsafe fn add_operand(&mut self, operand: Operand) {
         match operand {
             Operand::Instruction(mut inst) => {
                 inst.get_user_mut().push(self.self_ptr.unwrap());
@@ -450,10 +456,16 @@ impl InstManager {
         self.operand.push(operand);
     }
 
+    /// # Safety
+    ///
+    /// FIXME: explain why it is unsafe,and describe the safety requirements
     pub unsafe fn set_id(&mut self, id: usize) {
         self.id = Some(id);
     }
 
+    /// # Safety
+    ///
+    /// FIXME: explain why it is unsafe,and describe the safety requirements
     pub unsafe fn set_self_ptr(&mut self, self_ptr: InstPtr) {
         self.self_ptr = Some(self_ptr);
     }

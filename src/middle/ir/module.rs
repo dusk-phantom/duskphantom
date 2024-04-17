@@ -13,7 +13,7 @@ pub struct Module {
 }
 
 impl Module {
-    pub fn new(mut mem_pool: ObjPtr<IRBuilder>) -> Self {
+    pub fn new(mem_pool: ObjPtr<IRBuilder>) -> Self {
         Self {
             functions: Vec::new(),
             mem_pool,

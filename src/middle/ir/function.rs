@@ -58,7 +58,7 @@ impl Function {
 
     pub fn gen_llvm_ir(&self) -> String {
         let mut ir = format!("define {} @{}(", self.return_type, self.name);
-        if self.params.len() != 0 {
+        if !self.params.is_empty() {
             for param in self.params.iter() {
                 ir += &format!("{}, ", param.as_ref());
             }
@@ -109,11 +109,13 @@ impl Parameter {
     pub fn get_user(&self) -> &[InstPtr] {
         &self.user
     }
-
+    /// # Safety
+    /// FIXME: explain why it is unsafe,and describe the safety requirements
     pub unsafe fn add_user(&mut self, inst: InstPtr) {
         self.user.push(inst);
     }
-
+    /// # Safety
+    /// FIXME: explain why it is unsafe,and describe the safety requirements
     pub unsafe fn remove_user(&mut self, inst: InstPtr) {
         self.user
             .iter()

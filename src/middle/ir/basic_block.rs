@@ -43,7 +43,10 @@ impl BasicBlock {
         }
     }
 
+    /// # Safety
+    ///
     /// Inits `BasicBlock` after memory allocation.
+    ///
     /// This is an ugly code that is a compromise in design. You should not call this function.
     pub unsafe fn init_bb(mut bb: BBPtr) {
         let mut head = bb.head_inst;
@@ -115,7 +118,7 @@ impl BasicBlock {
     /// Sets which `BasicBlock` to jump to when the condition is true.
     pub fn set_true_bb(&mut self, mut bb: BBPtr) {
         let self_ptr = ObjPtr::new(self);
-        if self.succ_bbs.len() == 0 {
+        if self.succ_bbs.is_empty() {
             self.succ_bbs.push(bb);
         } else {
             let mut next = self.succ_bbs[0];

@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use super::*;
 
 impl IRBuilder {
@@ -112,9 +110,17 @@ impl ICmp {
     pub fn get_rhs(&self) -> &Operand {
         &self.get_operand()[1]
     }
+
+    /// # Safety
+    ///
+    /// FIXME: explain why it is unsafe,and describe the safety requirements
     pub unsafe fn set_lhs(&mut self, operand: Operand) {
         self.manager.set_operand(0, operand);
     }
+
+    /// # Safety
+    ///
+    /// FIXME: explain why it is unsafe,and describe the safety requirements
     pub unsafe fn set_rhs(&mut self, operand: Operand) {
         self.manager.set_operand(1, operand);
     }
@@ -196,9 +202,17 @@ impl FCmp {
     pub fn get_rhs(&self) -> &Operand {
         &self.get_operand()[1]
     }
+
+    /// # Safety
+    ///
+    /// FIXME: explain why it is unsafe,and describe the safety requirements
     pub unsafe fn set_lhs(&mut self, operand: Operand) {
         self.manager.set_operand(0, operand);
     }
+
+    /// # Safety
+    ///
+    /// FIXME: explain why it is unsafe,and describe the safety requirements
     pub unsafe fn set_rhs(&mut self, operand: Operand) {
         self.manager.set_operand(1, operand);
     }
@@ -233,6 +247,9 @@ impl Phi {
     pub fn get_incoming_values(&self) -> &[(Operand, BBPtr)] {
         &self.incoming_values
     }
+    /// # Safety
+    ///
+    /// FIXME: explain why it is unsafe,and describe the safety requirements
     pub unsafe fn set_incoming_values(&mut self, incoming_values: Vec<(Operand, BBPtr)>) {
         self.incoming_values = incoming_values;
     }
@@ -278,7 +295,12 @@ impl Display for Call {
 impl Instruction for Call {
     gen_common_code!(Call, Call);
     fn gen_llvm_ir(&self) -> String {
-        let mut res = format!("{} = call {} @{}(", self, self.get_value_type(), &self.func.name);
+        let mut res = format!(
+            "{} = call {} @{}(",
+            self,
+            self.get_value_type(),
+            &self.func.name
+        );
         for op in self.get_operand() {
             res.push_str(&format!("{} {}, ", op.get_type(), op));
         }
