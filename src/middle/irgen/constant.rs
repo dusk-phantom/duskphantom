@@ -1,5 +1,5 @@
 use crate::errors::MiddelError;
-use crate::frontend::{Expr, Type};
+use crate::frontend::Type;
 use crate::middle::ir::{Constant, ValueType};
 use crate::middle::irgen::util;
 use std::cmp;
@@ -23,38 +23,10 @@ pub fn type_to_const(ty: &Type) -> Result<Vec<Constant>, MiddelError> {
     }
 }
 
-/// Convert a constant expression to a constant
-pub fn expr_to_const(val: &Expr) -> Result<Vec<Constant>, MiddelError> {
-    match val {
-        Expr::Var(_) => Err(MiddelError::GenError),
-        Expr::Pack(pack) => pack
-            .iter()
-            // Convert inner expression to constant value
-            .map(expr_to_const)
-            // Collect as a large result
-            .collect::<Result<Vec<Vec<_>>, _>>()
-            // Flatten inner vec
-            .map(|v| v.into_iter().flatten().collect()),
-        Expr::Map(_) => Err(MiddelError::GenError),
-        Expr::Index(_, _) => Err(MiddelError::GenError),
-        Expr::Field(_, _) => Err(MiddelError::GenError),
-        Expr::Select(_, _) => Err(MiddelError::GenError),
-        Expr::Int32(i) => Ok(vec![Constant::Int(*i)]),
-        Expr::Float32(f) => Ok(vec![Constant::Float(*f)]),
-        Expr::String(_) => Err(MiddelError::GenError),
-        Expr::Char(_) => Err(MiddelError::GenError),
-        Expr::Bool(b) => Ok(vec![Constant::Bool(*b)]),
-        Expr::Call(_, _) => Err(MiddelError::GenError),
-        Expr::Unary(_, _) => Err(MiddelError::GenError),
-        Expr::Binary(_, _, _) => Err(MiddelError::GenError),
-        Expr::Conditional(_, _, _) => Err(MiddelError::GenError),
-    }
-}
-
 /// Type cast for constant
-impl Into<i32> for Constant {
-    fn into(self) -> i32 {
-        match self {
+impl From<Constant> for i32 {
+    fn from(val: Constant) -> Self {
+        match val {
             Constant::Int(x) => x,
             Constant::Float(x) => x as i32,
             Constant::Bool(x) => x as i32,
@@ -62,9 +34,9 @@ impl Into<i32> for Constant {
     }
 }
 
-impl Into<f32> for Constant {
-    fn into(self) -> f32 {
-        match self {
+impl From<Constant> for f32 {
+    fn from(val: Constant) -> Self {
+        match val {
             Constant::Int(x) => x as f32,
             Constant::Float(x) => x,
             Constant::Bool(x) => x as i32 as f32,
@@ -72,9 +44,9 @@ impl Into<f32> for Constant {
     }
 }
 
-impl Into<bool> for Constant {
-    fn into(self) -> bool {
-        match self {
+impl From<Constant> for bool {
+    fn from(val: Constant) -> Self {
+        match val {
             Constant::Int(x) => x != 0,
             Constant::Float(x) => x != 0.0,
             Constant::Bool(x) => x,

@@ -1,6 +1,6 @@
 use crate::errors::MiddelError;
 use crate::frontend::{BinaryOp, Decl, Expr, Type, UnaryOp};
-use crate::middle::ir::{Constant, FunPtr, ValueType};
+use crate::middle::ir::{Constant, FunPtr};
 use crate::middle::irgen::function_kit::FunctionKit;
 use crate::middle::irgen::value::Value;
 use crate::middle::irgen::{constant, value_type};
