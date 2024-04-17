@@ -11,6 +11,8 @@ pub enum UnaryOp {
     Inv,
     /// `-`
     Neg,
+    /// `+`
+    Pos,
     /// `++`
     Inc,
     /// `--`
@@ -33,7 +35,10 @@ pub fn unary_op(input: &mut &str) -> PResult<UnaryOp> {
             pad("--").value(UnaryOp::Dec),
             pad('-').value(UnaryOp::Neg),
         )),
-        '+' => pad("++").value(UnaryOp::Inc),
+        '+' => alt((
+            pad("++").value(UnaryOp::Inc),
+            pad('+').value(UnaryOp::Pos),
+        )),
         '*' => pad('*').value(UnaryOp::Ind),
         '&' => pad('&').value(UnaryOp::Addr),
         's' => keyword("sizeof").value(UnaryOp::Sizeof),
