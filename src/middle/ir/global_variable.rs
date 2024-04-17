@@ -62,11 +62,13 @@ impl GlobalVariable {
     pub fn get_user(&self) -> &[InstPtr] {
         &self.user
     }
-
+    /// # Safety
+    /// FIXME: explain why it is unsafe,and describe the safety requirements
     pub unsafe fn add_user(&mut self, inst: InstPtr) {
         self.user.push(inst);
     }
-
+    /// # Safety
+    /// FIXME: explain why it is unsafe,and describe the safety requirements
     pub unsafe fn remove_user(&mut self, inst: InstPtr) {
         self.user
             .iter()

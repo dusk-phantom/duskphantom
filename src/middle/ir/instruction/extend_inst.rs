@@ -55,6 +55,8 @@ impl ZextTo {
         &self.get_operand()[0]
     }
 
+    /// # Safety
+    ///
     /// Set the operand which will be zero extended
     pub unsafe fn set_src(&mut self, src: Operand) {
         self.manager.set_operand(0, src);
@@ -84,7 +86,9 @@ impl SextTo {
     pub fn get_src(&self) -> &Operand {
         &self.get_operand()[0]
     }
-    /// Set the operand which will be sign extended
+    ///  # Safety
+    ///
+    ///  Set the operand which will be sign extended
     pub unsafe fn set_src(&mut self, src: Operand) {
         self.manager.set_operand(0, src);
     }
@@ -112,6 +116,8 @@ impl ItoFp {
     pub fn get_src(&self) -> &Operand {
         &self.get_operand()[0]
     }
+    /// # Safety
+    ///
     /// Set the operand which will be converted
     pub unsafe fn set_src(&mut self, src: Operand) {
         self.manager.set_operand(0, src);
@@ -140,6 +146,8 @@ impl FpToI {
     pub fn get_src(&self) -> &Operand {
         &self.get_operand()[0]
     }
+    /// # Safety
+    ///
     /// Set the operand which will be converted
     pub unsafe fn set_src(&mut self, src: Operand) {
         self.manager.set_operand(0, src);

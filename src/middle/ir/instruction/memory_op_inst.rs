@@ -163,8 +163,12 @@ impl Load {
         &self.get_operand()[0]
     }
 
+    /// # Safety
+    ///
     /// Set the pointer to the value to be loaded
+    ///
     /// # Arguments
+    ///
     /// * `ptr` - The pointer to the value to be loaded
     pub unsafe fn set_ptr(&mut self, ptr: Operand) {
         self.get_manager_mut().set_operand(0, ptr);
@@ -208,6 +212,8 @@ impl Store {
         &self.get_operand()[1]
     }
 
+    /// # Safety
+    ///
     /// Set the value to be stored
     /// # Arguments
     /// * `value` - The value to be stored
@@ -215,6 +221,8 @@ impl Store {
         self.get_manager_mut().set_operand(0, value);
     }
 
+    /// # Safety
+    ///
     /// Set the pointer to the value to be stored
     /// # Arguments
     /// * `ptr` - The pointer to the value to be stored
@@ -262,6 +270,8 @@ impl GetElementPtr {
         &self.get_operand()[0]
     }
 
+    /// # Safety
+    ///
     /// Set the pointer to the array or the struct
     /// # Arguments
     /// * `ptr` - The pointer to the array or the struct
@@ -276,12 +286,12 @@ impl GetElementPtr {
         &self.get_operand()[1..]
     }
 
+    /// # Safety
+    ///
     /// Set the index of the element to be accessed
     /// # Arguments
     /// * `index` - The index of the element to be accessed
     pub unsafe fn set_index(&mut self, index: Vec<Operand>) {
-        let operand_len = self.get_operand().len();
-
         for (i, idx) in index.into_iter().enumerate() {
             self.get_manager_mut().set_operand(i + 1, idx);
         }
