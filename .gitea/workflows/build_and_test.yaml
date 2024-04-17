@@ -27,11 +27,11 @@ jobs:
         run: cargo build --verbose
       - name: Test Rust code
         run: cargo test --verbose
-      # - name: Build Rust code for release
-      #   run: cargo build --release --verbose
-      # - name: Test Rust code for release
-      #   run: cargo test --release --verbose
+      - name: Build Rust code for release
+        run: cargo build --release --verbose
+      - name: Test Rust code for release
+        run: cargo test --release --verbose
+      - name: Check for clippy warnings
+        run: cargo clippy --all-targets --all-features -- -D warnings
       # - name: Check code formatting
       #   run: cargo fmt --all -- --check
-      # - name: Check for clippy warnings
-      #   run: cargo clippy --all-targets --all-features -- -D warnings
