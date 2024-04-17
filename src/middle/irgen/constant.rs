@@ -2,6 +2,7 @@ use crate::errors::MiddelError;
 use crate::frontend::{Expr, Type};
 use crate::middle::ir::Constant;
 use crate::middle::irgen::util;
+use std::ops;
 
 /// Convert a type to its default constant
 pub fn type_to_const(ty: &Type) -> Result<Vec<Constant>, MiddelError> {
@@ -48,3 +49,6 @@ pub fn expr_to_const(val: &Expr) -> Result<Vec<Constant>, MiddelError> {
         Expr::Conditional(_, _, _) => Err(MiddelError::GenError),
     }
 }
+
+/// Override operators for constant
+impl 
