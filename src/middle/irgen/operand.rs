@@ -1,5 +1,6 @@
 use crate::errors::MiddelError;
-use crate::middle::ir::{Operand, ValueType};
+use crate::middle::ir::instruction::misc_inst::{FCmpOp, ICmpOp};
+use crate::middle::ir::{Constant, Operand, ValueType};
 use crate::middle::irgen::function_kit::FunctionKit;
 
 /// Convenient methods for operand
@@ -33,6 +34,28 @@ impl Operand {
                 // Convert to int first and then float
                 let inst = kit.program.mem_pool.get_zext(self);
                 let inst = kit.program.mem_pool.get_itofp(inst.into());
+                kit.exit.push_back(inst);
+                Ok(inst.into())
+            }
+            (ValueType::Int, ValueType::Bool) => {
+                // Direct convert
+                let inst = kit.program.mem_pool.get_icmp(
+                    ICmpOp::Ne, 
+                    ValueType::Int, 
+                    self, 
+                    Constant::Int(0).into()
+                );
+                kit.exit.push_back(inst);
+                Ok(inst.into())
+            }
+            (ValueType::Float, ValueType::Bool) => {
+                // Compare with 0.0 (NaN is treated as true)
+                let inst = kit.program.mem_pool.get_fcmp(
+                    FCmpOp::Une, 
+                    ValueType::Float, 
+                    self, 
+                    Constant::Float(0.0).into()
+                );
                 kit.exit.push_back(inst);
                 Ok(inst.into())
             }
