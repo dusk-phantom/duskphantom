@@ -40,7 +40,7 @@ impl<'a> ProgramKit<'a> {
 
                 // Get initializer
                 let initializer = match val {
-                    Some(v) => constant::expr_to_const(v)?,
+                    Some(v) => vec![self.gen_const_expr(v)?.constant()?],
                     None => constant::type_to_const(ty)?,
                 };
 
@@ -140,7 +140,7 @@ impl<'a> ProgramKit<'a> {
     }
 
     /// Generate constant expression
-    pub fn gen_expr(&mut self, expr: &Expr) -> Result<Value, MiddelError> {
+    pub fn gen_const_expr(&mut self, expr: &Expr) -> Result<Value, MiddelError> {
         match expr {
             Expr::Var(x) => {
                 // Ensure variable is defined
@@ -154,7 +154,7 @@ impl<'a> ProgramKit<'a> {
             // Some memory copy operation is required to process arrays
             Expr::Pack(_) => Err(MiddelError::GenError),
             Expr::Map(_) => Err(MiddelError::GenError),
-            Expr::Index(x, v) => Err(MiddelError::GenError),
+            Expr::Index(_, _) => Err(MiddelError::GenError),
             Expr::Field(_, _) => Err(MiddelError::GenError),
             Expr::Select(_, _) => Err(MiddelError::GenError),
             Expr::Int32(x) => Ok(Constant::Int(*x).into()),
@@ -162,316 +162,61 @@ impl<'a> ProgramKit<'a> {
             Expr::String(_) => Err(MiddelError::GenError),
             Expr::Char(_) => Err(MiddelError::GenError),
             Expr::Bool(_) => Err(MiddelError::GenError),
-            Expr::Call(func, args) => Err(MiddelError::GenError),
-            Expr::Unary(op, expr) => self.gen_unary(op, expr),
-            Expr::Binary(op, lhs, rhs) => self.gen_binary(op, lhs, rhs),
+            Expr::Call(_, _) => Err(MiddelError::GenError),
+            Expr::Unary(op, expr) => self.gen_const_unary(op, expr),
+            Expr::Binary(op, lhs, rhs) => self.gen_const_binary(op, lhs, rhs),
             Expr::Conditional(_, _, _) => Err(MiddelError::GenError),
         }
     }
 
     /// Generate a unary expression
-    pub fn gen_unary(&mut self, op: &UnaryOp, expr: &Expr) -> Result<Value, MiddelError> {
+    pub fn gen_const_unary(&mut self, op: &UnaryOp, expr: &Expr) -> Result<Value, MiddelError> {
         // Generate constant
-        let val = self.gen_expr(expr)?;
+        let val = self.gen_const_expr(expr)?.constant()?;
 
         // Apply operation
         match op {
-            UnaryOp::Neg => match val {
-                Constant::Int(i) => Ok(Constant::Int(-i).into()),
-                Constant::Float(i) => Ok(Constant::Float(-i).into()),
-                Constant::Bool(i) => Ok(Constant::Int(-Into::<i32>::into(i)).into()),
-            },
+            UnaryOp::Neg => Ok((-val).into()),
             UnaryOp::Pos => Ok(val.into()),
-            UnaryOp::Not => match val {
-                Constant::Int(i) => Ok(Constant::Bool(i != 0).into()),
-                Constant::Float(i) => Ok(Constant::Bool(i != 0.0).into()),
-                Constant::Bool(i) => Ok(Constant::Bool(i).into()),
-            },
+            UnaryOp::Not => Ok((!val).into()),
             _ => Err(MiddelError::GenError),
         }
     }
 
     /// Generate a binary expression
-    pub fn gen_binary(
+    pub fn gen_const_binary(
         &mut self,
         op: &BinaryOp,
         lhs: &Expr,
         rhs: &Expr,
     ) -> Result<Value, MiddelError> {
         // Generate constants
-        let lhs_val = self.gen_expr(lhs)?.constant()?;
-        let rhs_val = self.gen_expr(rhs)?.constant()?;
-
-        // Calculate maximum type for operator polymorphism
-        let max_ty = lhs_val.get_type().clone().max_with(&rhs_val.get_type());
+        let lv = self.gen_const_expr(lhs)?.constant()?;
+        let rv = self.gen_const_expr(rhs)?.constant()?;
 
         // Apply operation
         match op {
-            BinaryOp::Add => {
-                // Load operand as maximum type
-                let lop = lhs_val.load(max_ty.clone(), self)?;
-                let rop = rhs_val.load(max_ty.clone(), self)?;
-
-                // Add "add" instruction, operand is the result of the instruction
-                match max_ty {
-                    ValueType::Int => {
-                        let inst = self.program.mem_pool.get_add(lop, rop);
-                        self.exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
-                    }
-                    ValueType::Float => {
-                        let inst = self.program.mem_pool.get_fadd(lop, rop);
-                        self.exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
-                    }
-                    _ => Err(MiddelError::GenError),
-                }
-            }
-            BinaryOp::Sub => {
-                // Load operand as maximum type
-                let lop = lhs_val.load(max_ty.clone(), self)?;
-                let rop = rhs_val.load(max_ty.clone(), self)?;
-
-                // Add "sub" instruction, operand is the result of the instruction
-                match max_ty {
-                    ValueType::Int => {
-                        let inst = self.program.mem_pool.get_sub(lop, rop);
-                        self.exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
-                    }
-                    ValueType::Float => {
-                        let inst = self.program.mem_pool.get_fsub(lop, rop);
-                        self.exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
-                    }
-                    _ => Err(MiddelError::GenError),
-                }
-            }
-            BinaryOp::Mul => {
-                // Load operand as maximum type
-                let lop = lhs_val.load(max_ty.clone(), self)?;
-                let rop = rhs_val.load(max_ty.clone(), self)?;
-
-                // Add "mul" instruction, operand is the result of the instruction
-                match max_ty {
-                    ValueType::Int => {
-                        let inst = self.program.mem_pool.get_mul(lop, rop);
-                        self.exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
-                    }
-                    ValueType::Float => {
-                        let inst = self.program.mem_pool.get_fmul(lop, rop);
-                        self.exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
-                    }
-                    _ => Err(MiddelError::GenError),
-                }
-            }
-            BinaryOp::Div => {
-                // Load operand as maximum type
-                let lop = lhs_val.load(max_ty.clone(), self)?;
-                let rop = rhs_val.load(max_ty.clone(), self)?;
-
-                // Add "div" instruction, operand is the result of the instruction
-                match max_ty {
-                    ValueType::Int => {
-                        let inst = self.program.mem_pool.get_sdiv(lop, rop);
-                        self.exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
-                    }
-                    ValueType::Float => {
-                        let inst = self.program.mem_pool.get_fdiv(lop, rop);
-                        self.exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
-                    }
-                    _ => Err(MiddelError::GenError),
-                }
-            }
-            BinaryOp::Mod => {
-                // Load operand as integers
-                let lop = lhs_val.load(ValueType::Int, self)?;
-                let rop = rhs_val.load(ValueType::Int, self)?;
-
-                // Add "signed rem" instruction, operand is the result of the instruction
-                let inst = self.program.mem_pool.get_srem(lop, rop);
-                self.exit.push_back(inst);
-                Ok(Value::Operand(inst.into()))
-            }
-            // Bitwise operation on int is not required
+            BinaryOp::Add => Ok((lv + rv).into()),
+            BinaryOp::Sub => Ok((lv - rv).into()),
+            BinaryOp::Mul => Ok((lv * rv).into()),
+            BinaryOp::Div => Ok((lv / rv).into()),
+            BinaryOp::Mod => Ok((lv % rv).into()),
             BinaryOp::Shr => Err(MiddelError::GenError),
             BinaryOp::Shl => Err(MiddelError::GenError),
             BinaryOp::BitAnd => Err(MiddelError::GenError),
             BinaryOp::BitOr => Err(MiddelError::GenError),
             BinaryOp::BitXor => Err(MiddelError::GenError),
-            BinaryOp::Gt => {
-                // Load operand as maximum type
-                let lop = lhs_val.load(max_ty.clone(), self)?;
-                let rop = rhs_val.load(max_ty.clone(), self)?;
-
-                // Add compare instruction, operand is the result of the instruction
-                match max_ty {
-                    ValueType::Int => {
-                        let inst = self
-                            .program
-                            .mem_pool
-                            .get_icmp(ICmpOp::Sgt, max_ty, lop, rop);
-                        self.exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
-                    }
-                    ValueType::Float => {
-                        let inst = self
-                            .program
-                            .mem_pool
-                            .get_fcmp(FCmpOp::Ugt, max_ty, lop, rop);
-                        self.exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
-                    }
-                    _ => Err(MiddelError::GenError),
-                }
-            }
-            BinaryOp::Lt => {
-                // Load operand as maximum type
-                let lop = lhs_val.load(max_ty.clone(), self)?;
-                let rop = rhs_val.load(max_ty.clone(), self)?;
-
-                // Add compare instruction, operand is the result of the instruction
-                match max_ty {
-                    ValueType::Int => {
-                        let inst = self
-                            .program
-                            .mem_pool
-                            .get_icmp(ICmpOp::Slt, max_ty, lop, rop);
-                        self.exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
-                    }
-                    ValueType::Float => {
-                        let inst = self
-                            .program
-                            .mem_pool
-                            .get_fcmp(FCmpOp::Ult, max_ty, lop, rop);
-                        self.exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
-                    }
-                    _ => Err(MiddelError::GenError),
-                }
-            }
-            BinaryOp::Ge => {
-                // Load operand as maximum type
-                let lop = lhs_val.load(max_ty.clone(), self)?;
-                let rop = rhs_val.load(max_ty.clone(), self)?;
-
-                // Add compare instruction, operand is the result of the instruction
-                match max_ty {
-                    ValueType::Int => {
-                        let inst = self
-                            .program
-                            .mem_pool
-                            .get_icmp(ICmpOp::Sge, max_ty, lop, rop);
-                        self.exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
-                    }
-                    ValueType::Float => {
-                        let inst = self
-                            .program
-                            .mem_pool
-                            .get_fcmp(FCmpOp::Uge, max_ty, lop, rop);
-                        self.exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
-                    }
-                    _ => Err(MiddelError::GenError),
-                }
-            }
-            BinaryOp::Le => {
-                // Load operand as maximum type
-                let lop = lhs_val.load(max_ty.clone(), self)?;
-                let rop = rhs_val.load(max_ty.clone(), self)?;
-
-                // Add compare instruction, operand is the result of the instruction
-                match max_ty {
-                    ValueType::Int => {
-                        let inst = self
-                            .program
-                            .mem_pool
-                            .get_icmp(ICmpOp::Sle, max_ty, lop, rop);
-                        self.exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
-                    }
-                    ValueType::Float => {
-                        let inst = self
-                            .program
-                            .mem_pool
-                            .get_fcmp(FCmpOp::Ule, max_ty, lop, rop);
-                        self.exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
-                    }
-                    _ => Err(MiddelError::GenError),
-                }
-            }
-            BinaryOp::Eq => {
-                // Load operand as maximum type
-                let lop = lhs_val.load(max_ty.clone(), self)?;
-                let rop = rhs_val.load(max_ty.clone(), self)?;
-
-                // Add compare instruction, operand is the result of the instruction
-                match max_ty {
-                    ValueType::Int => {
-                        let inst = self.program.mem_pool.get_icmp(ICmpOp::Eq, max_ty, lop, rop);
-                        self.exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
-                    }
-                    ValueType::Float => {
-                        let inst = self
-                            .program
-                            .mem_pool
-                            .get_fcmp(FCmpOp::Ueq, max_ty, lop, rop);
-                        self.exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
-                    }
-                    _ => Err(MiddelError::GenError),
-                }
-            }
-            BinaryOp::Ne => {
-                // Load operand as maximum type
-                let lop = lhs_val.load(max_ty.clone(), self)?;
-                let rop = rhs_val.load(max_ty.clone(), self)?;
-
-                // Add compare instruction, operand is the result of the instruction
-                match max_ty {
-                    ValueType::Int => {
-                        let inst = self.program.mem_pool.get_icmp(ICmpOp::Ne, max_ty, lop, rop);
-                        self.exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
-                    }
-                    ValueType::Float => {
-                        let inst = self
-                            .program
-                            .mem_pool
-                            .get_fcmp(FCmpOp::Une, max_ty, lop, rop);
-                        self.exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
-                    }
-                    _ => Err(MiddelError::GenError),
-                }
-            }
+            BinaryOp::Gt => Ok(Constant::Bool(lv > rv).into()),
+            BinaryOp::Lt => Ok(Constant::Bool(lv < rv).into()),
+            BinaryOp::Ge => Ok(Constant::Bool(lv >= rv).into()),
+            BinaryOp::Le => Ok(Constant::Bool(lv <= rv).into()),
+            BinaryOp::Eq => Ok(Constant::Bool(lv == rv).into()),
+            BinaryOp::Ne => Ok(Constant::Bool(lv != rv).into()),
             BinaryOp::And => {
-                // Load operands as bool
-                let lop = lhs_val.load(ValueType::Bool, self)?;
-                let rop = rhs_val.load(ValueType::Bool, self)?;
-
-                // Add "and" instruction, operand is the result of the instruction
-                let inst = self.program.mem_pool.get_and(lop, rop);
-                self.exit.push_back(inst);
-                Ok(Value::Operand(inst.into()))
+                Ok(Constant::Bool(Into::<bool>::into(lv) && Into::<bool>::into(rv)).into())
             }
             BinaryOp::Or => {
-                // Load operands as bool
-                let lop = lhs_val.load(ValueType::Bool, self)?;
-                let rop = rhs_val.load(ValueType::Bool, self)?;
-
-                // Add "or" instruction, operand is the result of the instruction
-                let inst = self.program.mem_pool.get_or(lop, rop);
-                self.exit.push_back(inst);
-                Ok(Value::Operand(inst.into()))
+                Ok(Constant::Bool(Into::<bool>::into(lv) || Into::<bool>::into(rv)).into())
             }
         }
     }
