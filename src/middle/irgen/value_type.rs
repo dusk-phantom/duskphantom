@@ -1,4 +1,3 @@
-use crate::errors::MiddelError;
 use crate::frontend::Type;
 use crate::middle::ir::ValueType;
 
@@ -13,9 +12,10 @@ impl ValueType {
     /// Higher is more precise
     pub fn to_precision_level(&self) -> i32 {
         match self {
+            // All boolean should be converted to int when applying `+` and etc.
             ValueType::Bool => 1,
-            ValueType::Int => 2,
-            ValueType::Float => 3,
+            ValueType::Int => 1,
+            ValueType::Float => 2,
             _ => 0,
         }
     }
@@ -23,23 +23,23 @@ impl ValueType {
     /// Convert a precision level to a value type
     pub fn from_precision_level(level: i32) -> Self {
         match level {
-            1 => ValueType::Bool,
-            2 => ValueType::Int,
-            3 => ValueType::Float,
+            1 => ValueType::Int,
+            2 => ValueType::Float,
             _ => ValueType::Void,
         }
     }
 
     /// Max this type with another type
     /// Return more precise one
-    pub fn max_with(&self, b: &Self) -> Result<Self, MiddelError> {
+    /// If types are not number, return void
+    pub fn max_with(&self, b: &Self) -> Self {
         if self.is_num() && b.is_num() {
             let a_lv = self.to_precision_level();
             let b_lv = b.to_precision_level();
             let max_lv = if a_lv > b_lv { a_lv } else { b_lv };
-            Ok(ValueType::from_precision_level(max_lv))
+            ValueType::from_precision_level(max_lv)
         } else {
-            Err(MiddelError::GenError)
+            ValueType::Void
         }
     }
 }

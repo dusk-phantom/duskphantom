@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use crate::errors::MiddelError;
 use crate::{frontend, middle};
 use crate::frontend::{Decl, Type};
-use crate::middle::ir::{FunPtr, ValueType};
+use crate::middle::ir::FunPtr;
 use crate::middle::irgen::{constant, value_type};
 use crate::middle::irgen::function_kit::FunctionKit;
 use crate::middle::irgen::value::Value;
@@ -11,7 +11,6 @@ use crate::middle::irgen::value::Value;
 pub struct ProgramKit<'a> {
     pub env: HashMap<String, Value>,
     pub fun_env: HashMap<String, FunPtr>,
-    pub ctx: HashMap<String, ValueType>,
     pub program: &'a mut middle::Program,
 }
 
@@ -120,7 +119,6 @@ impl<'a> ProgramKit<'a> {
                     program: self.program,
                     env: self.env.clone(),
                     fun_env: cloned_fun_env,
-                    ctx: self.ctx.clone(),
                     entry,
                     exit: entry,
                     break_to: None,
