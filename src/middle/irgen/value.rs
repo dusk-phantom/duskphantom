@@ -1,4 +1,5 @@
 use crate::errors::MiddelError;
+use crate::middle::ir::instruction::misc_inst::{FCmpOp, ICmpOp};
 use crate::middle::ir::{Constant, Operand, ValueType};
 use crate::middle::irgen::function_kit::FunctionKit;
 
@@ -40,16 +41,74 @@ impl Value {
     }
 
     /// Load the value as an operand
-    pub fn load(self, kit: &mut FunctionKit) -> Operand {
+    pub fn load(self, target: ValueType, kit: &mut FunctionKit) -> Result<Operand, MiddelError> {
+        // Load raw
         let ty = self.get_type();
-        match self {
+        let raw = match self {
             Value::Operand(op) => op,
             Value::Pointer(op) => {
                 // Add instruction to exit
-                let inst = kit.program.mem_pool.get_load(ty, op);
+                let inst = kit.program.mem_pool.get_load(ty.clone(), op);
                 kit.exit.push_back(inst);
                 inst.into()
             }
+        };
+
+        // Return directly if type matches
+        if ty == target {
+            return Ok(raw);
+        }
+
+        // Convert type if not match
+        match (ty, target) {
+            (ValueType::Int, ValueType::Float) => {
+                // Direct convert
+                let inst = kit.program.mem_pool.get_itofp(raw);
+                kit.exit.push_back(inst);
+                Ok(inst.into())
+            }
+            (ValueType::Float, ValueType::Int) => {
+                // Direct convert
+                let inst = kit.program.mem_pool.get_fptoi(raw);
+                kit.exit.push_back(inst);
+                Ok(inst.into())
+            }
+            (ValueType::Bool, ValueType::Int) => {
+                // Direct convert
+                let inst = kit.program.mem_pool.get_zext(raw);
+                kit.exit.push_back(inst);
+                Ok(inst.into())
+            }
+            (ValueType::Bool, ValueType::Float) => {
+                // Convert to int first and then float
+                let inst = kit.program.mem_pool.get_zext(raw);
+                let inst = kit.program.mem_pool.get_itofp(inst.into());
+                kit.exit.push_back(inst);
+                Ok(inst.into())
+            }
+            (ValueType::Int, ValueType::Bool) => {
+                // Direct convert
+                let inst = kit.program.mem_pool.get_icmp(
+                    ICmpOp::Ne,
+                    ValueType::Int,
+                    raw,
+                    Constant::Int(0).into(),
+                );
+                kit.exit.push_back(inst);
+                Ok(inst.into())
+            }
+            (ValueType::Float, ValueType::Bool) => {
+                // Compare with 0.0 (NaN is treated as true)
+                let inst = kit.program.mem_pool.get_fcmp(
+                    FCmpOp::Une,
+                    ValueType::Float,
+                    raw,
+                    Constant::Float(0.0).into(),
+                );
+                kit.exit.push_back(inst);
+                Ok(inst.into())
+            }
+            _ => Err(MiddelError::GenError),
         }
     }
 

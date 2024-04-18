@@ -1,17 +1,16 @@
-use std::collections::HashMap;
 use crate::errors::MiddelError;
-use crate::{frontend, middle};
 use crate::frontend::{BinaryOp, Decl, Expr, Stmt, UnaryOp};
-use crate::middle::ir::{BBPtr, Constant, FunPtr, Operand, ValueType};
-use crate::middle::ir::instruction::misc_inst::ICmpOp;
-use crate::middle::irgen::{value, value_type};
+use crate::middle::ir::instruction::misc_inst::{FCmpOp, ICmpOp};
+use crate::middle::ir::{BBPtr, Constant, FunPtr, ValueType};
 use crate::middle::irgen::value::Value;
+use crate::middle::irgen::{value, value_type};
+use crate::{frontend, middle};
+use std::collections::HashMap;
 
 /// Kit for translating a function to middle IR
 pub struct FunctionKit<'a> {
     pub env: HashMap<String, Value>,
     pub fun_env: HashMap<String, FunPtr>,
-    pub ctx: HashMap<String, ValueType>,
     pub program: &'a mut middle::Program,
     pub entry: BBPtr,
     pub exit: BBPtr,
@@ -21,16 +20,19 @@ pub struct FunctionKit<'a> {
     pub counter: &'a mut usize,
 }
 
-
 /// A function kit can generate statements
 impl<'a> FunctionKit<'a> {
     /// Generate a new function kit
-    pub fn gen_function_kit(&mut self, entry: BBPtr, break_to: Option<BBPtr>, continue_to: Option<BBPtr>) -> FunctionKit {
+    pub fn gen_function_kit(
+        &mut self,
+        entry: BBPtr,
+        break_to: Option<BBPtr>,
+        continue_to: Option<BBPtr>,
+    ) -> FunctionKit {
         FunctionKit {
             program: self.program,
             env: self.env.clone(),
             fun_env: self.fun_env.clone(),
-            ctx: self.ctx.clone(),
             entry,
             // Default exit is entry
             exit: entry,
@@ -40,7 +42,7 @@ impl<'a> FunctionKit<'a> {
             counter: self.counter,
         }
     }
-    
+
     /// Generate a unique basic block name
     pub fn unique_name(&mut self, base: &str) -> String {
         let name = format!("{}{}", base, self.counter);
@@ -58,25 +60,25 @@ impl<'a> FunctionKit<'a> {
             }
             Stmt::Expr(opt_left_val, expr) => {
                 // Generate expression
-                let operand = self.gen_expr(expr)?.load(self);
+                let expr_val = self.gen_expr(expr)?;
                 match opt_left_val {
                     // Exist left value, try to add result to env
                     Some(left_val) => match left_val {
                         frontend::LVal::Nothing => Err(MiddelError::GenError),
                         frontend::LVal::Var(id) => {
                             // Find variable in environment
-                            let val = {
+                            let env_val = {
                                 let Some(v @ Value::Pointer(_)) = self.env.get(id) else {
                                     return Err(MiddelError::GenError);
                                 };
                                 v.clone()
                             };
 
-                            // Type check and type cast
-                            let operand = operand.conv(val.get_type(), self)?;
+                            // Load as env variable type
+                            let operand = expr_val.load(env_val.get_type(), self)?;
 
                             // Assign to value
-                            val.assign(self, operand)?;
+                            env_val.assign(self, operand)?;
                             Ok(())
                         }
                         frontend::LVal::Index(_, _) => Err(MiddelError::GenError),
@@ -110,17 +112,19 @@ impl<'a> FunctionKit<'a> {
                 self.exit = cond_bb;
 
                 // Add condition and br to condition block
-                let operand = self.gen_expr(cond)?.load(self).conv(ValueType::Bool, self)?;
+                let operand = self.gen_expr(cond)?.load(ValueType::Bool, self)?;
                 let br = self.program.mem_pool.get_br(Some(operand));
                 cond_bb.push_back(br);
 
                 // Add statements and br to then branch
                 // Retain break_to and continue_to
-                self.gen_function_kit(then_bb, self.break_to, self.continue_to).gen_stmt(then)?;
+                self.gen_function_kit(then_bb, self.break_to, self.continue_to)
+                    .gen_stmt(then)?;
                 then_bb.push_back(self.program.mem_pool.get_br(None));
 
                 // Add statements and br to alt branch
-                self.gen_function_kit(alt_bb, self.break_to, self.continue_to).gen_stmt(alt)?;
+                self.gen_function_kit(alt_bb, self.break_to, self.continue_to)
+                    .gen_stmt(alt)?;
                 alt_bb.push_back(self.program.mem_pool.get_br(None));
 
                 // Increment exit
@@ -147,12 +151,13 @@ impl<'a> FunctionKit<'a> {
                 self.exit = cond_bb;
 
                 // Add condition and br to condition block
-                let operand = self.gen_expr(cond)?.load(self).conv(ValueType::Bool, self)?;
+                let operand = self.gen_expr(cond)?.load(ValueType::Bool, self)?;
                 let br = self.program.mem_pool.get_br(Some(operand));
                 cond_bb.push_back(br);
 
                 // Add statements and br to body block
-                self.gen_function_kit(body_bb, Some(final_bb), Some(cond_bb)).gen_stmt(body)?;
+                self.gen_function_kit(body_bb, Some(final_bb), Some(cond_bb))
+                    .gen_stmt(body)?;
                 body_bb.push_back(self.program.mem_pool.get_br(None));
 
                 // Increment exit
@@ -179,12 +184,13 @@ impl<'a> FunctionKit<'a> {
                 self.exit = cond_bb;
 
                 // Add condition and br to condition block
-                let operand = self.gen_expr(cond)?.load(self).conv(ValueType::Bool, self)?;
+                let operand = self.gen_expr(cond)?.load(ValueType::Bool, self)?;
                 let br = self.program.mem_pool.get_br(Some(operand));
                 cond_bb.push_back(br);
 
                 // Add statements and br to body block
-                self.gen_function_kit(body_bb, Some(final_bb), Some(cond_bb)).gen_stmt(body)?;
+                self.gen_function_kit(body_bb, Some(final_bb), Some(cond_bb))
+                    .gen_stmt(body)?;
                 body_bb.push_back(self.program.mem_pool.get_br(None));
 
                 // Increment exit
@@ -223,9 +229,7 @@ impl<'a> FunctionKit<'a> {
             Stmt::Return(expr) => {
                 // Add returned result to exit block
                 let return_value = match expr {
-                    Some(expr) => {
-                        Some(self.gen_expr(expr)?.load(self).conv(self.return_type.clone(), self)?)
-                    }
+                    Some(expr) => Some(self.gen_expr(expr)?.load(self.return_type.clone(), self)?),
                     None => None,
                 };
 
@@ -248,21 +252,15 @@ impl<'a> FunctionKit<'a> {
     pub fn gen_decl(&mut self, decl: &Decl) -> Result<(), MiddelError> {
         match decl {
             Decl::Var(raw_ty, id, op) => {
-                // Add type to context
-                let ty = value_type::translate_type(raw_ty);
-                self.ctx.insert(id.clone(), ty.clone());
-
                 // Allocate space for variable, add to environment
+                let ty = value_type::translate_type(raw_ty);
                 let val = value::alloc(ty.clone(), self);
                 self.env.insert(id.clone(), val.clone());
 
                 // Assign to the variable if it is defined
                 if let Some(expr) = op {
-                    // Generate expression
-                    let operand = self.gen_expr(expr)?.load(self);
-
-                    // Type check and type cast
-                    let operand = operand.conv(ty.clone(), self)?;
+                    // Generate expression as variable type
+                    let operand = self.gen_expr(expr)?.load(ty.clone(), self)?;
 
                     // Assign operand to value
                     val.assign(self, operand)?;
@@ -296,8 +294,10 @@ impl<'a> FunctionKit<'a> {
             Expr::Pack(_) => Err(MiddelError::GenError),
             Expr::Map(_) => Err(MiddelError::GenError),
             Expr::Index(x, v) => {
-                // Generate arguments
-                let ix = self.gen_expr(v)?.load(self);
+                // Load index as integer
+                let ix = self.gen_expr(v)?.load(ValueType::Int, self)?;
+
+                // Generate GEP
                 self.gen_expr(x)?
                     .get_element_ptr(self, vec![Constant::Int(0).into(), ix])
             }
@@ -312,7 +312,7 @@ impl<'a> FunctionKit<'a> {
                 // Generate arguments
                 let mut operands = Vec::new();
                 for arg in args.iter() {
-                    operands.push(self.gen_expr(arg)?.load(self));
+                    operands.push(self.gen_expr(arg)?.load(ValueType::Int, self)?);
                 }
 
                 // Ensure function is a defined variable
@@ -327,7 +327,7 @@ impl<'a> FunctionKit<'a> {
                 let inst = self.program.mem_pool.get_call(*fun, operands);
                 self.exit.push_back(inst);
                 Ok(Value::Operand(inst.into()))
-            },
+            }
             Expr::Unary(op, expr) => self.gen_unary(op, expr),
             Expr::Binary(op, lhs, rhs) => self.gen_binary(op, lhs, rhs),
             Expr::Conditional(_, _, _) => Err(MiddelError::GenError),
@@ -337,28 +337,40 @@ impl<'a> FunctionKit<'a> {
     /// Generate a unary expression
     pub fn gen_unary(&mut self, op: &UnaryOp, expr: &Expr) -> Result<Value, MiddelError> {
         // Generate argument
-        let operand = self.gen_expr(expr)?.load(self);
+        let val = self.gen_expr(expr)?;
+
+        // Calculate type for operator polymorphism
+        let ty = val.get_type();
 
         // Apply operation
         match op {
             UnaryOp::Neg => {
                 // Return 0 - x
-                let ty = operand.get_type();
+                let operand = val.load(ty.clone(), self)?;
                 match ty {
                     ValueType::Int => {
-                        let inst = self.program.mem_pool.get_sub(Constant::Int(0).into(), operand);
+                        let inst = self
+                            .program
+                            .mem_pool
+                            .get_sub(Constant::Int(0).into(), operand);
                         self.exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
                     ValueType::Float => {
-                        let inst = self.program.mem_pool.get_fsub(Constant::Float(0.0).into(), operand);
+                        let inst = self
+                            .program
+                            .mem_pool
+                            .get_fsub(Constant::Float(0.0).into(), operand);
                         self.exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
                     ValueType::Bool => {
                         // Convert to int and then make negative
                         let zext = self.program.mem_pool.get_zext(operand);
-                        let sub = self.program.mem_pool.get_sub(Constant::Int(0).into(), zext.into());
+                        let sub = self
+                            .program
+                            .mem_pool
+                            .get_sub(Constant::Int(0).into(), zext.into());
                         self.exit.push_back(zext);
                         self.exit.push_back(sub);
                         Ok(Value::Operand(sub.into()))
@@ -368,7 +380,7 @@ impl<'a> FunctionKit<'a> {
             }
             UnaryOp::Pos => {
                 // Return operand directly
-                let ty = operand.get_type();
+                let operand = val.load(ty.clone(), self)?;
                 match ty {
                     ValueType::Int | ValueType::Float | ValueType::Bool => {
                         Ok(Value::Operand(operand))
@@ -377,11 +389,14 @@ impl<'a> FunctionKit<'a> {
                 }
             }
             UnaryOp::Not => {
-                // Convert operand to bool
-                let bool_op = operand.conv(ValueType::Bool, self)?;
+                // Load as boolean
+                let bool_op = val.load(ValueType::Bool, self)?;
 
                 // Add "xor" instruction
-                let inst = self.program.mem_pool.get_xor(bool_op, Constant::Bool(true).into());
+                let inst = self
+                    .program
+                    .mem_pool
+                    .get_xor(bool_op, Constant::Bool(true).into());
                 self.exit.push_back(inst);
                 Ok(Value::Operand(inst.into()))
             }
@@ -390,20 +405,28 @@ impl<'a> FunctionKit<'a> {
     }
 
     /// Generate a binary expression
-    pub fn gen_binary(&mut self, op: &BinaryOp, lhs: &Expr, rhs: &Expr) -> Result<Value, MiddelError> {
+    pub fn gen_binary(
+        &mut self,
+        op: &BinaryOp,
+        lhs: &Expr,
+        rhs: &Expr,
+    ) -> Result<Value, MiddelError> {
         // Generate arguments
-        let lop = self.gen_expr(lhs)?.load(self);
-        let rop = self.gen_expr(rhs)?.load(self);
+        let lhs_val = self.gen_expr(lhs)?;
+        let rhs_val = self.gen_expr(rhs)?;
+
+        // Calculate maximum type for operator polymorphism
+        let max_ty = lhs_val.get_type().clone().max_with(&rhs_val.get_type());
 
         // Apply operation
         match op {
             BinaryOp::Add => {
-                // Unify operand types
-                let (lop, rop) = Operand::unify(lop, rop, self)?;
-                let ty = lop.get_type();
+                // Load operand as maximum type
+                let lop = lhs_val.load(max_ty.clone(), self)?;
+                let rop = rhs_val.load(max_ty.clone(), self)?;
 
                 // Add "add" instruction, operand is the result of the instruction
-                match ty {
+                match max_ty {
                     ValueType::Int => {
                         let inst = self.program.mem_pool.get_add(lop, rop);
                         self.exit.push_back(inst);
@@ -418,12 +441,12 @@ impl<'a> FunctionKit<'a> {
                 }
             }
             BinaryOp::Sub => {
-                // Unify operand types
-                let (lop, rop) = Operand::unify(lop, rop, self)?;
-                let ty = lop.get_type();
+                // Load operand as maximum type
+                let lop = lhs_val.load(max_ty.clone(), self)?;
+                let rop = rhs_val.load(max_ty.clone(), self)?;
 
                 // Add "sub" instruction, operand is the result of the instruction
-                match ty {
+                match max_ty {
                     ValueType::Int => {
                         let inst = self.program.mem_pool.get_sub(lop, rop);
                         self.exit.push_back(inst);
@@ -438,12 +461,12 @@ impl<'a> FunctionKit<'a> {
                 }
             }
             BinaryOp::Mul => {
-                // Unify operand types
-                let (lop, rop) = Operand::unify(lop, rop, self)?;
-                let ty = lop.get_type();
+                // Load operand as maximum type
+                let lop = lhs_val.load(max_ty.clone(), self)?;
+                let rop = rhs_val.load(max_ty.clone(), self)?;
 
                 // Add "mul" instruction, operand is the result of the instruction
-                match ty {
+                match max_ty {
                     ValueType::Int => {
                         let inst = self.program.mem_pool.get_mul(lop, rop);
                         self.exit.push_back(inst);
@@ -458,12 +481,12 @@ impl<'a> FunctionKit<'a> {
                 }
             }
             BinaryOp::Div => {
-                // Unify operand types
-                let (lop, rop) = Operand::unify(lop, rop, self)?;
-                let ty = lop.get_type();
+                // Load operand as maximum type
+                let lop = lhs_val.load(max_ty.clone(), self)?;
+                let rop = rhs_val.load(max_ty.clone(), self)?;
 
                 // Add "div" instruction, operand is the result of the instruction
-                match ty {
+                match max_ty {
                     ValueType::Int => {
                         let inst = self.program.mem_pool.get_sdiv(lop, rop);
                         self.exit.push_back(inst);
@@ -478,9 +501,9 @@ impl<'a> FunctionKit<'a> {
                 }
             }
             BinaryOp::Mod => {
-                // Convert operands to int
-                let lop = lop.conv(ValueType::Int, self)?;
-                let rop = rop.conv(ValueType::Int, self)?;
+                // Load operand as integers
+                let lop = lhs_val.load(ValueType::Int, self)?;
+                let rop = rhs_val.load(ValueType::Int, self)?;
 
                 // Add "signed rem" instruction, operand is the result of the instruction
                 let inst = self.program.mem_pool.get_srem(lop, rop);
@@ -490,101 +513,173 @@ impl<'a> FunctionKit<'a> {
             // Bitwise operation on int is not required
             BinaryOp::Shr => Err(MiddelError::GenError),
             BinaryOp::Shl => Err(MiddelError::GenError),
-            BinaryOp::And => Err(MiddelError::GenError),
-            BinaryOp::Or => Err(MiddelError::GenError),
-            BinaryOp::Xor => Err(MiddelError::GenError),
+            BinaryOp::BitAnd => Err(MiddelError::GenError),
+            BinaryOp::BitOr => Err(MiddelError::GenError),
+            BinaryOp::BitXor => Err(MiddelError::GenError),
             BinaryOp::Gt => {
-                // Unify operand types
-                let (lop, rop) = Operand::unify(lop, rop, self)?;
-                let ty = lop.get_type();
+                // Load operand as maximum type
+                let lop = lhs_val.load(max_ty.clone(), self)?;
+                let rop = rhs_val.load(max_ty.clone(), self)?;
 
-                // Add "icmp" instruction, operand is the result of the instruction
-                let inst =
-                    self.program
-                        .mem_pool
-                        .get_icmp(ICmpOp::Sgt, ty, lop, rop);
-                self.exit.push_back(inst);
-                Ok(Value::Operand(inst.into()))
+                // Add compare instruction, operand is the result of the instruction
+                match max_ty {
+                    ValueType::Int => {
+                        let inst = self
+                            .program
+                            .mem_pool
+                            .get_icmp(ICmpOp::Sgt, max_ty, lop, rop);
+                        self.exit.push_back(inst);
+                        Ok(Value::Operand(inst.into()))
+                    }
+                    ValueType::Float => {
+                        let inst = self
+                            .program
+                            .mem_pool
+                            .get_fcmp(FCmpOp::Ugt, max_ty, lop, rop);
+                        self.exit.push_back(inst);
+                        Ok(Value::Operand(inst.into()))
+                    }
+                    _ => Err(MiddelError::GenError),
+                }
             }
             BinaryOp::Lt => {
-                // Unify operand types
-                let (lop, rop) = Operand::unify(lop, rop, self)?;
-                let ty = lop.get_type();
+                // Load operand as maximum type
+                let lop = lhs_val.load(max_ty.clone(), self)?;
+                let rop = rhs_val.load(max_ty.clone(), self)?;
 
-                // Add "icmp" instruction, operand is the result of the instruction
-                let inst =
-                    self.program
-                        .mem_pool
-                        .get_icmp(ICmpOp::Slt, ty, lop, rop);
-                self.exit.push_back(inst);
-                Ok(Value::Operand(inst.into()))
+                // Add compare instruction, operand is the result of the instruction
+                match max_ty {
+                    ValueType::Int => {
+                        let inst = self
+                            .program
+                            .mem_pool
+                            .get_icmp(ICmpOp::Slt, max_ty, lop, rop);
+                        self.exit.push_back(inst);
+                        Ok(Value::Operand(inst.into()))
+                    }
+                    ValueType::Float => {
+                        let inst = self
+                            .program
+                            .mem_pool
+                            .get_fcmp(FCmpOp::Ult, max_ty, lop, rop);
+                        self.exit.push_back(inst);
+                        Ok(Value::Operand(inst.into()))
+                    }
+                    _ => Err(MiddelError::GenError),
+                }
             }
             BinaryOp::Ge => {
-                // Unify operand types
-                let (lop, rop) = Operand::unify(lop, rop, self)?;
-                let ty = lop.get_type();
+                // Load operand as maximum type
+                let lop = lhs_val.load(max_ty.clone(), self)?;
+                let rop = rhs_val.load(max_ty.clone(), self)?;
 
-                // Add "icmp" instruction, operand is the result of the instruction
-                let inst =
-                    self.program
-                        .mem_pool
-                        .get_icmp(ICmpOp::Sge, ty, lop, rop);
-                self.exit.push_back(inst);
-                Ok(Value::Operand(inst.into()))
+                // Add compare instruction, operand is the result of the instruction
+                match max_ty {
+                    ValueType::Int => {
+                        let inst = self
+                            .program
+                            .mem_pool
+                            .get_icmp(ICmpOp::Sge, max_ty, lop, rop);
+                        self.exit.push_back(inst);
+                        Ok(Value::Operand(inst.into()))
+                    }
+                    ValueType::Float => {
+                        let inst = self
+                            .program
+                            .mem_pool
+                            .get_fcmp(FCmpOp::Uge, max_ty, lop, rop);
+                        self.exit.push_back(inst);
+                        Ok(Value::Operand(inst.into()))
+                    }
+                    _ => Err(MiddelError::GenError),
+                }
             }
             BinaryOp::Le => {
-                // Unify operand types
-                let (lop, rop) = Operand::unify(lop, rop, self)?;
-                let ty = lop.get_type();
+                // Load operand as maximum type
+                let lop = lhs_val.load(max_ty.clone(), self)?;
+                let rop = rhs_val.load(max_ty.clone(), self)?;
 
-                // Add "icmp" instruction, operand is the result of the instruction
-                let inst =
-                    self.program
-                        .mem_pool
-                        .get_icmp(ICmpOp::Sle, ty, lop, rop);
-                self.exit.push_back(inst);
-                Ok(Value::Operand(inst.into()))
+                // Add compare instruction, operand is the result of the instruction
+                match max_ty {
+                    ValueType::Int => {
+                        let inst = self
+                            .program
+                            .mem_pool
+                            .get_icmp(ICmpOp::Sle, max_ty, lop, rop);
+                        self.exit.push_back(inst);
+                        Ok(Value::Operand(inst.into()))
+                    }
+                    ValueType::Float => {
+                        let inst = self
+                            .program
+                            .mem_pool
+                            .get_fcmp(FCmpOp::Ule, max_ty, lop, rop);
+                        self.exit.push_back(inst);
+                        Ok(Value::Operand(inst.into()))
+                    }
+                    _ => Err(MiddelError::GenError),
+                }
             }
             BinaryOp::Eq => {
-                // Unify operand types
-                let (lop, rop) = Operand::unify(lop, rop, self)?;
-                let ty = lop.get_type();
+                // Load operand as maximum type
+                let lop = lhs_val.load(max_ty.clone(), self)?;
+                let rop = rhs_val.load(max_ty.clone(), self)?;
 
-                // Add "icmp" instruction, operand is the result of the instruction
-                let inst =
-                    self.program
-                        .mem_pool
-                        .get_icmp(ICmpOp::Eq, ty, lop, rop);
-                self.exit.push_back(inst);
-                Ok(Value::Operand(inst.into()))
+                // Add compare instruction, operand is the result of the instruction
+                match max_ty {
+                    ValueType::Int => {
+                        let inst = self.program.mem_pool.get_icmp(ICmpOp::Eq, max_ty, lop, rop);
+                        self.exit.push_back(inst);
+                        Ok(Value::Operand(inst.into()))
+                    }
+                    ValueType::Float => {
+                        let inst = self
+                            .program
+                            .mem_pool
+                            .get_fcmp(FCmpOp::Ueq, max_ty, lop, rop);
+                        self.exit.push_back(inst);
+                        Ok(Value::Operand(inst.into()))
+                    }
+                    _ => Err(MiddelError::GenError),
+                }
             }
             BinaryOp::Ne => {
-                // Unify operand types
-                let (lop, rop) = Operand::unify(lop, rop, self)?;
-                let ty = lop.get_type();
+                // Load operand as maximum type
+                let lop = lhs_val.load(max_ty.clone(), self)?;
+                let rop = rhs_val.load(max_ty.clone(), self)?;
 
-                // Add "icmp" instruction, operand is the result of the instruction
-                let inst =
-                    self.program
-                        .mem_pool
-                        .get_icmp(ICmpOp::Ne, ty, lop, rop);
-                self.exit.push_back(inst);
-                Ok(Value::Operand(inst.into()))
+                // Add compare instruction, operand is the result of the instruction
+                match max_ty {
+                    ValueType::Int => {
+                        let inst = self.program.mem_pool.get_icmp(ICmpOp::Ne, max_ty, lop, rop);
+                        self.exit.push_back(inst);
+                        Ok(Value::Operand(inst.into()))
+                    }
+                    ValueType::Float => {
+                        let inst = self
+                            .program
+                            .mem_pool
+                            .get_fcmp(FCmpOp::Une, max_ty, lop, rop);
+                        self.exit.push_back(inst);
+                        Ok(Value::Operand(inst.into()))
+                    }
+                    _ => Err(MiddelError::GenError),
+                }
             }
-            BinaryOp::All => {
-                // Convert operands to bool
-                let lop = lop.conv(ValueType::Bool, self)?;
-                let rop = rop.conv(ValueType::Bool, self)?;
+            BinaryOp::And => {
+                // Load operands as bool
+                let lop = lhs_val.load(ValueType::Bool, self)?;
+                let rop = rhs_val.load(ValueType::Bool, self)?;
 
                 // Add "and" instruction, operand is the result of the instruction
                 let inst = self.program.mem_pool.get_and(lop, rop);
                 self.exit.push_back(inst);
                 Ok(Value::Operand(inst.into()))
             }
-            BinaryOp::Any => {
-                // Convert operands to bool
-                let lop = lop.conv(ValueType::Bool, self)?;
-                let rop = rop.conv(ValueType::Bool, self)?;
+            BinaryOp::Or => {
+                // Load operands as bool
+                let lop = lhs_val.load(ValueType::Bool, self)?;
+                let rop = rhs_val.load(ValueType::Bool, self)?;
 
                 // Add "or" instruction, operand is the result of the instruction
                 let inst = self.program.mem_pool.get_or(lop, rop);
@@ -594,3 +689,4 @@ impl<'a> FunctionKit<'a> {
         }
     }
 }
+

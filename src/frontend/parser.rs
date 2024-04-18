@@ -10,14 +10,14 @@ pub fn word(input: &mut &str) -> PResult<String> {
 }
 
 /// List of all keywords.
-const KEYWORD: [&str; 20] = [
+const KEYWORDS: [&str; 20] = [
     "void", "int", "float", "string", "char", "bool", "struct", "enum", "union", "false", "true",
     "sizeof", "break", "continue", "return", "if", "else", "do", "while", "for",
 ];
 
 /// Parser of an identifier, a word which is not a keyword.
 pub fn ident(input: &mut &str) -> PResult<String> {
-    word.verify(|x| !KEYWORD.contains(&x)).parse_next(input)
+    word.verify(|x| !KEYWORDS.contains(&x)).parse_next(input)
 }
 
 /// Parser of an integer.
@@ -89,9 +89,9 @@ where
     InnerParser: Parser<&'s str, Output, ContextError>,
 {
     trace("paren", move |input: &mut &'s str| {
-        let _ = pad("(").parse_next(input)?;
+        let _ = token("(").parse_next(input)?;
         let output = parser.parse_next(input)?;
-        let _ = pad(")").parse_next(input)?;
+        let _ = token(")").parse_next(input)?;
         Ok(output)
     })
 }
@@ -104,9 +104,9 @@ where
     InnerParser: Parser<&'s str, Output, ContextError>,
 {
     trace("bracket", move |input: &mut &'s str| {
-        let _ = pad("[").parse_next(input)?;
+        let _ = token("[").parse_next(input)?;
         let output = parser.parse_next(input)?;
-        let _ = pad("]").parse_next(input)?;
+        let _ = token("]").parse_next(input)?;
         Ok(output)
     })
 }
@@ -119,9 +119,72 @@ where
     InnerParser: Parser<&'s str, Output, ContextError>,
 {
     trace("curly", move |input: &mut &'s str| {
-        let _ = pad("{").parse_next(input)?;
+        let _ = token("{").parse_next(input)?;
         let output = parser.parse_next(input)?;
-        let _ = pad("}").parse_next(input)?;
+        let _ = token("}").parse_next(input)?;
+        Ok(output)
+    })
+}
+
+/// Parser of a token.
+pub fn token<'s>(mut parser: &'static str) -> impl Parser<&'s str, &'s str, ContextError> {
+    // Get the first character and length of the token
+    let head = parser.chars().next().unwrap();
+    let len = parser.chars().count();
+    trace("token", move |input: &mut &'s str| {
+        let output = parser.parse_next(input)?;
+
+        // The next character after a token can not connect with the token
+        if head.is_alphanum() {
+            let _ = alt((peek(any), empty.value(' ')))
+                .verify(|x: &char| !x.is_alphanum() && *x != '_')
+                .parse_next(input)?;
+        }
+
+        // The next character of '>' can not be '>' or '='
+        if head == '>' && len == 1 {
+            let _ = alt((peek(any), empty.value(' ')))
+                .verify(|x: &char| *x != '>' && *x != '=')
+                .parse_next(input)?;
+        }
+
+        // The next character of '<' can not be '<' or '='
+        if head == '<' && len == 1 {
+            let _ = alt((peek(any), empty.value(' ')))
+                .verify(|x: &char| *x != '<' && *x != '=')
+                .parse_next(input)?;
+        }
+
+        // The next character of '=' can not be '='
+        if head == '=' && len == 1 {
+            let _ = alt((peek(any), empty.value(' ')))
+                .verify(|x: &char| *x != '=')
+                .parse_next(input)?;
+        }
+
+        // The next character of '!' can not be '='
+        if head == '!' && len == 1 {
+            let _ = alt((peek(any), empty.value(' ')))
+                .verify(|x: &char| *x != '=')
+                .parse_next(input)?;
+        }
+
+        // The next character of '&' can not be '&'
+        if head == '&' && len == 1 {
+            let _ = alt((peek(any), empty.value(' ')))
+                .verify(|x: &char| *x != '&')
+                .parse_next(input)?;
+        }
+
+        // The next character of '|' can not be '|'
+        if head == '|' && len == 1 {
+            let _ = alt((peek(any), empty.value(' ')))
+                .verify(|x: &char| *x != '|')
+                .parse_next(input)?;
+        }
+
+        // Consume some optional blanks
+        blank(input)?;
         Ok(output)
     })
 }
@@ -135,20 +198,6 @@ where
 {
     trace("pad", move |input: &mut &'s str| {
         let output = parser.parse_next(input)?;
-        blank(input)?;
-        Ok(output)
-    })
-}
-
-/// Parser of a keyword.
-pub fn keyword<'s>(mut parser: &'static str) -> impl Parser<&'s str, &'s str, ContextError> {
-    trace("keyword", move |input: &mut &'s str| {
-        let output = parser.parse_next(input)?;
-
-        // The next character after a keyword can not connect with the keyword
-        let _ = alt((peek(any), empty.value(' ')))
-            .verify(|x: &char| !x.is_alphanum() && *x != '_')
-            .parse_next(input)?;
         blank(input)?;
         Ok(output)
     })

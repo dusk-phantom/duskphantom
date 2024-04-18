@@ -29,19 +29,19 @@ pub enum UnaryOp {
 
 pub fn unary_op(input: &mut &str) -> PResult<UnaryOp> {
     dispatch! { peek(any);
-        '!' => pad('!').value(UnaryOp::Not),
-        '~' => pad('~').value(UnaryOp::Inv),
+        '!' => token("!").value(UnaryOp::Not),
+        '~' => token("~").value(UnaryOp::Inv),
         '-' => alt((
-            pad("--").value(UnaryOp::Dec),
-            pad('-').value(UnaryOp::Neg),
+            token("--").value(UnaryOp::Dec),
+            token("-").value(UnaryOp::Neg),
         )),
         '+' => alt((
-            pad("++").value(UnaryOp::Inc),
-            pad('+').value(UnaryOp::Pos),
+            token("++").value(UnaryOp::Inc),
+            token("+").value(UnaryOp::Pos),
         )),
-        '*' => pad('*').value(UnaryOp::Ind),
-        '&' => pad('&').value(UnaryOp::Addr),
-        's' => keyword("sizeof").value(UnaryOp::Sizeof),
+        '*' => token("*").value(UnaryOp::Ind),
+        '&' => token("&").value(UnaryOp::Addr),
+        's' => token("sizeof").value(UnaryOp::Sizeof),
         '(' => paren(single_type).map(UnaryOp::Cast),
         _ => fail,
     }
@@ -67,11 +67,11 @@ pub enum BinaryOp {
     /// <<
     Shl,
     /// &
-    And,
+    BitAnd,
     /// |
-    Or,
+    BitOr,
     /// ^
-    Xor,
+    BitXor,
     /// >
     Gt,
     /// <
@@ -85,17 +85,17 @@ pub enum BinaryOp {
     /// !=
     Ne,
     /// &&
-    All,
+    And,
     /// ||
-    Any,
+    Or,
 }
 
 /// Level 0 operators, left to right
 pub fn binary_op_lv0(input: &mut &str) -> PResult<BinaryOp> {
     dispatch! { peek(any);
-        '*' => pad('*').value(BinaryOp::Mul),
-        '/' => pad('/').value(BinaryOp::Div),
-        '%' => pad('%').value(BinaryOp::Mod),
+        '*' => token("*").value(BinaryOp::Mul),
+        '/' => token("/").value(BinaryOp::Div),
+        '%' => token("%").value(BinaryOp::Mod),
         _ => fail,
     }
     .parse_next(input)
@@ -103,14 +103,14 @@ pub fn binary_op_lv0(input: &mut &str) -> PResult<BinaryOp> {
 
 /// Level 1 operators, left to right
 pub fn binary_op_lv1(input: &mut &str) -> PResult<BinaryOp> {
-    alt((pad('+').value(BinaryOp::Add), pad('-').value(BinaryOp::Sub))).parse_next(input)
+    alt((token("+").value(BinaryOp::Add), token("-").value(BinaryOp::Sub))).parse_next(input)
 }
 
 /// Level 2 operators, left to right
 pub fn binary_op_lv2(input: &mut &str) -> PResult<BinaryOp> {
     alt((
-        pad(">>").value(BinaryOp::Shr),
-        pad("<<").value(BinaryOp::Shl),
+        token(">>").value(BinaryOp::Shr),
+        token("<<").value(BinaryOp::Shl),
     ))
     .parse_next(input)
 }
@@ -119,12 +119,12 @@ pub fn binary_op_lv2(input: &mut &str) -> PResult<BinaryOp> {
 pub fn binary_op_lv3(input: &mut &str) -> PResult<BinaryOp> {
     dispatch! { peek(any);
         '>' => alt((
-            pad(">=").value(BinaryOp::Ge),
-            pad('>').value(BinaryOp::Gt),
+            token(">=").value(BinaryOp::Ge),
+            token(">").value(BinaryOp::Gt),
         )),
         '<' => alt((
-            pad("<=").value(BinaryOp::Le),
-            pad('<').value(BinaryOp::Lt),
+            token("<=").value(BinaryOp::Le),
+            token("<").value(BinaryOp::Lt),
         )),
         _ => fail,
     }
@@ -133,30 +133,30 @@ pub fn binary_op_lv3(input: &mut &str) -> PResult<BinaryOp> {
 
 /// Level 4 operators, left to right
 pub fn binary_op_lv4(input: &mut &str) -> PResult<BinaryOp> {
-    alt((pad("==").value(BinaryOp::Eq), pad("!=").value(BinaryOp::Ne))).parse_next(input)
+    alt((token("==").value(BinaryOp::Eq), token("!=").value(BinaryOp::Ne))).parse_next(input)
 }
 
 /// Level 5 operators, left to right
 pub fn binary_op_lv5(input: &mut &str) -> PResult<BinaryOp> {
-    pad('&').value(BinaryOp::And).parse_next(input)
+    token("&").value(BinaryOp::BitAnd).parse_next(input)
 }
 
 /// Level 6 operators, left to right
 pub fn binary_op_lv6(input: &mut &str) -> PResult<BinaryOp> {
-    pad('^').value(BinaryOp::Xor).parse_next(input)
+    token("^").value(BinaryOp::BitXor).parse_next(input)
 }
 
 /// Level 7 operators, left to right
 pub fn binary_op_lv7(input: &mut &str) -> PResult<BinaryOp> {
-    pad('|').value(BinaryOp::Or).parse_next(input)
+    token("|").value(BinaryOp::BitOr).parse_next(input)
 }
 
 /// Level 8 operators, left to right
 pub fn binary_op_lv8(input: &mut &str) -> PResult<BinaryOp> {
-    pad("&&").value(BinaryOp::All).parse_next(input)
+    token("&&").value(BinaryOp::And).parse_next(input)
 }
 
 /// Level 9 operators, left to right
 pub fn binary_op_lv9(input: &mut &str) -> PResult<BinaryOp> {
-    pad("||").value(BinaryOp::Any).parse_next(input)
+    token("||").value(BinaryOp::Or).parse_next(input)
 }

@@ -56,8 +56,8 @@ pub fn make_const(decl: Decl) -> Decl {
 }
 
 pub fn decl(input: &mut &str) -> PResult<Decl> {
-    // Match const keyword.
-    let is_const = opt(keyword("const")).parse_next(input)?.is_some();
+    // Match const token.
+    let is_const = opt(token("const")).parse_next(input)?.is_some();
 
     // Parse type.
     let left_type = atom_type.parse_next(input)?;
@@ -65,14 +65,14 @@ pub fn decl(input: &mut &str) -> PResult<Decl> {
     // Parse lval and optional assignment expression.
     let mut decls: Vec<Decl> = separated(1.., 
         |input: &mut &str| assignment(input, left_type.clone()), 
-        pad(",")
+        token(",")
     ).parse_next(input)?;
 
     // Require semicolon if the last declaration is not function implementation
     if let Some(Decl::Func(_, _, Some(_))) = decls.last() {
         // Do nothing
     } else {
-        pad(';').parse_next(input)?;
+        token(";").parse_next(input)?;
     }
 
     // Make constant if necessary
@@ -96,7 +96,7 @@ pub fn assignment(input: &mut &str, left_type: Type) -> PResult<Decl> {
     };
 
     // Parse optional assignment.
-    if let Some(expr) = opt(preceded(pad("="), expr)).parse_next(input)? {
+    if let Some(expr) = opt(preceded(token("="), expr)).parse_next(input)? {
         return Ok(Decl::Var(typed_ident.ty, id, Some(expr)));
     };
 

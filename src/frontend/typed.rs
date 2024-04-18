@@ -55,15 +55,15 @@ pub enum Type {
 
 pub fn atom_type(input: &mut &str) -> PResult<Type> {
     alt((
-        keyword("void").value(Type::Void),
-        keyword("int").value(Type::Int32),
-        keyword("float").value(Type::Float32),
-        keyword("string").value(Type::String),
-        keyword("char").value(Type::Char),
-        keyword("bool").value(Type::Boolean),
-        (keyword("enum"), ident).map(|(_, ty)| Type::Enum(ty)),
-        (keyword("union"), ident).map(|(_, ty)| Type::Union(ty)),
-        (keyword("struct"), ident).map(|(_, ty)| Type::Struct(ty)),
+        token("void").value(Type::Void),
+        token("int").value(Type::Int32),
+        token("float").value(Type::Float32),
+        token("string").value(Type::String),
+        token("char").value(Type::Char),
+        token("bool").value(Type::Boolean),
+        (token("enum"), ident).map(|(_, ty)| Type::Enum(ty)),
+        (token("union"), ident).map(|(_, ty)| Type::Union(ty)),
+        (token("struct"), ident).map(|(_, ty)| Type::Struct(ty)),
     ))
     .parse_next(input)
 }
@@ -107,7 +107,7 @@ pub fn lval(input: &mut &str) -> PResult<LVal> {
         paren(vec_typed).map(|x| BoxF::new(|acc| LVal::Call(acc, x))),
     ));
     let access = lrec(atom, repeat(0.., access_tail));
-    let unary_init = pad('*').map(|_op| BoxF::new(LVal::Pointer));
+    let unary_init = token("*").map(|_op| BoxF::new(LVal::Pointer));
     rrec(repeat(0.., unary_init), access).parse_next(input)
 }
 
@@ -158,7 +158,7 @@ pub fn box_type(input: &mut &str) -> PResult<Box<Type>> {
 
 /// Parser of a vector of type.
 pub fn vec_typed(input: &mut &str) -> PResult<Vec<TypedIdent>> {
-    separated(0.., typed_ident, pad(',')).parse_next(input)
+    separated(0.., typed_ident, token(",")).parse_next(input)
 }
 
 // Unit tests

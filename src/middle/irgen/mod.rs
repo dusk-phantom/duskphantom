@@ -1,18 +1,13 @@
-use std::collections::HashMap;
+use crate::{errors::MiddelError, frontend, middle};
 use program_kit::ProgramKit;
-use crate::{
-    errors::MiddelError,
-    frontend,
-    middle,
-};
+use std::collections::HashMap;
 
+mod constant;
 mod function_kit;
 mod program_kit;
-mod operand;
-mod value_type;
-mod value;
 mod util;
-mod constant;
+mod value;
+mod value_type;
 
 /// Generate middle IR from a frontend AST
 pub fn gen(program: &frontend::Program) -> Result<middle::Program, MiddelError> {
@@ -21,7 +16,6 @@ pub fn gen(program: &frontend::Program) -> Result<middle::Program, MiddelError> 
         program: &mut result,
         env: HashMap::new(),
         fun_env: HashMap::new(),
-        ctx: HashMap::new(),
     }
     .gen(program)?;
     Ok(result)
@@ -202,21 +196,21 @@ mod tests {
         assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Int32, \"x\", Some(Int32(1)))), Decl(Var(Float32, \"y\", Some(Float32(2.0)))), Decl(Var(Float32, \"z\", Some(Binary(Add, Var(\"x\"), Var(\"y\"))))), Return(Some(Var(\"z\")))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
-        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 1, ptr %alloca_1\n%alloca_3 = alloca float\nstore float 2, ptr %alloca_3\n%alloca_5 = alloca float\n%load_6 = load i32, ptr %alloca_1\n%load_7 = load float, ptr %alloca_3\n%itofp_8 = sitofp i32 %load_6 to float\n%FAdd_9 = fadd float, %itofp_8, %load_7\nstore float %FAdd_9, ptr %alloca_5\n%load_11 = load float, ptr %alloca_5\n%fptoi_12 = fptosi float %load_11 to i32\nret %fptoi_12\n\n\n}\n");
+        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 1, ptr %alloca_1\n%alloca_3 = alloca float\nstore float 2, ptr %alloca_3\n%alloca_5 = alloca float\n%load_6 = load i32, ptr %alloca_1\n%itofp_7 = sitofp i32 %load_6 to float\n%load_8 = load float, ptr %alloca_3\n%FAdd_9 = fadd float, %itofp_7, %load_8\nstore float %FAdd_9, ptr %alloca_5\n%load_11 = load float, ptr %alloca_5\n%fptoi_12 = fptosi float %load_11 to i32\nret %fptoi_12\n\n\n}\n");
     }
 
     #[test]
     fn test_zext() {
         let code = r#"
             int main() {
-                return 3 > 1;
+                return (3 > 1) + (4 > 2);
             }
         "#;
         let program = parse(code).unwrap();
-        assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Return(Some(Binary(Gt, Int32(3), Int32(1))))])))] }");
+        assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Return(Some(Binary(Add, Binary(Gt, Int32(3), Int32(1)), Binary(Gt, Int32(4), Int32(2)))))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
-        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%icmp_1 = icmp sgt i32 3, 1\n%zext_2 = zext i1 %icmp_1 to i32\nret %zext_2\n\n\n}\n");
+        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%icmp_1 = icmp sgt i32 3, 1\n%icmp_2 = icmp sgt i32 4, 2\n%zext_3 = zext i1 %icmp_1 to i32\n%zext_4 = zext i1 %icmp_2 to i32\n%Add_5 = add i32, %zext_3, %zext_4\nret %Add_5\n\n\n}\n");
     }
 
     #[test]
@@ -237,7 +231,7 @@ mod tests {
     fn test_call() {
         let code = r#"
             int main() {
-                return f(1);
+                return f(1.7);
             }
 
             int f(int x) {
@@ -245,10 +239,10 @@ mod tests {
             }
         "#;
         let program = parse(code).unwrap();
-        assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Return(Some(Call(Var(\"f\"), [Int32(1)])))]))), Func(Function(Int32, [TypedIdent { ty: Int32, id: Some(\"x\") }]), \"f\", Some(Block([Return(Some(Binary(Add, Var(\"x\"), Int32(1))))])))] }");
+        assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Return(Some(Call(Var(\"f\"), [Float32(1.7)])))]))), Func(Function(Int32, [TypedIdent { ty: Int32, id: Some(\"x\") }]), \"f\", Some(Block([Return(Some(Binary(Add, Var(\"x\"), Int32(1))))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
-        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%call_1 = call i32 @f(i32 1)\nret %call_1\n\n\n}\ndefine i32 @f(i32 x) {\n%entry:\n%alloca_4 = alloca i32\nstore i32 %x, ptr %alloca_4\n%load_6 = load i32, ptr %alloca_4\n%Add_7 = add i32, %load_6, 1\nret %Add_7\n\n\n}\n");
+        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%fptoi_1 = fptosi float 1.7 to i32\n%call_2 = call i32 @f(i32 %fptoi_1)\nret %call_2\n\n\n}\ndefine i32 @f(i32 x) {\n%entry:\n%alloca_5 = alloca i32\nstore i32 %x, ptr %alloca_5\n%load_7 = load i32, ptr %alloca_5\n%Add_8 = add i32, %load_7, 1\nret %Add_8\n\n\n}\n");
     }
 
     #[test]
@@ -322,5 +316,21 @@ mod tests {
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
         assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 1, ptr %alloca_1\n%load_3 = load i32, ptr %alloca_1\n%Sub_4 = sub i32, 0, %load_3\n%icmp_5 = icmp ne i32 %Sub_4, 0\n%Xor_6 = xor i1, %icmp_5, true\n%zext_7 = zext i1 %Xor_6 to i32\nret %zext_7\n\n\n}\n");
+    }
+
+    #[test]
+    fn test_cmp() {
+        let code = r#"
+            int main() {
+                bool x = 1 < 2;
+                bool y = 1 < 1.1;
+                return x && y;
+            }
+        "#;
+        let program = parse(code).unwrap();
+        assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Boolean, \"x\", Some(Binary(Lt, Int32(1), Int32(2))))), Decl(Var(Boolean, \"y\", Some(Binary(Lt, Int32(1), Float32(1.1))))), Return(Some(Binary(And, Var(\"x\"), Var(\"y\"))))])))] }");
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca i1\n%icmp_2 = icmp slt i32 1, 2\nstore i1 %icmp_2, ptr %alloca_1\n%alloca_4 = alloca i1\n%itofp_5 = sitofp i32 1 to float\n%fcmp_6 = fcmp ult float %itofp_5, 1.1\nstore i1 %fcmp_6, ptr %alloca_4\n%load_8 = load i1, ptr %alloca_1\n%load_9 = load i1, ptr %alloca_4\n%And_10 = and i1, %load_8, %load_9\n%zext_11 = zext i1 %And_10 to i32\nret %zext_11\n\n\n}\n");
     }
 }

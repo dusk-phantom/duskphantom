@@ -67,7 +67,7 @@ pub fn vec_stmt(input: &mut &str) -> PResult<Vec<Stmt>> {
 
 /// Expression with semicolon.
 pub fn expr_sc(input: &mut &str) -> PResult<Expr> {
-    (expr, cut_err(pad(";"))).map(|(e, _)| e).parse_next(input)
+    (expr, cut_err(token(";"))).map(|(e, _)| e).parse_next(input)
 }
 
 /// Decl or Expr.
@@ -77,16 +77,16 @@ pub fn decl_or_expr(input: &mut &str) -> PResult<Either<Decl, Expr>> {
 
 pub fn stmt(input: &mut &str) -> PResult<Stmt> {
     let disp = dispatch! { peek(any);
-        'b' => (keyword("break"), cut_err(pad(";"))).value(Stmt::Break),
-        'c' => (keyword("continue"), cut_err(pad(";"))).value(Stmt::Continue),
-        'i' => (keyword("if"), cut_err((paren(expr), box_stmt, opt((keyword("else"), box_stmt)))))
+        'b' => (token("break"), cut_err(token(";"))).value(Stmt::Break),
+        'c' => (token("continue"), cut_err(token(";"))).value(Stmt::Continue),
+        'i' => (token("if"), cut_err((paren(expr), box_stmt, opt((token("else"), box_stmt)))))
             .map(|(_, (cond, pass, fail))| Stmt::If(cond, pass, fail.map_or(Stmt::Block(vec![]).into(), |(_, s)| s))),
-        'w' => (keyword("while"), cut_err((paren(expr), box_stmt))).map(|(_, (cond, body))| Stmt::While(cond, body)),
-        'd' => (keyword("do"), cut_err((box_stmt, keyword("while"), paren(expr), pad(";"))))
+        'w' => (token("while"), cut_err((paren(expr), box_stmt))).map(|(_, (cond, body))| Stmt::While(cond, body)),
+        'd' => (token("do"), cut_err((box_stmt, token("while"), paren(expr), token(";"))))
             .map(|(_, (body, _, cond, _))| Stmt::DoWhile(body, cond)),
-        'f' => (keyword("for"), cut_err((paren((decl_or_expr, expr_sc, expr)), box_stmt)))
+        'f' => (token("for"), cut_err((paren((decl_or_expr, expr_sc, expr)), box_stmt)))
             .map(|(_, ((a, b, c), s))| Stmt::For(a, b, c, s)),
-        'r' => (keyword("return"), cut_err((opt(expr), pad(";"))))
+        'r' => (token("return"), cut_err((opt(expr), token(";"))))
             .map(|(_, (e, _))| Stmt::Return(e)),
         '{' => curly(cut_err(vec_stmt)).map(Stmt::Block),
         _ => fail
@@ -94,8 +94,8 @@ pub fn stmt(input: &mut &str) -> PResult<Stmt> {
     alt((
         disp,
         decl.map(Stmt::Decl),
-        (opt(terminated(lval, pad("="))), expr_sc).map(|(lval, expr)| Stmt::Expr(lval, expr)),
-        pad(";").value(Stmt::Nothing),
+        (opt(terminated(lval, token("="))), expr_sc).map(|(lval, expr)| Stmt::Expr(lval, expr)),
+        token(";").value(Stmt::Nothing),
     ))
     .parse_next(input)
 }

@@ -69,7 +69,7 @@ pub enum Expr {
 
 /// Parse a vector of Expr.
 pub fn vec_expr(input: &mut &str) -> PResult<Vec<Expr>> {
-    separated(0.., expr, pad(",")).parse_next(input)
+    separated(0.., expr, token(",")).parse_next(input)
 }
 
 /// Parse a box of Expr.
@@ -83,8 +83,8 @@ pub fn prefix(input: &mut &str) -> PResult<Expr> {
     let disp = dispatch! { peek(any);
         '{' => alt((
             // TODO memoize expr here
-            curly(separated(0.., expr, pad(","))).map(Expr::Pack),
-            curly(separated(0.., map_entry, pad(","))).map(Expr::Map)
+            curly(separated(0.., expr, token(","))).map(Expr::Pack),
+            curly(separated(0.., map_entry, token(","))).map(Expr::Map)
         )),
         '0'..='9' => alt((
             pad(float).map(Expr::Float32),
@@ -92,8 +92,8 @@ pub fn prefix(input: &mut &str) -> PResult<Expr> {
         )),
         '"' => pad(string_lit).map(Expr::String),
         '\'' => pad(char_lit).map(Expr::Char),
-        'f' => keyword("false").value(Expr::Bool(false)),
-        't' => keyword("true").value(Expr::Bool(true)),
+        'f' => token("false").value(Expr::Bool(false)),
+        't' => token("true").value(Expr::Bool(true)),
         '(' => paren(expr),
         _ => fail,
     };
@@ -106,9 +106,9 @@ pub fn prefix(input: &mut &str) -> PResult<Expr> {
     // because all closures have unique types, making `alt` report errors.
     let postfix_tail = dispatch! { peek(any);
         '[' => bracket(box_expr).map(|x| BoxF::new(|acc| Expr::Index(acc, x))),
-        '.' => preceded(pad("."), pad(ident)).map(|x| BoxF::new(|acc| Expr::Field(acc, x))),
+        '.' => preceded(token("."), pad(ident)).map(|x| BoxF::new(|acc| Expr::Field(acc, x))),
         '(' => paren(vec_expr).map(|x| BoxF::new(|acc| Expr::Call(acc, x))),
-        '-' => preceded(pad("->"), pad(ident)).map(|x| BoxF::new(|acc| Expr::Select(acc, x))),
+        '-' => preceded(token("->"), pad(ident)).map(|x| BoxF::new(|acc| Expr::Select(acc, x))),
         _ => fail,
     };
     let postfix = lrec(atom, repeat(0.., postfix_tail));
@@ -136,7 +136,7 @@ pub fn expr(input: &mut &str) -> PResult<Expr> {
     // The first expression is memoized, so when there's no condition,
     // there will not be re-parsing.
     let cond = binary_lv9.parse_next(input)?;
-    match (pad("?"), expr, pad(":"), expr).parse_next(input) {
+    match (token("?"), expr, token(":"), expr).parse_next(input) {
         Ok((_, pass, _, fail)) => Ok(Expr::Conditional(
             Box::new(cond),
             Box::new(pass),
