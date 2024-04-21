@@ -37,6 +37,9 @@ pub enum MiddelError {
     // 优化错误
     #[error("optimize error")]
     OptimizeError,
+    // Custom error
+    #[error("custom error")]
+    CustomError(String),
 }
 
 // 后端错误

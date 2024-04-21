@@ -333,4 +333,23 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca i1\n%icmp_2 = icmp slt i32 1, 2\nstore i1 %icmp_2, ptr %alloca_1\n%alloca_4 = alloca i1\n%itofp_5 = sitofp i32 1 to float\n%fcmp_6 = fcmp ult float %itofp_5, 1.1\nstore i1 %fcmp_6, ptr %alloca_4\n%load_8 = load i1, ptr %alloca_1\n%load_9 = load i1, ptr %alloca_4\n%And_10 = and i1, %load_8, %load_9\n%zext_11 = zext i1 %And_10 to i32\nret %zext_11\n\n\n}\n");
     }
+
+    #[test]
+    fn test_constant_fold() {
+        let code = r#"
+            const int x = 1 + 3;
+            const int y = x * x;
+            int main() {
+                return x + y;
+            }
+        "#;
+        let program = parse(code).unwrap();
+        assert_eq!(format!("{:?}", program), "Program { module: [Const(Int32, \"x\", Some(Binary(Add, Int32(1), Int32(3)))), Const(Int32, \"y\", Some(Binary(Mul, Var(\"x\"), Var(\"x\")))), Func(Function(Int32, []), \"main\", Some(Block([Return(Some(Binary(Add, Var(\"x\"), Var(\"y\"))))])))] }");
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_eq!(
+            llvm_ir,
+            "@x = dso_local constant i32 [4]\n@y = dso_local constant i32 [16]\ndefine i32 @main() {\n%entry:\n%load_1 = load i32, ptr @x\n%load_2 = load i32, ptr @y\n%Add_3 = add i32, %load_1, %load_2\nret %Add_3\n\n\n}\n"
+        );
+    }
 }
