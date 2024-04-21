@@ -44,7 +44,7 @@ impl Value {
     pub fn constant(self) -> Result<Constant, MiddelError> {
         match self {
             Value::Operand(Operand::Constant(c)) => Ok(c),
-            _ => Err(MiddelError::GenError),
+            _ => Err(MiddelError::CustomError("expected constant".to_string())),
         }
     }
 

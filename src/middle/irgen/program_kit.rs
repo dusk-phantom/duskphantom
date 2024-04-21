@@ -1,6 +1,6 @@
 use crate::errors::MiddelError;
 use crate::frontend::{BinaryOp, Decl, Expr, Type, UnaryOp};
-use crate::middle::ir::{Constant, FunPtr};
+use crate::middle::ir::{Constant, FunPtr, Operand};
 use crate::middle::irgen::function_kit::FunctionKit;
 use crate::middle::irgen::value::Value;
 use crate::middle::irgen::{constant, value_type};
@@ -144,12 +144,18 @@ impl<'a> ProgramKit<'a> {
         match expr {
             Expr::Var(x) => {
                 // Ensure variable is defined
-                let Some(operand) = self.env.get(x) else {
-                    return Err(MiddelError::GenError);
+                let Some(val) = self.env.get(x) else {
+                    return Err(MiddelError::CustomError(format!("{} not defined", x)));
                 };
 
-                // Clone the operand and return, this clones the underlying value or InstPtr
-                Ok(operand.clone())
+                // Make sure returned value is a constant
+                // If operand is a global variable, convert it to constant
+                // because the global variable's value is not mutated yet
+                match val.clone() {
+                    Value::Pointer(Operand::Global(gvar)) => Ok(gvar.initializer[0].into()),
+                    val @ Value::Operand(Operand::Constant(_)) => Ok(val),
+                    _ => Err(MiddelError::CustomError(format!("{} isn't const", x))),
+                }
             }
             // Some memory copy operation is required to process arrays
             Expr::Pack(_) => Err(MiddelError::GenError),
@@ -221,4 +227,3 @@ impl<'a> ProgramKit<'a> {
         }
     }
 }
-
