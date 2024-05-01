@@ -12,7 +12,7 @@ pub struct GlobalVariable {
     pub value_type: ValueType,
     /// True if the global variable is a global variable, false if it is a global constant.
     pub variable_or_constant: bool,
-    pub initializer: Vec<Constant>,
+    pub initializer: Constant,
     user: Vec<InstPtr>,
 }
 
@@ -27,7 +27,7 @@ impl GlobalVariable {
         name: String,
         value_type: ValueType,
         variable_or_constant: bool,
-        initializer: Vec<Constant>,
+        initializer: Constant,
     ) -> Self {
         Self {
             name,
@@ -48,14 +48,7 @@ impl GlobalVariable {
                 "constant"
             },
             self.value_type,
-            "[".to_owned()
-                + &self
-                    .initializer
-                    .iter()
-                    .map(|x| x.to_string())
-                    .collect::<Vec<String>>()
-                    .join(", ")
-                + "]"
+            self.initializer,
         )
     }
 

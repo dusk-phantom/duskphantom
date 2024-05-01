@@ -40,7 +40,7 @@ impl<'a> ProgramKit<'a> {
 
                 // Get initializer
                 let initializer = match val {
-                    Some(v) => vec![self.gen_const_expr(v)?.constant()?],
+                    Some(v) => self.gen_const_expr(v)?,
                     None => constant::type_to_const(ty)?,
                 };
 
@@ -140,7 +140,7 @@ impl<'a> ProgramKit<'a> {
     }
 
     /// Generate constant expression
-    pub fn gen_const_expr(&mut self, expr: &Expr) -> Result<Value, MiddelError> {
+    pub fn gen_const_expr(&mut self, expr: &Expr) -> Result<Constant, MiddelError> {
         match expr {
             Expr::Var(x) => {
                 // Ensure variable is defined
@@ -152,19 +152,22 @@ impl<'a> ProgramKit<'a> {
                 // If operand is a global variable, convert it to constant
                 // because the global variable's value is not mutated yet
                 match val.clone() {
-                    Value::Pointer(Operand::Global(gvar)) => Ok(gvar.initializer[0].into()),
-                    val @ Value::Operand(Operand::Constant(_)) => Ok(val),
+                    Value::Pointer(Operand::Global(gvar)) => Ok(gvar.initializer.clone()),
+                    Value::Operand(Operand::Constant(val)) => Ok(val),
                     _ => Err(MiddelError::CustomError(format!("{} isn't const", x))),
                 }
             }
-            // Some memory copy operation is required to process arrays
-            Expr::Pack(_) => Err(MiddelError::GenError),
+            Expr::Pack(ls) => Ok(Constant::Array(
+                ls.iter()
+                    .map(|x| self.gen_const_expr(x))
+                    .collect::<Result<_, _>>()?,
+            )),
             Expr::Map(_) => Err(MiddelError::GenError),
             Expr::Index(_, _) => Err(MiddelError::GenError),
             Expr::Field(_, _) => Err(MiddelError::GenError),
             Expr::Select(_, _) => Err(MiddelError::GenError),
-            Expr::Int32(x) => Ok(Constant::Int(*x).into()),
-            Expr::Float32(x) => Ok(Constant::Float(*x).into()),
+            Expr::Int32(x) => Ok(Constant::Int(*x)),
+            Expr::Float32(x) => Ok(Constant::Float(*x)),
             Expr::String(_) => Err(MiddelError::GenError),
             Expr::Char(_) => Err(MiddelError::GenError),
             Expr::Bool(_) => Err(MiddelError::GenError),
@@ -176,15 +179,15 @@ impl<'a> ProgramKit<'a> {
     }
 
     /// Generate a unary expression
-    pub fn gen_const_unary(&mut self, op: &UnaryOp, expr: &Expr) -> Result<Value, MiddelError> {
+    pub fn gen_const_unary(&mut self, op: &UnaryOp, expr: &Expr) -> Result<Constant, MiddelError> {
         // Generate constant
-        let val = self.gen_const_expr(expr)?.constant()?;
+        let val = self.gen_const_expr(expr)?;
 
         // Apply operation
         match op {
-            UnaryOp::Neg => Ok((-val).into()),
-            UnaryOp::Pos => Ok(val.into()),
-            UnaryOp::Not => Ok((!val).into()),
+            UnaryOp::Neg => Ok(-val),
+            UnaryOp::Pos => Ok(val),
+            UnaryOp::Not => Ok(!val),
             _ => Err(MiddelError::GenError),
         }
     }
@@ -195,35 +198,35 @@ impl<'a> ProgramKit<'a> {
         op: &BinaryOp,
         lhs: &Expr,
         rhs: &Expr,
-    ) -> Result<Value, MiddelError> {
+    ) -> Result<Constant, MiddelError> {
         // Generate constants
-        let lv = self.gen_const_expr(lhs)?.constant()?;
-        let rv = self.gen_const_expr(rhs)?.constant()?;
+        let lv = self.gen_const_expr(lhs)?;
+        let rv = self.gen_const_expr(rhs)?;
 
         // Apply operation
         match op {
-            BinaryOp::Add => Ok((lv + rv).into()),
-            BinaryOp::Sub => Ok((lv - rv).into()),
-            BinaryOp::Mul => Ok((lv * rv).into()),
-            BinaryOp::Div => Ok((lv / rv).into()),
-            BinaryOp::Mod => Ok((lv % rv).into()),
+            BinaryOp::Add => Ok(lv + rv),
+            BinaryOp::Sub => Ok(lv - rv),
+            BinaryOp::Mul => Ok(lv * rv),
+            BinaryOp::Div => Ok(lv / rv),
+            BinaryOp::Mod => Ok(lv % rv),
             BinaryOp::Shr => Err(MiddelError::GenError),
             BinaryOp::Shl => Err(MiddelError::GenError),
             BinaryOp::BitAnd => Err(MiddelError::GenError),
             BinaryOp::BitOr => Err(MiddelError::GenError),
             BinaryOp::BitXor => Err(MiddelError::GenError),
-            BinaryOp::Gt => Ok(Constant::Bool(lv > rv).into()),
-            BinaryOp::Lt => Ok(Constant::Bool(lv < rv).into()),
-            BinaryOp::Ge => Ok(Constant::Bool(lv >= rv).into()),
-            BinaryOp::Le => Ok(Constant::Bool(lv <= rv).into()),
-            BinaryOp::Eq => Ok(Constant::Bool(lv == rv).into()),
-            BinaryOp::Ne => Ok(Constant::Bool(lv != rv).into()),
-            BinaryOp::And => {
-                Ok(Constant::Bool(Into::<bool>::into(lv) && Into::<bool>::into(rv)).into())
-            }
-            BinaryOp::Or => {
-                Ok(Constant::Bool(Into::<bool>::into(lv) || Into::<bool>::into(rv)).into())
-            }
+            BinaryOp::Gt => Ok(Constant::Bool(lv > rv)),
+            BinaryOp::Lt => Ok(Constant::Bool(lv < rv)),
+            BinaryOp::Ge => Ok(Constant::Bool(lv >= rv)),
+            BinaryOp::Le => Ok(Constant::Bool(lv <= rv)),
+            BinaryOp::Eq => Ok(Constant::Bool(lv == rv)),
+            BinaryOp::Ne => Ok(Constant::Bool(lv != rv)),
+            BinaryOp::And => Ok(Constant::Bool(
+                Into::<bool>::into(lv) && Into::<bool>::into(rv),
+            )),
+            BinaryOp::Or => Ok(Constant::Bool(
+                Into::<bool>::into(lv) || Into::<bool>::into(rv),
+            )),
         }
     }
 }

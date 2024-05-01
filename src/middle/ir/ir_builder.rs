@@ -33,7 +33,7 @@ impl IRBuilder {
         name: String,
         value_type: ValueType,
         variable_or_constant: bool,
-        initializer: Vec<Constant>,
+        initializer: Constant,
     ) -> GlobalPtr {
         self.gvar_pool.alloc(GlobalVariable::new(
             name,

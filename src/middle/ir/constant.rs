@@ -1,10 +1,11 @@
 use super::*;
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub enum Constant {
     Int(i32),
     Float(f32),
     Bool(bool),
+    Array(Vec<Constant>)
 }
 
 impl std::fmt::Display for Constant {
@@ -13,6 +14,16 @@ impl std::fmt::Display for Constant {
             Constant::Int(i) => write!(f, "{}", i),
             Constant::Float(fl) => write!(f, "{}", fl),
             Constant::Bool(b) => write!(f, "{}", b),
+            Constant::Array(arr) => {
+                write!(f, "[")?;
+                for (i, c) in arr.iter().enumerate() {
+                    write!(f, "{} {}", c.get_type(), c)?;
+                    if i != arr.len() - 1 {
+                        write!(f, ", ")?;
+                    }
+                }
+                write!(f, "]")
+            }
         }
     }
 }
@@ -23,6 +34,10 @@ impl Constant {
             Constant::Int(_) => ValueType::Int,
             Constant::Float(_) => ValueType::Float,
             Constant::Bool(_) => ValueType::Bool,
+            Constant::Array(arr) => {
+                let sub_type = arr.first().unwrap().get_type();
+                ValueType::Array(Box::new(sub_type), arr.len())
+            }
         }
     }
 }

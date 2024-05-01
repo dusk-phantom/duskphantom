@@ -119,7 +119,7 @@ impl IRBuilder {
                 panic!("Invalid index for getelementptr instruction");
             }
         }
-        
+
         // Generate the instruction from calculated type
         let mut inst = self.new_instruction(Box::new(GetElementPtr {
             element_type: element_type.clone(),
@@ -386,9 +386,9 @@ mod tests {
     #[test]
     fn test_getelementptr_subtype() {
         let mut ir_builder = IRBuilder::new();
-        let array_content = vec![Constant::Int(1), Constant::Int(2)];
+        let array_value = Constant::Array(vec![Constant::Int(1), Constant::Int(2)]);
         let array_type = ValueType::Array(ValueType::Int.into(), 2);
-        let ptr = ir_builder.new_global_variable("a".to_string(), array_type.clone(), true, array_content);
+        let ptr = ir_builder.new_global_variable("a".to_string(), array_type.clone(), true, array_value);
         let index = vec![Operand::Constant(1.into()), Operand::Constant(1.into())];
         let getelementptr = ir_builder.get_getelementptr(array_type, Operand::Global(ptr), index);
         assert_eq!(getelementptr.to_string(), "%getelementptr_0");
