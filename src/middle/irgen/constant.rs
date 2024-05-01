@@ -1,21 +1,23 @@
 use crate::errors::MiddelError;
 use crate::frontend::Type;
 use crate::middle::ir::{Constant, ValueType};
-use crate::middle::irgen::util;
 use std::cmp;
 use std::ops;
 
 /// Convert a type to its default constant
-pub fn type_to_const(ty: &Type) -> Result<Vec<Constant>, MiddelError> {
+pub fn type_to_const(ty: &Type) -> Result<Constant, MiddelError> {
     match ty {
         Type::Void => Err(MiddelError::GenError),
-        Type::Int32 => Ok(vec![Constant::Int(0)]),
-        Type::Float32 => Ok(vec![Constant::Float(0.0)]),
+        Type::Int32 => Ok(Constant::Int(0)),
+        Type::Float32 => Ok(Constant::Float(0.0)),
         Type::String => Err(MiddelError::GenError),
         Type::Char => Err(MiddelError::GenError),
-        Type::Boolean => Ok(vec![Constant::Bool(false)]),
+        Type::Boolean => Ok(Constant::Bool(false)),
         Type::Pointer(_) => Err(MiddelError::GenError),
-        Type::Array(ty, num) => Ok(util::repeat_vec(type_to_const(ty)?, *num)),
+        Type::Array(ty, num) => {
+            let inner_const = type_to_const(ty)?;
+            Ok(Constant::Array(vec![inner_const; *num]))
+        },
         Type::Function(_, _) => Err(MiddelError::GenError),
         Type::Enum(_) => Err(MiddelError::GenError),
         Type::Union(_) => Err(MiddelError::GenError),
@@ -30,6 +32,7 @@ impl From<Constant> for i32 {
             Constant::Int(x) => x,
             Constant::Float(x) => x as i32,
             Constant::Bool(x) => x as i32,
+            _ => panic!("Cannot cast {} to i32", val),
         }
     }
 }
@@ -40,6 +43,7 @@ impl From<Constant> for f32 {
             Constant::Int(x) => x as f32,
             Constant::Float(x) => x,
             Constant::Bool(x) => x as i32 as f32,
+            _ => panic!("Cannot cast {} to f32", val),
         }
     }
 }
@@ -50,6 +54,7 @@ impl From<Constant> for bool {
             Constant::Int(x) => x != 0,
             Constant::Float(x) => x != 0.0,
             Constant::Bool(x) => x,
+            _ => panic!("Cannot cast {} to bool", val),
         }
     }
 }
@@ -146,13 +151,35 @@ impl ops::Rem for Constant {
 
 impl cmp::PartialEq for Constant {
     fn eq(&self, other: &Constant) -> bool {
-        let max_ty = self.get_type().max_with(&other.get_type());
-        match max_ty {
-            ValueType::Float => Into::<f32>::into(*self) == Into::<f32>::into(*other),
-            ValueType::Int => Into::<i32>::into(*self) == Into::<i32>::into(*other),
-            ValueType::Bool => Into::<bool>::into(*self) == Into::<bool>::into(*other),
-            _ => todo!(),
+        match (self, other) {
+            // For array, compare length and all elements
+            (Constant::Array(a), Constant::Array(b)) => {
+                if a.len() != b.len() {
+                    return false;
+                }
+                for (x, y) in a.iter().zip(b.iter()) {
+                    if x != y {
+                        return false;
+                    }
+                }
+                true
+            }
+
+            // If only one of them is array, they are not equal
+            (Constant::Array(_), _) | (_, Constant::Array(_)) => false,
+
+            // For other types, cast to maximum type and then compare
+            (a, b) => {
+                let max_ty = self.get_type().max_with(&other.get_type());
+                match max_ty {
+                    ValueType::Float => Into::<f32>::into(a.clone()) == Into::<f32>::into(b.clone()),
+                    ValueType::Int => Into::<i32>::into(a.clone()) == Into::<i32>::into(b.clone()),
+                    ValueType::Bool => Into::<bool>::into(a.clone()) == Into::<bool>::into(b.clone()),
+                    _ => todo!(),
+                }
+            }
         }
+        
     }
 }
 
@@ -160,9 +187,9 @@ impl cmp::PartialOrd for Constant {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let max_ty = self.get_type().max_with(&other.get_type());
         match max_ty {
-            ValueType::Float => Into::<f32>::into(*self).partial_cmp(&Into::<f32>::into(*other)),
-            ValueType::Int => Into::<i32>::into(*self).partial_cmp(&Into::<i32>::into(*other)),
-            ValueType::Bool => Into::<bool>::into(*self).partial_cmp(&Into::<bool>::into(*other)),
+            ValueType::Float => Into::<f32>::into(self.clone()).partial_cmp(&Into::<f32>::into(other.clone())),
+            ValueType::Int => Into::<i32>::into(self.clone()).partial_cmp(&Into::<i32>::into(other.clone())),
+            ValueType::Bool => Into::<bool>::into(self.clone()).partial_cmp(&Into::<bool>::into(other.clone())),
             _ => todo!(),
         }
     }

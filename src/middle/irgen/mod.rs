@@ -5,7 +5,6 @@ use std::collections::HashMap;
 mod constant;
 mod function_kit;
 mod program_kit;
-mod util;
 mod value;
 mod value_type;
 
@@ -179,7 +178,7 @@ mod tests {
         assert_eq!(format!("{:?}", program), "Program { module: [Var(Int32, \"x\", Some(Int32(4))), Var(Int32, \"y\", Some(Int32(8))), Func(Function(Int32, []), \"main\", Some(Block([Expr(Some(Var(\"x\")), Binary(Add, Var(\"x\"), Var(\"y\"))), Return(Some(Var(\"x\")))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
-        assert_eq!(llvm_ir, "@x = dso_local global i32 [4]\n@y = dso_local global i32 [8]\ndefine i32 @main() {\n%entry:\n%load_1 = load i32, ptr @x\n%load_2 = load i32, ptr @y\n%Add_3 = add i32, %load_1, %load_2\nstore i32 %Add_3, ptr @x\n%load_5 = load i32, ptr @x\nret %load_5\n\n\n}\n");
+        assert_eq!(llvm_ir, "@x = dso_local global i32 4\n@y = dso_local global i32 [8]\ndefine i32 @main() {\n%entry:\n%load_1 = load i32, ptr @x\n%load_2 = load i32, ptr @y\n%Add_3 = add i32, %load_1, %load_2\nstore i32 %Add_3, ptr @x\n%load_5 = load i32, ptr @x\nret %load_5\n\n\n}\n");
     }
 
     #[test]
@@ -276,8 +275,39 @@ mod tests {
         assert_eq!(format!("{:?}", program), "Program { module: [Const(Float32, \"PI\", Some(Float32(3.1415925))), Func(Function(Int32, []), \"main\", Some(Block([Return(Some(Var(\"PI\")))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
-        // Constant folding is not avaliable yet
-        assert_eq!(llvm_ir, "@PI = dso_local constant float [3.1415925]\ndefine i32 @main() {\n%entry:\n%load_1 = load float, ptr @PI\n%fptoi_2 = fptosi float %load_1 to i32\nret %fptoi_2\n\n\n}\n");
+        assert_eq!(llvm_ir, "@PI = dso_local constant float 3.1415925\ndefine i32 @main() {\n%entry:\n%load_1 = load float, ptr @PI\n%fptoi_2 = fptosi float %load_1 to i32\nret %fptoi_2\n\n\n}\n");
+    }
+
+    #[test]
+    fn test_constant_array() {
+        let code = r#"
+            const float A[2] = {1, 4};
+
+            int main() {
+                return A[0];
+            }
+        "#;
+        let program = parse(code).unwrap();
+        assert_eq!(format!("{:?}", program), "Program { module: [Const(Array(Float32, 2), \"A\", Some(Pack([Int32(1), Int32(4)]))), Func(Function(Int32, []), \"main\", Some(Block([Return(Some(Index(Var(\"A\"), Int32(0))))])))] }");
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_eq!(llvm_ir, "@A = dso_local constant [2 x float] [i32 1, i32 4]\ndefine i32 @main() {\n%entry:\n%getelementptr_1 = getelementptr [2 x float], ptr @A, i32 0, i32 0\n%load_2 = load float, ptr %getelementptr_1\n%fptoi_3 = fptosi float %load_2 to i32\nret %fptoi_3\n\n\n}\n");
+    }
+
+    #[test]
+    fn test_large_array() {
+        let code = r#"
+            const float A[2][3] = {{1, 1, 4}, {5, 1, 4}};
+
+            int main() {
+                return A[1][1];
+            }
+        "#;
+        let program = parse(code).unwrap();
+        assert_eq!(format!("{:?}", program), "Program { module: [Const(Array(Array(Float32, 3), 2), \"A\", Some(Pack([Pack([Int32(1), Int32(1), Int32(4)]), Pack([Int32(5), Int32(1), Int32(4)])]))), Func(Function(Int32, []), \"main\", Some(Block([Return(Some(Index(Index(Var(\"A\"), Int32(1)), Int32(1))))])))] }");
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_eq!(llvm_ir, "@A = dso_local constant [2 x [3 x float]] [[3 x i32] [i32 1, i32 1, i32 4], [3 x i32] [i32 5, i32 1, i32 4]]\ndefine i32 @main() {\n%entry:\n%getelementptr_1 = getelementptr [2 x [3 x float]], ptr @A, i32 0, i32 1\n%getelementptr_2 = getelementptr [3 x float], ptr %getelementptr_1, i32 0, i32 1\n%load_3 = load float, ptr %getelementptr_2\n%fptoi_4 = fptosi float %load_3 to i32\nret %fptoi_4\n\n\n}\n");
     }
 
     #[test]
@@ -349,7 +379,7 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         assert_eq!(
             llvm_ir,
-            "@x = dso_local constant i32 [4]\n@y = dso_local constant i32 [16]\ndefine i32 @main() {\n%entry:\n%load_1 = load i32, ptr @x\n%load_2 = load i32, ptr @y\n%Add_3 = add i32, %load_1, %load_2\nret %Add_3\n\n\n}\n"
+            "@x = dso_local constant i32 4\n@y = dso_local constant i32 [16]\ndefine i32 @main() {\n%entry:\n%load_1 = load i32, ptr @x\n%load_2 = load i32, ptr @y\n%Add_3 = add i32, %load_1, %load_2\nret %Add_3\n\n\n}\n"
         );
     }
 }
