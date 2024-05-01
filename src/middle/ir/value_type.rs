@@ -43,4 +43,14 @@ impl ValueType {
     pub fn is_array(&self) -> bool {
         matches!(self, ValueType::Array(_, _))
     }
+
+    /// Get subtype of the value type.
+    /// Subtype is the type of the element in the array or the type of the pointer.
+    pub fn get_sub_type(&self) -> Option<&ValueType> {
+        match self {
+            ValueType::Array(sub_type, _) => Some(sub_type.as_ref()),
+            ValueType::Pointer(sub_type) => Some(sub_type.as_ref()),
+            _ => None,
+        }
+    }
 }
