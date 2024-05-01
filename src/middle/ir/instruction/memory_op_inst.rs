@@ -321,3 +321,50 @@ impl Instruction for GetElementPtr {
         s
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_alloca() {
+        let mut ir_builder = IRBuilder::new();
+        let alloca = ir_builder.get_alloca(ValueType::Int, 1);
+        assert_eq!(alloca.to_string(), "%alloca_0");
+        assert_eq!(alloca.get_value_type(), ValueType::Pointer(Box::new(ValueType::Int)));
+        assert_eq!(alloca.gen_llvm_ir(), "%alloca_0 = alloca i32");
+    }
+
+    #[test]
+    fn test_load() {
+        let mut ir_builder = IRBuilder::new();
+        let ptr = ir_builder.get_alloca(ValueType::Int, 1);
+        let load = ir_builder.get_load(ValueType::Int, Operand::Instruction(ptr));
+        assert_eq!(load.to_string(), "%load_1");
+        assert_eq!(load.get_value_type(), ValueType::Int);
+        assert_eq!(load.gen_llvm_ir(), "%load_1 = load i32, ptr %alloca_0");
+    }
+
+    #[test]
+    fn test_store() {
+        let mut ir_builder = IRBuilder::new();
+        let ptr = ir_builder.get_alloca(ValueType::Int, 1);
+        let value = Operand::Constant(1.into());
+        let store = ir_builder.get_store(value, Operand::Instruction(ptr));
+        assert_eq!(store.to_string(), "%store_1");
+        assert_eq!(store.get_value_type(), ValueType::Void);
+        assert_eq!(store.gen_llvm_ir(), "store i32 1, ptr %alloca_0");
+    }
+
+    #[test]
+    fn test_getelementptr() {
+        let mut ir_builder = IRBuilder::new();
+        let ptr = ir_builder.get_alloca(ValueType::Int, 1);
+        let index = vec![Operand::Constant(1.into())];
+        let getelementptr = ir_builder.get_getelementptr(ValueType
+            ::Int, Operand::Instruction(ptr), index);
+        assert_eq!(getelementptr.to_string(), "%getelementptr_1");
+        assert_eq!(getelementptr.get_value_type(), ValueType::Pointer(Box::new(ValueType::Int)));
+        assert_eq!(getelementptr.gen_llvm_ir(), "%getelementptr_1 = getelementptr i32, ptr %alloca_0, i32 1");
+    }
+}
