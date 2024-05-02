@@ -311,6 +311,21 @@ mod tests {
     }
 
     #[test]
+    fn test_variable_array() {
+        let code = r#"
+            int main() {
+                float A[2][3] = {{1, 1, 4}, {5, 1, 4}};
+                return A[1][1];
+            }
+        "#;
+        let program = parse(code).unwrap();
+        assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Array(Array(Float32, 3), 2), \"A\", Some(Pack([Pack([Int32(1), Int32(1), Int32(4)]), Pack([Int32(5), Int32(1), Int32(4)])])))), Return(Some(Index(Index(Var(\"A\"), Int32(1)), Int32(1))))])))] }");
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca [2 x [3 x float]]\n%getelementptr_2 = getelementptr [2 x [3 x float]], ptr %alloca_1, i32 0, i32 0\n%getelementptr_3 = getelementptr [3 x float], ptr %getelementptr_2, i32 0\n%getelementptr_4 = getelementptr [3 x float], ptr %getelementptr_3, i32 0, i32 0\n%getelementptr_5 = getelementptr float, ptr %getelementptr_4, i32 0\n%itofp_6 = sitofp i32 1 to float\nstore float %itofp_6, ptr %getelementptr_5\n%getelementptr_8 = getelementptr float, ptr %getelementptr_4, i32 1\n%itofp_9 = sitofp i32 1 to float\nstore float %itofp_9, ptr %getelementptr_8\n%getelementptr_11 = getelementptr float, ptr %getelementptr_4, i32 2\n%itofp_12 = sitofp i32 4 to float\nstore float %itofp_12, ptr %getelementptr_11\n%getelementptr_14 = getelementptr [3 x float], ptr %getelementptr_2, i32 1\n%getelementptr_15 = getelementptr [3 x float], ptr %getelementptr_14, i32 0, i32 0\n%getelementptr_16 = getelementptr float, ptr %getelementptr_15, i32 0\n%itofp_17 = sitofp i32 5 to float\nstore float %itofp_17, ptr %getelementptr_16\n%getelementptr_19 = getelementptr float, ptr %getelementptr_15, i32 1\n%itofp_20 = sitofp i32 1 to float\nstore float %itofp_20, ptr %getelementptr_19\n%getelementptr_22 = getelementptr float, ptr %getelementptr_15, i32 2\n%itofp_23 = sitofp i32 4 to float\nstore float %itofp_23, ptr %getelementptr_22\n%getelementptr_25 = getelementptr [2 x [3 x float]], ptr %alloca_1, i32 0, i32 1\n%getelementptr_26 = getelementptr [3 x float], ptr %getelementptr_25, i32 0, i32 1\n%load_27 = load float, ptr %getelementptr_26\n%fptoi_28 = fptosi float %load_27 to i32\nret %fptoi_28\n\n\n}\n");
+    }
+
+    #[test]
     fn test_number_condition() {
         let code = r#"
             int main() {

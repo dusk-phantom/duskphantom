@@ -9,6 +9,10 @@ use crate::middle::irgen::function_kit::FunctionKit;
 pub enum Value {
     Operand(Operand),
     Pointer(Operand),
+
+    /// An array of values.
+    /// Values in the array must all have the same type.
+    Array(Vec<Value>),
 }
 
 /// A value can be allocated with type and kit
@@ -33,10 +37,17 @@ impl Value {
         match self {
             Value::Operand(op) => op.get_type(),
             Value::Pointer(op) => match op.get_type() {
-                // Inside `Pointer` is the pointer to given value
+                // Inside `Pointer` is the pointer to given value,
+                // we're just getting type of the value
                 ValueType::Pointer(ty) => *ty,
                 _ => panic!("invalid pointer generated, whose content is not a pointer"),
             },
+            Value::Array(op) => {
+                // Inside `Array` is an array of values,
+                // we're getting type of the array
+                let ty = op[0].get_type();
+                ValueType::Array(Box::new(ty), op.len())
+            }
         }
     }
 
@@ -51,6 +62,12 @@ impl Value {
                 let inst = kit.program.mem_pool.get_load(ty.clone(), op);
                 kit.exit.push_back(inst);
                 inst.into()
+            }
+            Value::Array(_) => {
+                // Array is not loadable
+                return Err(MiddelError::CustomError(
+                    "array is not loadable".to_string(),
+                ));
             }
         };
 
@@ -108,7 +125,10 @@ impl Value {
                 kit.exit.push_back(inst);
                 Ok(inst.into())
             }
-            _ => Err(MiddelError::GenError),
+            (ty, target) => Err(MiddelError::CustomError(format!(
+                "cannot load from {} to {}",
+                ty, target,
+            ))),
         }
     }
 
@@ -125,6 +145,7 @@ impl Value {
         let ty = self.get_type();
         match self {
             Value::Operand(_) => Err(MiddelError::GenError),
+            Value::Array(_) => Err(MiddelError::GenError),
             Value::Pointer(op) => {
                 // Add instruction to exit
                 let inst = kit.program.mem_pool.get_getelementptr(ty, op, index);
@@ -137,12 +158,41 @@ impl Value {
         }
     }
 
-    /// Assign an operand to this value
-    pub fn assign(self, kit: &mut FunctionKit, op: Operand) -> Result<(), MiddelError> {
+    /// Assign a value to this value
+    pub fn assign(self, kit: &mut FunctionKit, val: Value) -> Result<(), MiddelError> {
+        let target = self.get_type();
+
+        // If target is array, load each element separately
+        if let Value::Array(arr) = val {
+            // Get first sub-pointer
+            let initial_ptr =
+                self.get_element_ptr(kit, vec![Constant::Int(0).into(), Constant::Int(0).into()])?;
+
+            // Iterate all sub-pointers
+            for (i, elem) in arr.into_iter().enumerate() {
+                let sub_ptr = initial_ptr
+                    .clone()
+                    .get_element_ptr(kit, vec![Constant::Int(i as i32).into()])?;
+
+                // Assign element to sub-pointer
+                sub_ptr.assign(kit, elem)?;
+            }
+            return Ok(());
+        }
+
+        // Otherwise load element
         match self {
-            Value::Operand(_) => Err(MiddelError::GenError),
+            Value::Operand(_) => Err(MiddelError::CustomError(
+                "cannot assign to read-only operand".to_string(),
+            )),
+            Value::Array(_) => Err(MiddelError::CustomError(
+                "cannot assign to array".to_string(),
+            )),
             Value::Pointer(ptr) => {
-                // Add instruction to exit
+                // Load operand from value first
+                let op = val.load(target, kit)?;
+
+                // Store operand to pointer
                 let inst = kit.program.mem_pool.get_store(op, ptr);
                 kit.exit.push_back(inst);
                 Ok(())
