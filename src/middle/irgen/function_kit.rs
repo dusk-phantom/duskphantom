@@ -1,10 +1,10 @@
 use crate::errors::MiddelError;
 use crate::frontend::{BinaryOp, Decl, Expr, Stmt, UnaryOp};
+use crate::middle;
 use crate::middle::ir::instruction::misc_inst::{FCmpOp, ICmpOp};
 use crate::middle::ir::{BBPtr, Constant, FunPtr, ValueType};
 use crate::middle::irgen::value::Value;
 use crate::middle::irgen::{value, value_type};
-use crate::{frontend, middle};
 use std::collections::HashMap;
 
 /// Kit for translating a function to middle IR
@@ -58,30 +58,12 @@ impl<'a> FunctionKit<'a> {
                 // Generate declaration
                 self.gen_decl(decl)
             }
-            Stmt::Expr(opt_left_val, expr) => {
+            Stmt::Expr(opt_lhs, expr) => {
                 // Generate expression
-                let expr_val = self.gen_expr(expr)?;
-                match opt_left_val {
-                    // Exist left value, try to add result to env
-                    Some(left_val) => match left_val {
-                        frontend::LVal::Nothing => Err(MiddelError::GenError),
-                        frontend::LVal::Var(id) => {
-                            // Find variable in environment
-                            let env_val = {
-                                let Some(v @ Value::Pointer(_)) = self.env.get(id) else {
-                                    return Err(MiddelError::GenError);
-                                };
-                                v.clone()
-                            };
-
-                            // Assign to value
-                            env_val.assign(self, expr_val)?;
-                            Ok(())
-                        }
-                        frontend::LVal::Index(_, _) => Err(MiddelError::GenError),
-                        frontend::LVal::Call(_, _) => Err(MiddelError::GenError),
-                        frontend::LVal::Pointer(_) => Err(MiddelError::GenError),
-                    },
+                let rhs = self.gen_expr(expr)?;
+                match opt_lhs {
+                    // Exist left value, try to assign
+                    Some(lhs) => self.gen_expr(lhs)?.assign(self, rhs),
                     // No left value, discard result
                     None => Ok(()),
                 }

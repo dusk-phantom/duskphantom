@@ -326,6 +326,22 @@ mod tests {
     }
 
     #[test]
+    fn test_assign_array() {
+        let code = r#"
+            int main() {
+                int A[1] = {0};
+                A[A[0]] = 1;
+                return A[0];
+            }
+        "#;
+        let program = parse(code).unwrap();
+        assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Array(Int32, 1), \"A\", Some(Pack([Int32(0)])))), Expr(Some(Index(Var(\"A\"), Index(Var(\"A\"), Int32(0)))), Int32(1)), Return(Some(Index(Var(\"A\"), Int32(0))))])))] }");
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca [1 x i32]\n%getelementptr_2 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 0\n%getelementptr_3 = getelementptr i32, ptr %getelementptr_2, i32 0\nstore i32 0, ptr %getelementptr_3\n%getelementptr_5 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 0\n%load_6 = load i32, ptr %getelementptr_5\n%getelementptr_7 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 %load_6\nstore i32 1, ptr %getelementptr_7\n%getelementptr_9 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 0\n%load_10 = load i32, ptr %getelementptr_9\nret %load_10\n\n\n}\n");
+    }
+
+    #[test]
     fn test_number_condition() {
         let code = r#"
             int main() {
