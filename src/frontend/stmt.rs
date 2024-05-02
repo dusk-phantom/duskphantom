@@ -16,8 +16,8 @@ pub enum Stmt {
 
     /// An expression as statement.
     /// Example:
-    /// `y = x++;` is `Expr(Val("y"), UnaryOperator(...))`
-    Expr(Option<LVal>, Expr),
+    /// `y = x++;` is `Expr(Var("y"), UnaryOperator(...))`
+    Expr(Option<Expr>, Expr),
 
     /// A conditional branch.
     /// If the third argument is None, it means there's no else block.
@@ -67,7 +67,9 @@ pub fn vec_stmt(input: &mut &str) -> PResult<Vec<Stmt>> {
 
 /// Expression with semicolon.
 pub fn expr_sc(input: &mut &str) -> PResult<Expr> {
-    (expr, cut_err(token(";"))).map(|(e, _)| e).parse_next(input)
+    (expr, cut_err(token(";")))
+        .map(|(e, _)| e)
+        .parse_next(input)
 }
 
 /// Decl or Expr.
@@ -94,7 +96,7 @@ pub fn stmt(input: &mut &str) -> PResult<Stmt> {
     alt((
         disp,
         decl.map(Stmt::Decl),
-        (opt(terminated(lval, token("="))), expr_sc).map(|(lval, expr)| Stmt::Expr(lval, expr)),
+        (opt(terminated(expr, token("="))), expr_sc).map(|(lval, expr)| Stmt::Expr(lval, expr)),
         token(";").value(Stmt::Nothing),
     ))
     .parse_next(input)
