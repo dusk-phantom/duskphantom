@@ -74,11 +74,8 @@ impl<'a> FunctionKit<'a> {
                                 v.clone()
                             };
 
-                            // Load as env variable type
-                            let operand = expr_val.load(env_val.get_type(), self)?;
-
                             // Assign to value
-                            env_val.assign(self, operand)?;
+                            env_val.assign(self, expr_val)?;
                             Ok(())
                         }
                         frontend::LVal::Index(_, _) => Err(MiddelError::GenError),
@@ -254,16 +251,16 @@ impl<'a> FunctionKit<'a> {
             Decl::Var(raw_ty, id, op) => {
                 // Allocate space for variable, add to environment
                 let ty = value_type::translate_type(raw_ty);
-                let val = value::alloc(ty.clone(), self);
-                self.env.insert(id.clone(), val.clone());
+                let lhs = value::alloc(ty.clone(), self);
+                self.env.insert(id.clone(), lhs.clone());
 
                 // Assign to the variable if it is defined
                 if let Some(expr) = op {
                     // Generate expression as variable type
-                    let operand = self.gen_expr(expr)?.load(ty.clone(), self)?;
+                    let rhs = self.gen_expr(expr)?;
 
                     // Assign operand to value
-                    val.assign(self, operand)?;
+                    lhs.assign(self, rhs)?;
                 };
                 Ok(())
             }
@@ -290,8 +287,11 @@ impl<'a> FunctionKit<'a> {
                 // Clone the operand and return, this clones the underlying value or InstPtr
                 Ok(operand.clone())
             }
-            // Some memory copy operation is required to process arrays
-            Expr::Pack(_) => Err(MiddelError::GenError),
+            Expr::Pack(ls) => Ok(Value::Array(
+                ls.iter()
+                    .map(|x| self.gen_expr(x))
+                    .collect::<Result<_, _>>()?,
+            )),
             Expr::Map(_) => Err(MiddelError::GenError),
             Expr::Index(x, v) => {
                 // Load index as integer
