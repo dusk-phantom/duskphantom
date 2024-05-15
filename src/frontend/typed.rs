@@ -91,7 +91,7 @@ pub enum LVal {
     Call(Box<LVal>, Vec<TypedIdent>),
 
     /// Application of indirection.
-    /// Example: `*x`
+    /// Example: `*x`, `x[]`
     Pointer(Box<LVal>),
 }
 
@@ -103,7 +103,13 @@ pub fn lval(input: &mut &str) -> PResult<LVal> {
         empty.value(LVal::Nothing),
     ));
     let access_tail = alt((
-        bracket(pad(usize)).map(|x| BoxF::new(move |acc| LVal::Index(acc, x))),
+        bracket(opt(pad(usize))).map(|x| {
+            // Empty bracket is pointer, non-empty bracket is index.
+            BoxF::new(move |acc| match x {
+                Some(ix) => LVal::Index(acc, ix),
+                None => LVal::Pointer(acc),
+            })
+        }),
         paren(vec_typed).map(|x| BoxF::new(|acc| LVal::Call(acc, x))),
     ));
     let access = lrec(atom, repeat(0.., access_tail));
@@ -262,6 +268,18 @@ pub mod tests_typed {
                     Box::new(Type::Pointer(Box::new(Type::Int32))),
                     vec![TypedIdent::new(Type::Int32, None)],
                 )
+            ),
+            Err(err) => panic!("failed to parse {}: {}", code, err),
+        }
+    }
+
+    #[test]
+    fn test_array_pointer() {
+        let code = "int x[][4]";
+        match single_type.parse(code) {
+            Ok(result) => assert_eq!(
+                result,
+                Type::Pointer(Box::new(Type::Array(Box::new(Type::Int32), 4)))
             ),
             Err(err) => panic!("failed to parse {}: {}", code, err),
         }
