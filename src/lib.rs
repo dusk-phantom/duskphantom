@@ -2,9 +2,10 @@ use errors::CompilerError;
 
 pub mod args;
 pub mod backend;
-#[cfg(feature = "clang_embeded")]
+
+#[cfg(feature = "clang_enabled")]
 pub mod clang_backend;
-#[cfg(feature = "clang_embeded")]
+#[cfg(feature = "clang_enabled")]
 pub mod clang_frontend;
 pub mod config;
 pub mod errors;
@@ -38,7 +39,7 @@ pub fn compile(
     std::fs::write(output_path, output).map_err(CompilerError::IOError)
 }
 
-#[cfg(feature = "clang_embeded")]
+#[cfg(feature = "clang_enabled")]
 /// compile from clang
 pub fn compile_clang(
     src_file: &str,
@@ -64,7 +65,7 @@ pub fn compile_clang(
     std::fs::write(output_file, output).map_err(CompilerError::IOError)
 }
 
-#[cfg(feature = "clang_embeded")]
+#[cfg(feature = "clang_enabled")]
 pub fn compile_clang_llc(
     src_file: &str,
     output_file: &str,
@@ -91,7 +92,7 @@ pub fn compile_clang_llc(
 #[allow(unused)]
 pub fn asm2bin(asm: String) -> String {
     // 使用lcc将汇编代码编译成二进制文件
-    #[cfg(feature = "clang_embeded")]
+    #[cfg(feature = "clang_enabled")]
     {
         let mut builder = tempfile::Builder::new();
         let tmp_asm_file = builder.suffix(".s").tempfile().unwrap();
@@ -115,7 +116,7 @@ pub fn asm2bin(asm: String) -> String {
         }
         bin_str
     }
-    #[cfg(not(feature = "clang_embeded"))]
+    #[cfg(not(feature = "clang_enabled"))]
     {
         String::new()
     }

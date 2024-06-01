@@ -4,7 +4,7 @@ use super::super::prog::Program;
 use crate::clang_frontend;
 use crate::errors::BackendError;
 
-#[cfg(feature = "clang_embeded")]
+#[cfg(feature = "clang_enabled")]
 #[allow(unused)]
 pub fn gen_from_clang(program: &clang_frontend::Program) -> Result<Program, BackendError> {
     use llvm_ir::Constant;
