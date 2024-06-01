@@ -8,7 +8,6 @@ use crate::errors::BackendError;
 #[allow(unused)]
 pub fn gen_from_clang(program: &clang_frontend::Program) -> Result<Program, BackendError> {
     use llvm_ir::Constant;
-    use winnow::ascii::Int;
 
     let mut global_vars = Vec::new();
     let mut funcs = Vec::new();
@@ -51,11 +50,10 @@ pub fn gen_from_clang(program: &clang_frontend::Program) -> Result<Program, Back
             }
         }
     }
-
     dbg!(&global_vars);
-    for f in &llvm.functions {
-        dbg!(f);
-    }
+    // for f in &llvm.functions {
+    //     dbg!(f);
+    // }
     let mdl = module::Module {
         name: "main".to_string(),
         entry: Some("main".to_string()),
