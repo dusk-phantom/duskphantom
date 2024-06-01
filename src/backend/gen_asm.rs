@@ -66,7 +66,7 @@ impl GenTool {
         ret
     }
     #[inline]
-    fn gen_preffix(file: &str) -> String {
+    fn gen_prefix(file: &str) -> String {
         let mut ret = String::with_capacity(64);
         ret.push_str(format!(".file \"{}\"\n", file).as_str());
         ret.push_str(".option pic\n");
@@ -81,8 +81,8 @@ impl GenTool {
     #[inline]
     pub fn gen_prog(file: &str, global: &str, funcs: &str) -> String {
         let mut ret = String::with_capacity(1024);
-        // gen preffix
-        ret.push_str(GenTool::gen_preffix(file).as_str());
+        // gen prefix
+        ret.push_str(GenTool::gen_prefix(file).as_str());
         ret.push('\n');
         // gen global data
         ret.push_str(global);

@@ -1,6 +1,5 @@
-use llvm_ir::{constant::Float, name};
-
-use super::gen_asm::GenTool;
+#[allow(unused)]
+use super::*;
 
 #[derive(Clone, Debug)]
 pub enum Var {
