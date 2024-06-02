@@ -50,8 +50,8 @@ harness = false
 
 # 特性管理
 [features]
-# default = ["clang_embeded"] # 解除该行注释获取基于clang的前后端
-clang_embeded = ["llvm-ir"]
+# default = ["clang_enabled"] # 解除该行注释获取基于clang的前后端
+clang_enabled = ["llvm-ir"]
 
 [profile.release]
 lto = true
