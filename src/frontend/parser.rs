@@ -231,7 +231,7 @@ impl<T> BoxF<T> {
 ///
 /// Note that `lrec` has built-in memoization, so parsing would be O(n).
 /// Benchmark results show that lrec / rrec has slightly better performance
-/// than hand-writter recursive version.
+/// than hand-written recursive version.
 ///
 /// `head`: parser of the FIRST element of left-recursive chain.
 /// `tail`: parser of ALL later elements, returning MUTATION on `head`.

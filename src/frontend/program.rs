@@ -1,7 +1,7 @@
 use super::*;
 
 /// The full program.
-/// A excutable program is a set of modules with an entry module.
+/// A executable program is a set of modules with an entry module.
 /// For now, only one module is supported, so the only module is entry.
 #[derive(Clone, PartialEq, Debug)]
 pub struct Program {

@@ -48,7 +48,7 @@ pub fn unary_op(input: &mut &str) -> PResult<UnaryOp> {
     .parse_next(input)
 }
 
-/// Bianry operator type.
+/// Binry operator type.
 /// Example: `+`, `-`
 #[derive(Clone, PartialEq, Debug)]
 pub enum BinaryOp {
@@ -103,7 +103,11 @@ pub fn binary_op_lv0(input: &mut &str) -> PResult<BinaryOp> {
 
 /// Level 1 operators, left to right
 pub fn binary_op_lv1(input: &mut &str) -> PResult<BinaryOp> {
-    alt((token("+").value(BinaryOp::Add), token("-").value(BinaryOp::Sub))).parse_next(input)
+    alt((
+        token("+").value(BinaryOp::Add),
+        token("-").value(BinaryOp::Sub),
+    ))
+    .parse_next(input)
 }
 
 /// Level 2 operators, left to right
@@ -133,7 +137,11 @@ pub fn binary_op_lv3(input: &mut &str) -> PResult<BinaryOp> {
 
 /// Level 4 operators, left to right
 pub fn binary_op_lv4(input: &mut &str) -> PResult<BinaryOp> {
-    alt((token("==").value(BinaryOp::Eq), token("!=").value(BinaryOp::Ne))).parse_next(input)
+    alt((
+        token("==").value(BinaryOp::Eq),
+        token("!=").value(BinaryOp::Ne),
+    ))
+    .parse_next(input)
 }
 
 /// Level 5 operators, left to right
