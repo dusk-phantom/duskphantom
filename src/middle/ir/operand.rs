@@ -5,7 +5,7 @@ pub enum Operand {
     Constant(Constant),
 
     Global(GlobalPtr),
-    Parametr(ParaPtr),
+    Parameter(ParaPtr),
 
     Instruction(InstPtr),
 }
@@ -15,7 +15,7 @@ impl Display for Operand {
         match self {
             Operand::Constant(c) => write!(f, "{}", c),
             Operand::Global(g) => write!(f, "{}", g),
-            Operand::Parametr(p) => write!(f, "{}", p),
+            Operand::Parameter(p) => write!(f, "{}", p),
             Operand::Instruction(inst) => write!(f, "{}", inst),
         }
     }
@@ -27,7 +27,7 @@ impl Operand {
             Operand::Constant(c) => c.get_type(),
             // Type of global var identifier (@gvar) is pointer
             Operand::Global(g) => ValueType::Pointer(g.value_type.clone().into()),
-            Operand::Parametr(p) => p.value_type.clone(),
+            Operand::Parameter(p) => p.value_type.clone(),
             Operand::Instruction(inst) => inst.get_value_type(),
         }
     }
@@ -47,7 +47,7 @@ impl From<InstPtr> for Operand {
 
 impl From<ParaPtr> for Operand {
     fn from(param: ParaPtr) -> Self {
-        Self::Parametr(param)
+        Self::Parameter(param)
     }
 }
 

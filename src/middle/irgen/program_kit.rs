@@ -1,4 +1,4 @@
-use crate::errors::MiddelError;
+use crate::errors::MiddleError;
 use crate::frontend::{BinaryOp, Decl, Expr, Type, UnaryOp};
 use crate::middle::ir::{Constant, FunPtr, Operand};
 use crate::middle::irgen::function_kit::FunctionKit;
@@ -16,7 +16,7 @@ pub struct ProgramKit<'a> {
 
 /// A program kit (top level) can generate declarations
 impl<'a> ProgramKit<'a> {
-    pub fn gen(mut self, program: &frontend::Program) -> Result<(), MiddelError> {
+    pub fn gen(mut self, program: &frontend::Program) -> Result<(), MiddleError> {
         for decl in program.module.iter() {
             self.gen_decl(decl)?;
         }
@@ -28,7 +28,7 @@ impl<'a> ProgramKit<'a> {
 
     /// Generate a declaration into the program
     /// Fails when declaration does not have a name
-    pub fn gen_decl(&mut self, decl: &Decl) -> Result<(), MiddelError> {
+    pub fn gen_decl(&mut self, decl: &Decl) -> Result<(), MiddleError> {
         match decl {
             Decl::Var(ty, id, val) | Decl::Const(ty, id, val) => {
                 // Get if value is global variable or constant
@@ -74,19 +74,19 @@ impl<'a> ProgramKit<'a> {
                 self.program.module.functions.push(fun_ptr);
                 Ok(())
             }
-            _ => Err(MiddelError::GenError),
+            _ => Err(MiddleError::GenError),
         }
     }
 
     /// Generate an implementation into the program
-    pub fn gen_impl(&mut self, decl: &Decl) -> Result<(), MiddelError> {
+    pub fn gen_impl(&mut self, decl: &Decl) -> Result<(), MiddleError> {
         match decl {
             Decl::Func(Type::Function(_, params), id, Some(stmt)) => {
                 // Clone function env before mutating it
                 let cloned_fun_env = self.fun_env.clone();
 
                 // Get function and its type
-                let fun_ptr = self.fun_env.get_mut(id).ok_or(MiddelError::GenError)?;
+                let fun_ptr = self.fun_env.get_mut(id).ok_or(MiddleError::GenError)?;
                 let fty = fun_ptr.return_type.clone();
 
                 // Create basic block
@@ -96,7 +96,7 @@ impl<'a> ProgramKit<'a> {
                 // Fill parameters
                 for param in params.iter() {
                     let param = self.program.mem_pool.new_parameter(
-                        param.id.clone().ok_or(MiddelError::GenError)?,
+                        param.id.clone().ok_or(MiddleError::GenError)?,
                         value_type::translate_type(&param.ty),
                     );
 
@@ -140,12 +140,12 @@ impl<'a> ProgramKit<'a> {
     }
 
     /// Generate constant expression
-    pub fn gen_const_expr(&mut self, expr: &Expr) -> Result<Constant, MiddelError> {
+    pub fn gen_const_expr(&mut self, expr: &Expr) -> Result<Constant, MiddleError> {
         match expr {
             Expr::Var(x) => {
                 // Ensure variable is defined
                 let Some(val) = self.env.get(x) else {
-                    return Err(MiddelError::CustomError(format!("{} not defined", x)));
+                    return Err(MiddleError::CustomError(format!("{} not defined", x)));
                 };
 
                 // Make sure returned value is a constant
@@ -154,7 +154,7 @@ impl<'a> ProgramKit<'a> {
                 match val.clone() {
                     Value::Pointer(Operand::Global(gvar)) => Ok(gvar.initializer.clone()),
                     Value::Operand(Operand::Constant(val)) => Ok(val),
-                    _ => Err(MiddelError::CustomError(format!("{} isn't const", x))),
+                    _ => Err(MiddleError::CustomError(format!("{} isn't const", x))),
                 }
             }
             Expr::Pack(ls) => Ok(Constant::Array(
@@ -162,24 +162,24 @@ impl<'a> ProgramKit<'a> {
                     .map(|x| self.gen_const_expr(x))
                     .collect::<Result<_, _>>()?,
             )),
-            Expr::Map(_) => Err(MiddelError::GenError),
-            Expr::Index(_, _) => Err(MiddelError::GenError),
-            Expr::Field(_, _) => Err(MiddelError::GenError),
-            Expr::Select(_, _) => Err(MiddelError::GenError),
+            Expr::Map(_) => Err(MiddleError::GenError),
+            Expr::Index(_, _) => Err(MiddleError::GenError),
+            Expr::Field(_, _) => Err(MiddleError::GenError),
+            Expr::Select(_, _) => Err(MiddleError::GenError),
             Expr::Int32(x) => Ok(Constant::Int(*x)),
             Expr::Float32(x) => Ok(Constant::Float(*x)),
-            Expr::String(_) => Err(MiddelError::GenError),
-            Expr::Char(_) => Err(MiddelError::GenError),
-            Expr::Bool(_) => Err(MiddelError::GenError),
-            Expr::Call(_, _) => Err(MiddelError::GenError),
+            Expr::String(_) => Err(MiddleError::GenError),
+            Expr::Char(_) => Err(MiddleError::GenError),
+            Expr::Bool(_) => Err(MiddleError::GenError),
+            Expr::Call(_, _) => Err(MiddleError::GenError),
             Expr::Unary(op, expr) => self.gen_const_unary(op, expr),
             Expr::Binary(op, lhs, rhs) => self.gen_const_binary(op, lhs, rhs),
-            Expr::Conditional(_, _, _) => Err(MiddelError::GenError),
+            Expr::Conditional(_, _, _) => Err(MiddleError::GenError),
         }
     }
 
     /// Generate a unary expression
-    pub fn gen_const_unary(&mut self, op: &UnaryOp, expr: &Expr) -> Result<Constant, MiddelError> {
+    pub fn gen_const_unary(&mut self, op: &UnaryOp, expr: &Expr) -> Result<Constant, MiddleError> {
         // Generate constant
         let val = self.gen_const_expr(expr)?;
 
@@ -188,7 +188,7 @@ impl<'a> ProgramKit<'a> {
             UnaryOp::Neg => Ok(-val),
             UnaryOp::Pos => Ok(val),
             UnaryOp::Not => Ok(!val),
-            _ => Err(MiddelError::GenError),
+            _ => Err(MiddleError::GenError),
         }
     }
 
@@ -198,7 +198,7 @@ impl<'a> ProgramKit<'a> {
         op: &BinaryOp,
         lhs: &Expr,
         rhs: &Expr,
-    ) -> Result<Constant, MiddelError> {
+    ) -> Result<Constant, MiddleError> {
         // Generate constants
         let lv = self.gen_const_expr(lhs)?;
         let rv = self.gen_const_expr(rhs)?;
@@ -210,11 +210,11 @@ impl<'a> ProgramKit<'a> {
             BinaryOp::Mul => Ok(lv * rv),
             BinaryOp::Div => Ok(lv / rv),
             BinaryOp::Mod => Ok(lv % rv),
-            BinaryOp::Shr => Err(MiddelError::GenError),
-            BinaryOp::Shl => Err(MiddelError::GenError),
-            BinaryOp::BitAnd => Err(MiddelError::GenError),
-            BinaryOp::BitOr => Err(MiddelError::GenError),
-            BinaryOp::BitXor => Err(MiddelError::GenError),
+            BinaryOp::Shr => Err(MiddleError::GenError),
+            BinaryOp::Shl => Err(MiddleError::GenError),
+            BinaryOp::BitAnd => Err(MiddleError::GenError),
+            BinaryOp::BitOr => Err(MiddleError::GenError),
+            BinaryOp::BitXor => Err(MiddleError::GenError),
             BinaryOp::Gt => Ok(Constant::Bool(lv > rv)),
             BinaryOp::Lt => Ok(Constant::Bool(lv < rv)),
             BinaryOp::Ge => Ok(Constant::Bool(lv >= rv)),

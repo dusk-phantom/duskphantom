@@ -8,7 +8,7 @@ use rayon::prelude::*;
 pub struct Func {
     name: String,
     args: Vec<String>,
-    // bacic blocks
+    // basic blocks
     bbs: Vec<Block>,
     // entry block
     entry: String,
