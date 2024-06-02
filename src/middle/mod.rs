@@ -1,4 +1,4 @@
-use crate::{errors::MiddelError, frontend, utils::mem::ObjPtr};
+use crate::{errors::MiddleError, frontend, utils::mem::ObjPtr};
 use ir::ir_builder::IRBuilder;
 
 mod analysis;
@@ -12,7 +12,7 @@ pub struct Program {
     pub mem_pool: Pin<Box<IRBuilder>>,
 }
 
-pub fn gen(program: &frontend::Program) -> Result<Program, MiddelError> {
+pub fn gen(program: &frontend::Program) -> Result<Program, MiddleError> {
     irgen::gen(program)
 }
 

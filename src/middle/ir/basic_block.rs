@@ -145,7 +145,7 @@ impl BasicBlock {
     }
 
     /// Returns a iterator of the `BasicBlock`.
-    /// The iterator yeilds the `InstPtr` of the `BasicBlock` except the head instruction.
+    /// The iterator yields the `InstPtr` of the `BasicBlock` except the head instruction.
     pub fn iter(&self) -> BasicBlockIterator {
         BasicBlockIterator {
             cur: self.head_inst,

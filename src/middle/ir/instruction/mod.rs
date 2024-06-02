@@ -445,7 +445,7 @@ impl InstManager {
             Operand::Instruction(mut inst) => {
                 inst.get_user_mut().push(self.self_ptr.unwrap());
             }
-            Operand::Parametr(mut param) => {
+            Operand::Parameter(mut param) => {
                 param.add_user(self.self_ptr.unwrap());
             }
             Operand::Global(mut global) => {

@@ -1,4 +1,4 @@
-use crate::errors::MiddelError;
+use crate::errors::MiddleError;
 use crate::middle::ir::instruction::misc_inst::{FCmpOp, ICmpOp};
 use crate::middle::ir::{Constant, Operand, ValueType};
 use crate::middle::irgen::function_kit::FunctionKit;
@@ -52,7 +52,7 @@ impl Value {
     }
 
     /// Load the value as an operand
-    pub fn load(self, target: ValueType, kit: &mut FunctionKit) -> Result<Operand, MiddelError> {
+    pub fn load(self, target: ValueType, kit: &mut FunctionKit) -> Result<Operand, MiddleError> {
         // Load raw
         let ty = self.get_type();
         let raw = match self {
@@ -65,7 +65,7 @@ impl Value {
             }
             Value::Array(_) => {
                 // Array is not loadable
-                return Err(MiddelError::CustomError(
+                return Err(MiddleError::CustomError(
                     "array is not loadable".to_string(),
                 ));
             }
@@ -125,7 +125,7 @@ impl Value {
                 kit.exit.push_back(inst);
                 Ok(inst.into())
             }
-            (ty, target) => Err(MiddelError::CustomError(format!(
+            (ty, target) => Err(MiddleError::CustomError(format!(
                 "cannot load from {} to {}",
                 ty, target,
             ))),
@@ -141,11 +141,11 @@ impl Value {
         self,
         kit: &mut FunctionKit,
         index: Vec<Operand>,
-    ) -> Result<Value, MiddelError> {
+    ) -> Result<Value, MiddleError> {
         let ty = self.get_type();
         match self {
-            Value::Operand(_) => Err(MiddelError::GenError),
-            Value::Array(_) => Err(MiddelError::GenError),
+            Value::Operand(_) => Err(MiddleError::GenError),
+            Value::Array(_) => Err(MiddleError::GenError),
             Value::Pointer(op) => {
                 // Add instruction to exit
                 let inst = kit.program.mem_pool.get_getelementptr(ty, op, index);
@@ -159,7 +159,7 @@ impl Value {
     }
 
     /// Assign a value to this value
-    pub fn assign(self, kit: &mut FunctionKit, val: Value) -> Result<(), MiddelError> {
+    pub fn assign(self, kit: &mut FunctionKit, val: Value) -> Result<(), MiddleError> {
         let target = self.get_type();
 
         // If target is array, load each element separately
@@ -182,10 +182,10 @@ impl Value {
 
         // Otherwise load element
         match self {
-            Value::Operand(_) => Err(MiddelError::CustomError(
+            Value::Operand(_) => Err(MiddleError::CustomError(
                 "cannot assign to read-only operand".to_string(),
             )),
-            Value::Array(_) => Err(MiddelError::CustomError(
+            Value::Array(_) => Err(MiddleError::CustomError(
                 "cannot assign to array".to_string(),
             )),
             Value::Pointer(ptr) => {

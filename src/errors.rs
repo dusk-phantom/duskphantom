@@ -11,7 +11,7 @@ pub enum CompilerError {
     FrontendError(#[from] FrontendError),
     // 中端错误
     #[error("middle error, cause: {0}")]
-    MiddleError(#[from] MiddelError),
+    MiddleError(#[from] MiddleError),
     // 后端错误
     #[error("backend error, cause: {0}")]
     BackendError(#[from] BackendError),
@@ -30,7 +30,7 @@ pub enum FrontendError {
 
 // 中端错误
 #[derive(Debug, Error)]
-pub enum MiddelError {
+pub enum MiddleError {
     // 生成错误
     #[error("gen error")]
     GenError,

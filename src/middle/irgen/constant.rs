@@ -1,27 +1,27 @@
-use crate::errors::MiddelError;
+use crate::errors::MiddleError;
 use crate::frontend::Type;
 use crate::middle::ir::{Constant, ValueType};
 use std::cmp;
 use std::ops;
 
 /// Convert a type to its default constant
-pub fn type_to_const(ty: &Type) -> Result<Constant, MiddelError> {
+pub fn type_to_const(ty: &Type) -> Result<Constant, MiddleError> {
     match ty {
-        Type::Void => Err(MiddelError::GenError),
+        Type::Void => Err(MiddleError::GenError),
         Type::Int32 => Ok(Constant::Int(0)),
         Type::Float32 => Ok(Constant::Float(0.0)),
-        Type::String => Err(MiddelError::GenError),
-        Type::Char => Err(MiddelError::GenError),
+        Type::String => Err(MiddleError::GenError),
+        Type::Char => Err(MiddleError::GenError),
         Type::Boolean => Ok(Constant::Bool(false)),
-        Type::Pointer(_) => Err(MiddelError::GenError),
+        Type::Pointer(_) => Err(MiddleError::GenError),
         Type::Array(ty, num) => {
             let inner_const = type_to_const(ty)?;
             Ok(Constant::Array(vec![inner_const; *num]))
-        },
-        Type::Function(_, _) => Err(MiddelError::GenError),
-        Type::Enum(_) => Err(MiddelError::GenError),
-        Type::Union(_) => Err(MiddelError::GenError),
-        Type::Struct(_) => Err(MiddelError::GenError),
+        }
+        Type::Function(_, _) => Err(MiddleError::GenError),
+        Type::Enum(_) => Err(MiddleError::GenError),
+        Type::Union(_) => Err(MiddleError::GenError),
+        Type::Struct(_) => Err(MiddleError::GenError),
     }
 }
 
@@ -172,14 +172,17 @@ impl cmp::PartialEq for Constant {
             (a, b) => {
                 let max_ty = self.get_type().max_with(&other.get_type());
                 match max_ty {
-                    ValueType::Float => Into::<f32>::into(a.clone()) == Into::<f32>::into(b.clone()),
+                    ValueType::Float => {
+                        Into::<f32>::into(a.clone()) == Into::<f32>::into(b.clone())
+                    }
                     ValueType::Int => Into::<i32>::into(a.clone()) == Into::<i32>::into(b.clone()),
-                    ValueType::Bool => Into::<bool>::into(a.clone()) == Into::<bool>::into(b.clone()),
+                    ValueType::Bool => {
+                        Into::<bool>::into(a.clone()) == Into::<bool>::into(b.clone())
+                    }
                     _ => todo!(),
                 }
             }
         }
-        
     }
 }
 
@@ -187,9 +190,15 @@ impl cmp::PartialOrd for Constant {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         let max_ty = self.get_type().max_with(&other.get_type());
         match max_ty {
-            ValueType::Float => Into::<f32>::into(self.clone()).partial_cmp(&Into::<f32>::into(other.clone())),
-            ValueType::Int => Into::<i32>::into(self.clone()).partial_cmp(&Into::<i32>::into(other.clone())),
-            ValueType::Bool => Into::<bool>::into(self.clone()).partial_cmp(&Into::<bool>::into(other.clone())),
+            ValueType::Float => {
+                Into::<f32>::into(self.clone()).partial_cmp(&Into::<f32>::into(other.clone()))
+            }
+            ValueType::Int => {
+                Into::<i32>::into(self.clone()).partial_cmp(&Into::<i32>::into(other.clone()))
+            }
+            ValueType::Bool => {
+                Into::<bool>::into(self.clone()).partial_cmp(&Into::<bool>::into(other.clone()))
+            }
             _ => todo!(),
         }
     }

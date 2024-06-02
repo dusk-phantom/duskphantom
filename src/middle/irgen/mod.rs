@@ -1,4 +1,4 @@
-use crate::{errors::MiddelError, frontend, middle};
+use crate::{errors::MiddleError, frontend, middle};
 use program_kit::ProgramKit;
 use std::collections::HashMap;
 
@@ -9,7 +9,7 @@ mod value;
 mod value_type;
 
 /// Generate middle IR from a frontend AST
-pub fn gen(program: &frontend::Program) -> Result<middle::Program, MiddelError> {
+pub fn gen(program: &frontend::Program) -> Result<middle::Program, MiddleError> {
     let mut result = middle::Program::new();
     ProgramKit {
         program: &mut result,

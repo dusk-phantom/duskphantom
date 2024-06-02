@@ -90,7 +90,7 @@ impl IRBuilder {
     ///
     /// # Return
     /// The pointer to the `GetElementPtr` instruction
-    /// 
+    ///
     /// # Panics
     /// Attempt to access subtype of primitive pointers will panic.
     ///
@@ -261,7 +261,7 @@ impl Instruction for Store {
             match &self.get_operand()[0] {
                 Operand::Instruction(inst) => format!("{}", inst.get_value_type()),
                 Operand::Constant(c) => format!("{}", c.get_type()),
-                Operand::Parametr(param) => format!("{}", param.value_type),
+                Operand::Parameter(param) => format!("{}", param.value_type),
                 _ => panic!("Invalid operand type"),
             },
             self.get_operand()[0],
@@ -347,7 +347,10 @@ mod tests {
         let mut ir_builder = IRBuilder::new();
         let alloca = ir_builder.get_alloca(ValueType::Int, 1);
         assert_eq!(alloca.to_string(), "%alloca_0");
-        assert_eq!(alloca.get_value_type(), ValueType::Pointer(Box::new(ValueType::Int)));
+        assert_eq!(
+            alloca.get_value_type(),
+            ValueType::Pointer(Box::new(ValueType::Int))
+        );
         assert_eq!(alloca.gen_llvm_ir(), "%alloca_0 = alloca i32");
     }
 
@@ -377,10 +380,17 @@ mod tests {
         let mut ir_builder = IRBuilder::new();
         let ptr = ir_builder.get_alloca(ValueType::Int, 1);
         let index = vec![Operand::Constant(1.into())];
-        let getelementptr = ir_builder.get_getelementptr(ValueType::Int, Operand::Instruction(ptr), index);
+        let getelementptr =
+            ir_builder.get_getelementptr(ValueType::Int, Operand::Instruction(ptr), index);
         assert_eq!(getelementptr.to_string(), "%getelementptr_1");
-        assert_eq!(getelementptr.get_value_type(), ValueType::Pointer(Box::new(ValueType::Int)));
-        assert_eq!(getelementptr.gen_llvm_ir(), "%getelementptr_1 = getelementptr i32, ptr %alloca_0, i32 1");
+        assert_eq!(
+            getelementptr.get_value_type(),
+            ValueType::Pointer(Box::new(ValueType::Int))
+        );
+        assert_eq!(
+            getelementptr.gen_llvm_ir(),
+            "%getelementptr_1 = getelementptr i32, ptr %alloca_0, i32 1"
+        );
     }
 
     #[test]
@@ -388,11 +398,18 @@ mod tests {
         let mut ir_builder = IRBuilder::new();
         let array_value = Constant::Array(vec![Constant::Int(1), Constant::Int(2)]);
         let array_type = ValueType::Array(ValueType::Int.into(), 2);
-        let ptr = ir_builder.new_global_variable("a".to_string(), array_type.clone(), true, array_value);
+        let ptr =
+            ir_builder.new_global_variable("a".to_string(), array_type.clone(), true, array_value);
         let index = vec![Operand::Constant(1.into()), Operand::Constant(1.into())];
         let getelementptr = ir_builder.get_getelementptr(array_type, Operand::Global(ptr), index);
         assert_eq!(getelementptr.to_string(), "%getelementptr_0");
-        assert_eq!(getelementptr.get_value_type(), ValueType::Pointer(Box::new(ValueType::Int)));
-        assert_eq!(getelementptr.gen_llvm_ir(), "%getelementptr_0 = getelementptr [2 x i32], ptr @a, i32 1, i32 1");
+        assert_eq!(
+            getelementptr.get_value_type(),
+            ValueType::Pointer(Box::new(ValueType::Int))
+        );
+        assert_eq!(
+            getelementptr.gen_llvm_ir(),
+            "%getelementptr_0 = getelementptr [2 x i32], ptr @a, i32 1, i32 1"
+        );
     }
 }
