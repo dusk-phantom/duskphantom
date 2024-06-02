@@ -1,7 +1,7 @@
 extern crate compiler;
 
 pub fn main() {
-    #[cfg(feature = "clang_embeded")]
+    #[cfg(feature = "clang_enabled")]
     {
         use compiler::compile_clang_llc;
         use compiler::errors::handle_error;
