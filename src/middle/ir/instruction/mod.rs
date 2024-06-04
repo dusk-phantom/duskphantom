@@ -250,23 +250,18 @@ pub trait Instruction: Display {
 
     /// Remove current instruction from the `BasicBlock`.
     /// This operation will remove the current instruction from the `BasicBlock` and clear the current operand.
-    fn remove_self(&mut self)
-    where
-        Self: Sized,
-    {
+    fn remove_self(&mut self) {
         unsafe {
+            let id = self.get_id();
             self.move_self();
-
-            let self_p = ObjPtr::new(self);
 
             let manager = self.get_manager_mut();
 
             manager.prev = None;
             manager.next = None;
             manager.operand.iter_mut().for_each(|op| {
-                if let Operand::Instruction(op) = op {
-                    op.get_user_mut()
-                        .retain(|user| !std::ptr::eq(user.as_ref().as_ref(), self_p.as_ref()));
+                if let Operand::Instruction(inst) = op {
+                    inst.get_user_mut().retain(|user| user.get_id() != id);
                 }
             });
             manager.operand.clear();
