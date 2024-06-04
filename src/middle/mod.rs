@@ -7,6 +7,8 @@ mod irgen;
 mod transform;
 
 use std::pin::Pin;
+
+use self::transform::deadcode_elimination::deadcode_elimination;
 pub struct Program {
     pub module: ir::Module,
     pub mem_pool: Pin<Box<IRBuilder>>,
@@ -17,7 +19,7 @@ pub fn gen(program: &frontend::Program) -> Result<Program, MiddleError> {
 }
 
 pub fn optimize(_program: &mut Program) {
-    todo!()
+    deadcode_elimination(&mut _program.module);
 }
 
 impl Default for Program {
