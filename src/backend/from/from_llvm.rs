@@ -13,14 +13,16 @@ pub fn gen_from_clang(program: &clang_frontend::Program) -> Result<Program, Back
     let mut funcs = Vec::new();
     let llvm = &program.llvm;
     for global_var in &llvm.global_vars {
+        dbg!(&global_var);
         let name = &global_var.name.to_string()[1..];
         if let Some(init) = &global_var.initializer {
+            dbg!(&init);
             let c = init.as_ref().to_owned();
             match c {
                 Constant::Int { bits, value } => {
                     let var = var::Var::Prim(var::PrimVar::IntVar(var::IntVar {
                         name: name.to_string(),
-                        init: Some(value as i64),
+                        init: Some(value as i32),
                         is_const: false,
                     }));
                     global_vars.push(var);
@@ -29,18 +31,19 @@ pub fn gen_from_clang(program: &clang_frontend::Program) -> Result<Program, Back
                     llvm_ir::constant::Float::Single(f) => {
                         let var = var::Var::Prim(var::PrimVar::FloatVar(var::FloatVar {
                             name: name.to_string(),
-                            init: Some(f as f64),
+                            init: Some(f),
                             is_const: false,
                         }));
                         global_vars.push(var);
                     }
                     llvm_ir::constant::Float::Double(f) => {
-                        let var = var::Var::Prim(var::PrimVar::FloatVar(var::FloatVar {
-                            name: name.to_string(),
-                            init: Some(f),
-                            is_const: false,
-                        }));
-                        global_vars.push(var);
+                        unimplemented!("double float");
+                        // let var = var::Var::Prim(var::PrimVar::FloatVar(var::FloatVar {
+                        //     name: name.to_string(),
+                        //     init: Some(f),
+                        //     is_const: false,
+                        // }));
+                        // global_vars.push(var);
                     }
                     _ => {
                         unreachable!();

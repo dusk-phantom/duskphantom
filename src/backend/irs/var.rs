@@ -1,3 +1,5 @@
+use gen_asm::{Data, GenTool};
+
 #[allow(unused)]
 use super::*;
 
@@ -5,7 +7,8 @@ use super::*;
 pub enum Var {
     Prim(PrimVar),
     Str(Str),
-    Arr(ArrVar),
+    IntArr(ArrVar<u32>),
+    FloatArr(ArrVar<f32>),
 }
 
 #[derive(Clone, Debug)]
@@ -16,7 +19,7 @@ pub enum PrimVar {
 #[derive(Clone, Debug)]
 pub struct IntVar {
     pub name: String,
-    pub init: Option<i64>,
+    pub init: Option<i32>,
     pub is_const: bool,
 }
 #[derive(Clone, Debug)]
@@ -27,40 +30,45 @@ pub struct Str {
 }
 impl Str {
     fn gen_asm(&self) -> String {
-        String::new()
+        let init = self.init.as_deref().unwrap_or("");
+        GenTool::gen_const_str(&self.name, init)
     }
 }
 #[derive(Clone, Debug)]
 pub struct FloatVar {
     pub name: String,
-    pub init: Option<f64>,
+    pub init: Option<f32>,
     pub is_const: bool,
 }
 #[derive(Clone, Debug)]
-pub struct ArrVar {
+pub struct ArrVar<T: Data> {
     pub name: String,
-    pub size: usize,
-    pub init: Vec<PrimVar>,
+    pub capacity: usize,
+    pub init: Vec<(usize, T)>,
     pub is_const: bool,
 }
 
-impl ArrVar {
+impl<T: Data> ArrVar<T> {
     pub fn gen_asm(&self) -> String {
-        // TODO
-        String::new()
+        GenTool::gen_array(&self.name, self.capacity, &self.init)
     }
 }
 impl PrimVar {
     pub fn gen_asm(&self) -> String {
-        // match self {
-        //     IntVar(i) => {
-        //         let n=i.n
-        //         // GenTool::gen_word(, val)
-        //     }
-        //     FloatVar(f) => {}
-        // }
-        // TODO
-        String::new()
+        match self {
+            PrimVar::IntVar(var) => var.gen_asm(),
+            PrimVar::FloatVar(var) => var.gen_asm(),
+        }
+    }
+}
+impl IntVar {
+    pub fn gen_asm(&self) -> String {
+        GenTool::gen_int(&self.name, self.init.unwrap_or(0))
+    }
+}
+impl FloatVar {
+    pub fn gen_asm(&self) -> String {
+        GenTool::gen_float(&self.name, self.init.unwrap_or(0.0))
     }
 }
 
@@ -69,7 +77,8 @@ impl Var {
         match self {
             Var::Prim(prim) => prim.gen_asm(),
             Var::Str(str) => str.gen_asm(),
-            Var::Arr(arr) => arr.gen_asm(),
+            Var::IntArr(arr) => arr.gen_asm(),
+            Var::FloatArr(arr) => arr.gen_asm(),
         }
     }
 }

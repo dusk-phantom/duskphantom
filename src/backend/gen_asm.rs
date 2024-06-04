@@ -146,6 +146,23 @@ impl GenTool {
         );
         ret
     }
+
+    #[inline]
+    pub fn gen_int<T: Into<i32>>(name: &str, val: T) -> String {
+        let val: i32 = val.into();
+        let mut ret = String::with_capacity(64);
+        ret.push_str(".data\n.align\t2\n");
+        ret.push_str(format!(".globl\t{}\n", name).as_str());
+        ret.push_str(
+            format!(
+                ".type\t{0}, @object\n.size\t{0}, 4\n{0}:\n.word\t{1}",
+                name, val
+            )
+            .as_str(),
+        );
+        ret
+    }
+
     #[inline]
     pub fn gen_float(name: &str, val: f32) -> String {
         let mut ret = String::with_capacity(128);
@@ -190,7 +207,7 @@ impl GenTool {
         ret
     }
     #[inline]
-    pub fn gen_array<T: Data>(name: &str, num_elems: u32, init: &[(u32, T)]) -> String {
+    pub fn gen_array<T: Data>(name: &str, num_elems: usize, init: &[(usize, T)]) -> String {
         let mut ret = String::with_capacity(128);
         let size_elem: u32 = T::size();
         ret.push_str(".data\n.align\t3\n");
@@ -199,25 +216,29 @@ impl GenTool {
             format!(
                 ".type\t{0}, @object\n.size\t{0}, {1}\n",
                 name,
-                num_elems * size_elem
+                num_elems * size_elem as usize
             )
             .as_str(),
         );
         ret.push_str(format!("{0}:\n", name).as_str());
-        let mut init: Vec<&(u32, T)> = init.iter().collect();
+        let mut init: Vec<&(usize, T)> = init.iter().collect();
         init.sort_by(|(idx1, _), (idx2, _)| idx1.cmp(idx2));
         for (index, (idx, val)) in init.iter().enumerate() {
             if index == 0 && idx != &0 {
-                ret.push_str(format!(".zero\t{}\n", idx * size_elem).as_str());
+                ret.push_str(format!(".zero\t{}\n", idx * size_elem as usize).as_str());
             } else if index != 0 {
                 let prev_idx = init[index - 1].0;
                 if idx - prev_idx != 1 {
-                    ret.push_str(format!(".zero\t{}\n", (idx - prev_idx - 1) * size_elem).as_str());
+                    ret.push_str(
+                        format!(".zero\t{}\n", (idx - prev_idx - 1) * size_elem as usize).as_str(),
+                    );
                 }
             }
             ret.push_str(format!("{}\n", val.to_str()).as_str());
             if index == init.len() - 1 {
-                ret.push_str(format!(".zero\t{}", (num_elems - idx - 1) * size_elem).as_str());
+                ret.push_str(
+                    format!(".zero\t{}", (num_elems - idx - 1) * size_elem as usize).as_str(),
+                );
             }
         }
         ret
@@ -428,6 +449,19 @@ hello:
 .double\t2
 .double\t3
 .zero\t56";
+        assert_eq!(s, raw_match);
+    }
+    #[test]
+    fn test_gen_int() {
+        let s = super::GenTool::gen_int("a", -1);
+        println!("{}", s);
+        let raw_match = ".data
+.align	2
+.globl	a
+.type	a, @object
+.size	a, 4
+a:
+.word	-1";
         assert_eq!(s, raw_match);
     }
 }
