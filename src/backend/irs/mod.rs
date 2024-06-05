@@ -3,6 +3,7 @@ pub mod func;
 pub mod inst;
 pub mod module;
 pub mod prog;
+pub mod stack_slot;
 pub mod var;
 
 pub use super::*;
@@ -10,3 +11,4 @@ pub use block::*;
 pub use func::*;
 pub use inst::*;
 pub use module::*;
+pub use stack_slot::*;
