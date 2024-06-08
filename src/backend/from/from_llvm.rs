@@ -3,16 +3,12 @@ use super::*;
 use super::super::prog::Program;
 use crate::clang_frontend;
 use crate::errors::BackendError;
+use llvm_ir::{Constant, Name};
+use std::collections::HashMap;
 
 #[cfg(feature = "clang_enabled")]
 #[allow(unused)]
 pub fn gen_from_clang(program: &clang_frontend::Program) -> Result<Program, BackendError> {
-    use std::collections::HashMap;
-
-    use llvm_ir::{Constant, Name};
-    use serde_yaml::Number;
-    use winnow::combinator::todo;
-
     let mut global_vars = Vec::new();
     let mut funcs = Vec::new();
     let llvm = &program.llvm;
@@ -64,8 +60,8 @@ pub fn gen_from_clang(program: &clang_frontend::Program) -> Result<Program, Back
         let mut stack_slots: HashMap<Name, StackSlot> = HashMap::new();
         // dbg!(&ret_ty);
         for bb in &f.basic_blocks {
+            // dbg!(bb);
             for inst in &bb.instrs {
-                dbg!(inst);
                 match inst {
                     llvm_ir::Instruction::Add(_) => todo!(),
                     llvm_ir::Instruction::Sub(_) => todo!(),
@@ -103,7 +99,32 @@ pub fn gen_from_clang(program: &clang_frontend::Program) -> Result<Program, Back
                     }
                     llvm_ir::Instruction::Load(_) => todo!(),
                     llvm_ir::Instruction::Store(store) => {
-                        //
+                        let address = &store.address;
+                        let val = &store.value;
+                        let address = match address {
+                            llvm_ir::Operand::LocalOperand { name, ty } => {
+                                let ss = stack_slots.get(name).unwrap();
+                                ss
+                            }
+                            llvm_ir::Operand::ConstantOperand(_) => todo!(),
+                            llvm_ir::Operand::MetadataOperand => todo!(),
+                        };
+                        // #[allow(unused)]
+                        // let val = match val {
+                        //     llvm_ir::Operand::LocalOperand { name, ty } => {
+                        //         todo!()
+                        //     }
+                        //     llvm_ir::Operand::ConstantOperand(c) => match c.as_ref() {
+                        //         Constant::Int { bits, value } => {
+                        //             // crate::backend::Operand::Imm(Imm::from(*value as i32))
+                        //         }
+                        //         Constant::Float(_) => todo!(),
+                        //         _ => todo!(),
+                        //     },
+                        //     llvm_ir::Operand::MetadataOperand => todo!(),
+                        // };
+
+                        dbg!(&store);
                         todo!();
                     }
                     llvm_ir::Instruction::Fence(_) => todo!(),
