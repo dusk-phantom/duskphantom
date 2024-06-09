@@ -350,3 +350,152 @@ impl Operand {
         }
     }
 }
+
+/// 单元测试
+#[cfg(test)]
+pub mod tests {
+    use std::collections::HashSet;
+
+    use super::*;
+
+    #[test]
+    fn test_gen_reg() {
+        let mut regs = HashSet::new();
+        let mut handlers = vec![];
+        for _ in 0..10 {
+            let handler = std::thread::spawn(move || {
+                let mut regs = HashSet::new();
+                for _ in 0..1000 {
+                    let reg = Reg::gen_virtual_usual_reg();
+                    regs.insert(reg.clone());
+                    let reg = Reg::gen_virtual_float_reg();
+                    regs.insert(reg.clone());
+                }
+                regs
+            });
+            handlers.push(handler);
+        }
+        for handler in handlers {
+            let par_regs = handler.join().unwrap();
+            regs.extend(par_regs.iter().cloned())
+        }
+        assert_eq!(regs.len(), 20000);
+        for reg in regs.iter() {
+            assert!(reg.is_virtual());
+        }
+        for i in 0..10000 {
+            let reg = Reg::new(i + 32, true);
+            assert!(regs.contains(&reg));
+            let reg = Reg::new(i + 32, false);
+            assert!(regs.contains(&reg));
+        }
+    }
+
+    #[test]
+    fn test_special_reg() {
+        let reg = Reg::new(0, true);
+        assert_eq!(reg.gen_asm(), "zero");
+        let reg = Reg::new(1, true);
+        assert_eq!(reg.gen_asm(), "ra");
+        let reg = Reg::new(2, true);
+        assert_eq!(reg.gen_asm(), "sp");
+        let reg = Reg::new(3, true);
+        assert_eq!(reg.gen_asm(), "gp");
+        let reg = Reg::new(4, true);
+        assert_eq!(reg.gen_asm(), "tp");
+    }
+    #[test]
+    fn test_usual_float() {
+        for i in 0..=31 {
+            let reg = Reg::new(i, true);
+            assert_eq!(reg.to_str(), format!("x{}", i));
+            assert!(reg.is_usual());
+            let reg = Reg::new(i, false);
+            assert_eq!(reg.to_str(), format!("f{}", i));
+            assert!(!reg.is_usual());
+        }
+    }
+    #[test]
+    fn test_phisic_virtual() {
+        for i in 0..=31 {
+            let reg = Reg::new(i, true);
+            assert!(reg.is_phisic());
+            assert!(!reg.is_virtual());
+            let reg = Reg::new(i, false);
+            assert!(reg.is_phisic());
+            assert!(!reg.is_virtual());
+        }
+        for i in 32..=127 {
+            let reg = Reg::new(i, false);
+            assert!(!reg.is_phisic());
+            assert!(reg.is_virtual());
+        }
+    }
+    #[test]
+    pub fn test_const_phisic_reg() {
+        assert_eq!(REG_ZERO.gen_asm(), "zero");
+        assert_eq!(REG_RA.gen_asm(), "ra");
+        assert_eq!(REG_SP.gen_asm(), "sp");
+        assert_eq!(REG_GP.gen_asm(), "gp");
+        assert_eq!(REG_TP.gen_asm(), "tp");
+        assert_eq!(REG_T0.gen_asm(), "t0");
+        assert_eq!(REG_T1.gen_asm(), "t1");
+        assert_eq!(REG_T2.gen_asm(), "t2");
+        assert_eq!(REG_S0.gen_asm(), "s0");
+        assert_eq!(REG_S1.gen_asm(), "s1");
+        assert_eq!(REG_A0.gen_asm(), "a0");
+        assert_eq!(REG_A1.gen_asm(), "a1");
+        assert_eq!(REG_A2.gen_asm(), "a2");
+        assert_eq!(REG_A3.gen_asm(), "a3");
+        assert_eq!(REG_A4.gen_asm(), "a4");
+        assert_eq!(REG_A5.gen_asm(), "a5");
+        assert_eq!(REG_A6.gen_asm(), "a6");
+        assert_eq!(REG_A7.gen_asm(), "a7");
+        assert_eq!(REG_S2.gen_asm(), "s2");
+        assert_eq!(REG_S3.gen_asm(), "s3");
+        assert_eq!(REG_S4.gen_asm(), "s4");
+        assert_eq!(REG_S5.gen_asm(), "s5");
+        assert_eq!(REG_S6.gen_asm(), "s6");
+        assert_eq!(REG_S7.gen_asm(), "s7");
+        assert_eq!(REG_S8.gen_asm(), "s8");
+        assert_eq!(REG_S9.gen_asm(), "s9");
+        assert_eq!(REG_S10.gen_asm(), "s10");
+        assert_eq!(REG_S11.gen_asm(), "s11");
+        assert_eq!(REG_T3.gen_asm(), "t3");
+        assert_eq!(REG_T4.gen_asm(), "t4");
+        assert_eq!(REG_T5.gen_asm(), "t5");
+        assert_eq!(REG_T6.gen_asm(), "t6");
+        assert_eq!(REG_FT0.gen_asm(), "ft0");
+        assert_eq!(REG_FT1.gen_asm(), "ft1");
+        assert_eq!(REG_FT2.gen_asm(), "ft2");
+        assert_eq!(REG_FT3.gen_asm(), "ft3");
+        assert_eq!(REG_FT4.gen_asm(), "ft4");
+        assert_eq!(REG_FT5.gen_asm(), "ft5");
+        assert_eq!(REG_FT6.gen_asm(), "ft6");
+        assert_eq!(REG_FT7.gen_asm(), "ft7");
+        assert_eq!(REG_FS0.gen_asm(), "fs0");
+        assert_eq!(REG_FS1.gen_asm(), "fs1");
+        assert_eq!(REG_FA0.gen_asm(), "fa0");
+        assert_eq!(REG_FA1.gen_asm(), "fa1");
+        assert_eq!(REG_FA2.gen_asm(), "fa2");
+        assert_eq!(REG_FA3.gen_asm(), "fa3");
+        assert_eq!(REG_FA4.gen_asm(), "fa4");
+        assert_eq!(REG_FA5.gen_asm(), "fa5");
+        assert_eq!(REG_FA6.gen_asm(), "fa6");
+        assert_eq!(REG_FA7.gen_asm(), "fa7");
+        assert_eq!(REG_FS2.gen_asm(), "fs2");
+        assert_eq!(REG_FS3.gen_asm(), "fs3");
+        assert_eq!(REG_FS4.gen_asm(), "fs4");
+        assert_eq!(REG_FS5.gen_asm(), "fs5");
+        assert_eq!(REG_FS6.gen_asm(), "fs6");
+        assert_eq!(REG_FS7.gen_asm(), "fs7");
+        assert_eq!(REG_FS8.gen_asm(), "fs8");
+        assert_eq!(REG_FS9.gen_asm(), "fs9");
+        assert_eq!(REG_FS10.gen_asm(), "fs10");
+        assert_eq!(REG_FS11.gen_asm(), "fs11");
+        assert_eq!(REG_FT8.gen_asm(), "ft8");
+        assert_eq!(REG_FT9.gen_asm(), "ft9");
+        assert_eq!(REG_FT10.gen_asm(), "ft10");
+        assert_eq!(REG_FT11.gen_asm(), "ft11");
+    }
+}
