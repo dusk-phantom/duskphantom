@@ -2,6 +2,8 @@ use crate::utils::paral_counter::ParalCounter;
 use once_cell::sync::Lazy;
 use std::ops::Deref;
 
+use super::BackendError;
+
 #[derive(Clone)]
 pub enum Operand {
     Reg(Reg),
@@ -347,6 +349,53 @@ impl Operand {
             Self::Imm(imm) => imm.gen_asm(),
             Self::Fmm(fmm) => fmm.gen_asm(),
             Self::Label(label) => label.gen_asm(),
+        }
+    }
+}
+
+impl TryInto<Reg> for Operand {
+    type Error = BackendError;
+    fn try_into(self) -> Result<Reg, Self::Error> {
+        match self {
+            Operand::Reg(reg) => Ok(reg),
+            _ => Err(BackendError::InternalConsistencyError(
+                "Operand is not a Reg".to_string(),
+            )),
+        }
+    }
+}
+
+impl TryInto<Imm> for Operand {
+    type Error = BackendError;
+    fn try_into(self) -> Result<Imm, Self::Error> {
+        match self {
+            Operand::Imm(imm) => Ok(imm),
+            _ => Err(BackendError::InternalConsistencyError(
+                "Operand is not a Imm".to_string(),
+            )),
+        }
+    }
+}
+impl TryInto<Fmm> for Operand {
+    type Error = BackendError;
+    fn try_into(self) -> Result<Fmm, Self::Error> {
+        match self {
+            Operand::Fmm(fmm) => Ok(fmm),
+            _ => Err(BackendError::InternalConsistencyError(
+                "Operand is not a Fmm".to_string(),
+            )),
+        }
+    }
+}
+
+impl TryInto<Label> for Operand {
+    type Error = BackendError;
+    fn try_into(self) -> Result<Label, Self::Error> {
+        match self {
+            Operand::Label(label) => Ok(label),
+            _ => Err(BackendError::InternalConsistencyError(
+                "Operand is not a Label".to_string(),
+            )),
         }
     }
 }

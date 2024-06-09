@@ -12,6 +12,7 @@ pub fn gen_from_clang(program: &clang_frontend::Program) -> Result<Program, Back
     let mut global_vars = Vec::new();
     let mut funcs = Vec::new();
     let llvm = &program.llvm;
+    // dbg!(&llvm.types);
     for global_var in &llvm.global_vars {
         // dbg!(&global_var);
         let name = &global_var.name.to_string()[1..];
@@ -70,8 +71,10 @@ pub fn gen_from_clang(program: &clang_frontend::Program) -> Result<Program, Back
         for bb in &f.basic_blocks {
             let mut m_bb = Block::new(bb.name.to_string());
             for inst in &bb.instrs {
-                let inst = build_instruction(inst, &mut stack_allocator, &mut stack_slots)?;
-                m_bb.push_inst(inst);
+                let gen_insts = build_instruction(inst, &mut stack_allocator, &mut stack_slots)?;
+                for inst in gen_insts {
+                    m_bb.push_inst(inst);
+                }
             }
             m_f.push_bb(m_bb);
         }
@@ -91,19 +94,11 @@ pub fn gen_from_clang(program: &clang_frontend::Program) -> Result<Program, Back
 }
 
 #[allow(unused)]
-impl TryFrom<&llvm_ir::Operand> for Operand {
-    type Error = BackendError;
-    fn try_from(value: &llvm_ir::Operand) -> Result<Self, Self::Error> {
-        todo!();
-    }
-}
-
-#[allow(unused)]
 pub fn build_instruction(
     inst: &llvm_ir::Instruction,
     stack_allocator: &mut StackAllocator,
     stack_slots: &mut HashMap<Name, StackSlot>,
-) -> Result<Inst, BackendError> {
+) -> Result<Vec<Inst>, BackendError> {
     match inst {
         llvm_ir::Instruction::Add(_) => todo!(),
         llvm_ir::Instruction::Sub(_) => todo!(),
@@ -133,7 +128,7 @@ pub fn build_instruction(
             build_alloca_inst(alloca, stack_allocator, stack_slots)
         }
         llvm_ir::Instruction::Load(_) => todo!(),
-        llvm_ir::Instruction::Store(store) => build_store_inst(store, stack_slots),
+        llvm_ir::Instruction::Store(store) => build_store_inst(store, stack_allocator, stack_slots),
         llvm_ir::Instruction::Fence(_) => todo!(),
         llvm_ir::Instruction::CmpXchg(_) => todo!(),
         llvm_ir::Instruction::AtomicRMW(_) => todo!(),
@@ -164,58 +159,84 @@ pub fn build_instruction(
     }
 }
 
-#[allow(unused)]
+impl Operand {
+    #[inline]
+    #[allow(unused)]
+    pub fn try_from_llvm(
+        operand: &llvm_ir::Operand,
+        stack_allocator: &mut StackAllocator,
+        stack_slots: &mut HashMap<Name, StackSlot>,
+    ) -> Result<Self, BackendError> {
+        Ok(match operand {
+            llvm_ir::Operand::LocalOperand { name, ty } => {
+                let ss = stack_slots
+                    .get(name)
+                    .ok_or(BackendError::GenFromLlvmError(format!(
+                        "stack slot {} not found",
+                        name
+                    )))?;
+                (ss.start() as i64).into()
+            }
+            llvm_ir::Operand::ConstantOperand(c) => match c.as_ref() {
+                Constant::Int { bits: _bits, value } => Operand::Imm((*value as i64).into()),
+                Constant::Float(f) => match f {
+                    llvm_ir::constant::Float::Single(f) => Operand::Fmm((*f as f64).into()),
+                    llvm_ir::constant::Float::Double(_) => {
+                        unimplemented!("double float");
+                    }
+                    _ => {
+                        unreachable!();
+                    }
+                },
+                _ => todo!(),
+            },
+            llvm_ir::Operand::MetadataOperand => todo!(),
+        })
+    }
+}
+
+/// alloca instruction only instruct allocating memory on stack,not generate one-one instruction
 pub fn build_alloca_inst(
     alloca: &llvm_ir::instruction::Alloca,
     stack_allocator: &mut StackAllocator,
     stack_slots: &mut HashMap<Name, StackSlot>,
-) -> Result<Inst, BackendError> {
-    let dest = &alloca.dest;
-    match &alloca.allocated_type.as_ref() {
-        llvm_ir::Type::IntegerType { bits } => {
-            let ss = stack_allocator.alloc(*bits as usize);
-            stack_slots.insert(dest.clone(), ss);
-        }
+) -> Result<Vec<Inst>, BackendError> {
+    let name = alloca.dest.clone();
+    let ty = alloca.allocated_type.clone();
+    let bits = match ty.as_ref() {
+        llvm_ir::Type::IntegerType { bits } => *bits,
         _ => todo!(),
     };
-    todo!();
+    let ss = stack_allocator.alloc(bits as usize);
+    stack_slots.insert(name.clone(), ss.clone());
+    Ok(vec![])
 }
 
 #[allow(unused)]
 pub fn build_store_inst(
     store: &llvm_ir::instruction::Store,
+    stack_allocator: &mut StackAllocator,
     stack_slots: &mut HashMap<Name, StackSlot>,
-) -> Result<Inst, BackendError> {
+) -> Result<Vec<Inst>, BackendError> {
     let address = &store.address;
     let val = &store.value;
-    let address = match address {
-        llvm_ir::Operand::LocalOperand { name, ty } => {
-            let ss = stack_slots.get(name).unwrap();
-            ss
+    let address = Operand::try_from_llvm(address, stack_allocator, stack_slots)?;
+    let val: Operand = Operand::try_from_llvm(val, stack_allocator, stack_slots)?;
+    let mut ret: Vec<Inst> = Vec::new();
+    match val {
+        Operand::Imm(imm) => {
+            let dst = Reg::gen_virtual_usual_reg();
+            let li = AddInst::new(dst.clone().into(), REG_ZERO.into(), imm.into());
+            let sd = SdInst::new(dst, address.try_into()?, REG_SP);
+            ret.push(li.into());
+            ret.push(sd.into());
         }
-        llvm_ir::Operand::ConstantOperand(_) => todo!(),
-        llvm_ir::Operand::MetadataOperand => todo!(),
-    };
-    let val: Operand = match val {
-        llvm_ir::Operand::LocalOperand { name: _, ty: _ } => {
-            todo!();
+        Operand::Fmm(_) => {
+            return Err(BackendError::GenFromLlvmError(
+                "store instruction with float value".to_string(),
+            ))
         }
-        llvm_ir::Operand::ConstantOperand(c) => match c.as_ref() {
-            Constant::Int { bits: _, value } => Operand::Imm((*value as i64).into()),
-            Constant::Float(f) => match f {
-                llvm_ir::constant::Float::Single(f) => Operand::Fmm((*f as f64).into()),
-                llvm_ir::constant::Float::Double(f) => {
-                    unimplemented!("double float");
-                }
-                _ => {
-                    unreachable!();
-                }
-            },
-            _ => todo!(),
-        },
-        llvm_ir::Operand::MetadataOperand => todo!(),
-    };
-
-    dbg!(&store);
-    todo!();
+        _ => (),
+    }
+    Ok(ret)
 }

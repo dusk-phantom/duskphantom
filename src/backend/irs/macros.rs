@@ -125,3 +125,14 @@ macro_rules! impl_unary_inst {
         }
     };
 }
+
+#[macro_export]
+macro_rules! impl_inst_from {
+    ($inst_type:ident,$enumerator:ident) => {
+        impl From<$inst_type> for Inst {
+            fn from(value: $inst_type) -> Inst {
+                Inst::$enumerator(value)
+            }
+        }
+    };
+}
