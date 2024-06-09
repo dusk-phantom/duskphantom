@@ -44,3 +44,20 @@ impl Func {
         GenTool::gen_func(self.name.as_str(), entry.as_str(), other_bbs.as_str())
     }
 }
+
+impl Func {
+    pub fn new(name: String, args: Vec<String>) -> Func {
+        Func {
+            name,
+            args,
+            bbs: Vec::new(),
+            entry: String::new(),
+        }
+    }
+    pub fn push_bb(&mut self, bb: Block) {
+        self.bbs.push(bb);
+    }
+    pub fn set_entry(&mut self, entry: String) {
+        self.entry = entry;
+    }
+}

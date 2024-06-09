@@ -1,15 +1,23 @@
-//内存数据结构, 维护内存段,包含上下限,隐含大小
+/// StackSlot: represents a stack slot, which is a contiguous memory region on the stack.
 pub struct StackSlot {
     start: usize,
-    end: usize,
+    size: usize,
 }
 impl StackSlot {
+    /// get the start address of the stack slot,stack_slot[start]=<s> means
+    /// this stack slot if from <s>(sp) to <e>(sp)
+    pub fn start(&self) -> usize {
+        self.start
+    }
+    pub fn end(&self) -> usize {
+        self.start + self.size
+    }
     pub fn size(&self) -> usize {
-        self.end - self.start
+        self.size
     }
 }
 
-// 内存分配器,记录栈顶位置
+// StackAllocator: a simple stack allocator for stack slots.
 pub struct StackAllocator {
     alloc_from: usize,
 }
@@ -25,9 +33,12 @@ impl StackAllocator {
     pub fn alloc(&mut self, size: usize) -> StackSlot {
         let ret = StackSlot {
             start: self.alloc_from,
-            end: self.alloc_from + size,
+            size,
         };
         self.alloc_from += size;
         ret
+    }
+    pub fn allocated(&self) -> usize {
+        self.alloc_from
     }
 }
