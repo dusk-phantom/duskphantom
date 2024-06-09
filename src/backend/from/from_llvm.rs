@@ -78,7 +78,6 @@ pub fn gen_from_clang(program: &clang_frontend::Program) -> Result<Program, Back
             }
             m_f.push_bb(m_bb);
         }
-
         funcs.push(m_f);
     }
     let mdl = module::Module {
