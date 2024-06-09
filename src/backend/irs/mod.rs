@@ -1,6 +1,9 @@
 pub mod block;
 pub mod func;
 pub mod inst;
+#[macro_use]
+mod macros;
+
 pub mod module;
 pub mod operand;
 pub mod prog;
