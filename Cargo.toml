@@ -50,8 +50,12 @@ harness = false
 
 # 特性管理
 [features]
-# default = ["clang_enabled"] # 解除该行注释获取基于clang的前后端
+default = [
+    # "clang_enabled",   # 解除该行注释获取基于clang的前后端
+    # "gen_virtual_asm", # 解除该行注释获取生成虚拟汇编的功能
+]
 clang_enabled = ["llvm-ir"]
+gen_virtual_asm = []
 
 [profile.release]
 lto = true

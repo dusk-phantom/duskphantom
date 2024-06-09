@@ -270,7 +270,18 @@ impl Reg {
                 },
             }
         } else {
-            panic!("gen_asm for virtual reg is not implemented");
+            #[cfg(feature = "gen_virtual_asm")]
+            {
+                if self.is_usual {
+                    format!("x{}", self.id)
+                } else {
+                    format!("f{}", self.id)
+                }
+            }
+            #[cfg(not(feature = "gen_virtual_asm"))]
+            {
+                panic!("gen_asm for virtual reg is not implemented");
+            }
         }
     }
 
