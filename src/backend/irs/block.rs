@@ -4,7 +4,7 @@ use crate::config::CONFIG;
 #[allow(unused)]
 pub struct Block {
     label: String,
-    insts: Vec<inst::Inst>,
+    insts: Vec<Inst>,
     // Vec<(inst index, label)>, to be filled after all insts are generated
     to_bbs: Vec<(usize, String)>,
 }
@@ -30,7 +30,7 @@ impl Block {
             to_bbs: Vec::new(),
         }
     }
-    pub fn push_inst(&mut self, inst: inst::Inst) {
+    pub fn push_inst(&mut self, inst: Inst) {
         self.insts.push(inst);
     }
     pub fn extend_insts(&mut self, insts: Vec<Inst>) {
