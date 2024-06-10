@@ -72,10 +72,10 @@ pub fn gen_from_clang(program: &clang_frontend::Program) -> Result<Program, Back
             let mut m_bb = Block::new(bb.name.to_string());
             for inst in &bb.instrs {
                 let gen_insts = build_instruction(inst, &mut stack_allocator, &mut stack_slots)?;
-                for inst in gen_insts {
-                    m_bb.push_inst(inst);
-                }
+                m_bb.extend_insts(gen_insts);
             }
+            let gen_insts = build_term_inst(&bb.term)?;
+            m_bb.extend_insts(gen_insts);
             m_f.push_bb(m_bb);
         }
         funcs.push(m_f);
@@ -238,4 +238,32 @@ pub fn build_store_inst(
         _ => (),
     }
     Ok(ret)
+}
+
+pub fn build_term_inst(term: &llvm_ir::Terminator) -> Result<Vec<Inst>, BackendError> {
+    let mut ret_insts: Vec<Inst> = Vec::new();
+    match term {
+        llvm_ir::Terminator::Ret(r) => {
+            if let Some(op) = &r.return_operand {
+                match op {
+                    llvm_ir::Operand::LocalOperand { name: _, ty: _ } => todo!(),
+                    llvm_ir::Operand::ConstantOperand(c) => match c.as_ref() {
+                        Constant::Int { bits: _, value } => {
+                            let imm = (*value as i64).into();
+                            let addi = AddInst::new(REG_A0.into(), REG_ZERO.into(), imm);
+                            ret_insts.push(addi.into());
+                            ret_insts.push(Inst::Ret);
+                        }
+                        Constant::Float(_) => todo!(),
+                        _ => todo!(),
+                    },
+                    llvm_ir::Operand::MetadataOperand => todo!(),
+                }
+            } else {
+                unimplemented!();
+            }
+        }
+        _ => todo!(),
+    }
+    Ok(ret_insts)
 }
