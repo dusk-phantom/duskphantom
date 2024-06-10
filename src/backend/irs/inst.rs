@@ -84,6 +84,7 @@ impl_two_op_inst!(MvInst);
 impl_mem_inst!(LdInst, "ld");
 impl_mem_inst!(SdInst, "sd");
 impl_mem_inst!(SwInst, "sw");
+impl_mem_inst!(LwInst, "lw");
 impl_unary_inst!(JmpInst, "j");
 impl_unary_inst!(CallInst, "call");
 
