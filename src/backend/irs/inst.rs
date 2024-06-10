@@ -1,4 +1,3 @@
-use crate::{impl_inst_from, impl_mem_inst, impl_three_op_inst, impl_two_op_inst, impl_unary_inst};
 
 use super::*;
 
@@ -75,23 +74,6 @@ pub enum Inst {
 // and
 // andi
 
-impl_three_op_inst!(AddInst, "add");
-impl_three_op_inst!(SubInst, "sub");
-impl_three_op_inst!(MulInst, "mul");
-impl_three_op_inst!(RemInst, "rem");
-impl_three_op_inst!(DivInst, "div");
-impl_three_op_inst!(SllInst, "sll");
-impl_three_op_inst!(SrlInst, "srl");
-impl_three_op_inst!(SraInst, "sra");
-impl_two_op_inst!(NegInst,"neg");
-impl_two_op_inst!(MvInst,"mv");
-impl_mem_inst!(LdInst, "ld");
-impl_mem_inst!(SdInst, "sd");
-impl_mem_inst!(SwInst, "sw");
-impl_mem_inst!(LwInst, "lw");
-
-impl_unary_inst!(JmpInst, "j");
-impl_unary_inst!(CallInst, "call");
 
 // slli
 // slliw
@@ -136,72 +118,6 @@ impl LaInst {
 // jalr
 // jr
 
-#[derive(Clone)]
-pub struct BranchInst(BranchOp, Reg, Reg, Label);
-impl BranchInst {
-    pub fn new(op: BranchOp, lhs: Reg, rhs: Reg, label: Label) -> Self {
-        Self(op, lhs, rhs, label)
-    }
-    pub fn op(&self) -> &BranchOp {
-        &self.0
-    }
-    pub fn lhs(&self) -> &Reg {
-        &self.1
-    }
-    pub fn rhs(&self) -> &Reg {
-        &self.2
-    }
-    pub fn label(&self) -> &Label {
-        &self.3
-    }
-    pub fn lhs_mut(&mut self) -> &mut Reg {
-        &mut self.1
-    }
-    pub fn rhs_mut(&mut self) -> &mut Reg {
-        &mut self.2
-    }
-    pub fn label_mut(&mut self) -> &mut Label {
-        &mut self.3
-    }
-    pub fn defs(&self) -> Vec<&Reg> {
-        vec![]
-    }
-    pub fn uses(&self) -> Vec<&Reg> {
-        vec![self.lhs(), self.rhs()]
-    }
-}
-
-// beqz
-// bgeu
-// bgez
-// bltu
-// bltz
-// bleu
-// blez
-// bgtu
-// bgtz
-#[derive(Clone)]
-pub enum BranchOp {
-    Beq,
-    Bne,
-    Blt,
-    Ble,
-    Bgt,
-    Bge,
-}
-
-impl BranchOp {
-    pub fn gen_asm(&self) -> String {
-        match self {
-            Self::Beq => String::from("beq"),
-            Self::Bne => String::from("bne"),
-            Self::Blt => String::from("blt"),
-            Self::Ble => String::from("ble"),
-            Self::Bgt => String::from("bgt"),
-            Self::Bge => String::from("bge"),
-        }
-    }
-}
 
 impl LaInst {
     pub fn gen_asm(&self) -> String {
@@ -209,17 +125,6 @@ impl LaInst {
     }
 }
 
-impl BranchInst {
-    pub fn gen_asm(&self) -> String {
-        format!(
-            "{} {},{},{}",
-            self.0.gen_asm(),
-            self.1.gen_asm(),
-            self.2.gen_asm(),
-            self.3.gen_asm(),
-        )
-    }
-}
 
 impl Inst {
     pub fn gen_asm(&self) -> String {
@@ -247,142 +152,134 @@ impl Inst {
     }
 }
 
-// impl From<T> for Inst
-impl_inst_from!(SdInst, Sd);
-impl_inst_from!(LdInst, Ld);
-impl_inst_from!(AddInst, Add);
-impl_inst_from!(SubInst, Sub);
-impl_inst_from!(MulInst, Mul);
-impl_inst_from!(RemInst, Rem);
-impl_inst_from!(DivInst, Div);
-impl_inst_from!(SllInst, SLL);
-impl_inst_from!(SrlInst, SRL);
-impl_inst_from!(NegInst, Neg);
-impl_inst_from!(MvInst, Mv);
-impl_inst_from!(JmpInst, Jmp);
-impl_inst_from!(BranchInst, Branch);
-impl_inst_from!(CallInst, Call);
-impl_inst_from!(LaInst, La);
 
+// /* def and impl RegUses and RegDefs */ 
+// pub trait RegUses {
+//     fn uses(&self) -> Vec<&Reg> {
+//         vec![]
+//     }
+// }
+// pub trait RegDefs {
+//     fn defs(&self) -> Vec<&Reg> {
+//         vec![]
+//     }
+// }
 
-/* def and impl RegUses and RegDefs */ 
-pub trait RegUses {
-    fn uses(&self) -> Vec<&Reg> {
-        vec![]
-    }
-}
-pub trait RegDefs {
-    fn defs(&self) -> Vec<&Reg> {
-        vec![]
-    }
-}
+// impl RegUses for Inst {
+//     fn uses(&self) -> Vec<&Reg> {
+//         match self {
+//             Inst::Add(inst) => inst.uses(),
+//             Inst::Sub(inst) => inst.uses(),
+//             Inst::Mul(inst) => inst.uses(),
+//             Inst::Rem(inst) => inst.uses(),
+//             Inst::Div(inst) => inst.uses(),
+//             Inst::SLL(inst) => inst.uses(),
+//             Inst::SRL(inst) => inst.uses(),
+//             Inst::Neg(inst) => inst.uses(),
+//             Inst::Mv(inst) => inst.uses(),
+//             Inst::Ld(inst) => inst.uses(),
+//             Inst::Sd(inst) => inst.uses(),
+//             Inst::Lw(inst) => inst.uses(),
+//             Inst::Sw(inst) => inst.uses(),
+//             Inst::La(inst) => inst.uses(),
+//             Inst::Jmp(inst) => inst.uses(),
+//             Inst::Branch(inst) => inst.uses(),
+//             Inst::Call(inst) => inst.uses(),
+//             Inst::SRA(inst) => inst.uses(),
+//             Inst::Ret => vec![],
+//         }
+//     }
+// }
+// impl RegDefs for Inst {
+//     fn defs(&self) -> Vec<&Reg> {
+//         match self {
+//             Inst::Add(inst) => inst.defs(),
+//             Inst::Sub(inst) => inst.defs(),
+//             Inst::Mul(inst) => inst.defs(),
+//             Inst::Rem(inst) => inst.defs(),
+//             Inst::Div(inst) => inst.defs(),
+//             Inst::SLL(inst) => inst.defs(),
+//             Inst::SRL(inst) => inst.defs(),
+//             Inst::Neg(inst) => inst.defs(),
+//             Inst::Mv(inst) => inst.defs(),
+//             Inst::Ld(inst) => inst.defs(),
+//             Inst::Sd(inst) => inst.defs(),
+//             Inst::Lw(inst) => inst.defs(),
+//             Inst::Sw(inst)=>inst.defs(),
+//             Inst::La(inst) => inst.defs(),
+//             Inst::Jmp(inst) => inst.defs(),
+//             Inst::Branch(inst) => inst.defs(),
+//             Inst::Call(inst) => inst.defs(),
+//             Inst::SRA(inst) => inst.defs(),
+//             Inst::Ret => vec![],
+//         }
+//     }
+// }
 
-impl RegUses for Inst {
-    fn uses(&self) -> Vec<&Reg> {
-        match self {
-            Inst::Add(inst) => inst.uses(),
-            Inst::Sub(inst) => inst.uses(),
-            Inst::Mul(inst) => inst.uses(),
-            Inst::Rem(inst) => inst.uses(),
-            Inst::Div(inst) => inst.uses(),
-            Inst::SLL(inst) => inst.uses(),
-            Inst::SRL(inst) => inst.uses(),
-            Inst::Neg(inst) => inst.uses(),
-            Inst::Mv(inst) => inst.uses(),
-            Inst::Ld(inst) => inst.uses(),
-            Inst::Sd(inst) => inst.uses(),
-            Inst::Lw(inst) => inst.uses(),
-            Inst::Sw(inst) => inst.uses(),
-            Inst::La(inst) => inst.uses(),
-            Inst::Jmp(inst) => inst.uses(),
-            Inst::Branch(inst) => inst.uses(),
-            Inst::Call(inst) => inst.uses(),
-            Inst::SRA(inst) => inst.uses(),
-            Inst::Ret => vec![],
-        }
-    }
-}
-impl RegDefs for Inst {
-    fn defs(&self) -> Vec<&Reg> {
-        match self {
-            Inst::Add(inst) => inst.defs(),
-            Inst::Sub(inst) => inst.defs(),
-            Inst::Mul(inst) => inst.defs(),
-            Inst::Rem(inst) => inst.defs(),
-            Inst::Div(inst) => inst.defs(),
-            Inst::SLL(inst) => inst.defs(),
-            Inst::SRL(inst) => inst.defs(),
-            Inst::Neg(inst) => inst.defs(),
-            Inst::Mv(inst) => inst.defs(),
-            Inst::Ld(inst) => inst.defs(),
-            Inst::Sd(inst) => inst.defs(),
-            Inst::Lw(inst) => inst.defs(),
-            Inst::Sw(inst)=>inst.defs(),
-            Inst::La(inst) => inst.defs(),
-            Inst::Jmp(inst) => inst.defs(),
-            Inst::Branch(inst) => inst.defs(),
-            Inst::Call(inst) => inst.defs(),
-            Inst::SRA(inst) => inst.defs(),
-            Inst::Ret => vec![],
-        }
-    }
-}
+// impl RegUses for BranchInst {
+//     fn uses(&self) -> Vec<&Reg> {
+//         vec![self.lhs(), self.rhs()]
+//     }
+// }
+// impl RegDefs for BranchInst {
+//     fn defs(&self) -> Vec<&Reg> {
+//         vec![]
+//     }
+// }
 
-impl RegUses for BranchInst {
-    fn uses(&self) -> Vec<&Reg> {
-        vec![self.lhs(), self.rhs()]
-    }
-}
-impl RegDefs for BranchInst {
-    fn defs(&self) -> Vec<&Reg> {
-        vec![]
-    }
-}
+// impl RegUses for LaInst {}
 
-impl RegUses for LaInst {}
+// impl RegDefs for LaInst {
+//     fn defs(&self) -> Vec<&Reg> {
+//         vec![self.dst()]
+//     }
+// }
+// impl RegUses for CallInst {}
+// impl RegDefs for CallInst {}
+// impl RegUses for JmpInst {}
+// impl RegDefs for JmpInst {}
+// impl RegUses for LdInst {
+//     fn uses(&self) -> Vec<&Reg> {
+//         vec![self.base()]
+//     }
+// }
+// impl RegDefs for LdInst {
+//     fn defs(&self) -> Vec<&Reg> {
+//         vec![self.dst()]
+//     }
+// }
+// impl RegUses for SdInst {
+//     fn uses(&self) -> Vec<&Reg> {
+//         vec![self.base(), self.dst()]
+//     }
+// }
+// impl RegDefs for SdInst {}
+// impl RegUses for LwInst {
+//     fn uses(&self) -> Vec<&Reg> {
+//         vec![self.base()]
+//     }
+// }
+// impl RegDefs for LwInst {
+//     fn defs(&self) -> Vec<&Reg> {
+//         vec![self.dst()]
+//     }
+// }
 
-impl RegDefs for LaInst {
-    fn defs(&self) -> Vec<&Reg> {
-        vec![self.dst()]
-    }
-}
-impl RegUses for CallInst {}
-impl RegDefs for CallInst {}
-impl RegUses for JmpInst {}
-impl RegDefs for JmpInst {}
-impl RegUses for LdInst {
-    fn uses(&self) -> Vec<&Reg> {
-        vec![self.base()]
-    }
-}
-impl RegDefs for LdInst {
-    fn defs(&self) -> Vec<&Reg> {
-        vec![self.dst()]
-    }
-}
-impl RegUses for SdInst {
-    fn uses(&self) -> Vec<&Reg> {
-        vec![self.base(), self.dst()]
-    }
-}
-impl RegDefs for SdInst {}
-impl RegUses for LwInst {
-    fn uses(&self) -> Vec<&Reg> {
-        vec![self.base()]
-    }
-}
-impl RegDefs for LwInst {
-    fn defs(&self) -> Vec<&Reg> {
-        vec![self.dst()]
-    }
-}
-
-impl RegUses for SwInst {
-    fn uses(&self) -> Vec<&Reg> {
-        vec![self.base(), self.dst()]
-    }
-}
-impl RegDefs for SwInst {}
-
+// impl RegUses for SwInst {
+//     fn uses(&self) -> Vec<&Reg> {
+//         vec![self.base(), self.dst()]
+//     }
+// }
+// impl RegDefs for SwInst {}
+// pub trait RegUses {
+//     fn uses(&self) -> Vec<&Reg> {
+//         vec![]
+//     }
+// }
+// pub trait RegDefs {
+//     fn defs(&self) -> Vec<&Reg> {
+//         vec![]
+//     }
+// }
 
 //* impl  get_stack_slot for mem Inst */
