@@ -1,3 +1,4 @@
+
 #[macro_export]
 macro_rules! impl_three_op_inst {
     ($ty_name:ident,$inst_name:expr) => {
