@@ -33,6 +33,27 @@ macro_rules! impl_three_op_inst {
                 format!("{} {},{},{}", $inst_name, dst, lhs, rhs)
             }
         }
+        impl RegDefs for $ty_name {
+            fn defs(&self) -> Vec<&Reg> {
+                if let Operand::Reg(reg) = self.dst() {
+                    vec![reg]
+                } else {
+                    vec![]
+                }
+            }
+        }
+        impl RegUses for $ty_name {
+            fn uses(&self) -> Vec<&Reg> {
+                let mut regs = vec![];
+                if let Operand::Reg(reg) = self.lhs() {
+                    regs.push(reg);
+                }
+                if let Operand::Reg(reg) = self.rhs() {
+                    regs.push(reg);
+                }
+                regs
+            }
+        }
     };
 }
 #[macro_export]
@@ -60,6 +81,24 @@ macro_rules! impl_two_op_inst {
                 let dst = self.dst().gen_asm();
                 let src = self.src().gen_asm();
                 format!("{} {},{}", stringify!($ty_name).to_lowercase(), dst, src)
+            }
+        }
+        impl RegDefs for $ty_name {
+            fn defs(&self) -> Vec<&Reg> {
+                if let Operand::Reg(reg) = self.dst() {
+                    vec![reg]
+                } else {
+                    vec![]
+                }
+            }
+        }
+        impl RegUses for $ty_name {
+            fn uses(&self) -> Vec<&Reg> {
+                if let Operand::Reg(reg) = self.src() {
+                    vec![reg]
+                } else {
+                    vec![]
+                }
             }
         }
     };
