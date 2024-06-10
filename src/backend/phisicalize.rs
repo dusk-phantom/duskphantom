@@ -7,13 +7,23 @@ pub fn phisicalize(program: &mut Program) {
         for func in module.funcs.iter_mut() {
             let mut stack_size = 0;
             // count stack size: 统计栈大小,首先遍历每个块每条指令,统计中函数调用的最大栈大小
-            // insert prologue: 在函数开头插入: 开栈、保存callee save寄存器
-            // insert epilogue: 在函数返回块插入: 关栈、恢复callee save寄存器
-            // insert caller save: 在调用前插入: 保存caller save寄存器
-            // 检测是否存在长地址访问问题,如果没有,则不保留长地址访问需要的寄存器
-            // alloc reg,insert spill: 分配寄存器,插入spill指令,在需要时溢出寄存器值到栈上
-            // 虚拟栈地址物理化,根据使用频率和代码结构调整分配的地址
-            // 处理长地址访问问题: 使用之前保留的寄存器进行二次计算使用的内存地址
+
+            // alloc reg: 调用寄存器分配算法,获得分配结果,其中包括寄存器溢出需要的空间
+
+            // count caller save: 计算保存caller save需要的栈空间
+
+            // count callee save: 计算保存callee save需要的栈空间
+
+            // count return value: 计算返回值需要的栈空间,返回值的栈空间以栈底作为起点
+
+            // process_long_address:检测是否有长地址访问,如果有,则使用保留寄存器处理长地址访问问题 
+
+            // apply reg alloc: 实施寄存器分配结果,插入spill 指令,使用t0-t3三个寄存器处理寄存器溢出问题
+
+            // apply caller save: 插入保存caller save的指令
+
+            // apply callee save: 插入保存callee save的指令
+
         }
     }
 }
