@@ -96,15 +96,13 @@ impl GenTool {
         ret
     }
     #[inline]
-    pub fn gen_func(fname: &str, entry_bb: &str, other_bbs: &str) -> String {
+    pub fn gen_func(fname: &str, other_bbs: &str) -> String {
         let mut ret = String::with_capacity(1024);
         ret.push_str(".text\n.align\t3\n");
         ret.push_str(format!(".globl\t{}\n", fname).as_str());
         ret.push_str(format!(".type\t{}, @function\n", fname).as_str());
         ret.push_str(fname);
         ret.push_str(":\n");
-        ret.push_str(entry_bb);
-        ret.push('\n');
         ret.push_str(other_bbs);
         ret.push('\n');
         ret.push_str(format!(".size\t{}, .-{}", fname, fname).as_str());
@@ -339,8 +337,8 @@ addi x0, x0, 0";
     fn test_gen_func() {
         let s = super::GenTool::gen_func(
             "hello",
-            "hello_0:\naddi a0, a0, 33",
-            "hello_1:\naddi x0, x0, 0",
+            "hello_0:\naddi a0, a0, 33
+hello_1:\naddi x0, x0, 0",
         );
         println!("{}", s);
         let raw_match = ".text
