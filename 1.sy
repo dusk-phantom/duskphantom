@@ -1,6 +1,3 @@
-int a;
-float m;
-char b;
 int main(){
-    return 1;
+    return 0;
 }
