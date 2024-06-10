@@ -58,7 +58,7 @@ macro_rules! impl_three_op_inst {
 }
 #[macro_export]
 macro_rules! impl_two_op_inst {
-    ($ty_name:ident) => {
+    ($ty_name:ident,$inst_name:expr) => {
         #[derive(Clone)]
         pub struct $ty_name(Operand, Operand);
         impl $ty_name {
@@ -80,7 +80,7 @@ macro_rules! impl_two_op_inst {
             pub fn gen_asm(&self) -> String {
                 let dst = self.dst().gen_asm();
                 let src = self.src().gen_asm();
-                format!("{} {},{}", stringify!($ty_name).to_lowercase(), dst, src)
+                format!("{} {},{}",$inst_name, dst, src)
             }
         }
         impl RegDefs for $ty_name {

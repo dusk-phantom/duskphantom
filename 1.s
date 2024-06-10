@@ -4,8 +4,17 @@
 .attribute unaligned_access, 0
 .attribute stack_align, 16
 
+.text
+.align	3
+.globl	main
+.type	main, @function
+main:
+%0:
+add x32,zero,0
+sd x32,0(sp)
+add a0,zero,0
+ret
 
-
-
+.size	main, .-main
 .ident	"compiler: (visionfive2) 0.1.0"
 .section	.note.GNU-stack,"",@progbits

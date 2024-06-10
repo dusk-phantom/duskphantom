@@ -58,6 +58,8 @@ pub enum Inst {
     Mv(MvInst),
     Ld(LdInst),
     Sd(SdInst),
+    Lw(LwInst),
+    Sw(SwInst),
     La(LaInst),
     // control flow operation
     Jmp(JmpInst),
@@ -81,8 +83,8 @@ impl_three_op_inst!(DivInst, "div");
 impl_three_op_inst!(SllInst, "sll");
 impl_three_op_inst!(SrlInst, "srl");
 impl_three_op_inst!(SraInst, "sra");
-impl_two_op_inst!(NegInst);
-impl_two_op_inst!(MvInst);
+impl_two_op_inst!(NegInst,"neg");
+impl_two_op_inst!(MvInst,"mv");
 impl_mem_inst!(LdInst, "ld");
 impl_mem_inst!(SdInst, "sd");
 impl_mem_inst!(SwInst, "sw");
@@ -233,6 +235,8 @@ impl Inst {
             Inst::Mv(inst) => inst.gen_asm(),
             Inst::Ld(inst) => inst.gen_asm(),
             Inst::Sd(inst) => inst.gen_asm(),
+            Inst::Sw(inst) => inst.gen_asm(),
+            Inst::Lw(inst) => inst.gen_asm(),
             Inst::La(inst) => inst.gen_asm(),
             Inst::Jmp(inst) => inst.gen_asm(),
             Inst::Branch(inst) => inst.gen_asm(),
@@ -260,6 +264,8 @@ impl_inst_from!(BranchInst, Branch);
 impl_inst_from!(CallInst, Call);
 impl_inst_from!(LaInst, La);
 
+
+/* def and impl RegUses and RegDefs */ 
 pub trait RegUses {
     fn uses(&self) -> Vec<&Reg> {
         vec![]
@@ -285,6 +291,8 @@ impl RegUses for Inst {
             Inst::Mv(inst) => inst.uses(),
             Inst::Ld(inst) => inst.uses(),
             Inst::Sd(inst) => inst.uses(),
+            Inst::Lw(inst) => inst.uses(),
+            Inst::Sw(inst) => inst.uses(),
             Inst::La(inst) => inst.uses(),
             Inst::Jmp(inst) => inst.uses(),
             Inst::Branch(inst) => inst.uses(),
@@ -308,6 +316,8 @@ impl RegDefs for Inst {
             Inst::Mv(inst) => inst.defs(),
             Inst::Ld(inst) => inst.defs(),
             Inst::Sd(inst) => inst.defs(),
+            Inst::Lw(inst) => inst.defs(),
+            Inst::Sw(inst)=>inst.defs(),
             Inst::La(inst) => inst.defs(),
             Inst::Jmp(inst) => inst.defs(),
             Inst::Branch(inst) => inst.defs(),
@@ -373,3 +383,6 @@ impl RegUses for SwInst {
     }
 }
 impl RegDefs for SwInst {}
+
+
+//* impl  get_stack_slot for mem Inst */

@@ -59,25 +59,26 @@ pub fn gen_from_clang(program: &clang_frontend::Program) -> Result<Program, Back
     for f in &llvm.functions {
         // dbg!(&f);
         let args: Vec<String> = f.parameters.iter().map(|p| p.name.to_string()).collect();
-        let mut m_f = Func::new(f.name.to_string(), args);
+
         let ret_ty = &f.return_type;
         let mut stack_allocator = StackAllocator::new();
         let mut stack_slots: HashMap<Name, StackSlot> = HashMap::new();
-
-        if let Some(bb) = f.basic_blocks.first() {
-            m_f.set_entry(bb.name.to_string());
-        }
+        let mut bb = f.basic_blocks.first().expect("func must have entry");
+        let entry = build_bb(bb, &mut stack_allocator, &mut stack_slots)?;
+        let mut m_f = Func::new(f.name.to_string(), args, entry);
         // dbg!(&ret_ty);
-        for bb in &f.basic_blocks {
-            let mut m_bb = Block::new(bb.name.to_string());
-            for inst in &bb.instrs {
-                let gen_insts = build_instruction(inst, &mut stack_allocator, &mut stack_slots)?;
-                m_bb.extend_insts(gen_insts);
-            }
-            let gen_insts = build_term_inst(&bb.term)?;
-            m_bb.extend_insts(gen_insts);
+        for bb in &f.basic_blocks[1..] {
+            let m_bb = build_bb(bb, &mut stack_allocator, &mut stack_slots)?;
             m_f.push_bb(m_bb);
         }
+        // count stack size,
+        let stack_size = stack_allocator.allocated();
+        // align to 16
+        let stack_size = if stack_size % 16 == 0 {
+            stack_size
+        } else {
+            stack_size - stack_size % 16 + 16
+        };
         funcs.push(m_f);
     }
     let mdl = module::Module {
@@ -194,8 +195,23 @@ impl Operand {
     }
 }
 
+fn build_bb(
+    bb: &llvm_ir::BasicBlock,
+    stack_allocator: &mut StackAllocator,
+    stack_slots: &mut HashMap<Name, StackSlot>,
+) -> Result<Block, BackendError> {
+    let mut m_bb = Block::new(bb.name.to_string());
+    for inst in &bb.instrs {
+        let gen_insts = build_instruction(inst, stack_allocator, stack_slots)?;
+        m_bb.extend_insts(gen_insts);
+    }
+    let gen_insts = build_term_inst(&bb.term)?;
+    m_bb.extend_insts(gen_insts);
+    Ok(m_bb)
+}
+
 /// alloca instruction only instruct allocating memory on stack,not generate one-one instruction
-pub fn build_alloca_inst(
+fn build_alloca_inst(
     alloca: &llvm_ir::instruction::Alloca,
     stack_allocator: &mut StackAllocator,
     stack_slots: &mut HashMap<Name, StackSlot>,
@@ -212,7 +228,7 @@ pub fn build_alloca_inst(
 }
 
 #[allow(unused)]
-pub fn build_store_inst(
+fn build_store_inst(
     store: &llvm_ir::instruction::Store,
     stack_allocator: &mut StackAllocator,
     stack_slots: &mut HashMap<Name, StackSlot>,
@@ -240,7 +256,7 @@ pub fn build_store_inst(
     Ok(ret)
 }
 
-pub fn build_term_inst(term: &llvm_ir::Terminator) -> Result<Vec<Inst>, BackendError> {
+fn build_term_inst(term: &llvm_ir::Terminator) -> Result<Vec<Inst>, BackendError> {
     let mut ret_insts: Vec<Inst> = Vec::new();
     match term {
         llvm_ir::Terminator::Ret(r) => {
