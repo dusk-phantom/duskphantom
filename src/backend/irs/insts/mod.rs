@@ -3,6 +3,7 @@ mod binary;
 mod mem;
 mod unary;
 mod branch;
+mod inst;
 mod reg_def_use;
 pub use super::*;
 pub use three_op::*;
@@ -10,6 +11,7 @@ pub use binary::*;
 pub use mem::*;
 pub use unary::*;
 pub use branch::*;
+pub use inst::*;
 pub use reg_def_use::*;
 pub use crate::{impl_inst_from, impl_mem_inst, impl_three_op_inst, impl_two_op_inst, impl_unary_inst};
 

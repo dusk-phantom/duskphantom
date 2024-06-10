@@ -1,6 +1,6 @@
 pub mod block;
 pub mod func;
-pub mod inst;
+// pub mod inst;
 #[macro_use]
 mod macros;
 
@@ -14,7 +14,6 @@ mod insts;
 pub use super::*;
 pub use block::*;
 pub use func::*;
-pub use inst::*;
 pub use module::*;
 pub use operand::*;
 pub use prog::*;
