@@ -57,6 +57,9 @@ impl Func {
     pub fn push_bb(&mut self, bb: Block) {
         self.bbs.push(bb);
     }
+    pub fn extend_bbs(&mut self, bbs: Vec<Block>) {
+        self.bbs.extend(bbs);
+    }
     pub fn set_entry(&mut self, entry: String) {
         self.entry = entry;
     }
