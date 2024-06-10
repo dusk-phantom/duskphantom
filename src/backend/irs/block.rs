@@ -23,6 +23,9 @@ impl Block {
     pub fn push_inst(&mut self, inst: inst::Inst) {
         self.insts.push(inst);
     }
+    pub fn extend_insts(&mut self, insts: Vec<Inst>) {
+        self.insts.extend(insts);
+    }
     pub fn gen_asm(&self) -> String {
         let label = self.label.as_str();
         let thread_pool = rayon::ThreadPoolBuilder::new()

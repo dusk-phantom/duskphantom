@@ -16,4 +16,5 @@ pub use func::*;
 pub use inst::*;
 pub use module::*;
 pub use operand::*;
+pub use prog::*;
 pub use stack_slot::*;

@@ -58,6 +58,8 @@ pub fn compile_clang(
     let mut program = backend::gen_from_clang(&program)?;
     if opt_flag {
         backend::optimize(&mut program);
+    } else {
+        backend::phisicalize(&mut program);
     }
     let asm = program.gen_asm();
     let output = if !asm_flag { asm2bin(asm) } else { asm };
