@@ -9,6 +9,16 @@ pub struct Block {
     to_bbs: Vec<(usize, String)>,
 }
 
+impl Default for Block {
+    fn default() -> Self {
+        Self {
+            label: "default".to_string(),
+            insts: vec![],
+            to_bbs: vec![],
+        }
+    }
+}
+
 impl Block {
     pub fn label(&self) -> &str {
         self.label.as_str()
@@ -40,5 +50,9 @@ impl Block {
                 .join("\n")
         });
         GenTool::gen_bb(label, insts.as_str())
+    }
+
+    pub fn insts(&self) -> &Vec<Inst> {
+        &self.insts
     }
 }
