@@ -52,6 +52,7 @@ pub enum Inst {
 
     SLL(SllInst),
     SRL(SrlInst),
+    SRA(SraInst),
     Neg(NegInst),
     // data transfer operation
     Mv(MvInst),
@@ -79,6 +80,7 @@ impl_three_op_inst!(RemInst, "rem");
 impl_three_op_inst!(DivInst, "div");
 impl_three_op_inst!(SllInst, "sll");
 impl_three_op_inst!(SrlInst, "srl");
+impl_three_op_inst!(SraInst, "sra");
 impl_two_op_inst!(NegInst);
 impl_two_op_inst!(MvInst);
 impl_mem_inst!(LdInst, "ld");
@@ -235,6 +237,7 @@ impl Inst {
             Inst::Jmp(inst) => inst.gen_asm(),
             Inst::Branch(inst) => inst.gen_asm(),
             Inst::Call(inst) => inst.gen_asm(),
+            Inst::SRA(inst) => inst.gen_asm(),
             Inst::Ret => String::from("ret"),
         }
     }
@@ -286,6 +289,7 @@ impl RegUses for Inst {
             Inst::Jmp(inst) => inst.uses(),
             Inst::Branch(inst) => inst.uses(),
             Inst::Call(inst) => inst.uses(),
+            Inst::SRA(inst) => inst.uses(),
             Inst::Ret => vec![],
         }
     }
@@ -308,6 +312,7 @@ impl RegDefs for Inst {
             Inst::Jmp(inst) => inst.defs(),
             Inst::Branch(inst) => inst.defs(),
             Inst::Call(inst) => inst.defs(),
+            Inst::SRA(inst) => inst.defs(),
             Inst::Ret => vec![],
         }
     }
