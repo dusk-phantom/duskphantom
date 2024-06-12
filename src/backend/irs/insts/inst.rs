@@ -38,20 +38,21 @@ pub enum Inst {
     // li
     // algebraic operation
     Add(AddInst),
-
-    // xor
-    // xori
-
-    // subw
     Sub(SubInst),
-
     Mul(MulInst),
     Div(DivInst),
     Rem(RemInst),
 
+    // bit
+    // xor
+    // xori
+    // subw
     SLL(SllInst),
     SRL(SrlInst),
     SRA(SraInst),
+    AND(AndInst),
+    OR(OrInst),
+    XOR(XorInst),
     Neg(NegInst),
     // data transfer operation
     Mv(MvInst),
@@ -148,6 +149,9 @@ impl Inst {
             Inst::Call(inst) => inst.gen_asm(),
             Inst::SRA(inst) => inst.gen_asm(),
             Inst::Ret => String::from("ret"),
+            Inst::AND(inst) => inst.gen_asm(),
+            Inst::OR(inst) => inst.gen_asm(),
+            Inst::XOR(inst) => inst.gen_asm(),
         }
     }
 }
