@@ -47,16 +47,16 @@ pub enum Inst {
     // xor
     // xori
     // subw
-    SLL(SllInst),
-    SRL(SrlInst),
+    Sll(SllInst),
+    Srl(SrlInst),
     SRA(SraInst),
-    AND(AndInst),
-    OR(OrInst),
-    XOR(XorInst),
+    And(AndInst),
+    Or(OrInst),
+    Xor(XorInst),
     Neg(NegInst),
 
     // comparison operation
-    SLT(SltInst),
+    Slt(SltInst),
 
     // data transfer operation
     Mv(MvInst),
@@ -140,9 +140,9 @@ impl Inst {
             Inst::Rem(inst) => inst.gen_asm(),
             Inst::Neg(inst) => inst.gen_asm(),
             Inst::Div(inst) => inst.gen_asm(),
-            Inst::SLL(inst) => inst.gen_asm(),
-            Inst::SRL(inst) => inst.gen_asm(),
-            Inst::SLT(inst) => inst.gen_asm(),
+            Inst::Sll(inst) => inst.gen_asm(),
+            Inst::Srl(inst) => inst.gen_asm(),
+            Inst::Slt(inst) => inst.gen_asm(),
             Inst::Mv(inst) => inst.gen_asm(),
             Inst::Ld(inst) => inst.gen_asm(),
             Inst::Sd(inst) => inst.gen_asm(),
@@ -154,9 +154,9 @@ impl Inst {
             Inst::Call(inst) => inst.gen_asm(),
             Inst::SRA(inst) => inst.gen_asm(),
             Inst::Ret => String::from("ret"),
-            Inst::AND(inst) => inst.gen_asm(),
-            Inst::OR(inst) => inst.gen_asm(),
-            Inst::XOR(inst) => inst.gen_asm(),
+            Inst::And(inst) => inst.gen_asm(),
+            Inst::Or(inst) => inst.gen_asm(),
+            Inst::Xor(inst) => inst.gen_asm(),
             Inst::Tail(inst) =>inst.gen_asm(),
         }
     }
