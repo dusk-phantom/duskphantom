@@ -65,6 +65,8 @@ pub enum Inst {
     Lw(LwInst),
     Sw(SwInst),
     La(LaInst),
+    Load(LoadInst),
+    Store(StoreInst),
     // control flow operation
     Jmp(JmpInst),
     Branch(BranchInst),
@@ -125,6 +127,8 @@ impl Inst {
             Inst::Sw(inst) => inst.gen_asm(),
             Inst::Lw(inst) => inst.gen_asm(),
             Inst::La(inst) => inst.gen_asm(),
+            Inst::Load(inst) => inst.gen_asm(),
+            Inst::Store(inst) => inst.gen_asm(),
             Inst::Jmp(inst) => inst.gen_asm(),
             Inst::Branch(inst) => inst.gen_asm(),
             Inst::Call(inst) => inst.gen_asm(),
