@@ -1,3 +1,4 @@
+
 use super::*;
 
 
@@ -30,6 +31,8 @@ impl RegUses for Inst {
             Inst::Sd(inst) => inst.uses(),
             Inst::Lw(inst) => inst.uses(),
             Inst::Sw(inst) => inst.uses(),
+            Inst::Load(inst) => inst.uses(),
+            Inst::Store(inst) => inst.uses(),
             Inst::La(inst) => inst.uses(),
             Inst::Jmp(inst) => inst.uses(),
             Inst::Branch(inst) => inst.uses(),
@@ -61,6 +64,8 @@ impl RegDefs for Inst {
             Inst::Mv(inst) => inst.defs(),
             Inst::Ld(inst) => inst.defs(),
             Inst::Sd(inst) => inst.defs(),
+            Inst::Load(inst) => inst.defs(),
+            Inst::Store(inst) => inst.defs(),
             Inst::Lw(inst) => inst.defs(),
             Inst::Sw(inst)=>inst.defs(),
             Inst::La(inst) => inst.defs(),
@@ -131,3 +136,7 @@ impl RegUses for SwInst {
 }
 impl RegDefs for SwInst {}
 
+impl RegDefs for LoadInst{}
+impl RegUses for LoadInst{}
+impl RegDefs for StoreInst{}
+impl RegUses for StoreInst{}

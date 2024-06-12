@@ -152,7 +152,7 @@ pub fn build_instruction(
         llvm_ir::Instruction::Select(_) => todo!(),
         llvm_ir::Instruction::Freeze(_) => todo!(),
         llvm_ir::Instruction::Call(call) => {
-           build_call_inst(call)
+           build_call_inst(call,stack_allocator,stack_slots)
         },
         llvm_ir::Instruction::VAArg(_) => todo!(),
         llvm_ir::Instruction::LandingPad(_) => todo!(),
@@ -229,7 +229,7 @@ fn build_alloca_inst(
     Ok(vec![])
 }
 
-#[allow(unused)]
+
 fn build_store_inst(
     store: &llvm_ir::instruction::Store,
     stack_allocator: &mut StackAllocator,
@@ -286,10 +286,23 @@ fn build_term_inst(term: &llvm_ir::Terminator) -> Result<Vec<Inst>, BackendError
     Ok(ret_insts)
 }
 
-fn build_call_inst(call:&llvm_ir::instruction::Call) ->Result<Vec<Inst>,BackendError> {
-
-    dbg!(&call.dest);
-    dbg!(&call.arguments);
-    dbg!(&call.function);
-    todo!();
+fn build_call_inst(call:&llvm_ir::instruction::Call,stack_allocator: &mut StackAllocator,stack_slots: &mut HashMap<Name, StackSlot>) ->Result<Vec<Inst>,BackendError> {
+    
+    let dst=&call.dest;
+    let f_name=match &call.function{
+        rayon::iter::Either::Left(_) => todo!(),
+        rayon::iter::Either::Right(op) =>match op {
+            llvm_ir::Operand::LocalOperand { name, ty:_ty } => name.to_string(),
+            llvm_ir::Operand::ConstantOperand(_) => todo!(),
+            llvm_ir::Operand::MetadataOperand => todo!(),
+        },
+    };
+    let mut ret:Vec<Inst>=Vec::new();
+    unimplemented!();
+    // if let Some(dst)=dst{
+        
+    // }
+    let call=CallInst::new(f_name.into()).into();
+    ret.push(call);
+    Ok(ret)
 }
