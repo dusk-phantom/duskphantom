@@ -6,7 +6,6 @@ mod branch;
 mod inst;
 mod reg_def_use;
 pub use super::*;
-use llvm_ir::constant::Xor;
 pub use three_op::*;
 pub use binary::*;
 pub use mem::*;

@@ -43,7 +43,7 @@ pub enum Inst {
     Div(DivInst),
     Rem(RemInst),
 
-    // bit
+    // bit count operation
     // xor
     // xori
     // subw
@@ -54,6 +54,10 @@ pub enum Inst {
     OR(OrInst),
     XOR(XorInst),
     Neg(NegInst),
+
+    // comparison operation
+    SLT(SltInst),
+
     // data transfer operation
     Mv(MvInst),
     Ld(LdInst),
@@ -134,10 +138,11 @@ impl Inst {
             Inst::Sub(inst) => inst.gen_asm(),
             Inst::Mul(inst) => inst.gen_asm(),
             Inst::Rem(inst) => inst.gen_asm(),
+            Inst::Neg(inst) => inst.gen_asm(),
             Inst::Div(inst) => inst.gen_asm(),
             Inst::SLL(inst) => inst.gen_asm(),
             Inst::SRL(inst) => inst.gen_asm(),
-            Inst::Neg(inst) => inst.gen_asm(),
+            Inst::SLT(inst) => inst.gen_asm(),
             Inst::Mv(inst) => inst.gen_asm(),
             Inst::Ld(inst) => inst.gen_asm(),
             Inst::Sd(inst) => inst.gen_asm(),
