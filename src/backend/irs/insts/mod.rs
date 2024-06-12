@@ -35,5 +35,4 @@ impl_inst_from!(JmpInst, Jmp);
 impl_inst_from!(BranchInst, Branch);
 impl_inst_from!(CallInst, Call);
 impl_inst_from!(LaInst, La);
-impl_inst_from!(RetInst, Ret);
 impl_inst_from!(TailInst, Tail);
