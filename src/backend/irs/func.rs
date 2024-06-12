@@ -1,5 +1,5 @@
 use crate::config::CONFIG;
-
+use super::*;
 use super::{block::Block, gen_asm::GenTool};
 use rayon::prelude::*;
 
@@ -68,23 +68,32 @@ impl Func {
     }
 
     // count stack_size this func need
-    // pub fn stack_size(&self) -> usize {
-    //     let mut size = 0;
-    //     self.iter_bbs().for_each(|bb| {
-    //         bb.insts().iter().for_each(|inst| {
-    //             use Inst::*;
-    //             let stack_slot=
-    //             match inst{
-    //                 Ld(inst)=> inst.get_stack_slot(),
-    //                 Lw(inst)=> inst.get_stack_slot(),
-    //                 Sw(inst)=> inst.get_stack_slot(),
-    //                 Sd(inst)=> inst.get_stack_slot(),
-    //             };
-    //             todo!();
-    //         })
-    //     });
-    //     0
-    // }
+    #[allow(unused)]
+    pub fn stack_size(&self) -> Result<usize,BackendError> {
+        let mut size = 0;
+        for bb in self.iter_bbs() {
+            for inst in bb.insts() {
+                match inst {
+                    Inst::Ld(inst) => {
+                        let offset=inst.offset();
+                        let base=inst.base();
+                        
+                    },
+                    Inst::Sd(inst) => {
+
+                    },
+                    Inst::Lw(inst) =>{
+
+                    },
+                    Inst::Sw(inst) => {
+
+                    },
+                    _ =>todo!(),
+                }
+            }
+        }
+        Ok(size)
+    }
 }
 
 pub struct BBIter<'a> {

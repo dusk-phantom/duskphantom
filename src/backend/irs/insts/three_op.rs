@@ -8,3 +8,6 @@ impl_three_op_inst!(DivInst, "div");
 impl_three_op_inst!(SllInst, "sll");
 impl_three_op_inst!(SrlInst, "srl");
 impl_three_op_inst!(SraInst, "sra");
+impl_three_op_inst!(AndInst,"and");
+impl_three_op_inst!(OrInst,"or");
+impl_three_op_inst!(XorInst,"xor");
