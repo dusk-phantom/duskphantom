@@ -11,3 +11,7 @@ impl_three_op_inst!(SraInst, "sra");
 impl_three_op_inst!(AndInst,"and");
 impl_three_op_inst!(OrInst,"or");
 impl_three_op_inst!(XorInst,"xor");
+// 实现比较指令
+impl_three_op_inst!(SltInst, "slt");
+
+

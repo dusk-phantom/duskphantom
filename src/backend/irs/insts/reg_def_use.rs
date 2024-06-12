@@ -24,6 +24,7 @@ impl RegUses for Inst {
             Inst::SLL(inst) => inst.uses(),
             Inst::SRL(inst) => inst.uses(),
             Inst::Neg(inst) => inst.uses(),
+            Inst::SLT(inst) => inst.uses(),
             Inst::Mv(inst) => inst.uses(),
             Inst::Ld(inst) => inst.uses(),
             Inst::Sd(inst) => inst.uses(),
@@ -38,7 +39,7 @@ impl RegUses for Inst {
             Inst::OR(inst) => inst.uses(),
             Inst::XOR(inst) => inst.uses(),
             Inst::Ret => vec![],
-            Inst::Tail(inst) =>vec![],
+            Inst::Tail(_) =>vec![],
         }
     }
 }
@@ -68,6 +69,7 @@ impl RegDefs for Inst {
             Inst::Call(inst) => inst.defs(),
             Inst::Ret => vec![],
             Inst::Tail(_) =>vec![],
+            Inst::SLT(inst) => inst.defs(),
             
         }
     }
