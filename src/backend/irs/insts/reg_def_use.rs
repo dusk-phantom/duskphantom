@@ -34,10 +34,11 @@ impl RegUses for Inst {
             Inst::Branch(inst) => inst.uses(),
             Inst::Call(inst) => inst.uses(),
             Inst::SRA(inst) => inst.uses(),
-            Inst::Ret => vec![],
             Inst::AND(inst) => inst.uses(),
             Inst::OR(inst) => inst.uses(),
             Inst::XOR(inst) => inst.uses(),
+            Inst::Ret => vec![],
+            Inst::Tail(inst) =>vec![],
         }
     }
 }
@@ -66,6 +67,7 @@ impl RegDefs for Inst {
             Inst::Branch(inst) => inst.defs(),
             Inst::Call(inst) => inst.defs(),
             Inst::Ret => vec![],
+            Inst::Tail(_) =>vec![],
             
         }
     }
