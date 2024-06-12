@@ -9,7 +9,7 @@ fn main() {
     #[cfg(feature = "clang_enabled")]
     {
         use std::borrow::Borrow;
-        use compiler::{args::get_args, compile, compile_self_llc, errors::handle_error};
+        use compiler::{args::get_args, compile_self_llc, errors::handle_error};
         let args = get_args();
         println!("{:?}", args);
         let (sy_path, output_path, opt_flag, asm_flag) = (

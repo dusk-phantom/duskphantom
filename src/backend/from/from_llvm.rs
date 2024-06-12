@@ -286,6 +286,7 @@ fn build_term_inst(term: &llvm_ir::Terminator) -> Result<Vec<Inst>, BackendError
     Ok(ret_insts)
 }
 
+#[allow(unused)]
 fn build_call_inst(call:&llvm_ir::instruction::Call,stack_allocator: &mut StackAllocator,stack_slots: &mut HashMap<Name, StackSlot>) ->Result<Vec<Inst>,BackendError> {
     
     let dst=&call.dest;
