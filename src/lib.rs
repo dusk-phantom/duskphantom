@@ -90,6 +90,44 @@ pub fn compile_clang_llc(
     std::fs::write(output_file, output).map_err(CompilerError::IOError)
 }
 
+#[cfg(feature = "clang_enabled")]
+pub fn compile_self_llc(
+    sy_path: &str,
+    output_path: &str,
+    opt_flag: bool,
+    asm_flag: bool,
+) -> Result<(), CompilerError> {
+    use std::fs;
+
+    let mut program = frontend::parse(sy_path)?;
+    if opt_flag {
+        frontend::optimize(&mut program);
+    }
+    let mut program = middle::gen(&program)?;
+    if opt_flag {
+        middle::optimize(&mut program);
+    }
+    // 中端接clang
+    let llvm_ir = program.module.gen_llvm_ir();
+    let mut builder = tempfile::Builder::new();
+    let tmp_cfile = builder.suffix(".c").tempfile().unwrap();
+    let tmp_llvm_file = builder.suffix(".ll").tempfile().unwrap();
+    fs::write(&tmp_llvm_file, llvm_ir.as_bytes())?;
+    let llvm=llvm_ir::Module::from_ir_path(&tmp_llvm_file).expect("llvm ir file not found");
+    let program = clang_frontend::Program {
+        tmp_cfile,
+        tmp_llvm_file,
+        llvm,
+    };
+    let mut program = clang_backend::gen_from_clang(&program)?;
+    if opt_flag {
+        clang_backend::optimize(&mut program);
+    }
+    let asm = program.gen_asm();
+    let output = if !asm_flag { asm2bin(asm) } else { asm };
+    std::fs::write(output_path, output).map_err(CompilerError::IOError)
+}
+
 #[allow(unused)]
 pub fn asm2bin(asm: String) -> String {
     // 使用lcc将汇编代码编译成二进制文件

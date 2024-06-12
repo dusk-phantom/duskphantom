@@ -8,6 +8,7 @@ default-run = "compiler-cs"
 name = "compiler"
 path = "src/lib.rs"
 
+# 使用自己编写的前端中端后端
 [[bin]]
 name = "compiler"
 path = "src/main.rs"
@@ -21,6 +22,11 @@ path = "src/main_clang_llc.rs"
 [[bin]]
 name = "compiler-cs"
 path = "src/main_clang_self.rs"
+
+# 使用自己实现的中端导出llvm ir,使用llc作为后端
+[[bin]]
+name = "compiler-sc"
+path = "src/main_self_llc.rs"
 
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
