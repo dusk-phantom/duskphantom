@@ -151,7 +151,9 @@ pub fn build_instruction(
         llvm_ir::Instruction::Phi(_) => todo!(),
         llvm_ir::Instruction::Select(_) => todo!(),
         llvm_ir::Instruction::Freeze(_) => todo!(),
-        llvm_ir::Instruction::Call(_) => todo!(),
+        llvm_ir::Instruction::Call(call) => {
+           build_call_inst(call)
+        },
         llvm_ir::Instruction::VAArg(_) => todo!(),
         llvm_ir::Instruction::LandingPad(_) => todo!(),
         llvm_ir::Instruction::CatchPad(_) => todo!(),
@@ -282,4 +284,12 @@ fn build_term_inst(term: &llvm_ir::Terminator) -> Result<Vec<Inst>, BackendError
         _ => todo!(),
     }
     Ok(ret_insts)
+}
+
+fn build_call_inst(call:&llvm_ir::instruction::Call) ->Result<Vec<Inst>,BackendError> {
+
+    dbg!(&call.dest);
+    dbg!(&call.arguments);
+    dbg!(&call.function);
+    todo!();
 }
