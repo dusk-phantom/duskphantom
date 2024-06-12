@@ -65,7 +65,7 @@ pub enum Inst {
     Jmp(JmpInst),
     Branch(BranchInst),
     Call(CallInst),
-    // tail 尾调用
+    Tail(TailInst),
     Ret,
 }
 
@@ -152,6 +152,7 @@ impl Inst {
             Inst::AND(inst) => inst.gen_asm(),
             Inst::OR(inst) => inst.gen_asm(),
             Inst::XOR(inst) => inst.gen_asm(),
+            Inst::Tail(inst) =>inst.gen_asm(),
         }
     }
 }
