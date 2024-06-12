@@ -1,3 +1,8 @@
+extern int f1();
 int main(){
+    int op=f1();
+    if (op<1){
+        return 1;
+    }
     return 0;
 }

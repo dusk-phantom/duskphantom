@@ -9,7 +9,7 @@ pub mod operand;
 pub mod prog;
 pub mod stack_slot;
 pub mod var;
-mod insts;
+pub mod instruction;
 
 pub use super::*;
 pub use block::*;
@@ -18,4 +18,4 @@ pub use module::*;
 pub use operand::*;
 pub use prog::*;
 pub use stack_slot::*;
-pub use insts::*;
+pub use instruction::*;
