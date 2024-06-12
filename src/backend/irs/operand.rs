@@ -80,6 +80,11 @@ impl From<&str> for Operand {
         Self::Label(Label(val.to_string()))
     }
 }
+impl From<String> for Operand{
+    fn from(value: String) -> Self {
+        Self::Label(Label(value))
+    }
+}
 impl From<i64> for Operand {
     fn from(val: i64) -> Self {
         Self::Imm(Imm(val))
