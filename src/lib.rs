@@ -1,3 +1,4 @@
+use backend::checker::CheckValidInst;
 use errors::CompilerError;
 
 pub mod args;
@@ -33,7 +34,25 @@ pub fn compile(
     let mut program = backend::gen(&program)?;
     if opt_flag {
         backend::optimize(&mut program);
+    }else{
+        backend::phisicalize(&mut program);
     }
+    // check valid
+    {
+        for module in program.modules.iter() {
+            for func in module.funcs.iter() {
+                for bb in func.iter_bbs() {
+                    for inst in bb.insts() {
+                        if ! inst.check_valid() {
+                            panic!("invalid inst: {:?}", &inst.gen_asm());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
     let asm = program.gen_asm();
     let output = if !asm_flag { asm2bin(asm) } else { asm };
     std::fs::write(output_path, output).map_err(CompilerError::IOError)
@@ -60,6 +79,20 @@ pub fn compile_clang(
         backend::optimize(&mut program);
     } else {
         backend::phisicalize(&mut program);
+    }
+     // check valid
+    {
+        for module in program.modules.iter() {
+            for func in module.funcs.iter() {
+                for bb in func.iter_bbs() {
+                    for inst in bb.insts() {
+                        if ! inst.check_valid() {
+                            panic!("invalid inst: {:?}", &inst.gen_asm());
+                        }
+                    }
+                }
+            }
+        }
     }
     let asm = program.gen_asm();
     let output = if !asm_flag { asm2bin(asm) } else { asm };
