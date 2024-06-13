@@ -58,8 +58,18 @@ pub mod riscv{
     impl CheckValidInst for SwInst{}
     impl CheckValidInst for LwInst{}
     impl CheckValidInst for LaInst{}
-    impl CheckValidInst for LoadInst{}
-    impl CheckValidInst for StoreInst{}
+    impl CheckValidInst for LoadInst{
+        /// 在riscv 阶段，不应该存在load指令
+        fn check_valid(&self)->bool {
+            false
+        }
+    }
+    impl CheckValidInst for StoreInst{
+        /// 在riscv 阶段，不应该存在store指令
+        fn check_valid(&self)->bool {
+            false
+        }
+    }
     impl CheckValidInst for JmpInst{}
     impl CheckValidInst for BranchInst{}
     impl CheckValidInst for CallInst{}
