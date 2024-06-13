@@ -29,7 +29,13 @@ pub mod riscv{
                 Inst::Load(inst) => inst.check_valid(),
                 Inst::Store(inst) => inst.check_valid(),
                 Inst::Jmp(inst) => inst.check_valid(),
-                Inst::Branch(inst) => inst.check_valid(),
+                Inst::Beq(inst)=>inst.check_valid(),
+                Inst::Bne(inst)=>inst.check_valid(),
+                Inst::Bge(inst)=>inst.check_valid(),
+                Inst::Blt(inst)=>inst.check_valid(),
+                Inst::Bgt(inst)=>inst.check_valid(),
+                Inst::Ble(inst)=>inst.check_valid(),
+                
                 Inst::Call(inst) => inst.check_valid(),
                 Inst::SRA(inst) => inst.check_valid(),
                 Inst::Ret => true,
@@ -71,7 +77,12 @@ pub mod riscv{
         }
     }
     impl CheckValidInst for JmpInst{}
-    impl CheckValidInst for BranchInst{}
+    impl CheckValidInst for BeqInst{}
+    impl CheckValidInst for BneInst{}
+    impl CheckValidInst for BgeInst{}
+    impl CheckValidInst for BltInst{}
+    impl CheckValidInst for BgtInst{}
+    impl CheckValidInst for BleInst{}
     impl CheckValidInst for CallInst{}
     impl CheckValidInst for AndInst{}
     impl CheckValidInst for OrInst{}

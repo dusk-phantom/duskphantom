@@ -35,7 +35,12 @@ impl RegUses for Inst {
             Inst::Store(inst) => inst.uses(),
             Inst::La(inst) => inst.uses(),
             Inst::Jmp(inst) => inst.uses(),
-            Inst::Branch(inst) => inst.uses(),
+            Inst::Beq(inst)=>inst.uses(),
+            Inst::Bne(inst)=>inst.uses(),
+            Inst::Bge(inst)=>inst.uses(),
+            Inst::Blt(inst)=>inst.uses(),
+            Inst::Bgt(inst)=>inst.uses(),
+            Inst::Ble(inst)=>inst.uses(),
             Inst::Call(inst) => inst.uses(),
             Inst::SRA(inst) => inst.uses(),
             Inst::And(inst) => inst.uses(),
@@ -70,7 +75,12 @@ impl RegDefs for Inst {
             Inst::Sw(inst)=>inst.defs(),
             Inst::La(inst) => inst.defs(),
             Inst::Jmp(inst) => inst.defs(),
-            Inst::Branch(inst) => inst.defs(),
+            Inst::Beq(inst)=>inst.defs(),
+            Inst::Bne(inst)=>inst.defs(),
+            Inst::Bge(inst)=>inst.defs(),
+            Inst::Blt(inst)=>inst.defs(),
+            Inst::Bgt(inst)=>inst.defs(),
+            Inst::Ble(inst)=>inst.defs(),
             Inst::Call(inst) => inst.defs(),
             Inst::Ret => vec![],
             Inst::Tail(_) =>vec![],
@@ -80,16 +90,6 @@ impl RegDefs for Inst {
     }
 }
 
-impl RegUses for BranchInst {
-    fn uses(&self) -> Vec<&Reg> {
-        vec![self.lhs(), self.rhs()]
-    }
-}
-impl RegDefs for BranchInst {
-    fn defs(&self) -> Vec<&Reg> {
-        vec![]
-    }
-}
 
 impl RegUses for LaInst {}
 

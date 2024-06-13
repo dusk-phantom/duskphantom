@@ -57,8 +57,8 @@ harness = false
 # 特性管理
 [features]
 default = [
-    "clang_enabled",   # 解除该行注释获取基于clang的前后端, 比赛提交的时候该行需要注释掉
-    "gen_virtual_asm", # 解除该行注释获取生成虚拟汇编的功能
+    # "clang_enabled",   # 解除该行注释获取基于clang的前后端, 比赛提交的时候该行需要注释掉
+    # "gen_virtual_asm", # 解除该行注释获取生成虚拟汇编的功能
 ]
 clang_enabled = ["llvm-ir"]
 gen_virtual_asm = []

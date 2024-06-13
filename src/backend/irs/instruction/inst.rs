@@ -69,7 +69,15 @@ pub enum Inst {
     Store(StoreInst),
     // control flow operation
     Jmp(JmpInst),
-    Branch(BranchInst),
+
+    Beq(BeqInst),
+    Bne(BneInst),
+    Blt(BltInst),
+    Ble(BleInst),
+    Bgt(BgtInst),
+    Bge(BgeInst),
+    
+
     Call(CallInst),
     Tail(TailInst),
     Ret,
@@ -130,7 +138,12 @@ impl Inst {
             Inst::Load(inst) => inst.gen_asm(),
             Inst::Store(inst) => inst.gen_asm(),
             Inst::Jmp(inst) => inst.gen_asm(),
-            Inst::Branch(inst) => inst.gen_asm(),
+            Inst::Beq(inst) => inst.gen_asm(),
+            Inst::Bne(inst) => inst.gen_asm(),
+            Inst::Bge(inst) => inst.gen_asm(),
+            Inst::Blt(inst) => inst.gen_asm(),
+            Inst::Bgt(inst) => inst.gen_asm(),
+            Inst::Ble(inst) => inst.gen_asm(),
             Inst::Call(inst) => inst.gen_asm(),
             Inst::SRA(inst) => inst.gen_asm(),
             Inst::Ret => String::from("ret"),

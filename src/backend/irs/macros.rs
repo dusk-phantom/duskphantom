@@ -61,6 +61,61 @@ macro_rules! impl_three_op_inst {
         }
     };
 }
+
+
+
+#[macro_export]
+macro_rules! impl_branch_inst {
+    ($ty_name:ident,$inst_name:expr) => {
+        #[derive(Clone)]
+        pub struct $ty_name(Reg, Reg, Label);
+        impl $ty_name {
+            pub fn new(dst: Reg, lhs: Reg, rhs: Label) -> Self {
+                Self(dst, lhs, rhs)
+            }
+            pub fn lhs(&self) -> &Reg {
+                &self.0
+            }
+            pub fn rhs(&self) -> &Reg {
+                &self.0
+            }
+            pub fn lhs_mut(&mut self) -> &mut Reg {
+                &mut self.1
+            }
+            pub fn rhs_mut(&mut self) -> &mut Reg {
+                &mut self.1
+            }
+            pub fn label(&self)->&Label{
+                &self.2
+            }
+            pub fn label_mut(&mut self)->&mut Label {
+                &mut self.2
+            }
+
+            pub fn gen_asm(&self) -> String {
+                let lhs = self.lhs().gen_asm();
+                let rhs = self.rhs().gen_asm();
+                let label=self.label().gen_asm();
+                format!("{} {},{},{}", $inst_name, lhs, rhs,label)
+            }
+        }
+        impl RegDefs for $ty_name {
+            fn defs(&self) -> Vec<&Reg> {
+                vec![]
+            }
+        }
+        impl RegUses for $ty_name {
+            fn uses(&self) -> Vec<&Reg> {
+               vec![self.lhs(),self.rhs()]
+            }
+        }
+    };
+}
+
+
+
+
+
 #[macro_export]
 macro_rules! impl_two_op_inst {
     ($ty_name:ident,$inst_name:expr) => {
