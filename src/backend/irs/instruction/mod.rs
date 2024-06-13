@@ -40,6 +40,5 @@ impl_inst_from!(SwInst,Sw);
 
 // inst for control flow
 impl_inst_from!(JmpInst, Jmp);
-impl_inst_from!(BranchInst, Branch);
 impl_inst_from!(CallInst, Call);
 impl_inst_from!(TailInst, Tail);
