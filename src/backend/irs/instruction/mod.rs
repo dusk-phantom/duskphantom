@@ -3,6 +3,7 @@ mod data_move;
 mod inst;
 mod reg_def_use;
 mod control_flow;
+pub mod checker;
 pub use super::*;
 pub use algebra::*;
 pub use data_move::*;
