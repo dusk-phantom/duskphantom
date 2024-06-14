@@ -60,6 +60,7 @@ pub enum Inst {
 
     // data transfer operation
     Mv(MvInst),
+    Li(LiInst),
     Ld(LdInst),
     Sd(SdInst),
     Lw(LwInst),
@@ -135,6 +136,7 @@ impl Inst {
             Inst::Sw(inst) => inst.gen_asm(),
             Inst::Lw(inst) => inst.gen_asm(),
             Inst::La(inst) => inst.gen_asm(),
+            Inst::Li(inst)=>inst.gen_asm(),
             Inst::Load(inst) => inst.gen_asm(),
             Inst::Store(inst) => inst.gen_asm(),
             Inst::Jmp(inst) => inst.gen_asm(),
