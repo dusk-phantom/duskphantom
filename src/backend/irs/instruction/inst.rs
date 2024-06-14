@@ -186,6 +186,9 @@ impl_inst_convert!(SdInst, Sd);
 impl_inst_convert!(LdInst, Ld);
 impl_inst_convert!(LwInst,Lw);
 impl_inst_convert!(SwInst,Sw);
+impl_inst_convert!(LiInst,Li);
+impl_inst_convert!(LoadInst,Load);
+impl_inst_convert!(StoreInst,Store);
 
 // inst for control flow
 impl_inst_convert!(JmpInst, Jmp);
