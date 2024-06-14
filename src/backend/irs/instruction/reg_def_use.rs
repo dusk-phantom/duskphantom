@@ -48,6 +48,7 @@ impl RegUses for Inst {
             Inst::Xor(inst) => inst.uses(),
             Inst::Ret => vec![],
             Inst::Tail(_) =>vec![],
+            Inst::Li(inst) => inst.uses(),
         }
     }
 }
@@ -85,6 +86,7 @@ impl RegDefs for Inst {
             Inst::Ret => vec![],
             Inst::Tail(_) =>vec![],
             Inst::Slt(inst) => inst.defs(),
+            Inst::Li(inst) => inst.defs(),
             
         }
     }

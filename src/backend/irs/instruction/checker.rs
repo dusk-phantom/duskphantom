@@ -43,6 +43,7 @@ pub mod riscv{
                 Inst::Or(inst) => inst.check_valid(),
                 Inst::Xor(inst) => inst.check_valid(),
                 Inst::Tail(inst) =>inst.check_valid(),
+                Inst::Li(inst) =>inst.check_valid(),
             }
         
         }
@@ -93,7 +94,11 @@ pub mod riscv{
     impl CheckValidInst for SubInst{}
     impl CheckValidInst for MulInst{}
     impl CheckValidInst for NegInst{}
-    
+    impl CheckValidInst for LiInst{
+        fn check_valid(&self)->bool {
+            matches!(self.dst(),Operand::Reg(_))&&matches!(self.src(),Operand::Imm(_))
+        }
+    }
 
 }
 
