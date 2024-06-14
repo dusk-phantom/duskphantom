@@ -108,7 +108,6 @@ pub enum Inst {
 
 // lw
 
-
 // j
 // jal
 // jalr
@@ -158,6 +157,38 @@ impl Inst {
 }
 
 
+//*********************************************************************************
+// impl From<T> for Inst 
+// and impl TryFrom<Inst> for T
+// T is the specific instruction type
+//*********************************************************************************
 
+// for algebraic operation
+impl_inst_convert!(AddInst, Add);
+impl_inst_convert!(SubInst, Sub);
+impl_inst_convert!(MulInst, Mul);
+impl_inst_convert!(RemInst, Rem);
+impl_inst_convert!(DivInst, Div);
+impl_inst_convert!(NegInst, Neg);
 
-//* impl  get_stack_slot for mem Inst */
+// for bit count operation
+impl_inst_convert!(AndInst,And);
+impl_inst_convert!(OrInst,Or);
+impl_inst_convert!(XorInst,Xor);
+impl_inst_convert!(SllInst, Sll);
+impl_inst_convert!(SrlInst, Srl);
+impl_inst_convert!(SltInst,Slt);
+
+// inst for data transfer
+impl_inst_convert!(MvInst, Mv);
+impl_inst_convert!(LaInst, La);
+impl_inst_convert!(SdInst, Sd);
+impl_inst_convert!(LdInst, Ld);
+impl_inst_convert!(LwInst,Lw);
+impl_inst_convert!(SwInst,Sw);
+
+// inst for control flow
+impl_inst_convert!(JmpInst, Jmp);
+impl_inst_convert!(CallInst, Call);
+impl_inst_convert!(TailInst, Tail);
+
