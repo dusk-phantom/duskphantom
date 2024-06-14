@@ -226,12 +226,22 @@ macro_rules! impl_unary_inst {
 }
 
 #[macro_export]
-macro_rules! impl_inst_from {
+macro_rules! impl_inst_convert {
     ($inst_type:ident,$enumerator:ident) => {
         impl From<$inst_type> for Inst {
             fn from(value: $inst_type) -> Inst {
                 Inst::$enumerator(value)
             }
         }
+        impl TryFrom<Inst> for $inst_type {
+            type Error = Inst;
+            fn try_from(value: Inst) -> Result<$inst_type, Inst> {
+                match value {
+                    Inst::$enumerator(inst) => Ok(inst),
+                    _ => Err(value),
+                }
+            }
+        }
     };
 }
+
