@@ -23,7 +23,8 @@ pub fn compile(
     opt_flag: bool,
     asm_flag: bool,
 ) -> Result<(), CompilerError> {
-    let mut program = frontend::parse(sy_path)?;
+    let content = std::fs::read_to_string(sy_path).map_err(CompilerError::IOError)?;
+    let mut program = frontend::parse(&content)?;
     if opt_flag {
         frontend::optimize(&mut program);
     }

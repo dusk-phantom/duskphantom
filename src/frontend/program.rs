@@ -53,6 +53,27 @@ pub mod tests_program {
     }
 
     #[test]
+    fn test_simple_main() {
+        let code = r#"
+int main() {
+    return 0;
+}
+"#;
+        match parse(code) {
+            Ok(result) => {
+                assert_eq!(
+                    format!("{:?}", result),
+                    "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Return(Some(Int32(0)))])))] }"
+                )
+            }
+            Err(err) => match err {
+                FrontendError::ParseError(s) => panic!("{}", s),
+                FrontendError::OptimizeError => panic!("optimize error"),
+            },
+        }
+    }
+
+    #[test]
     fn test_assign() {
         let code = "int n = 3;";
         match parse(code) {
