@@ -1,11 +1,128 @@
+use core::panic;
 use std::collections::{HashMap, HashSet};
 
 use crate::middle::ir::{instruction::InstType, BBPtr, InstPtr, Operand};
 
+type PhiArg = (BBPtr, Operand);
+type PhiArgs = Vec<PhiArg>;
+
+/// The mem2reg pass
+#[allow(unused)]
+pub fn mem2reg(entry: BBPtr) {
+    let phi_positions: HashMap<InstPtr, HashSet<BBPtr>> = get_variable_to_phi_insertion(entry);
+    let mut phi_for_block: HashMap<BBPtr, HashSet<InstPtr>> = HashMap::new();
+
+    // populate `phi_for_block` from `phi_positions`
+    for (variable, positions) in phi_positions.iter() {
+        for position in positions.iter() {
+            phi_for_block
+                .entry(*position)
+                .or_default()
+                .insert(*variable);
+        }
+    }
+
+    // for each "phi" insert position, decide the value for each argument
+    fn decide_variable_value(
+        variable: InstPtr,
+        current_variable_value: &mut [HashMap<InstPtr, PhiArg>],
+    ) -> (BBPtr, Operand) {
+        for frame in current_variable_value.iter().rev() {
+            if let Some(value) = frame.get(&variable) {
+                return value.clone();
+            }
+        }
+        panic!("variable value not found");
+    }
+    fn decide_values_start_from(
+        entry: BBPtr,
+        visited: &mut HashSet<BBPtr>,
+        current_variable_value: &mut [HashMap<InstPtr, PhiArg>],
+        block_to_phi_insertion: &mut HashMap<BBPtr, HashMap<InstPtr, PhiArgs>>,
+    ) {
+        // decide value for each "phi" instruction to add
+        for (variable, phi_args) in block_to_phi_insertion
+            .get_mut(&entry)
+            .unwrap_or(&mut HashMap::new())
+            .iter_mut()
+        {
+            let value = decide_variable_value(*variable, current_variable_value);
+            phi_args.push(value);
+            current_variable_value
+                .last_mut()
+                .unwrap()
+                .insert(*variable, (entry, Operand::Constant(0.into())));
+        }
+    }
+}
+
+/// Get all "phi" to insert for each basic block
+/// Returns: basic_block -> (alloca -> [(from_block, operand)])
+#[allow(unused)]
+fn get_block_to_phi_insertion(
+    entry: BBPtr,
+) -> HashMap<BBPtr, HashMap<InstPtr, Vec<(BBPtr, Operand)>>> {
+    let phi_insert_positions = get_variable_to_phi_insertion(entry);
+    let mut block_to_phi_insertion: HashMap<BBPtr, HashMap<InstPtr, Vec<(BBPtr, Operand)>>> =
+        HashMap::new();
+    for (variable, positions) in phi_insert_positions.iter() {
+        for position in positions.iter() {
+            block_to_phi_insertion
+                .entry(*position)
+                .or_default()
+                .insert(*variable, vec![]);
+        }
+    }
+    block_to_phi_insertion
+}
+
+/// Get places to insert "phi" instructions for each "alloca" instruction
+#[allow(unused)]
+fn get_variable_to_phi_insertion(entry: BBPtr) -> HashMap<InstPtr, HashSet<BBPtr>> {
+    let mut phi_positions = HashMap::new();
+    let df = get_dominance_frontiers(entry);
+
+    // for each "store", make insert position at the beginning of the dominance frontier
+    fn dfs_insertion(
+        current_bb: BBPtr,
+        visited: &mut HashSet<BBPtr>,
+        df: &HashMap<BBPtr, HashSet<BBPtr>>,
+        phi_positions: &mut HashMap<InstPtr, HashSet<BBPtr>>,
+    ) {
+        if visited.contains(&current_bb) {
+            return;
+        }
+        visited.insert(current_bb);
+        for inst in current_bb.iter() {
+            if inst.get_type() == InstType::Store {
+                let store = inst;
+                let store_operands = store.get_operand();
+                let store_ptr = &store_operands[1];
+
+                // only insert "phi" when store destination is a constant pointer
+                if let Operand::Instruction(inst) = store_ptr {
+                    if inst.get_type() == InstType::Alloca {
+                        for df_bb in df.get(&current_bb).unwrap_or(&HashSet::new()).iter() {
+                            phi_positions.entry(*inst).or_default().insert(*df_bb);
+                        }
+                    }
+                }
+            }
+        }
+        for succ in current_bb.get_succ_bb() {
+            dfs_insertion(*succ, visited, df, phi_positions);
+        }
+    }
+    dfs_insertion(entry, &mut HashSet::new(), &df, &mut phi_positions);
+
+    // return result
+    phi_positions
+}
+
 /// Get dominance frontiers of each basic block in the function
 #[allow(unused)]
-pub fn get_df(entry: BBPtr) -> HashMap<BBPtr, HashSet<BBPtr>> {
-    let idoms = get_idoms(entry);
+fn get_dominance_frontiers(entry: BBPtr) -> HashMap<BBPtr, HashSet<BBPtr>> {
+    let idoms = get_immediate_dominators(entry);
     let mut df = HashMap::new();
 
     // calculate dominance frontiers
@@ -28,7 +145,7 @@ pub fn get_df(entry: BBPtr) -> HashMap<BBPtr, HashSet<BBPtr>> {
 
 /// Get immediate dominators of each basic block in the function
 #[allow(unused)]
-pub fn get_idoms(entry: BBPtr) -> HashMap<BBPtr, BBPtr> {
+fn get_immediate_dominators(entry: BBPtr) -> HashMap<BBPtr, BBPtr> {
     let mut idoms = HashMap::new();
     idoms.insert(entry, entry);
 
@@ -51,10 +168,9 @@ pub fn get_idoms(entry: BBPtr) -> HashMap<BBPtr, BBPtr> {
     }
     let mut postorder_map = HashMap::new();
     let mut postorder_array = Vec::new();
-    let mut postorder_visited = HashSet::new();
     dfs_postorder(
         entry,
-        &mut postorder_visited,
+        &mut HashSet::new(),
         &mut postorder_map,
         &mut postorder_array,
     );
@@ -99,94 +215,6 @@ pub fn get_idoms(entry: BBPtr) -> HashMap<BBPtr, BBPtr> {
     idoms
 }
 
-/// Get and remove all primitive "alloca" from function
-#[allow(unused)]
-pub fn consume_all_alloca(entry: BBPtr) -> Vec<InstPtr> {
-    let mut alloca_list = Vec::new();
-
-    // find and remove all "alloca" with dfs
-    fn find_and_remove(
-        current_bb: BBPtr,
-        visited: &mut HashSet<BBPtr>,
-        alloca_list: &mut Vec<InstPtr>,
-    ) {
-        if visited.contains(&current_bb) {
-            return;
-        }
-        visited.insert(current_bb);
-        let mut current_inst: Option<InstPtr> = if current_bb.is_empty() {
-            None
-        } else {
-            Some(current_bb.get_first_inst())
-        };
-        while let Some(mut inst) = current_inst {
-            if inst.get_type() == InstType::Alloca {
-                alloca_list.push(inst);
-                inst.remove_self();
-            }
-            current_inst = inst.get_next();
-        }
-        for succ in current_bb.get_succ_bb() {
-            find_and_remove(*succ, visited, alloca_list);
-        }
-    }
-    let mut visited = HashSet::new();
-    find_and_remove(entry, &mut visited, &mut alloca_list);
-
-    // return result
-    alloca_list
-}
-
-/// Get places to insert "phi" instructions for each "alloca" instruction
-#[allow(unused)]
-pub fn phi_insert_positions(entry: BBPtr) -> HashMap<InstPtr, HashSet<BBPtr>> {
-    let mut phi_positions = HashMap::new();
-    let df = get_df(entry);
-
-    // for each "store", make insert position at the beginning of the dominance frontier
-    fn dfs_insert_positions(
-        current_bb: BBPtr,
-        visited: &mut HashSet<BBPtr>,
-        df: &HashMap<BBPtr, HashSet<BBPtr>>,
-        phi_positions: &mut HashMap<InstPtr, HashSet<BBPtr>>,
-    ) {
-        if visited.contains(&current_bb) {
-            return;
-        }
-        visited.insert(current_bb);
-        let mut current_inst: Option<InstPtr> = if current_bb.is_empty() {
-            None
-        } else {
-            Some(current_bb.get_first_inst())
-        };
-        while let Some(mut inst) = current_inst {
-            if inst.get_type() == InstType::Store {
-                let store = inst;
-                let store_operands = store.get_operand();
-                let store_ptr = &store_operands[1];
-
-                // only insert "phi" when store destination is a constant pointer
-                if let Operand::Instruction(alloc) = store_ptr {
-                    if alloc.get_type() == InstType::Alloca {
-                        for df_bb in df.get(&current_bb).unwrap_or(&HashSet::new()).iter() {
-                            phi_positions.entry(*alloc).or_default().insert(*df_bb);
-                        }
-                    }
-                }
-            }
-            current_inst = inst.get_next();
-        }
-        for succ in current_bb.get_succ_bb() {
-            dfs_insert_positions(*succ, visited, df, phi_positions);
-        }
-    }
-    let mut visited = HashSet::new();
-    dfs_insert_positions(entry, &mut visited, &df, &mut phi_positions);
-
-    // return result
-    phi_positions
-}
-
 #[cfg(test)]
 pub mod tests_mem2reg {
     use super::*;
@@ -212,7 +240,7 @@ pub mod tests_mem2reg {
         alt.set_true_bb(end);
 
         // calculate idoms
-        let idoms = get_idoms(entry);
+        let idoms = get_immediate_dominators(entry);
 
         // check if idoms are correct
         assert_eq!(idoms[&entry].name, entry.name);
@@ -243,7 +271,7 @@ pub mod tests_mem2reg {
         alt.set_true_bb(end);
 
         // calculate df
-        let df = get_df(entry);
+        let df = get_dominance_frontiers(entry);
 
         // check if df lengths are correct
         assert_eq!(df.len(), 4);
@@ -257,31 +285,6 @@ pub mod tests_mem2reg {
         assert!(df[&then_then].contains(&end));
         assert!(df[&then_alt].contains(&end));
         assert!(df[&alt].contains(&end));
-    }
-
-    #[test]
-    fn test_consume_all_alloca() {
-        let mut program = Program::new();
-
-        // construct a function with "alloca" instructions
-        let mut entry = program.mem_pool.new_basicblock("entry".to_string());
-        let alloca1 = program.mem_pool.get_alloca(ValueType::Int, 1);
-        let alloca2 = program.mem_pool.get_alloca(ValueType::Int, 1);
-        let alloca3 = program.mem_pool.get_alloca(ValueType::Int, 1);
-        let store = program
-            .mem_pool
-            .get_store(Operand::Constant(1.into()), Operand::Instruction(alloca1));
-        entry.push_back(alloca1);
-        entry.push_back(alloca2);
-        entry.push_back(alloca3);
-        entry.push_back(store);
-
-        // consume all "alloca" instructions
-        let alloca_list = consume_all_alloca(entry);
-
-        // check if all "alloca" instructions are consumed
-        assert_eq!(alloca_list.len(), 3);
-        assert_eq!(entry.get_first_inst().get_type(), InstType::Store);
     }
 
     #[test]
@@ -310,7 +313,7 @@ pub mod tests_mem2reg {
         entry.push_back(store3);
 
         // calculate df and phi insert positions
-        let phi_positions = phi_insert_positions(entry);
+        let phi_positions = get_variable_to_phi_insertion(entry);
 
         // check if phi insert positions are correct
         assert_eq!(phi_positions.len(), 0);
@@ -356,7 +359,7 @@ pub mod tests_mem2reg {
         alt.push_back(store3);
 
         // calculate phi insert positions
-        let phi_positions = phi_insert_positions(entry);
+        let phi_positions = get_variable_to_phi_insertion(entry);
 
         // check if phi insert positions are correct
         assert_eq!(phi_positions.len(), 3);
