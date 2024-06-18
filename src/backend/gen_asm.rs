@@ -223,21 +223,31 @@ impl GenTool {
         init.sort_by(|(idx1, _), (idx2, _)| idx1.cmp(idx2));
         for (index, (idx, val)) in init.iter().enumerate() {
             if index == 0 && idx != &0 {
-                ret.push_str(format!(".zero\t{}\n", idx * size_elem as usize).as_str());
+                ret.push_str(
+                    &Self::gen_zero_fill(idx * size_elem as usize),
+                );
             } else if index != 0 {
                 let prev_idx = init[index - 1].0;
                 if idx - prev_idx != 1 {
                     ret.push_str(
-                        format!(".zero\t{}\n", (idx - prev_idx - 1) * size_elem as usize).as_str(),
+                        &Self::gen_zero_fill((idx - prev_idx - 1) * size_elem as usize),
                     );
                 }
             }
             ret.push_str(format!("{}\n", val.to_str()).as_str());
             if index == init.len() - 1 {
                 ret.push_str(
-                    format!(".zero\t{}", (num_elems - idx - 1) * size_elem as usize).as_str(),
+                    &Self::gen_zero_fill((num_elems - idx - 1) * size_elem as usize),
                 );
             }
+        }
+        ret
+    }
+    pub fn gen_zero_fill(num_byte: usize) -> String {
+        let mut ret = String::with_capacity(40);
+        ret.push_str(".zero");
+        if num_byte != 0 {
+            ret.push_str(&format!("\t{}", num_byte));
         }
         ret
     }
@@ -245,6 +255,7 @@ impl GenTool {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     #[test]
     fn test_gen_const_str() {
         let s = super::GenTool::gen_const_str("hello", "world");
@@ -369,6 +380,17 @@ hello:
 .zero\t7";
         assert_eq!(s, raw_match);
     }
+    #[test]
+    fn test_zero_fill(){
+        assert_eq!(GenTool::gen_zero_fill(1),".zero\t1");
+        assert_eq!(GenTool::gen_zero_fill(0),".zero");
+    }
+    #[test]
+    fn test_zero_fill_for_gen_array(){
+        let s=GenTool::gen_array::<u16>("arr",3,&[(0,1),(1,2),(2,3)]);
+        assert_eq!(s,".data\n.align\t3\n.globl\tarr\n.type\tarr, @object\n.size\tarr, 6\narr:\n.short\t0x1\n.short\t0x2\n.short\t0x3\n.zero");
+    }
+
     #[test]
     fn test_gen_short_arr() {
         let s = super::GenTool::gen_array::<u16>("hello", 10, &[(0, 1), (1, 2), (2, 3)]);
