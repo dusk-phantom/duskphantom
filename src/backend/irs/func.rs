@@ -56,13 +56,10 @@ impl Func {
     // iter bbs in a special order,in which entry is the first one,
     // and other bbs in order of label's dictionary order
     pub fn iter_bbs(&self) -> BBIter {
-        let mut ordered_bbs = Vec::new();
-        let mut ordered_other_bbs: Vec<&Block> = self.other_bbs.iter().collect();
-        ordered_other_bbs.sort_by_key(|b| b.label());
-        ordered_bbs.extend(ordered_other_bbs.iter());
+        let other_bbs: Vec<&Block> = self.other_bbs.iter().collect();
         BBIter {
             entry: &self.entry,
-            ordered_other_bbs: ordered_bbs,
+            other_bbs,
             idx: 0,
         }
     }
@@ -98,7 +95,7 @@ impl Func {
 
 pub struct BBIter<'a> {
     entry: &'a Block,
-    ordered_other_bbs: Vec<&'a Block>,
+    other_bbs: Vec<&'a Block>,
     idx: usize,
 }
 impl<'a> Iterator for BBIter<'a> {
@@ -109,9 +106,33 @@ impl<'a> Iterator for BBIter<'a> {
             self.idx += 1;
             Some(self.entry)
         } else {
-            let ret = self.ordered_other_bbs.get(self.idx - 1).cloned();
+            let ret = self.other_bbs.get(self.idx - 1).cloned();
             self.idx += 1;
             ret
         }
+    }
+}
+
+
+#[cfg(test)]
+mod tests{
+    #[test]
+    fn test_iter_bb_order(){
+        use super::*;
+        let mut func=Func::default();
+        let entry=Block::new("entry".to_string());
+        let bb1=Block::new("bb1".to_string());
+        let bb2=Block::new("bb4".to_string());
+        let bb3=Block::new("bb3".to_string());
+        func.entry=entry;
+        func.other_bbs.push(bb1);
+        func.other_bbs.push(bb2);
+        func.other_bbs.push(bb3);
+        let mut iter=func.iter_bbs();
+        assert_eq!(iter.next().unwrap().label(),"entry");
+        assert_eq!(iter.next().unwrap().label(),"bb1");
+        assert_eq!(iter.next().unwrap().label(),"bb4");
+        assert_eq!(iter.next().unwrap().label(),"bb3");
+        assert!(iter.next().is_none());
     }
 }
