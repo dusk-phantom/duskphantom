@@ -151,9 +151,7 @@ pub fn build_instruction(
         llvm_ir::Instruction::Phi(_) => todo!(),
         llvm_ir::Instruction::Select(_) => todo!(),
         llvm_ir::Instruction::Freeze(_) => todo!(),
-        llvm_ir::Instruction::Call(call) => {
-           build_call_inst(call,stack_allocator,stack_slots)
-        },
+        llvm_ir::Instruction::Call(call) => build_call_inst(call, stack_allocator, stack_slots),
         llvm_ir::Instruction::VAArg(_) => todo!(),
         llvm_ir::Instruction::LandingPad(_) => todo!(),
         llvm_ir::Instruction::CatchPad(_) => todo!(),
@@ -195,6 +193,20 @@ impl Operand {
             llvm_ir::Operand::MetadataOperand => todo!(),
         })
     }
+
+    #[inline]
+    pub fn global_name_from(operand: &llvm_ir::Operand) -> Result<Name, BackendError> {
+        match operand {
+            llvm_ir::Operand::LocalOperand { name: _, ty: _ } => {
+                Err(BackendError::GenFromLlvmError("local operand".to_string()))
+            }
+            llvm_ir::Operand::ConstantOperand(c) => match c.as_ref() {
+                Constant::GlobalReference { name, ty: _ } => Ok(name.clone()),
+                _ => todo!(),
+            },
+            llvm_ir::Operand::MetadataOperand => todo!(),
+        }
+    }
 }
 
 fn build_bb(
@@ -228,7 +240,6 @@ fn build_alloca_inst(
     stack_slots.insert(name.clone(), ss.clone());
     Ok(vec![])
 }
-
 
 fn build_store_inst(
     store: &llvm_ir::instruction::Store,
@@ -287,23 +298,19 @@ fn build_term_inst(term: &llvm_ir::Terminator) -> Result<Vec<Inst>, BackendError
 }
 
 #[allow(unused)]
-fn build_call_inst(call:&llvm_ir::instruction::Call,stack_allocator: &mut StackAllocator,stack_slots: &mut HashMap<Name, StackSlot>) ->Result<Vec<Inst>,BackendError> {
-    
-    let dst=&call.dest;
-    let f_name=match &call.function{
+fn build_call_inst(
+    call: &llvm_ir::instruction::Call,
+    stack_allocator: &mut StackAllocator,
+    stack_slots: &mut HashMap<Name, StackSlot>,
+) -> Result<Vec<Inst>, BackendError> {
+    let dst = &call.dest;
+    let f_name = match &call.function {
         rayon::iter::Either::Left(_) => todo!(),
-        rayon::iter::Either::Right(op) =>match op {
-            llvm_ir::Operand::LocalOperand { name, ty:_ty } => name.to_string(),
-            llvm_ir::Operand::ConstantOperand(_) => todo!(),
-            llvm_ir::Operand::MetadataOperand => todo!(),
-        },
+        rayon::iter::Either::Right(op) => Operand::global_name_from(op)?,
     };
-    let mut ret:Vec<Inst>=Vec::new();
-    unimplemented!();
-    // if let Some(dst)=dst{
-        
-    // }
-    let call=CallInst::new(f_name.into()).into();
+    let mut ret: Vec<Inst> = Vec::new();
+    // FIXME: process arguments
+    let call = CallInst::new(f_name.to_string().into()).into();
     ret.push(call);
     Ok(ret)
 }
