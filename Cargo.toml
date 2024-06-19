@@ -43,7 +43,7 @@ serde_yaml = "0.9.30"
 thiserror = "1.0.50"
 typed-arena = "2.0.2"
 once_cell = "1.7.2"
-llvm-ir = { version = "0.10.0", features = ["llvm-16"], optional = true }
+llvm-ir = { version = "0.11.1", features = ["llvm-16"], optional = true }
 tempfile = "3.9.0"
 winnow = "0.6.5"
 
@@ -57,8 +57,8 @@ harness = false
 # 特性管理
 [features]
 default = [
-    # "clang_enabled",   # 解除该行注释获取基于clang的前后端, 比赛提交的时候该行需要注释掉
-    # "gen_virtual_asm", # 解除该行注释获取生成虚拟汇编的功能
+    "clang_enabled",   # 解除该行注释获取基于clang的前后端, 比赛提交的时候该行需要注释掉
+    "gen_virtual_asm", # 解除该行注释获取生成虚拟汇编的功能
 ]
 clang_enabled = ["llvm-ir"]
 gen_virtual_asm = []
