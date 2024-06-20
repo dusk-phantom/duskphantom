@@ -1,10 +1,50 @@
 use core::panic;
 use std::collections::{HashMap, HashSet};
 
-use crate::middle::ir::{instruction::InstType, BBPtr, InstPtr, Operand};
+use crate::middle::{
+    ir::{
+        instruction::{downcast_mut, misc_inst::Phi, InstType},
+        BBPtr, InstPtr, Operand, ValueType,
+    },
+    Program,
+};
 
+/// A single argument of "phi" instruction
 type PhiArg = (BBPtr, Operand);
-type PhiArgs = Vec<PhiArg>;
+
+/// Pack of a "phi" instruction with corresponding variable
+/// The variable is an "alloca" instruction
+struct PhiPack {
+    phi: InstPtr,
+    variable: InstPtr,
+}
+
+impl PhiPack {
+    /// Create a PhiPack from a variable
+    /// The variable is the "alloca" instruction to be eliminated
+    pub fn new_from_variable(variable: InstPtr, program: &mut Program, bb: &mut BBPtr) -> Self {
+        // get type of phi variable
+        let ValueType::Pointer(ty) = variable.get_value_type() else {
+            panic!("variable type is not pointer");
+        };
+
+        // get and insert empty "phi" instruction
+        let phi = program.mem_pool.get_phi(*ty, vec![]);
+        bb.push_front(phi);
+
+        // return phi pack
+        Self { phi, variable }
+    }
+
+    /// Add an argument to the "phi" instruction
+    pub fn add_argument(&mut self, phi_arg: PhiArg) {
+        // get mutable reference of phi
+        let phi = downcast_mut::<Phi>(self.phi.as_mut().as_mut());
+
+        // add argument to phi
+        phi.incoming_values.push((phi_arg.1, phi_arg.0));
+    }
+}
 
 /// The mem2reg pass
 #[allow(unused)]
@@ -38,39 +78,87 @@ pub fn mem2reg(entry: BBPtr) {
         entry: BBPtr,
         visited: &mut HashSet<BBPtr>,
         current_variable_value: &mut [HashMap<InstPtr, PhiArg>],
-        block_to_phi_insertion: &mut HashMap<BBPtr, HashMap<InstPtr, PhiArgs>>,
+        block_to_phi_insertion: &mut HashMap<BBPtr, Vec<PhiPack>>,
     ) {
         // decide value for each "phi" instruction to add
-        for (variable, phi_args) in block_to_phi_insertion
+        for mut phi in block_to_phi_insertion
             .get_mut(&entry)
-            .unwrap_or(&mut HashMap::new())
+            .unwrap_or(&mut vec![])
             .iter_mut()
         {
-            let value = decide_variable_value(*variable, current_variable_value);
-            phi_args.push(value);
+            let new_phi_arg = decide_variable_value(phi.variable, current_variable_value);
+            phi.add_argument(new_phi_arg);
             current_variable_value
                 .last_mut()
                 .unwrap()
-                .insert(*variable, (entry, Operand::Constant(0.into())));
+                .insert(phi.variable, (entry, Operand::Constant(0.into())));
+        }
+
+        // do not continue if visited
+        // "phi" instruction can be added multiple times for each basic block
+        // so it's put before this
+        if visited.contains(&entry) {
+            return;
+        }
+        visited.insert(entry);
+
+        // iterate all instructions and:
+        // 1. for each "store", update current variable value and remove the "store"
+        // 2. for each "load", replace with the current variable value
+        for inst in entry.iter() {
+            match inst.get_type() {
+                InstType::Store => {
+                    let mut store = inst;
+                    let store_operands = store.get_operand();
+                    let store_ptr = &store_operands[1];
+                    let store_value = &store_operands[0];
+                    if let Operand::Instruction(inst) = store_ptr {
+                        current_variable_value
+                            .last_mut()
+                            .unwrap()
+                            .insert(*inst, (entry, store_value.clone()));
+                        store.remove_self();
+                    }
+                }
+                InstType::Load => {
+                    let mut load = inst;
+                    let load_operands = load.get_operand();
+                    let load_ptr = &load_operands[0];
+                    if let Operand::Instruction(inst) = load_ptr {
+                        let new_value = decide_variable_value(*inst, current_variable_value);
+                        load.remove_self();
+                        todo!("add new instruction to replace load");
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        // visit all successors
+        for succ in entry.get_succ_bb() {
+            todo!("add empty frame to current variable value");
+            decide_values_start_from(
+                *succ,
+                visited,
+                current_variable_value,
+                block_to_phi_insertion,
+            );
         }
     }
 }
 
 /// Get all "phi" to insert for each basic block
-/// Returns: basic_block -> (alloca -> [(from_block, operand)])
+/// Returns: basic_block -> [(phi, variable)]
 #[allow(unused)]
-fn get_block_to_phi_insertion(
-    entry: BBPtr,
-) -> HashMap<BBPtr, HashMap<InstPtr, Vec<(BBPtr, Operand)>>> {
-    let phi_insert_positions = get_variable_to_phi_insertion(entry);
-    let mut block_to_phi_insertion: HashMap<BBPtr, HashMap<InstPtr, Vec<(BBPtr, Operand)>>> =
-        HashMap::new();
-    for (variable, positions) in phi_insert_positions.iter() {
-        for position in positions.iter() {
+fn get_block_to_phi_insertion(entry: BBPtr, program: &mut Program) -> HashMap<BBPtr, Vec<PhiPack>> {
+    let mut phi_insert_positions = get_variable_to_phi_insertion(entry);
+    let mut block_to_phi_insertion: HashMap<BBPtr, Vec<PhiPack>> = HashMap::new();
+    for (variable, positions) in phi_insert_positions.into_iter() {
+        for mut position in positions.into_iter() {
             block_to_phi_insertion
-                .entry(*position)
+                .entry(position)
                 .or_default()
-                .insert(*variable, vec![]);
+                .push(PhiPack::new_from_variable(variable, program, &mut position));
         }
     }
     block_to_phi_insertion
