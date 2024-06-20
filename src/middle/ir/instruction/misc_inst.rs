@@ -239,7 +239,7 @@ impl Instruction for FCmp {
 }
 
 pub struct Phi {
-    incoming_values: Vec<(Operand, BBPtr)>,
+    pub incoming_values: Vec<(Operand, BBPtr)>,
     manager: InstManager,
 }
 
