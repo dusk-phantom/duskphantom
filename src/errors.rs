@@ -51,7 +51,7 @@ pub enum BackendError {
     // 优化错误
     #[error("optimize error")]
     OptimizeError,
-    #[error("gen from llvm error")]
+    #[error("gen from llvm error: {0}")]
     GenFromLlvmError(String),
     #[error("internal consistency error: {0}")]
     InternalConsistencyError(String),

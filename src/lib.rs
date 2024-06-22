@@ -68,6 +68,8 @@ pub fn compile_clang(
     asm_flag: bool,
     ll_path: Option<String>,
 ) -> Result<(), CompilerError> {
+    use errors::BackendError;
+
     let mut program = clang_frontend::Program::parse(src_file);
     if opt_flag {
         clang_frontend::optimize(&mut program);
@@ -75,7 +77,7 @@ pub fn compile_clang(
     if let Some(ll_path) = ll_path {
         std::fs::write(ll_path, program.gen_ll()).map_err(CompilerError::IOError)?;
     }
-    let mut program = backend::gen_from_clang(&program)?;
+    let mut program = backend::gen_from_clang(&program).map_err(|e|BackendError::GenFromLlvmError(format!("{e:?}")))?;
     if opt_flag {
         backend::optimize(&mut program);
     } else {
