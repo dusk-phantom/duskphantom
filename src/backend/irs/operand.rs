@@ -10,7 +10,7 @@ pub enum Operand {
     Fmm(Fmm),
     Label(Label),
 }
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone,Copy, PartialEq, Eq, Hash)]
 pub struct Reg {
     id: u32,
     is_usual: bool,
@@ -352,7 +352,7 @@ impl Label {
 impl Operand {
     pub fn reg(&self) -> Option<Reg> {
         match self {
-            Self::Reg(reg) => Some(reg.clone()),
+            Self::Reg(reg) => Some(*reg),
             _ => None,
         }
     }
@@ -452,9 +452,9 @@ pub mod tests {
                 let mut reg_gener=reg_gener.lock().unwrap();
                 for _ in 0..1000 {
                     let reg = reg_gener.gen_virtual_usual_reg();
-                    regs.insert(reg.clone());
+                    regs.insert(reg);
                     let reg = reg_gener.gen_virtual_float_reg();
-                    regs.insert(reg.clone());
+                    regs.insert(reg);
                 }
                 regs
             });
