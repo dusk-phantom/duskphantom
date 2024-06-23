@@ -170,7 +170,9 @@ pub fn build_instruction(
         llvm_ir::Instruction::Phi(_) => todo!(),
         llvm_ir::Instruction::Select(_) => todo!(),
         llvm_ir::Instruction::Freeze(_) => todo!(),
-        llvm_ir::Instruction::Call(call) => build_call_inst(call, stack_allocator, stack_slots),
+        llvm_ir::Instruction::Call(call) => {
+            build_call_inst(call, stack_allocator, stack_slots, reg_gener, regs)
+        }
         llvm_ir::Instruction::VAArg(_) => todo!(),
         llvm_ir::Instruction::LandingPad(_) => todo!(),
         llvm_ir::Instruction::CatchPad(_) => todo!(),
@@ -285,7 +287,7 @@ fn build_store_inst(
     match val {
         Operand::Imm(imm) => {
             let dst = reg_gener.gen_virtual_usual_reg();
-            let li = AddInst::new(dst.clone().into(), REG_ZERO.into(), imm.into());
+            let li = AddInst::new(dst.into(), REG_ZERO.into(), imm.into());
             let sd = SdInst::new(dst, address.try_into().with_context(|| context!())?, REG_SP);
             ret.push(li.into());
             ret.push(sd.into());
@@ -333,7 +335,9 @@ fn build_call_inst(
     call: &llvm_ir::instruction::Call,
     stack_allocator: &mut StackAllocator,
     stack_slots: &mut HashMap<Name, StackSlot>,
-) -> Result<Vec<Inst>, BackendError> {
+    reg_gener: &mut RegGenerator,
+    regs: &mut HashMap<Name, Reg>,
+) -> Result<Vec<Inst>> {
     let dst = &call.dest;
     let f_name = match &call.function {
         rayon::iter::Either::Left(_) => todo!(),
@@ -346,13 +350,40 @@ fn build_call_inst(
     let mut ret: Vec<Inst> = Vec::new();
     let call_inst = CallInst::new(f_name.to_string().into()).into();
     ret.push(call_inst);
+
     if let Some(dest) = &call.dest {
         dbg!(dest);
+        let func_ty = &call.function_ty;
+        let dst_reg: Reg = match func_ty.as_ref() {
+            llvm_ir::Type::FuncType {
+                result_type,
+                param_types,
+                is_var_arg,
+            } => match result_type.as_ref() {
+                llvm_ir::Type::FPType(_) => {
+                    let dst = reg_gener.gen_virtual_float_reg();
+                    let mv = MvInst::new(dst.into(), REG_FA0.into());
+                    ret.push(mv.into());
+                    dst
+                }
+                llvm_ir::Type::IntegerType { bits } => {
+                    let dst = reg_gener.gen_virtual_usual_reg();
+                    let mv = MvInst::new(dst.into(), REG_A0.into());
+                    ret.push(mv.into());
+                    dst
+                }
+                _ => {
+                    unimplemented!();
+                }
+            },
+            _ => {
+                unimplemented!("function type");
+            }
+        };
+        regs.insert(dest.clone(), dst_reg);
     }
-    dbg!(&call);
     // FIXME: process arguments
-    unimplemented!("process arguments");
-    unimplemented!("process return value");
+    // unimplemented!("process arguments");
 
     Ok(ret)
 }
