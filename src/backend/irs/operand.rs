@@ -1,5 +1,4 @@
 use crate::utils::paral_counter::ParalCounter;
-use once_cell::sync::Lazy;
 use std::ops::Deref;
 
 use super::BackendError;
@@ -196,8 +195,34 @@ pub const REG_FT9: Reg = Reg::new(29, false);
 pub const REG_FT10: Reg = Reg::new(30, false);
 pub const REG_FT11: Reg = Reg::new(31, false);
 
-static USUAL_REG_COUNTER: Lazy<ParalCounter> = Lazy::new(|| ParalCounter::new(32, 100_000_000));
-static FLOAT_REG_COUNTER: Lazy<ParalCounter> = Lazy::new(|| ParalCounter::new(32, 100_000_000));
+
+pub struct RegGenerator{
+    usual_counter: ParalCounter,
+    float_counter: ParalCounter,
+}
+impl Default for RegGenerator {
+    fn default() -> Self {
+        Self {
+            usual_counter: ParalCounter::new(32, 100_000_000),
+            float_counter: ParalCounter::new(32, 100_000_000),
+        }
+    }
+}
+impl RegGenerator{
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn gen_virtual_usual_reg(&mut self) -> Reg {
+        let id = self.usual_counter.get_id().unwrap();
+        Reg::new(id as u32, true)
+    }
+    pub fn gen_virtual_float_reg(&mut self) -> Reg {
+        let id = self.float_counter.get_id().unwrap();
+        Reg::new(id as u32, false)
+    }
+}
+
+
 impl Reg {
     #[inline]
     pub fn gen_asm(&self) -> String {
@@ -306,16 +331,7 @@ impl Reg {
     pub fn is_virtual(&self) -> bool {
         !self.is_phisic()
     }
-    // 生成一个虚拟通用寄存器
-    pub fn gen_virtual_usual_reg() -> Self {
-        let id = USUAL_REG_COUNTER.get_id().unwrap();
-        Self::new(id as u32, true)
-    }
-    // 生成一个虚拟浮点寄存器
-    pub fn gen_virtual_float_reg() -> Self {
-        let id = FLOAT_REG_COUNTER.get_id().unwrap();
-        Self::new(id as u32, false)
-    }
+    
 }
 impl Imm {
     pub fn gen_asm(&self) -> String {
@@ -419,21 +435,25 @@ impl TryInto<Label> for Operand {
 /// 单元测试
 #[cfg(test)]
 pub mod tests {
-    use std::collections::HashSet;
+    use std::{collections::HashSet, sync::{Arc, Mutex}};
 
     use super::*;
 
     #[test]
     fn test_gen_reg() {
-        let mut regs = HashSet::new();
+        let mut regs:HashSet<Reg> = HashSet::new();
+        let reg_gener=RegGenerator::new();
+        let reg_gener=Arc::new(Mutex::new(reg_gener));
         let mut handlers = vec![];
         for _ in 0..10 {
+            let reg_gener = Arc::clone(&reg_gener);
             let handler = std::thread::spawn(move || {
                 let mut regs = HashSet::new();
+                let mut reg_gener=reg_gener.lock().unwrap();
                 for _ in 0..1000 {
-                    let reg = Reg::gen_virtual_usual_reg();
+                    let reg = reg_gener.gen_virtual_usual_reg();
                     regs.insert(reg.clone());
-                    let reg = Reg::gen_virtual_float_reg();
+                    let reg = reg_gener.gen_virtual_float_reg();
                     regs.insert(reg.clone());
                 }
                 regs
