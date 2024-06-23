@@ -1,6 +1,6 @@
 /// StackSlot: represents a stack slot, which is a contiguous memory region on the stack.
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone,Copy)]
 pub struct StackSlot {
     start: usize,
     size: usize,
@@ -16,6 +16,10 @@ impl StackSlot {
     }
     pub fn size(&self) -> usize {
         self.size
+    }
+
+    pub fn gen_asm(&self) -> String {
+        format!("[{}-{}]", self.start, self.end())
     }
 }
 

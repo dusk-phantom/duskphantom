@@ -1,18 +1,21 @@
-; ModuleID = '/tmp/.tmp1hQU0a.c'
-source_filename = "/tmp/.tmp1hQU0a.c"
+; ModuleID = '/tmp/.tmp1wmAKb.c'
+source_filename = "/tmp/.tmp1wmAKb.c"
 target datalayout = "e-m:e-p:64:64-i64:64-i128:128-n32:64-S128"
 target triple = "riscv64"
 
 ; Function Attrs: noinline nounwind
-define dso_local signext i32 @f() #0 {
-  ret i32 1
+define dso_local signext i32 @f(i32 noundef signext %0) #0 {
+  %2 = alloca i32, align 4
+  store i32 %0, ptr %2, align 4
+  %3 = load i32, ptr %2, align 4
+  ret i32 %3
 }
 
 ; Function Attrs: noinline nounwind
 define dso_local signext i32 @main() #0 {
   %1 = alloca i32, align 4
   store i32 0, ptr %1, align 4
-  %2 = call signext i32 @f()
+  %2 = call signext i32 @f(i32 noundef signext 1)
   ret i32 %2
 }
 
