@@ -4,7 +4,6 @@ use super::super::prog::Program;
 use crate::clang_frontend;
 use crate::context;
 use crate::errors::BackendError;
-use anyhow::{anyhow, Context, Result};
 use llvm_ir::{Constant, Name};
 use std::collections::HashMap;
 
@@ -79,7 +78,7 @@ pub fn gen_from_clang(program: &clang_frontend::Program) -> Result<Program> {
         let stack_size = if stack_size % 16 == 0 {
             stack_size
         } else {
-            stack_size - stack_size % 16 + 16
+            stack_size - (stack_size % 16) + 16
         };
         funcs.push(m_f);
     }
@@ -100,8 +99,7 @@ pub fn build_instruction(
     inst: &llvm_ir::Instruction,
     stack_allocator: &mut StackAllocator,
     stack_slots: &mut HashMap<Name, StackSlot>,
-) -> Result<Vec<Inst>> {
-    dbg!(&inst);
+) -> Result<Vec<Inst>, BackendError> {
     match inst {
         llvm_ir::Instruction::Add(_) => todo!(),
         llvm_ir::Instruction::Sub(_) => todo!(),
@@ -169,7 +167,7 @@ impl Operand {
         operand: &llvm_ir::Operand,
         stack_allocator: &mut StackAllocator,
         stack_slots: &mut HashMap<Name, StackSlot>,
-    ) -> Result<Self> {
+    ) -> Result<Self, BackendError> {
         Ok(match operand {
             llvm_ir::Operand::LocalOperand { name, ty } => {
                 let ss = stack_slots
@@ -216,13 +214,14 @@ fn build_bb(
     bb: &llvm_ir::BasicBlock,
     stack_allocator: &mut StackAllocator,
     stack_slots: &mut HashMap<Name, StackSlot>,
-) -> Result<Block> {
+) -> Result<Block, BackendError> {
     let mut m_bb = Block::new(bb.name.to_string());
     for inst in &bb.instrs {
-        let gen_insts = build_instruction(inst, stack_allocator, stack_slots).with_context(||context!())?;
+        let gen_insts =
+            build_instruction(inst, stack_allocator, stack_slots).with_context(|| context!())?;
         m_bb.extend_insts(gen_insts);
     }
-    let gen_insts = build_term_inst(&bb.term).with_context(||context!())?;
+    let gen_insts = build_term_inst(&bb.term).with_context(|| context!())?;
     m_bb.extend_insts(gen_insts);
     Ok(m_bb)
 }
@@ -232,7 +231,7 @@ fn build_alloca_inst(
     alloca: &llvm_ir::instruction::Alloca,
     stack_allocator: &mut StackAllocator,
     stack_slots: &mut HashMap<Name, StackSlot>,
-) -> Result<Vec<Inst>> {
+) -> Result<Vec<Inst>, BackendError> {
     let name = alloca.dest.clone();
     let ty = alloca.allocated_type.clone();
     let bits = match ty.as_ref() {
@@ -248,27 +247,28 @@ fn build_store_inst(
     store: &llvm_ir::instruction::Store,
     stack_allocator: &mut StackAllocator,
     stack_slots: &mut HashMap<Name, StackSlot>,
-) -> Result<Vec<Inst>> {
-    dbg!("build store inst");
+) -> Result<Vec<Inst>, BackendError> {
     let address = &store.address;
     let val = &store.value;
-    let address = Operand::try_from_llvm(address, stack_allocator, stack_slots).with_context(||context!())?;
+    let address = Operand::try_from_llvm(address, stack_allocator, stack_slots)
+        .with_context(|| context!())?;
     dbg!(address.gen_asm());
-    let val: Operand = Operand::try_from_llvm(val, stack_allocator, stack_slots).with_context(||context!())?;
+    let val: Operand =
+        Operand::try_from_llvm(val, stack_allocator, stack_slots).with_context(|| context!())?;
     dbg!("gg");
     let mut ret: Vec<Inst> = Vec::new();
     match val {
         Operand::Imm(imm) => {
             let dst = Reg::gen_virtual_usual_reg();
             let li = AddInst::new(dst.clone().into(), REG_ZERO.into(), imm.into());
-            let sd = SdInst::new(dst, address.try_into().with_context(||context!())?, REG_SP);
+            let sd = SdInst::new(dst, address.try_into().with_context(|| context!())?, REG_SP);
             ret.push(li.into());
             ret.push(sd.into());
         }
         Operand::Fmm(_) => {
-            return Err(
-                anyhow!("store instruction with float value".to_string(),))
-            .with_context(||context!());
+            return Err(BackendError::GenFromLlvmError(
+                "store instruction with float value".to_string(),
+            ));
         }
         _ => (),
     }
@@ -308,17 +308,22 @@ fn build_call_inst(
     call: &llvm_ir::instruction::Call,
     stack_allocator: &mut StackAllocator,
     stack_slots: &mut HashMap<Name, StackSlot>,
-) -> Result<Vec<Inst>> {
+) -> Result<Vec<Inst>, BackendError> {
     let dst = &call.dest;
     let f_name = match &call.function {
         rayon::iter::Either::Left(_) => todo!(),
-        rayon::iter::Either::Right(op) => Operand::global_name_from(op).with_context(||context!())?,
+        rayon::iter::Either::Right(op) => match op {
+            llvm_ir::Operand::LocalOperand { name, ty: _ty } => name.to_string(),
+            llvm_ir::Operand::ConstantOperand(_) => todo!(),
+            llvm_ir::Operand::MetadataOperand => todo!(),
+        },
     };
     let mut ret: Vec<Inst> = Vec::new();
-    // FIXME: process arguments
-    unimplemented!("process arguments");
-    unimplemented!("process return value");
-    let call = CallInst::new(f_name.to_string().into()).into();
+    unimplemented!();
+    // if let Some(dst)=dst{
+
+    // }
+    let call = CallInst::new(f_name.into()).into();
     ret.push(call);
     Ok(ret)
 }
