@@ -18,33 +18,27 @@ pub fn gen(program: &middle::Program) -> Result<prog::Program, BackendError> {
         if let c = &global_var.initializer {
             match c {
                 Constant::Int(value) => {
-                    let var = var::Var::Prim(
-                        var::PrimVar::IntVar(var::IntVar {
-                            name: name.to_string(),
-                            init: Some(*value as i32),
-                            is_const: false,
-                        })
-                    );
+                    let var = var::Var::Prim(var::PrimVar::IntVar(var::IntVar {
+                        name: name.to_string(),
+                        init: Some(*value as i32),
+                        is_const: false,
+                    }));
                     global_vars.push(var);
                 }
                 Constant::Float(value) => {
-                    let var = var::Var::Prim(
-                        var::PrimVar::FloatVar(var::FloatVar {
-                            name: name.to_string(),
-                            init: Some(*value as f32),
-                            is_const: false,
-                        })
-                    );
+                    let var = var::Var::Prim(var::PrimVar::FloatVar(var::FloatVar {
+                        name: name.to_string(),
+                        init: Some(*value as f32),
+                        is_const: false,
+                    }));
                     global_vars.push(var);
                 }
                 Constant::Bool(value) => {
-                    let var = var::Var::Prim(
-                        var::PrimVar::IntVar(var::IntVar {
-                            name: name.to_string(),
-                            init: Some(*value as i32),
-                            is_const: false,
-                        })
-                    );
+                    let var = var::Var::Prim(var::PrimVar::IntVar(var::IntVar {
+                        name: name.to_string(),
+                        init: Some(*value as i32),
+                        is_const: false,
+                    }));
                     global_vars.push(var);
                 }
                 Constant::Array(arr) => {
