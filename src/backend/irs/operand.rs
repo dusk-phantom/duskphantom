@@ -1,13 +1,14 @@
 use crate::utils::paral_counter::ParalCounter;
 use std::ops::Deref;
 
-use super::BackendError;
+use super::{BackendError, StackSlot};
 
 #[derive(Clone)]
 pub enum Operand {
     Reg(Reg),
     Imm(Imm),
     Fmm(Fmm),
+    StackSlot(StackSlot),
     Label(Label),
 }
 #[derive(Clone,Copy, PartialEq, Eq, Hash)]
@@ -380,6 +381,7 @@ impl Operand {
             Self::Reg(reg) => reg.gen_asm(),
             Self::Imm(imm) => imm.gen_asm(),
             Self::Fmm(fmm) => fmm.gen_asm(),
+            Self::StackSlot(stack_slot) => stack_slot.gen_asm(),
             Self::Label(label) => label.gen_asm(),
         }
     }
@@ -419,6 +421,18 @@ impl TryInto<Fmm> for Operand {
         }
     }
 }
+impl TryInto<StackSlot> for Operand {
+    type Error = BackendError;
+    fn try_into(self) -> Result<StackSlot, Self::Error> {
+        match self {
+            Operand::StackSlot(stack_slot) => Ok(stack_slot),
+            _ => Err(BackendError::InternalConsistencyError(
+                "Operand is not a StackSlot".to_string(),
+            )),
+        }
+    }
+}
+
 
 impl TryInto<Label> for Operand {
     type Error = BackendError;
@@ -437,6 +451,12 @@ impl From<&Reg> for Operand{
         Operand::Reg(*value)
     }
 }
+impl From<&StackSlot> for Operand{
+    fn from(value: &StackSlot) -> Self {
+        Operand::StackSlot(*value)
+    }
+}
+
 
 /// 单元测试
 #[cfg(test)]
