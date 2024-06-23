@@ -60,16 +60,29 @@ pub fn gen_from_clang(program: &clang_frontend::Program) -> Result<Program> {
     for f in &llvm.functions {
         // dbg!(&f);
         let args: Vec<String> = f.parameters.iter().map(|p| p.name.to_string()).collect();
-
+        let mut reg_gener = RegGenerator::new();
+        let mut regs: HashMap<Name, Reg> = HashMap::new();
         let ret_ty = &f.return_type;
         let mut stack_allocator = StackAllocator::new();
         let mut stack_slots: HashMap<Name, StackSlot> = HashMap::new();
         let mut bb = f.basic_blocks.first().expect("func must have entry");
-        let entry = build_bb(bb, &mut stack_allocator, &mut stack_slots)?;
+        let entry = build_bb(
+            bb,
+            &mut stack_allocator,
+            &mut stack_slots,
+            &mut reg_gener,
+            &mut regs,
+        )?;
         let mut m_f = Func::new(f.name.to_string(), args, entry);
         // dbg!(&ret_ty);
         for bb in &f.basic_blocks[1..] {
-            let m_bb = build_bb(bb, &mut stack_allocator, &mut stack_slots)?;
+            let m_bb = build_bb(
+                bb,
+                &mut stack_allocator,
+                &mut stack_slots,
+                &mut reg_gener,
+                &mut regs,
+            )?;
             m_f.push_bb(m_bb);
         }
         // count stack size,
@@ -99,7 +112,10 @@ pub fn build_instruction(
     inst: &llvm_ir::Instruction,
     stack_allocator: &mut StackAllocator,
     stack_slots: &mut HashMap<Name, StackSlot>,
-) -> Result<Vec<Inst>, BackendError> {
+    reg_gener: &mut RegGenerator,
+    regs: &mut HashMap<Name, Reg>,
+) -> Result<Vec<Inst>> {
+    dbg!(&inst);
     match inst {
         llvm_ir::Instruction::Add(_) => todo!(),
         llvm_ir::Instruction::Sub(_) => todo!(),
@@ -129,7 +145,9 @@ pub fn build_instruction(
             build_alloca_inst(alloca, stack_allocator, stack_slots)
         }
         llvm_ir::Instruction::Load(_) => todo!(),
-        llvm_ir::Instruction::Store(store) => build_store_inst(store, stack_allocator, stack_slots),
+        llvm_ir::Instruction::Store(store) => {
+            build_store_inst(store, stack_allocator, stack_slots, reg_gener, regs)
+        }
         llvm_ir::Instruction::Fence(_) => todo!(),
         llvm_ir::Instruction::CmpXchg(_) => todo!(),
         llvm_ir::Instruction::AtomicRMW(_) => todo!(),
@@ -214,11 +232,15 @@ fn build_bb(
     bb: &llvm_ir::BasicBlock,
     stack_allocator: &mut StackAllocator,
     stack_slots: &mut HashMap<Name, StackSlot>,
-) -> Result<Block, BackendError> {
+    reg_gener: &mut RegGenerator,
+    regs: &mut HashMap<Name, Reg>,
+) -> Result<Block> {
     let mut m_bb = Block::new(bb.name.to_string());
     for inst in &bb.instrs {
         let gen_insts =
             build_instruction(inst, stack_allocator, stack_slots).with_context(|| context!())?;
+        let gen_insts = build_instruction(inst, stack_allocator, stack_slots, reg_gener, regs)
+            .with_context(|| context!())?;
         m_bb.extend_insts(gen_insts);
     }
     let gen_insts = build_term_inst(&bb.term).with_context(|| context!())?;
@@ -247,7 +269,10 @@ fn build_store_inst(
     store: &llvm_ir::instruction::Store,
     stack_allocator: &mut StackAllocator,
     stack_slots: &mut HashMap<Name, StackSlot>,
-) -> Result<Vec<Inst>, BackendError> {
+    reg_gener: &mut RegGenerator,
+    _regs: &mut HashMap<Name, Reg>,
+) -> Result<Vec<Inst>> {
+    dbg!("build store inst");
     let address = &store.address;
     let val = &store.value;
     let address = Operand::try_from_llvm(address, stack_allocator, stack_slots)
@@ -259,7 +284,7 @@ fn build_store_inst(
     let mut ret: Vec<Inst> = Vec::new();
     match val {
         Operand::Imm(imm) => {
-            let dst = Reg::gen_virtual_usual_reg();
+            let dst = reg_gener.gen_virtual_usual_reg();
             let li = AddInst::new(dst.clone().into(), REG_ZERO.into(), imm.into());
             let sd = SdInst::new(dst, address.try_into().with_context(|| context!())?, REG_SP);
             ret.push(li.into());
@@ -319,11 +344,15 @@ fn build_call_inst(
         },
     };
     let mut ret: Vec<Inst> = Vec::new();
-    unimplemented!();
-    // if let Some(dst)=dst{
+    let call_inst = CallInst::new(f_name.to_string().into()).into();
+    ret.push(call_inst);
+    if let Some(dest) = &call.dest {
+        dbg!(dest);
+    }
+    dbg!(&call);
+    // FIXME: process arguments
+    unimplemented!("process arguments");
+    unimplemented!("process return value");
 
-    // }
-    let call = CallInst::new(f_name.into()).into();
-    ret.push(call);
     Ok(ret)
 }

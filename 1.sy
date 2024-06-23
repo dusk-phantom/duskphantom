@@ -1,8 +1,4 @@
-extern int f1();
+int f(){return 1;}
 int main(){
-    int op=f1();
-    if (op<1){
-        return 1;
-    }
-    return 0;
+    return f();
 }
