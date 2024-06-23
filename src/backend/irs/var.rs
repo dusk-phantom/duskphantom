@@ -1,4 +1,4 @@
-use gen_asm::{Data, GenTool};
+use gen_asm::{ Data, GenTool };
 
 #[allow(unused)]
 use super::*;
