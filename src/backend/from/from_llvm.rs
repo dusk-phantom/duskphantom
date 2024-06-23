@@ -4,6 +4,8 @@ use super::super::prog::Program;
 use crate::clang_frontend;
 use crate::context;
 use crate::errors::BackendError;
+use anyhow::Ok;
+use anyhow::{anyhow, Context, Result};
 use llvm_ir::{Constant, Name};
 use std::collections::HashMap;
 
@@ -228,6 +230,25 @@ impl Operand {
             llvm_ir::Operand::MetadataOperand => todo!(),
         }
     }
+
+    #[inline]
+    pub fn func_name_from(operand: &llvm_ir::Operand) -> Result<String> {
+        let name = match operand {
+            llvm_ir::Operand::LocalOperand { name: _, ty: _ } => {
+                Err(anyhow!("local operand".to_string())).with_context(|| context!())
+            }
+            llvm_ir::Operand::ConstantOperand(c) => match c.as_ref() {
+                Constant::GlobalReference { name, ty: _ } => Ok(name.clone()),
+                _ => todo!(),
+            },
+            llvm_ir::Operand::MetadataOperand => todo!(),
+        }?;
+        let f_name = name.to_string();
+        let f_name = &f_name
+            .strip_prefix('%')
+            .ok_or(anyhow!("").context(context!()))?;
+        Ok(f_name.to_string())
+    }
 }
 
 fn build_bb(
@@ -237,7 +258,13 @@ fn build_bb(
     reg_gener: &mut RegGenerator,
     regs: &mut HashMap<Name, Reg>,
 ) -> Result<Block> {
-    let mut m_bb = Block::new(bb.name.to_string());
+    let mut m_bb = Block::new(
+        bb.name
+            .to_string()
+            .strip_prefix('%')
+            .unwrap_or(&bb.name.to_string())
+            .to_string(),
+    );
     for inst in &bb.instrs {
         let gen_insts =
             build_instruction(inst, stack_allocator, stack_slots).with_context(|| context!())?;
@@ -245,7 +272,7 @@ fn build_bb(
             .with_context(|| context!())?;
         m_bb.extend_insts(gen_insts);
     }
-    let gen_insts = build_term_inst(&bb.term).with_context(|| context!())?;
+    let gen_insts = build_term_inst(&bb.term, regs).with_context(|| context!())?;
     m_bb.extend_insts(gen_insts);
     Ok(m_bb)
 }
@@ -302,13 +329,25 @@ fn build_store_inst(
     Ok(ret)
 }
 
-fn build_term_inst(term: &llvm_ir::Terminator) -> Result<Vec<Inst>> {
+fn build_term_inst(term: &llvm_ir::Terminator, regs: &mut HashMap<Name, Reg>) -> Result<Vec<Inst>> {
     let mut ret_insts: Vec<Inst> = Vec::new();
+    dbg!(term);
     match term {
         llvm_ir::Terminator::Ret(r) => {
             if let Some(op) = &r.return_operand {
                 match op {
-                    llvm_ir::Operand::LocalOperand { name: _, ty: _ } => todo!(),
+                    llvm_ir::Operand::LocalOperand { name, ty } => {
+                        let reg = regs.get(name).ok_or(anyhow!("").context(context!()))?;
+                        let mv_inst = match ty.as_ref() {
+                            llvm_ir::Type::IntegerType { bits: _ } => {
+                                MvInst::new(REG_A0.into(), reg.into())
+                            }
+                            llvm_ir::Type::FPType(_) => MvInst::new(REG_FA0.into(), reg.into()),
+                            _ => unimplemented!(),
+                        };
+                        ret_insts.push(mv_inst.into());
+                        ret_insts.push(Inst::Ret);
+                    }
                     llvm_ir::Operand::ConstantOperand(c) => match c.as_ref() {
                         Constant::Int { bits: _, value } => {
                             let imm = (*value as i64).into();
@@ -341,11 +380,9 @@ fn build_call_inst(
     let dst = &call.dest;
     let f_name = match &call.function {
         rayon::iter::Either::Left(_) => todo!(),
-        rayon::iter::Either::Right(op) => match op {
-            llvm_ir::Operand::LocalOperand { name, ty: _ty } => name.to_string(),
-            llvm_ir::Operand::ConstantOperand(_) => todo!(),
-            llvm_ir::Operand::MetadataOperand => todo!(),
-        },
+        rayon::iter::Either::Right(op) => {
+            Operand::func_name_from(op).with_context(|| context!())?
+        }
     };
     let mut ret: Vec<Inst> = Vec::new();
     let call_inst = CallInst::new(f_name.to_string().into()).into();

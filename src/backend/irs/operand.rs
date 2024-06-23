@@ -432,6 +432,12 @@ impl TryInto<Label> for Operand {
     }
 }
 
+impl From<&Reg> for Operand{
+    fn from(value: &Reg) -> Self {
+        Operand::Reg(*value)
+    }
+}
+
 /// 单元测试
 #[cfg(test)]
 pub mod tests {
