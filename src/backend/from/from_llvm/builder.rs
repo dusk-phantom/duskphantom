@@ -183,8 +183,9 @@ impl IRBuilder {
                 .to_string(),
         );
         for inst in &bb.instrs {
-            let gen_insts = Self::build_instruction(inst, stack_allocator, stack_slots, reg_gener, regs)
-                .with_context(|| context!())?;
+            let gen_insts =
+                Self::build_instruction(inst, stack_allocator, stack_slots, reg_gener, regs)
+                    .with_context(|| context!())?;
             m_bb.extend_insts(gen_insts);
         }
         let gen_insts = Self::build_term_inst(&bb.term, regs).with_context(|| context!())?;

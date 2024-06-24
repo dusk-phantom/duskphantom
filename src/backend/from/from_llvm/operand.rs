@@ -15,12 +15,14 @@ impl IRBuilder {
 
     pub fn address_from(
         operand: &llvm_ir::Operand,
-        stack_slots: &HashMap<Name, StackSlot>
+        stack_slots: &HashMap<Name, StackSlot>,
     ) -> Result<Operand> {
         Ok(match operand {
-            llvm_ir::Operand::LocalOperand { name, ty:_ } => {
-                stack_slots.get(name).ok_or(anyhow!("stack slot not found {}", name)).with_context(|| context!())?.into()
-            }
+            llvm_ir::Operand::LocalOperand { name, ty: _ } => stack_slots
+                .get(name)
+                .ok_or(anyhow!("stack slot not found {}", name))
+                .with_context(|| context!())?
+                .into(),
             llvm_ir::Operand::ConstantOperand(_) => todo!(),
             llvm_ir::Operand::MetadataOperand => todo!(),
         })
@@ -30,15 +32,16 @@ impl IRBuilder {
         regs: &HashMap<Name, Reg>,
     ) -> Result<Operand> {
         Ok(match operand {
-            llvm_ir::Operand::LocalOperand { name, ty:_ } => {
+            llvm_ir::Operand::LocalOperand { name, ty: _ } => {
                 let reg = regs
                     .get(name)
                     .ok_or(anyhow!("local var not found {}", name))
                     .with_context(|| context!())?;
                 reg.into()
-            },
-            _=>{
-                return Err(anyhow!("operand is not local var:{}",operand)).with_context(|| context!());
+            }
+            _ => {
+                return Err(anyhow!("operand is not local var:{}", operand))
+                    .with_context(|| context!());
             }
         })
     }
@@ -58,19 +61,20 @@ impl IRBuilder {
                 },
                 _ => todo!(),
             },
-            _=>{
-                return Err(anyhow!("operand is not constant:{}",operand)).with_context(|| context!())
+            _ => {
+                return Err(anyhow!("operand is not constant:{}", operand))
+                    .with_context(|| context!())
             }
         })
     }
 
-    pub fn value_from(operand: &llvm_ir::Operand,regs: &HashMap<Name, Reg>) -> Result<Operand> {
-        if let Ok(c)=Self::const_from(operand) {
+    pub fn value_from(operand: &llvm_ir::Operand, regs: &HashMap<Name, Reg>) -> Result<Operand> {
+        if let Ok(c) = Self::const_from(operand) {
             Ok(c)
-        }else if let Ok(c)=Self::local_var_from(operand, regs) {
+        } else if let Ok(c) = Self::local_var_from(operand, regs) {
             Ok(c)
-        }else{
-            Err(anyhow!("value neither is reg or const:{}",operand)).with_context(|| context!())
+        } else {
+            Err(anyhow!("value neither is reg or const:{}", operand)).with_context(|| context!())
         }
     }
 
