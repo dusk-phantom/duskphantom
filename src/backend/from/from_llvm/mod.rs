@@ -1,12 +1,11 @@
 mod builder;
-mod operand;
 mod instruction;
+mod operand;
 
 pub use super::irs::*;
-pub use crate::context;
 pub use crate::clang_frontend;
-pub use anyhow::{anyhow,Result,Context};
-
+pub use crate::context;
+pub use anyhow::{anyhow, Context, Result};
 
 #[cfg(feature = "clang_enabled")]
 #[allow(unused)]

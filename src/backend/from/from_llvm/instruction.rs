@@ -1,8 +1,8 @@
+use super::*;
 use anyhow::Ok;
 use builder::IRBuilder;
-use std::collections::HashMap;
 use llvm_ir::{Constant, Name};
-use super::*;
+use std::collections::HashMap;
 
 impl IRBuilder {
     pub fn build_instruction(
@@ -41,7 +41,9 @@ impl IRBuilder {
             llvm_ir::Instruction::Alloca(alloca) => {
                 Self::build_alloca_inst(alloca, stack_allocator, stack_slots)
             }
-            llvm_ir::Instruction::Load(load) => Self::build_load_inst(load, stack_slots, reg_gener, regs),
+            llvm_ir::Instruction::Load(load) => {
+                Self::build_load_inst(load, stack_slots, reg_gener, regs)
+            }
             llvm_ir::Instruction::Store(store) => {
                 Self::build_store_inst(store, stack_slots, reg_gener, regs)
             }
@@ -102,11 +104,9 @@ impl IRBuilder {
     ) -> Result<Vec<Inst>> {
         let address = &store.address;
         let val = &store.value;
-        let address = Self::address_from(address, stack_slots)
-            .with_context(|| context!())?;
+        let address = Self::address_from(address, stack_slots).with_context(|| context!())?;
         dbg!(address.gen_asm());
-        let val: Operand = Self::value_from(val,regs)
-            .with_context(|| context!())?;
+        let val: Operand = Self::value_from(val, regs).with_context(|| context!())?;
         dbg!("gg");
         let mut ret: Vec<Inst> = Vec::new();
         match val {
@@ -134,7 +134,7 @@ impl IRBuilder {
         regs: &HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
         dbg!(load);
-        let mut ret:Vec<Inst>=Vec::new();
+        let mut ret: Vec<Inst> = Vec::new();
         todo!();
         Ok(ret)
     }
