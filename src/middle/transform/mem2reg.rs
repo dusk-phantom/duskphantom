@@ -51,24 +51,16 @@ impl PhiPack {
 
 /// The mem2reg pass
 #[allow(unused)]
-pub fn mem2reg(entry: BBPtr) {
-    let phi_positions: HashMap<InstPtr, HashSet<BBPtr>> = get_variable_to_phi_insertion(entry);
-    let mut phi_for_block: HashMap<BBPtr, HashSet<InstPtr>> = HashMap::new();
-
-    // populate `phi_for_block` from `phi_positions`
-    for (variable, positions) in phi_positions.iter() {
-        for position in positions.iter() {
-            phi_for_block
-                .entry(*position)
-                .or_default()
-                .insert(*variable);
-        }
-    }
+pub fn mem2reg(entry: BBPtr, program: &mut Program) {
+    let mut variable_to_phi_insertion: HashMap<InstPtr, Vec<BBPtr>> =
+        get_variable_to_phi_insertion(entry);
+    let mut block_to_phi_insertion: HashMap<BBPtr, Vec<PhiPack>> =
+        insert_empty_phi(entry, program, &mut variable_to_phi_insertion);
 
     // for each "phi" insert position, decide the value for each argument
     fn decide_variable_value(
         variable: InstPtr,
-        current_variable_value: &mut [HashMap<InstPtr, PhiArg>],
+        current_variable_value: &[HashMap<InstPtr, PhiArg>],
     ) -> (BBPtr, Operand) {
         for frame in current_variable_value.iter().rev() {
             if let Some(value) = frame.get(&variable) {
@@ -77,10 +69,13 @@ pub fn mem2reg(entry: BBPtr) {
         }
         panic!("variable value not found");
     }
+
+    // start from entry node, decide the value for each "phi" instruction
+    // this will also remove "load" and "store" instructions when possible
     fn decide_values_start_from(
         entry: BBPtr,
         visited: &mut HashSet<BBPtr>,
-        current_variable_value: &mut [HashMap<InstPtr, PhiArg>],
+        current_variable_value: &mut Vec<HashMap<InstPtr, PhiArg>>,
         block_to_phi_insertion: &mut HashMap<BBPtr, Vec<PhiPack>>,
     ) {
         // decide value for each "phi" instruction to add
@@ -106,30 +101,44 @@ pub fn mem2reg(entry: BBPtr) {
         visited.insert(entry);
 
         // iterate all instructions and:
+        //
         // 1. for each "store", update current variable value and remove the "store"
         // 2. for each "load", replace with the current variable value
-        for inst in entry.iter() {
+        //
+        // bypass if featured variable is not a constant pointer,
+        // for example if it's calculated from "getelementptr"
+        //
+        // does not remove "alloca" because it doesn't check if array is being accessed,
+        // we use dead code elimination instead to remove unused "alloca"
+        for mut inst in entry.iter() {
             match inst.get_type() {
                 InstType::Store => {
-                    let mut store = inst;
-                    let store_operands = store.get_operand();
+                    let store_operands = inst.get_operand();
                     let store_ptr = &store_operands[1];
                     let store_value = &store_operands[0];
-                    if let Operand::Instruction(inst) = store_ptr {
-                        current_variable_value
-                            .last_mut()
-                            .unwrap()
-                            .insert(*inst, (entry, store_value.clone()));
-                        store.remove_self();
+
+                    // update only when store destination is a constant pointer
+                    if let Operand::Instruction(variable) = store_ptr {
+                        if variable.get_type() == InstType::Alloca {
+                            current_variable_value
+                                .last_mut()
+                                .unwrap()
+                                .insert(*variable, (entry, store_value.clone()));
+                            inst.remove_self();
+                        }
                     }
                 }
                 InstType::Load => {
-                    let mut load = inst;
-                    let load_operands = load.get_operand();
+                    let load_operands = inst.get_operand();
                     let load_ptr = &load_operands[0];
-                    if let Operand::Instruction(inst) = load_ptr {
-                        let (_, new_value) = decide_variable_value(*inst, current_variable_value);
-                        load.replace_self(&new_value);
+
+                    // replace only when load source is a constant pointer
+                    if let Operand::Instruction(variable) = load_ptr {
+                        if variable.get_type() == InstType::Alloca {
+                            let (_, new_value) =
+                                decide_variable_value(*variable, current_variable_value);
+                            inst.replace_self(&new_value);
+                        }
                     }
                 }
                 _ => (),
@@ -138,29 +147,41 @@ pub fn mem2reg(entry: BBPtr) {
 
         // visit all successors
         for succ in entry.get_succ_bb() {
-            todo!("add empty frame to current variable value");
+            current_variable_value.push(HashMap::new());
             decide_values_start_from(
                 *succ,
                 visited,
                 current_variable_value,
                 block_to_phi_insertion,
             );
+            current_variable_value.pop();
         }
     }
+
+    // start mem2reg pass from the entry block
+    decide_values_start_from(
+        entry,
+        &mut HashSet::new(),
+        &mut vec![HashMap::new()],
+        &mut block_to_phi_insertion,
+    );
 }
 
-/// Get all "phi" to insert for each basic block
-/// Returns: basic_block -> [(phi, variable)]
+/// Insert empty "phi" for basic blocks starting from `entry`
+/// Returns a mapping from basic block to inserted "phi" instructions
 #[allow(unused)]
-fn get_block_to_phi_insertion(entry: BBPtr, program: &mut Program) -> HashMap<BBPtr, Vec<PhiPack>> {
-    let mut phi_insert_positions = get_variable_to_phi_insertion(entry);
+fn insert_empty_phi(
+    entry: BBPtr,
+    program: &mut Program,
+    phi_insert_positions: &mut HashMap<InstPtr, Vec<BBPtr>>,
+) -> HashMap<BBPtr, Vec<PhiPack>> {
     let mut block_to_phi_insertion: HashMap<BBPtr, Vec<PhiPack>> = HashMap::new();
-    for (variable, positions) in phi_insert_positions.into_iter() {
-        for mut position in positions.into_iter() {
+    for (variable, positions) in phi_insert_positions.iter_mut() {
+        for position in positions.iter_mut() {
             block_to_phi_insertion
-                .entry(position)
+                .entry(*position)
                 .or_default()
-                .push(PhiPack::new_from_variable(variable, program, &mut position));
+                .push(PhiPack::new_from_variable(*variable, program, position));
         }
     }
     block_to_phi_insertion
@@ -168,16 +189,15 @@ fn get_block_to_phi_insertion(entry: BBPtr, program: &mut Program) -> HashMap<BB
 
 /// Get places to insert "phi" instructions for each "alloca" instruction
 #[allow(unused)]
-fn get_variable_to_phi_insertion(entry: BBPtr) -> HashMap<InstPtr, HashSet<BBPtr>> {
+fn get_variable_to_phi_insertion(entry: BBPtr) -> HashMap<InstPtr, Vec<BBPtr>> {
     let mut phi_positions = HashMap::new();
-    let df = get_dominance_frontiers(entry);
 
     // for each "store", make insert position at the beginning of the dominance frontier
     fn dfs_insertion(
         current_bb: BBPtr,
         visited: &mut HashSet<BBPtr>,
         df: &HashMap<BBPtr, HashSet<BBPtr>>,
-        phi_positions: &mut HashMap<InstPtr, HashSet<BBPtr>>,
+        phi_positions: &mut HashMap<InstPtr, Vec<BBPtr>>,
     ) {
         if visited.contains(&current_bb) {
             return;
@@ -193,7 +213,7 @@ fn get_variable_to_phi_insertion(entry: BBPtr) -> HashMap<InstPtr, HashSet<BBPtr
                 if let Operand::Instruction(inst) = store_ptr {
                     if inst.get_type() == InstType::Alloca {
                         for df_bb in df.get(&current_bb).unwrap_or(&HashSet::new()).iter() {
-                            phi_positions.entry(*inst).or_default().insert(*df_bb);
+                            phi_positions.entry(*inst).or_default().push(*df_bb);
                         }
                     }
                 }
@@ -203,7 +223,12 @@ fn get_variable_to_phi_insertion(entry: BBPtr) -> HashMap<InstPtr, HashSet<BBPtr
             dfs_insertion(*succ, visited, df, phi_positions);
         }
     }
-    dfs_insertion(entry, &mut HashSet::new(), &df, &mut phi_positions);
+    dfs_insertion(
+        entry,
+        &mut HashSet::new(),
+        &get_dominance_frontiers(entry),
+        &mut phi_positions,
+    );
 
     // return result
     phi_positions
@@ -308,7 +333,83 @@ fn get_immediate_dominators(entry: BBPtr) -> HashMap<BBPtr, BBPtr> {
 #[cfg(test)]
 pub mod tests_mem2reg {
     use super::*;
-    use crate::middle::{ir::ValueType, Program};
+    use crate::{
+        frontend::parse,
+        middle::{ir::ValueType, irgen::gen, Program},
+    };
+
+    #[test]
+    /// Optimize the following function:
+    ///
+    /// ```llvm
+    /// define i32 @main {
+    ///     %alloca_1 = alloca i32
+    ///     store i32 1, ptr %alloca_1
+    ///     %load_3 = load i32, ptr %alloca_1
+    ///     ret i32 %load_3
+    /// }
+    /// ```
+    ///
+    /// To:
+    ///
+    /// ```llvm
+    /// define i32 @main {
+    ///     %alloca_1 = alloca i32
+    ///     ret i32 1
+    /// }
+    /// ```
+    ///
+    /// `%alloca_1` is not removed because limitation of mem2reg pass (see code for details)
+    /// It should be removed by dead code elimination pass instead
+    fn test_mem2reg_simple() {
+        let code = r#"
+            int main() {
+                int a = 1;
+                return a;
+            }
+        "#;
+        let parsed = parse(code).unwrap();
+        let mut program = gen(&parsed).unwrap();
+        assert_eq!(
+            program.module.gen_llvm_ir(),
+            "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 1, ptr %alloca_1\n%load_3 = load i32, ptr %alloca_1\nret %load_3\n\n\n}\n"
+        );
+
+        // check optimization
+        mem2reg(program.module.functions[0].entry.unwrap(), &mut program);
+        assert_eq!(
+            program.module.gen_llvm_ir(),
+            "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nret 1\n\n\n}\n"
+        );
+    }
+
+    #[test]
+    fn test_mem2reg_simple_if() {
+        let code = r#"
+            int main() {
+                int x;
+                if (1) {
+                    x = 1;
+                } else {
+                    x = 2;
+                }
+                return x;
+            }
+        "#;
+        let parsed = parse(code).unwrap();
+        let mut program = gen(&parsed).unwrap();
+        assert_eq!(
+            program.module.gen_llvm_ir(),
+            "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nbr label %cond0\n\n%cond0:\n%icmp_7 = icmp ne i32 1, 0\nbr i1 %icmp_7, label %then1, label %alt2\n\n%then1:\nstore i32 1, ptr %alloca_1\nbr label %final3\n\n%alt2:\nstore i32 2, ptr %alloca_1\nbr label %final3\n\n%final3:\n%load_13 = load i32, ptr %alloca_1\nret %load_13\n\n\n}\n"
+        );
+
+        // check optimization
+        mem2reg(program.module.functions[0].entry.unwrap(), &mut program);
+        assert_eq!(
+            program.module.gen_llvm_ir(),
+            "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nret 1\n\n\n}\n"
+        );
+    }
 
     #[test]
     fn test_get_idoms() {
