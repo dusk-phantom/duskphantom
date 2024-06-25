@@ -1,17 +1,18 @@
-use crate::backend::{Inst, Reg, RegGenerator, StackAllocator, StackSlot};
-use crate::context;
-use crate::middle::ir::instruction::memory_op_inst::Alloca;
+use crate::backend::*;
+use crate::middle::ir::instruction::memory_op_inst::{Alloca, Store};
 use crate::middle::ir::instruction::{downcast_ref, InstType};
 use crate::middle::ir::{Instruction, ValueType};
 use crate::utils::mem::ObjPtr;
+use crate::{context, middle};
 
 use super::*;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 use anyhow::Ok;
 use builder::IRBuilder;
 use llvm_ir::Name;
+use std::any::Any;
 use std::collections::HashMap;
 
 impl IRBuilder {
@@ -80,14 +81,14 @@ impl IRBuilder {
             }
             InstType::Alloca => {
                 let alloca = downcast_ref::<Alloca>(inst.as_ref().as_ref());
-                Self::build_alloca_inst(alloca, stack_allocator, stack_slots);
-                todo!();
+                Self::build_alloca_inst(alloca, stack_allocator, stack_slots)
             }
             InstType::Load => {
                 todo!();
             }
             InstType::Store => {
-                todo!();
+                let store = downcast_ref::<Store>(inst.as_ref().as_ref());
+                Self::build_store_inst(store, stack_slots, reg_gener, regs)
             }
             InstType::GetElementPtr => {
                 todo!();
@@ -140,16 +141,15 @@ impl IRBuilder {
     }
 
     pub fn build_store_inst(
-        store: &llvm_ir::instruction::Store,
+        store: &Store,
         stack_slots: &mut HashMap<Name, StackSlot>,
         reg_gener: &mut RegGenerator,
         regs: &HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
-        let address = &store.address;
-        let val = &store.value;
+        let address = &store.get_ptr();
+        let val = &store.get_value();
         let address = Self::address_from(address, stack_slots).with_context(|| context!())?;
-        dbg!(address.gen_asm());
-        let val: Operand = Self::value_from(val, regs).with_context(|| context!())?;
+        let val = Self::value_from(val, regs).with_context(|| context!())?;
         dbg!("gg");
         let mut ret: Vec<Inst> = Vec::new();
         match val {
@@ -171,112 +171,109 @@ impl IRBuilder {
 
     #[allow(unused)]
     pub fn build_load_inst(
-        load: &llvm_ir::instruction::Load,
+        load: &middle::ir::instruction::memory_op_inst::Load,
         stack_slots: &mut HashMap<Name, StackSlot>,
         reg_gener: &mut RegGenerator,
         regs: &HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
-        dbg!(load);
+        // dbg!(load);
         let mut ret: Vec<Inst> = Vec::new();
         todo!();
         Ok(ret)
     }
 
     pub fn build_term_inst(
-        term: &llvm_ir::Terminator,
+        term: &middle::ir::instruction::terminator_inst::Ret,
         regs: &mut HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
         let mut ret_insts: Vec<Inst> = Vec::new();
-        dbg!(term);
-        match term {
-            llvm_ir::Terminator::Ret(r) => {
-                if let Some(op) = &r.return_operand {
-                    match op {
-                        llvm_ir::Operand::LocalOperand { name, ty } => {
-                            let reg = regs.get(name).ok_or(anyhow!("").context(context!()))?;
-                            let mv_inst = match ty.as_ref() {
-                                llvm_ir::Type::IntegerType { bits: _ } => {
-                                    MvInst::new(REG_A0.into(), reg.into())
-                                }
-                                llvm_ir::Type::FPType(_) => MvInst::new(REG_FA0.into(), reg.into()),
-                                _ => unimplemented!(),
-                            };
-                            ret_insts.push(mv_inst.into());
-                            ret_insts.push(Inst::Ret);
-                        }
-                        llvm_ir::Operand::ConstantOperand(c) => match c.as_ref() {
-                            Constant::Int { bits: _, value } => {
-                                let imm = (*value as i64).into();
-                                let addi = AddInst::new(REG_A0.into(), REG_ZERO.into(), imm);
-                                ret_insts.push(addi.into());
-                                ret_insts.push(Inst::Ret);
-                            }
-                            Constant::Float(_) => todo!(),
-                            _ => todo!(),
-                        },
-                        llvm_ir::Operand::MetadataOperand => todo!(),
-                    }
-                } else {
-                    unimplemented!();
-                }
-            }
-            _ => todo!(),
-        }
+        // dbg!(term);
+
+        // match term {
+        //     llvm_ir::Terminator::Ret(r) => {
+        //         if let Some(op) = &r.return_operand {
+        //             match op {
+        //                 llvm_ir::Operand::LocalOperand { name, ty } => {
+        //                     let reg = regs.get(name).ok_or(anyhow!("").context(context!()))?;
+        //                     let mv_inst = match ty.as_ref() {
+        //                         llvm_ir::Type::IntegerType { bits: _ } => {
+        //                             MvInst::new(REG_A0.into(), reg.into())
+        //                         }
+        //                         llvm_ir::Type::FPType(_) => MvInst::new(REG_FA0.into(), reg.into()),
+        //                         _ => unimplemented!(),
+        //                     };
+        //                     ret_insts.push(mv_inst.into());
+        //                     ret_insts.push(Inst::Ret);
+        //                 }
+        //                 llvm_ir::Operand::ConstantOperand(c) => match c.as_ref() {
+        //                     Constant::Int { bits: _, value } => {
+        //                         let imm = (*value as i64).into();
+        //                         let addi = AddInst::new(REG_A0.into(), REG_ZERO.into(), imm);
+        //                         ret_insts.push(addi.into());
+        //                         ret_insts.push(Inst::Ret);
+        //                     }
+        //                     Constant::Float(_) => todo!(),
+        //                     _ => todo!(),
+        //                 },
+        //                 llvm_ir::Operand::MetadataOperand => todo!(),
+        //             }
+        //         } else {
+        //             unimplemented!();
+        //         }
+        //     }
+        //     _ => todo!(),
+        // }
         Ok(ret_insts)
     }
 
     #[allow(unused)]
     pub fn build_call_inst(
-        call: &llvm_ir::instruction::Call,
+        // call: &llvm_ir::instruction::Call,
+        call: &middle::ir::instruction::misc_inst::Call,
         stack_allocator: &mut StackAllocator,
         stack_slots: &mut HashMap<Name, StackSlot>,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
-        let dst = &call.dest;
-        let f_name = match &call.function {
-            rayon::iter::Either::Left(_) => todo!(),
-            rayon::iter::Either::Right(op) => {
-                Self::func_name_from(op).with_context(|| context!())?
-            }
-        };
+        // let dst = &call.dest;
+        let dst = &call.get_id();
+        let f_name = &call.func.name;
         let mut ret: Vec<Inst> = Vec::new();
         let call_inst = CallInst::new(f_name.to_string().into()).into();
         ret.push(call_inst);
 
-        if let Some(dest) = &call.dest {
-            dbg!(dest);
-            let func_ty = &call.function_ty;
-            let dst_reg: Reg = match func_ty.as_ref() {
-                llvm_ir::Type::FuncType {
-                    result_type,
-                    param_types,
-                    is_var_arg,
-                } => match result_type.as_ref() {
-                    llvm_ir::Type::FPType(_) => {
-                        let dst = reg_gener.gen_virtual_float_reg();
-                        let mv = MvInst::new(dst.into(), REG_FA0.into());
-                        ret.push(mv.into());
-                        dst
-                    }
-                    llvm_ir::Type::IntegerType { bits } => {
-                        let dst = reg_gener.gen_virtual_usual_reg();
-                        let mv = MvInst::new(dst.into(), REG_A0.into());
-                        ret.push(mv.into());
-                        dst
-                    }
-                    _ => {
-                        unimplemented!();
-                    }
-                },
-                _ => {
-                    unimplemented!("function type");
-                }
-            };
-            regs.insert(dest.clone(), dst_reg);
-        }
-        // FIXME: process arguments
-        // unimplemented!("process arguments");
+        unimplemented!();
+
+        // // let func_ty = &call.type_id();
+        // let dst_reg: Reg = match func_ty.as_ref() {
+        //     llvm_ir::Type::FuncType {
+        //         result_type,
+        //         param_types,
+        //         is_var_arg,
+        //     } => match result_type.as_ref() {
+        //         llvm_ir::Type::FPType(_) => {
+        //             let dst = reg_gener.gen_virtual_float_reg();
+        //             let mv = MvInst::new(dst.into(), REG_FA0.into());
+        //             ret.push(mv.into());
+        //             dst
+        //         }
+        //         llvm_ir::Type::IntegerType { bits } => {
+        //             let dst = reg_gener.gen_virtual_usual_reg();
+        //             let mv = MvInst::new(dst.into(), REG_A0.into());
+        //             ret.push(mv.into());
+        //             dst
+        //         }
+        //         _ => {
+        //             unimplemented!();
+        //         }
+        //     },
+        //     _ => {
+        //         unimplemented!("function type");
+        //     }
+        // };
+        // regs.insert(dest.clone(), dst_reg);
+        // // FIXME: process arguments
+        // // unimplemented!("process arguments");
 
         Ok(ret)
     }

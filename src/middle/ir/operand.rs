@@ -3,10 +3,8 @@ use super::*;
 #[derive(Clone, PartialEq, Debug)]
 pub enum Operand {
     Constant(Constant),
-
     Global(GlobalPtr),
     Parameter(ParaPtr),
-
     Instruction(InstPtr),
 }
 
