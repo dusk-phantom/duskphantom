@@ -5,8 +5,6 @@ use crate::middle::ir::instruction::{downcast_ref, InstType};
 use crate::middle::ir::{Instruction, ValueType};
 use crate::utils::mem::ObjPtr;
 
-use std::any::Any;
-
 use super::*;
 
 use anyhow::Result;
