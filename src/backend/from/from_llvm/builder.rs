@@ -153,6 +153,7 @@ impl IRBuilder {
         entry.extend_insts(insts);
         Ok(entry)
     }
+
     fn build_other_bbs(
         f: &llvm_ir::Function,
         stack_allocator: &mut StackAllocator,
