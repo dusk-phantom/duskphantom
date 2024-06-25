@@ -25,6 +25,7 @@ pub fn deadcode_elimination_inst(mut inst: InstPtr) {
             // Need to call deadcode_elimination again?
             Operand::Instruction(i) => deadcode_elimination_inst(i),
             // TODO: Other Operand
+            Operand::Global(_) => {},
             _ => {}
         }
     }
