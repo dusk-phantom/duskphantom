@@ -1,4 +1,8 @@
 use crate::backend::{Inst, Reg, RegGenerator, StackAllocator, StackSlot};
+use crate::middle::ir::instruction::memory_op_inst::Alloca;
+use crate::middle::ir::instruction::InstType;
+use crate::middle::ir::{Instruction, ValueType};
+use crate::utils::mem::ObjPtr;
 
 use super::*;
 
@@ -11,89 +15,121 @@ use std::collections::HashMap;
 
 impl IRBuilder {
     pub fn build_instruction(
-        inst: &llvm_ir::Instruction,
+        inst: &ObjPtr<Box<dyn Instruction>>,
         stack_allocator: &mut StackAllocator,
         stack_slots: &mut HashMap<Name, StackSlot>,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
-        dbg!(&inst);
-        match inst {
-            llvm_ir::Instruction::Add(_) => todo!(),
-            llvm_ir::Instruction::Sub(_) => todo!(),
-            llvm_ir::Instruction::Mul(_) => todo!(),
-            llvm_ir::Instruction::UDiv(_) => todo!(),
-            llvm_ir::Instruction::SDiv(_) => todo!(),
-            llvm_ir::Instruction::URem(_) => todo!(),
-            llvm_ir::Instruction::SRem(_) => todo!(),
-            llvm_ir::Instruction::And(_) => todo!(),
-            llvm_ir::Instruction::Or(_) => todo!(),
-            llvm_ir::Instruction::Xor(_) => todo!(),
-            llvm_ir::Instruction::Shl(_) => todo!(),
-            llvm_ir::Instruction::LShr(_) => todo!(),
-            llvm_ir::Instruction::AShr(_) => todo!(),
-            llvm_ir::Instruction::FAdd(_) => todo!(),
-            llvm_ir::Instruction::FSub(_) => todo!(),
-            llvm_ir::Instruction::FMul(_) => todo!(),
-            llvm_ir::Instruction::FDiv(_) => todo!(),
-            llvm_ir::Instruction::FRem(_) => todo!(),
-            llvm_ir::Instruction::FNeg(_) => todo!(),
-            llvm_ir::Instruction::ExtractElement(_) => todo!(),
-            llvm_ir::Instruction::InsertElement(_) => todo!(),
-            llvm_ir::Instruction::ShuffleVector(_) => todo!(),
-            llvm_ir::Instruction::ExtractValue(_) => todo!(),
-            llvm_ir::Instruction::InsertValue(_) => todo!(),
-            llvm_ir::Instruction::Alloca(alloca) => {
-                Self::build_alloca_inst(alloca, stack_allocator, stack_slots)
+        match inst.get_type() {
+            InstType::Add => {
+                todo!();
             }
-            llvm_ir::Instruction::Load(load) => {
-                Self::build_load_inst(load, stack_slots, reg_gener, regs)
+            InstType::FAdd => {
+                todo!();
             }
-            llvm_ir::Instruction::Store(store) => {
-                Self::build_store_inst(store, stack_slots, reg_gener, regs)
+            InstType::Sub => {
+                todo!();
             }
-            llvm_ir::Instruction::Fence(_) => todo!(),
-            llvm_ir::Instruction::CmpXchg(_) => todo!(),
-            llvm_ir::Instruction::AtomicRMW(_) => todo!(),
-            llvm_ir::Instruction::GetElementPtr(_) => todo!(),
-            llvm_ir::Instruction::Trunc(_) => todo!(),
-            llvm_ir::Instruction::ZExt(_) => todo!(),
-            llvm_ir::Instruction::SExt(_) => todo!(),
-            llvm_ir::Instruction::FPTrunc(_) => todo!(),
-            llvm_ir::Instruction::FPExt(_) => todo!(),
-            llvm_ir::Instruction::FPToUI(_) => todo!(),
-            llvm_ir::Instruction::FPToSI(_) => todo!(),
-            llvm_ir::Instruction::UIToFP(_) => todo!(),
-            llvm_ir::Instruction::SIToFP(_) => todo!(),
-            llvm_ir::Instruction::PtrToInt(_) => todo!(),
-            llvm_ir::Instruction::IntToPtr(_) => todo!(),
-            llvm_ir::Instruction::BitCast(_) => todo!(),
-            llvm_ir::Instruction::AddrSpaceCast(_) => todo!(),
-            llvm_ir::Instruction::ICmp(_) => todo!(),
-            llvm_ir::Instruction::FCmp(_) => todo!(),
-            llvm_ir::Instruction::Phi(_) => todo!(),
-            llvm_ir::Instruction::Select(_) => todo!(),
-            llvm_ir::Instruction::Freeze(_) => todo!(),
-            llvm_ir::Instruction::Call(call) => {
-                Self::build_call_inst(call, stack_allocator, stack_slots, reg_gener, regs)
+            InstType::FSub => {
+                todo!();
             }
-            llvm_ir::Instruction::VAArg(_) => todo!(),
-            llvm_ir::Instruction::LandingPad(_) => todo!(),
-            llvm_ir::Instruction::CatchPad(_) => todo!(),
-            llvm_ir::Instruction::CleanupPad(_) => todo!(),
+            InstType::Mul => {
+                todo!();
+            }
+            InstType::FMul => {
+                todo!();
+            }
+            InstType::UDiv => {
+                todo!();
+            }
+            InstType::SDiv => {
+                todo!();
+            }
+            InstType::FDiv => {
+                todo!();
+            }
+            InstType::URem => {
+                todo!();
+            }
+            InstType::SRem => {
+                todo!();
+            }
+            InstType::Shl => {
+                todo!();
+            }
+            InstType::LShr => {
+                todo!();
+            }
+            InstType::AShr => {
+                todo!();
+            }
+            InstType::And => {
+                todo!();
+            }
+            InstType::Or => {
+                todo!();
+            }
+            InstType::Xor => {
+                todo!();
+            }
+            InstType::Ret => {
+                todo!();
+            }
+            InstType::Br => {
+                todo!();
+            }
+            InstType::Alloca => {
+                todo!();
+            }
+            InstType::Load => {
+                todo!();
+            }
+            InstType::Store => {
+                todo!();
+            }
+            InstType::GetElementPtr => {
+                todo!();
+            }
+            InstType::ZextTo => {
+                todo!();
+            }
+            InstType::SextTo => {
+                todo!();
+            }
+            InstType::ItoFp => {
+                todo!();
+            }
+            InstType::FpToI => {
+                todo!();
+            }
+            InstType::ICmp => {
+                todo!();
+            }
+            InstType::FCmp => {
+                todo!();
+            }
+            InstType::Phi => {
+                todo!();
+            }
+            InstType::Call => {
+                todo!();
+            }
+            _ => {
+                unreachable!()
+            }
         }
     }
 
     /// alloca instruction only instruct allocating memory on stack,not generate one-one instruction
     fn build_alloca_inst(
-        alloca: &llvm_ir::instruction::Alloca,
+        alloca: Box<Alloca>,
         stack_allocator: &mut StackAllocator,
         stack_slots: &mut HashMap<Name, StackSlot>,
     ) -> Result<Vec<Inst>> {
         let name = alloca.dest.clone();
-        let ty = alloca.allocated_type.clone();
-        let bits = match ty.as_ref() {
-            llvm_ir::Type::IntegerType { bits } => *bits,
+        let ty = alloca.value_type.clone();
+        let bits = match ty {
             _ => todo!(),
         };
         let ss = stack_allocator.alloc(bits as usize);
