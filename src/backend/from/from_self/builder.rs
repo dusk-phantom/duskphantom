@@ -16,13 +16,6 @@ use var::{ArrVar, Var};
 pub struct IRBuilder;
 
 impl IRBuilder {
-    pub fn is_ty_int(ty: &llvm_ir::Type) -> bool {
-        matches!(ty, llvm_ir::Type::IntegerType { bits: _ })
-    }
-    pub fn is_ty_float(ty: &llvm_ir::Type) -> bool {
-        matches!(ty, llvm_ir::Type::FPType(_))
-    }
-
     pub fn gen_from_self(program: &middle::Program) -> Result<Program> {
         let llvm_module = &program.module;
         // dbg!(&llvm.types);
