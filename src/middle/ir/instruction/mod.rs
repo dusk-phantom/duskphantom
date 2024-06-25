@@ -237,10 +237,10 @@ pub trait Instruction: Display {
             inst.set_parent_bb(self.get_parent_bb().unwrap());
         }
 
-        let mut next = self.get_next().unwrap();
+        let mut next = self.get_manager_mut().next.unwrap();
 
         unsafe {
-            let mut self_ptr = next.get_prev().unwrap();
+            let mut self_ptr = next.get_manager_mut().prev.unwrap();
             next.set_prev(inst);
             self_ptr.set_next(inst);
             inst.set_prev(self_ptr);
