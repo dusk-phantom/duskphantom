@@ -202,15 +202,16 @@ impl IRBuilder {
                 .unwrap_or(&bb.name.to_string())
                 .to_string(),
         );
-        for inst in bb.iter() {
-            let gen_insts =
-                Self::build_instruction(&inst, stack_allocator, stack_slots, reg_gener, regs)
-                    .with_context(|| context!())?;
-            m_bb.extend_insts(gen_insts);
-        }
-        // FIXME
-        let gen_insts = Self::build_term_inst(&bb, regs).with_context(|| context!())?;
-        m_bb.extend_insts(gen_insts);
+        // for inst in bb.iter() {
+        //     let gen_insts =
+        //         Self::build_instruction(&inst, stack_allocator, stack_slots, reg_gener, regs)
+        //             .with_context(|| context!())?;
+        //     m_bb.extend_insts(gen_insts);
+        // }
+        // // FIXME
+        // let gen_insts = Self::build_term_inst(&bb, regs).with_context(|| context!())?;
+        // m_bb.extend_insts(gen_insts);
+        todo!();
         Ok(m_bb)
     }
 
@@ -221,31 +222,32 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
     ) -> Result<Block> {
-        let bb = f.basic_blocks.first().expect("func must have entry");
-        let mut insts = Vec::new();
-        for (i, param) in f.parameters.iter().enumerate() {
-            if i <= 7 {
-                let reg = if IRBuilder::is_ty_int(&param.ty) {
-                    Reg::new(REG_A0.id() + i as u32, true)
-                } else if IRBuilder::is_ty_float(&param.ty) {
-                    Reg::new(REG_FA0.id() + i as u32, true)
-                } else {
-                    unimplemented!();
-                };
-                regs.insert(param.name.clone(), reg);
-            } else {
-                unimplemented!();
-            }
-        }
-        for inst in &bb.instrs {
-            let gen_insts =
-                Self::build_instruction(inst, stack_allocator, stack_slots, reg_gener, regs)
-                    .with_context(|| context!())?;
-            insts.extend(gen_insts);
-        }
-        insts.extend(Self::build_term_inst(&bb.term, regs)?);
+        // let bb = f.basic_blocks.first().expect("func must have entry");
+        // let mut insts = Vec::new();
+        // for (i, param) in f.parameters.iter().enumerate() {
+        //     if i <= 7 {
+        //         let reg = if IRBuilder::is_ty_int(&param.ty) {
+        //             Reg::new(REG_A0.id() + i as u32, true)
+        //         } else if IRBuilder::is_ty_float(&param.ty) {
+        //             Reg::new(REG_FA0.id() + i as u32, true)
+        //         } else {
+        //             unimplemented!();
+        //         };
+        //         regs.insert(param.name.clone(), reg);
+        //     } else {
+        //         unimplemented!();
+        //     }
+        // }
+        // for inst in &bb.instrs {
+        //     let gen_insts =
+        //         Self::build_instruction(inst, stack_allocator, stack_slots, reg_gener, regs)
+        //             .with_context(|| context!())?;
+        //     insts.extend(gen_insts);
+        // }
+        // insts.extend(Self::build_term_inst(&bb.term, regs)?);
         let mut entry = Block::new("entry".to_string());
-        entry.extend_insts(insts);
+        // entry.extend_insts(insts);
+        todo!();
         Ok(entry)
     }
 }
