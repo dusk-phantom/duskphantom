@@ -1,8 +1,11 @@
 use crate::backend::{Inst, Reg, RegGenerator, StackAllocator, StackSlot};
+use crate::context;
 use crate::middle::ir::instruction::memory_op_inst::Alloca;
-use crate::middle::ir::instruction::InstType;
+use crate::middle::ir::instruction::{downcast_ref, InstType};
 use crate::middle::ir::{Instruction, ValueType};
 use crate::utils::mem::ObjPtr;
+
+use std::any::Any;
 
 use super::*;
 
@@ -70,9 +73,7 @@ impl IRBuilder {
             InstType::Or => {
                 todo!();
             }
-            InstType::Xor => {
-                todo!();
-            }
+            InstType::Xor => todo!(),
             InstType::Ret => {
                 todo!();
             }
@@ -80,6 +81,8 @@ impl IRBuilder {
                 todo!();
             }
             InstType::Alloca => {
+                let alloca = downcast_ref::<Alloca>(inst.as_ref().as_ref());
+                Self::build_alloca_inst(alloca, stack_allocator, stack_slots);
                 todo!();
             }
             InstType::Load => {
@@ -123,17 +126,18 @@ impl IRBuilder {
 
     /// alloca instruction only instruct allocating memory on stack,not generate one-one instruction
     fn build_alloca_inst(
-        alloca: Box<Alloca>,
+        alloca: &Alloca,
         stack_allocator: &mut StackAllocator,
         stack_slots: &mut HashMap<Name, StackSlot>,
     ) -> Result<Vec<Inst>> {
-        let name = alloca.dest.clone();
+        let name = alloca.get_id();
         let ty = alloca.value_type.clone();
         let bits = match ty {
-            _ => todo!(),
+            ValueType::Int => 4usize, // 4B
+            _ => todo!(),             // TODO
         };
         let ss = stack_allocator.alloc(bits as usize);
-        stack_slots.insert(name.clone(), ss);
+        stack_slots.insert(name.into(), ss);
         Ok(vec![])
     }
 
