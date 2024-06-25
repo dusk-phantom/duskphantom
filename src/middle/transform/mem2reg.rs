@@ -15,7 +15,7 @@ type PhiArg = (BBPtr, Operand);
 /// Pack of a "phi" instruction with corresponding variable
 /// The variable is an "alloca" instruction
 struct PhiPack {
-    phi: InstPtr,
+    inst: InstPtr,
     variable: InstPtr,
 }
 
@@ -33,13 +33,16 @@ impl PhiPack {
         bb.push_front(phi);
 
         // return phi pack
-        Self { phi, variable }
+        Self {
+            inst: phi,
+            variable,
+        }
     }
 
     /// Add an argument to the "phi" instruction
     pub fn add_argument(&mut self, phi_arg: PhiArg) {
         // get mutable reference of phi
-        let phi = downcast_mut::<Phi>(self.phi.as_mut().as_mut());
+        let phi = downcast_mut::<Phi>(self.inst.as_mut().as_mut());
 
         // add argument to phi
         phi.incoming_values.push((phi_arg.1, phi_arg.0));
@@ -91,7 +94,7 @@ pub fn mem2reg(entry: BBPtr) {
             current_variable_value
                 .last_mut()
                 .unwrap()
-                .insert(phi.variable, (entry, Operand::Constant(0.into())));
+                .insert(phi.variable, (entry, Operand::Instruction(phi.inst)));
         }
 
         // do not continue if visited
@@ -125,12 +128,11 @@ pub fn mem2reg(entry: BBPtr) {
                     let load_operands = load.get_operand();
                     let load_ptr = &load_operands[0];
                     if let Operand::Instruction(inst) = load_ptr {
-                        let new_value = decide_variable_value(*inst, current_variable_value);
-                        load.remove_self();
-                        todo!("add new instruction to replace load");
+                        let (_, new_value) = decide_variable_value(*inst, current_variable_value);
+                        load.replace_self(&new_value);
                     }
                 }
-                _ => {}
+                _ => (),
             }
         }
 

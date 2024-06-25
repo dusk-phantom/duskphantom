@@ -267,6 +267,24 @@ pub trait Instruction: Display {
         }
     }
 
+    /// Replace current instruction with an operand.
+    /// This operation will call `remove_self`, but update all users to use the new operand.
+    fn replace_self(&mut self, operand: &Operand) {
+        unsafe {
+            let user = self.get_user().to_vec();
+            let self_operand = Operand::Instruction(self.get_manager().self_ptr.unwrap());
+            user.into_iter().for_each(|mut user| {
+                let operand_index = user
+                    .get_operand()
+                    .iter()
+                    .position(|op| op == &self_operand)
+                    .unwrap();
+                user.get_operand_mut()[operand_index] = operand.clone();
+            });
+            self.remove_self();
+        }
+    }
+
     /// Returns the `BasicBlock` that current instruction belongs to.
     #[inline]
     fn get_parent_bb(&self) -> Option<BBPtr> {
