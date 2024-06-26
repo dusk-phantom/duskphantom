@@ -12,7 +12,6 @@ pub struct FunctionKit<'a> {
     pub env: HashMap<String, Value>,
     pub fun_env: HashMap<String, FunPtr>,
     pub program: &'a mut middle::Program,
-    pub entry: BBPtr,
     pub exit: BBPtr,
     pub break_to: Option<BBPtr>,
     pub continue_to: Option<BBPtr>,
@@ -25,7 +24,7 @@ impl<'a> FunctionKit<'a> {
     /// Generate a new function kit
     pub fn gen_function_kit(
         &mut self,
-        entry: BBPtr,
+        exit: BBPtr,
         break_to: Option<BBPtr>,
         continue_to: Option<BBPtr>,
     ) -> FunctionKit {
@@ -33,9 +32,7 @@ impl<'a> FunctionKit<'a> {
             program: self.program,
             env: self.env.clone(),
             fun_env: self.fun_env.clone(),
-            entry,
-            // Default exit is entry
-            exit: entry,
+            exit,
             break_to,
             continue_to,
             return_type: self.return_type.clone(),
@@ -51,21 +48,26 @@ impl<'a> FunctionKit<'a> {
     }
 
     /// Generate a statement into the program
-    pub fn gen_stmt(&mut self, stmt: &Stmt) -> Result<(), MiddleError> {
+    ///
+    /// Returns the exit of the statement block that can be appended to
+    /// eg. if "break", the exit block can't be appended, this will return `None`
+    /// The exit returned is different from kit.exit, which always exists
+    ///
+    /// Error when statement generation is not successful
+    pub fn gen_stmt(&mut self, stmt: &Stmt) -> Result<Option<BBPtr>, MiddleError> {
         match stmt {
-            Stmt::Nothing => Ok(()),
+            Stmt::Nothing => (),
             Stmt::Decl(decl) => {
                 // Generate declaration
-                self.gen_decl(decl)
+                self.gen_decl(decl)?;
             }
             Stmt::Expr(opt_lhs, expr) => {
                 // Generate expression
                 let rhs = self.gen_expr(expr)?;
-                match opt_lhs {
-                    // Exist left value, try to assign
-                    Some(lhs) => self.gen_expr(lhs)?.assign(self, rhs),
-                    // No left value, discard result
-                    None => Ok(()),
+
+                // Try to assign if exists left value
+                if let Some(lhs) = opt_lhs {
+                    self.gen_expr(lhs)?.assign(self, rhs)?;
                 }
             }
             Stmt::If(cond, then, alt) => {
@@ -73,110 +75,113 @@ impl<'a> FunctionKit<'a> {
                 let cond_name = self.unique_name("cond");
                 let mut cond_bb = self.program.mem_pool.new_basicblock(cond_name);
                 let then_name = self.unique_name("then");
-                let mut then_bb = self.program.mem_pool.new_basicblock(then_name);
+                let then_entry = self.program.mem_pool.new_basicblock(then_name);
                 let alt_name = self.unique_name("alt");
-                let mut alt_bb = self.program.mem_pool.new_basicblock(alt_name);
+                let alt_entry = self.program.mem_pool.new_basicblock(alt_name);
                 let final_name = self.unique_name("final");
                 let final_bb = self.program.mem_pool.new_basicblock(final_name);
 
-                // Route basic blocks
-                cond_bb.set_true_bb(then_bb);
-                cond_bb.set_false_bb(alt_bb);
-                then_bb.set_true_bb(final_bb);
-                alt_bb.set_true_bb(final_bb);
+                // Redirect exit to condition block
                 self.exit.set_true_bb(cond_bb);
-
-                // Add br to exit block, jump to condition block
                 self.exit.push_back(self.program.mem_pool.get_br(None));
-                self.exit = cond_bb;
 
                 // Add condition and br to condition block
+                self.exit = cond_bb;
                 let operand = self.gen_expr(cond)?.load(ValueType::Bool, self)?;
                 let br = self.program.mem_pool.get_br(Some(operand));
                 cond_bb.push_back(br);
+                cond_bb.set_true_bb(then_entry);
+                cond_bb.set_false_bb(alt_entry);
 
                 // Add statements and br to then branch
                 // Retain break_to and continue_to
-                self.gen_function_kit(then_bb, self.break_to, self.continue_to)
+                let then_exit = self
+                    .gen_function_kit(then_entry, self.break_to, self.continue_to)
                     .gen_stmt(then)?;
-                then_bb.push_back(self.program.mem_pool.get_br(None));
+                if let Some(mut then_exit) = then_exit {
+                    then_exit.push_back(self.program.mem_pool.get_br(None));
+                    then_exit.set_true_bb(final_bb);
+                }
 
                 // Add statements and br to alt branch
-                self.gen_function_kit(alt_bb, self.break_to, self.continue_to)
+                let alt_exit = self
+                    .gen_function_kit(alt_entry, self.break_to, self.continue_to)
                     .gen_stmt(alt)?;
-                alt_bb.push_back(self.program.mem_pool.get_br(None));
+                if let Some(mut alt_exit) = alt_exit {
+                    alt_exit.push_back(self.program.mem_pool.get_br(None));
+                    alt_exit.set_true_bb(final_bb);
+                }
 
-                // Increment exit
+                // Exit is final block
                 self.exit = final_bb;
-                Ok(())
             }
             Stmt::While(cond, body) => {
                 // Allocate basic blocks
                 let cond_name = self.unique_name("cond");
                 let mut cond_bb = self.program.mem_pool.new_basicblock(cond_name);
                 let body_name = self.unique_name("body");
-                let mut body_bb = self.program.mem_pool.new_basicblock(body_name);
+                let body_entry = self.program.mem_pool.new_basicblock(body_name);
                 let final_name = self.unique_name("final");
                 let final_bb = self.program.mem_pool.new_basicblock(final_name);
 
-                // Route basic blocks
-                cond_bb.set_true_bb(body_bb);
-                cond_bb.set_false_bb(final_bb);
-                body_bb.set_true_bb(cond_bb);
+                // Redirect current exit to condition block
                 self.exit.set_true_bb(cond_bb);
-
-                // Add br to exit block, jump to condition block
                 self.exit.push_back(self.program.mem_pool.get_br(None));
-                self.exit = cond_bb;
+
+                // Add statements and br to body block
+                let body_exit = self
+                    .gen_function_kit(body_entry, Some(final_bb), Some(cond_bb))
+                    .gen_stmt(body)?;
+                if let Some(mut body_exit) = body_exit {
+                    body_exit.push_back(self.program.mem_pool.get_br(None));
+                    body_exit.set_true_bb(cond_bb);
+                }
 
                 // Add condition and br to condition block
+                self.exit = cond_bb;
+                cond_bb.set_true_bb(body_entry);
+                cond_bb.set_false_bb(final_bb);
                 let operand = self.gen_expr(cond)?.load(ValueType::Bool, self)?;
                 let br = self.program.mem_pool.get_br(Some(operand));
                 cond_bb.push_back(br);
 
-                // Add statements and br to body block
-                self.gen_function_kit(body_bb, Some(final_bb), Some(cond_bb))
-                    .gen_stmt(body)?;
-                body_bb.push_back(self.program.mem_pool.get_br(None));
-
-                // Increment exit
+                // Exit is final block
                 self.exit = final_bb;
-                Ok(())
             }
             Stmt::DoWhile(body, cond) => {
                 // Allocate basic blocks
                 let body_name = self.unique_name("body");
-                let mut body_bb = self.program.mem_pool.new_basicblock(body_name);
+                let body_entry = self.program.mem_pool.new_basicblock(body_name);
                 let cond_name = self.unique_name("cond");
                 let mut cond_bb = self.program.mem_pool.new_basicblock(cond_name);
                 let final_name = self.unique_name("final");
                 let final_bb = self.program.mem_pool.new_basicblock(final_name);
 
-                // Route basic blocks
-                body_bb.set_true_bb(cond_bb);
-                cond_bb.set_true_bb(body_bb);
-                cond_bb.set_false_bb(final_bb);
-                self.exit.set_true_bb(body_bb);
-
-                // Add br to exit block, jump to condition block
+                // Redirect current exit to body block
+                self.exit.set_true_bb(body_entry);
                 self.exit.push_back(self.program.mem_pool.get_br(None));
-                self.exit = cond_bb;
+
+                // Add statements and br to body block
+                let body_exit = self
+                    .gen_function_kit(body_entry, Some(final_bb), Some(cond_bb))
+                    .gen_stmt(body)?;
+                if let Some(mut body_exit) = body_exit {
+                    body_exit.push_back(self.program.mem_pool.get_br(None));
+                    body_exit.set_true_bb(cond_bb);
+                }
 
                 // Add condition and br to condition block
+                self.exit = cond_bb;
+                cond_bb.set_true_bb(body_entry);
+                cond_bb.set_false_bb(final_bb);
                 let operand = self.gen_expr(cond)?.load(ValueType::Bool, self)?;
                 let br = self.program.mem_pool.get_br(Some(operand));
                 cond_bb.push_back(br);
 
-                // Add statements and br to body block
-                self.gen_function_kit(body_bb, Some(final_bb), Some(cond_bb))
-                    .gen_stmt(body)?;
-                body_bb.push_back(self.program.mem_pool.get_br(None));
-
-                // Increment exit
+                // Exit is final block
                 self.exit = final_bb;
-                Ok(())
             }
-            Stmt::For(_, _, _, _) => Err(MiddleError::GenError),
+            Stmt::For(_, _, _, _) => return Err(MiddleError::GenError),
             Stmt::Break => {
                 // Add br instruction to exit block
                 let br = self.program.mem_pool.get_br(None);
@@ -189,7 +194,9 @@ impl<'a> FunctionKit<'a> {
 
                 // Rewrite next block to break destination
                 self.exit.set_true_bb(break_to);
-                Ok(())
+
+                // Return None to indicate that the exit block can't be appended
+                return Ok(None);
             }
             Stmt::Continue => {
                 // Add br instruction to exit block
@@ -203,7 +210,9 @@ impl<'a> FunctionKit<'a> {
 
                 // Rewrite next block to continue destination
                 self.exit.set_true_bb(continue_to);
-                Ok(())
+
+                // Return None to indicate that the exit block can't be appended
+                return Ok(None);
             }
             Stmt::Return(expr) => {
                 // Add returned result to exit block
@@ -215,16 +224,22 @@ impl<'a> FunctionKit<'a> {
                 // Add ret instruction to exit block
                 let ret = self.program.mem_pool.get_ret(return_value);
                 self.exit.push_back(ret);
-                Ok(())
+
+                // Return None to indicate that the exit block can't be appended
+                return Ok(None);
             }
             Stmt::Block(stmts) => {
                 // Add statements to current block
                 for stmt in stmts.iter() {
-                    self.gen_stmt(stmt)?;
+                    if self.gen_stmt(stmt)?.is_none() {
+                        // The rest of the code in this block will not be executed
+                        // because the exit block can't be appended
+                        return Ok(None);
+                    }
                 }
-                Ok(())
             }
         }
+        Ok(Some(self.exit))
     }
 
     /// Generate a declaration as a statement into the program
