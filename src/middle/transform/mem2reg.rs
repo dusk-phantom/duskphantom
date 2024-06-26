@@ -341,29 +341,37 @@ pub mod tests_mem2reg {
     #[test]
     fn test_mem2reg_simple() {
         let code = r#"
-int main() {
-    int a = 1;
-    return a;
-}
+            int main() {
+                int a = 1;
+                return a;
+            }
         "#;
         let expected_before_optimize = r#"define i32 @main() {
-%entry:
-%alloca_1 = alloca i32
-store i32 1, ptr %alloca_1
-%load_3 = load i32, ptr %alloca_1
-ret %load_3
+            %entry:
+            %alloca_1 = alloca i32
+            store i32 1, ptr %alloca_1
+            %load_3 = load i32, ptr %alloca_1
+            ret %load_3
 
 
-}
-"#;
+            }
+            "#
+        .split('\n')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>()
+        .join("\n");
         let expected_after_optimize = r#"define i32 @main() {
-%entry:
-%alloca_1 = alloca i32
-ret 1
+            %entry:
+            %alloca_1 = alloca i32
+            ret 1
 
 
-}
-"#;
+            }
+            "#
+        .split('\n')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>()
+        .join("\n");
 
         // check before optimization
         let parsed = parse(code).unwrap();
@@ -378,70 +386,78 @@ ret 1
     #[test]
     fn test_mem2reg_branch() {
         let code = r#"
-int main() {
-    int x = 0;
-    if (x < 10) {
-        x = x + 1;
-    } else {
-        x = x + 9;
-    }
-    return x;
-}
+            int main() {
+                int x = 0;
+                if (x < 10) {
+                    x = x + 1;
+                } else {
+                    x = x + 9;
+                }
+                return x;
+            }
         "#;
         let expected_before_optimize = r#"define i32 @main() {
-%entry:
-%alloca_1 = alloca i32
-store i32 0, ptr %alloca_1
-br label %cond0
+            %entry:
+            %alloca_1 = alloca i32
+            store i32 0, ptr %alloca_1
+            br label %cond0
 
-%cond0:
-%load_8 = load i32, ptr %alloca_1
-%icmp_9 = icmp slt i32 %load_8, 10
-br i1 %icmp_9, label %then1, label %alt2
+            %cond0:
+            %load_8 = load i32, ptr %alloca_1
+            %icmp_9 = icmp slt i32 %load_8, 10
+            br i1 %icmp_9, label %then1, label %alt2
 
-%then1:
-%load_11 = load i32, ptr %alloca_1
-%Add_12 = add i32, %load_11, 1
-store i32 %Add_12, ptr %alloca_1
-br label %final3
+            %then1:
+            %load_11 = load i32, ptr %alloca_1
+            %Add_12 = add i32, %load_11, 1
+            store i32 %Add_12, ptr %alloca_1
+            br label %final3
 
-%alt2:
-%load_15 = load i32, ptr %alloca_1
-%Add_16 = add i32, %load_15, 9
-store i32 %Add_16, ptr %alloca_1
-br label %final3
+            %alt2:
+            %load_15 = load i32, ptr %alloca_1
+            %Add_16 = add i32, %load_15, 9
+            store i32 %Add_16, ptr %alloca_1
+            br label %final3
 
-%final3:
-%load_19 = load i32, ptr %alloca_1
-ret %load_19
+            %final3:
+            %load_19 = load i32, ptr %alloca_1
+            ret %load_19
 
 
-}
-"#;
+            }
+            "#
+        .split('\n')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>()
+        .join("\n");
         let expected_after_optimize = r#"define i32 @main() {
-%entry:
-%alloca_1 = alloca i32
-br label %cond0
+            %entry:
+            %alloca_1 = alloca i32
+            br label %cond0
 
-%cond0:
-%icmp_9 = icmp slt i32 0, 10
-br i1 %icmp_9, label %then1, label %alt2
+            %cond0:
+            %icmp_9 = icmp slt i32 0, 10
+            br i1 %icmp_9, label %then1, label %alt2
 
-%then1:
-%Add_12 = add i32, 0, 1
-br label %final3
+            %then1:
+            %Add_12 = add i32, 0, 1
+            br label %final3
 
-%alt2:
-%Add_16 = add i32, 0, 9
-br label %final3
+            %alt2:
+            %Add_16 = add i32, 0, 9
+            br label %final3
 
-%final3:
-%phi_21 = phi i32 [%Add_12, %then1], [%Add_16, %alt2]
-ret %phi_21
+            %final3:
+            %phi_21 = phi i32 [%Add_12, %then1], [%Add_16, %alt2]
+            ret %phi_21
 
 
-}
-"#;
+            }
+            "#
+        .split('\n')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>()
+        .join("\n");
 
         // check before optimization
         let parsed = parse(code).unwrap();
@@ -456,58 +472,194 @@ ret %phi_21
     #[test]
     fn test_mem2reg_loop() {
         let code = r#"
-int main() {
-    int x = 0;
-    while (x < 10) {
-        x = x + 1;
-    }
-    return x;
-}
+            int main() {
+                int x = 0;
+                while (x < 10) {
+                    x = x + 1;
+                }
+                return x;
+            }
         "#;
         let expected_before_optimize = r#"define i32 @main() {
-%entry:
-%alloca_1 = alloca i32
-store i32 0, ptr %alloca_1
-br label %cond0
-
-%cond0:
-%load_7 = load i32, ptr %alloca_1
-%icmp_8 = icmp slt i32 %load_7, 10
-br i1 %icmp_8, label %body1, label %final2
-
-%body1:
-%load_10 = load i32, ptr %alloca_1
-%Add_11 = add i32, %load_10, 1
-store i32 %Add_11, ptr %alloca_1
-br label %cond0
-
-%final2:
-%load_14 = load i32, ptr %alloca_1
-ret %load_14
-
-
-}
-"#;
+            %entry:
+            %alloca_1 = alloca i32
+            store i32 0, ptr %alloca_1
+            br label %cond0
+            
+            %cond0:
+            %load_11 = load i32, ptr %alloca_1
+            %icmp_12 = icmp slt i32 %load_11, 10
+            br i1 %icmp_12, label %body1, label %final2
+            
+            %body1:
+            %load_7 = load i32, ptr %alloca_1
+            %Add_8 = add i32, %load_7, 1
+            store i32 %Add_8, ptr %alloca_1
+            br label %cond0
+            
+            %final2:
+            %load_14 = load i32, ptr %alloca_1
+            ret %load_14
+            
+            
+            }
+            "#
+        .split('\n')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>()
+        .join("\n");
         let expected_after_optimize = r#"define i32 @main() {
-%entry:
-%alloca_1 = alloca i32
-br label %cond0
+            %entry:
+            %alloca_1 = alloca i32
+            br label %cond0
+            
+            %cond0:
+            %phi_16 = phi i32 [0, %entry], [%Add_8, %body1]
+            %icmp_12 = icmp slt i32 %phi_16, 10
+            br i1 %icmp_12, label %body1, label %final2
+            
+            %body1:
+            %Add_8 = add i32, %phi_16, 1
+            br label %cond0
+            
+            %final2:
+            ret %phi_16
+            
+            
+            }
+            "#
+        .split('\n')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>()
+        .join("\n");
 
-%cond0:
-%phi_16 = phi i32 [0, %entry], [%Add_11, %body1]
-%icmp_8 = icmp slt i32 %phi_16, 10
-br i1 %icmp_8, label %body1, label %final2
+        // check before optimization
+        let parsed = parse(code).unwrap();
+        let mut program = gen(&parsed).unwrap();
+        assert_eq!(program.module.gen_llvm_ir(), expected_before_optimize);
 
-%body1:
-%Add_11 = add i32, %phi_16, 1
-br label %cond0
+        // check after optimization
+        mem2reg(program.module.functions[0].entry.unwrap(), &mut program);
+        assert_eq!(program.module.gen_llvm_ir(), expected_after_optimize);
+    }
 
-%final2:
-ret %phi_16
-
-
-}
-"#;
+    #[test]
+    fn test_mem2reg_nested() {
+        let code = r#"
+            int main() {
+                int x = 0;
+                while (x < 10) {
+                    x = x + 2;
+                    if (x > 5) while (x < 8) x = x + 1;
+                }
+                return x;
+            }
+        "#;
+        let expected_before_optimize = r#"define i32 @main() {
+            %entry:
+            %alloca_1 = alloca i32
+            store i32 0, ptr %alloca_1
+            br label %cond0
+            
+            %cond0:
+            %load_32 = load i32, ptr %alloca_1
+            %icmp_33 = icmp slt i32 %load_32, 10
+            br i1 %icmp_33, label %body1, label %final2
+            
+            %body1:
+            %load_7 = load i32, ptr %alloca_1
+            %Add_8 = add i32, %load_7, 2
+            store i32 %Add_8, ptr %alloca_1
+            br label %cond3
+            
+            %final2:
+            %load_35 = load i32, ptr %alloca_1
+            ret %load_35
+            
+            %cond3:
+            %load_15 = load i32, ptr %alloca_1
+            %icmp_16 = icmp sgt i32 %load_15, 5
+            br i1 %icmp_16, label %then4, label %alt5
+            
+            %then4:
+            br label %cond7
+            
+            %alt5:
+            br label %final6
+            
+            %cond7:
+            %load_26 = load i32, ptr %alloca_1
+            %icmp_27 = icmp slt i32 %load_26, 8
+            br i1 %icmp_27, label %body8, label %final9
+            
+            %final6:
+            br label %cond0
+            
+            %body8:
+            %load_22 = load i32, ptr %alloca_1
+            %Add_23 = add i32, %load_22, 1
+            store i32 %Add_23, ptr %alloca_1
+            br label %cond7
+            
+            %final9:
+            br label %final6
+            
+            
+            }
+            "#
+        .split('\n')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>()
+        .join("\n");
+        let expected_after_optimize = r#"define i32 @main() {
+            %entry:
+            %alloca_1 = alloca i32
+            br label %cond0
+            
+            %cond0:
+            %phi_37 = phi i32 [0, %entry], [%phi_38, %cond7]
+            %icmp_33 = icmp slt i32 %phi_37, 10
+            br i1 %icmp_33, label %body1, label %final2
+            
+            %body1:
+            %Add_8 = add i32, %phi_37, 2
+            br label %cond3
+            
+            %final2:
+            ret %phi_37
+            
+            %cond3:
+            %icmp_16 = icmp sgt i32 %Add_8, 5
+            br i1 %icmp_16, label %then4, label %alt5
+            
+            %then4:
+            br label %cond7
+            
+            %alt5:
+            br label %final6
+            
+            %cond7:
+            %phi_38 = phi i32 [%Add_8, %body1], [%Add_23, %body8]
+            %icmp_27 = icmp slt i32 %phi_38, 8
+            br i1 %icmp_27, label %body8, label %final9
+            
+            %final6:
+            br label %cond0
+            
+            %body8:
+            %Add_23 = add i32, %phi_38, 1
+            br label %cond7
+            
+            %final9:
+            br label %final6
+            
+            
+            }
+            "#
+        .split('\n')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>()
+        .join("\n");
 
         // check before optimization
         let parsed = parse(code).unwrap();
