@@ -19,7 +19,7 @@ pub enum Value {
 pub fn alloc(ty: ValueType, kit: &mut FunctionKit) -> Value {
     // Add instruction to exit
     let inst = kit.program.mem_pool.get_alloca(ty, 1);
-    kit.exit.push_back(inst);
+    kit.exit.unwrap().push_back(inst);
     Value::Pointer(inst.into())
 }
 
@@ -60,7 +60,7 @@ impl Value {
             Value::Pointer(op) => {
                 // Add instruction to exit
                 let inst = kit.program.mem_pool.get_load(ty.clone(), op);
-                kit.exit.push_back(inst);
+                kit.exit.unwrap().push_back(inst);
                 inst.into()
             }
             Value::Array(_) => {
@@ -81,26 +81,26 @@ impl Value {
             (ValueType::Int, ValueType::Float) => {
                 // Direct convert
                 let inst = kit.program.mem_pool.get_itofp(raw);
-                kit.exit.push_back(inst);
+                kit.exit.unwrap().push_back(inst);
                 Ok(inst.into())
             }
             (ValueType::Float, ValueType::Int) => {
                 // Direct convert
                 let inst = kit.program.mem_pool.get_fptoi(raw);
-                kit.exit.push_back(inst);
+                kit.exit.unwrap().push_back(inst);
                 Ok(inst.into())
             }
             (ValueType::Bool, ValueType::Int) => {
                 // Direct convert
                 let inst = kit.program.mem_pool.get_zext(raw);
-                kit.exit.push_back(inst);
+                kit.exit.unwrap().push_back(inst);
                 Ok(inst.into())
             }
             (ValueType::Bool, ValueType::Float) => {
                 // Convert to int first and then float
                 let inst = kit.program.mem_pool.get_zext(raw);
                 let inst = kit.program.mem_pool.get_itofp(inst.into());
-                kit.exit.push_back(inst);
+                kit.exit.unwrap().push_back(inst);
                 Ok(inst.into())
             }
             (ValueType::Int, ValueType::Bool) => {
@@ -111,7 +111,7 @@ impl Value {
                     raw,
                     Constant::Int(0).into(),
                 );
-                kit.exit.push_back(inst);
+                kit.exit.unwrap().push_back(inst);
                 Ok(inst.into())
             }
             (ValueType::Float, ValueType::Bool) => {
@@ -122,7 +122,7 @@ impl Value {
                     raw,
                     Constant::Float(0.0).into(),
                 );
-                kit.exit.push_back(inst);
+                kit.exit.unwrap().push_back(inst);
                 Ok(inst.into())
             }
             (ty, target) => Err(MiddleError::CustomError(format!(
@@ -149,7 +149,7 @@ impl Value {
             Value::Pointer(op) => {
                 // Add instruction to exit
                 let inst = kit.program.mem_pool.get_getelementptr(ty, op, index);
-                kit.exit.push_back(inst);
+                kit.exit.unwrap().push_back(inst);
 
                 // Construct new value
                 // TODO Type of pointer should be shrunk (as "get element" states)
@@ -194,7 +194,7 @@ impl Value {
 
                 // Store operand to pointer
                 let inst = kit.program.mem_pool.get_store(op, ptr);
-                kit.exit.push_back(inst);
+                kit.exit.unwrap().push_back(inst);
                 Ok(())
             }
         }

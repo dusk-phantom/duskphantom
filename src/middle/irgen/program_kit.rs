@@ -123,7 +123,7 @@ impl<'a> ProgramKit<'a> {
                     program: self.program,
                     env: self.env.clone(),
                     fun_env: cloned_fun_env,
-                    exit: entry,
+                    exit: Some(entry),
                     break_to: None,
                     continue_to: None,
                     return_type: fty,
@@ -131,7 +131,7 @@ impl<'a> ProgramKit<'a> {
                 };
                 kit.gen_stmt(stmt)?;
                 fun_ptr.entry = Some(entry);
-                fun_ptr.exit = Some(kit.exit);
+                fun_ptr.exit = kit.exit;
                 Ok(())
             }
             _ => Ok(()),

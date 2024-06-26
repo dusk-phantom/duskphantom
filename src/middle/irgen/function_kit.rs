@@ -12,7 +12,7 @@ pub struct FunctionKit<'a> {
     pub env: HashMap<String, Value>,
     pub fun_env: HashMap<String, FunPtr>,
     pub program: &'a mut middle::Program,
-    pub exit: BBPtr,
+    pub exit: Option<BBPtr>,
     pub break_to: Option<BBPtr>,
     pub continue_to: Option<BBPtr>,
     pub return_type: ValueType,
@@ -32,7 +32,7 @@ impl<'a> FunctionKit<'a> {
             program: self.program,
             env: self.env.clone(),
             fun_env: self.fun_env.clone(),
-            exit,
+            exit: Some(exit),
             break_to,
             continue_to,
             return_type: self.return_type.clone(),
@@ -48,13 +48,10 @@ impl<'a> FunctionKit<'a> {
     }
 
     /// Generate a statement into the program
-    ///
-    /// Returns the exit of the statement block that can be appended to
-    /// eg. if "break", the exit block can't be appended, this will return `None`
-    /// The exit returned is different from kit.exit, which always exists
-    ///
-    /// Error when statement generation is not successful
-    pub fn gen_stmt(&mut self, stmt: &Stmt) -> Result<Option<BBPtr>, MiddleError> {
+    pub fn gen_stmt(&mut self, stmt: &Stmt) -> Result<&Self, MiddleError> {
+        let Some(mut exit) = self.exit else {
+            return Err(MiddleError::GenError);
+        };
         match stmt {
             Stmt::Nothing => (),
             Stmt::Decl(decl) => {
@@ -82,11 +79,11 @@ impl<'a> FunctionKit<'a> {
                 let final_bb = self.program.mem_pool.new_basicblock(final_name);
 
                 // Redirect exit to condition block
-                self.exit.set_true_bb(cond_bb);
-                self.exit.push_back(self.program.mem_pool.get_br(None));
+                exit.set_true_bb(cond_bb);
+                exit.push_back(self.program.mem_pool.get_br(None));
 
                 // Add condition and br to condition block
-                self.exit = cond_bb;
+                self.exit = Some(cond_bb);
                 let operand = self.gen_expr(cond)?.load(ValueType::Bool, self)?;
                 let br = self.program.mem_pool.get_br(Some(operand));
                 cond_bb.push_back(br);
@@ -97,7 +94,8 @@ impl<'a> FunctionKit<'a> {
                 // Retain break_to and continue_to
                 let then_exit = self
                     .gen_function_kit(then_entry, self.break_to, self.continue_to)
-                    .gen_stmt(then)?;
+                    .gen_stmt(then)?
+                    .exit;
                 if let Some(mut then_exit) = then_exit {
                     then_exit.push_back(self.program.mem_pool.get_br(None));
                     then_exit.set_true_bb(final_bb);
@@ -106,14 +104,15 @@ impl<'a> FunctionKit<'a> {
                 // Add statements and br to alt branch
                 let alt_exit = self
                     .gen_function_kit(alt_entry, self.break_to, self.continue_to)
-                    .gen_stmt(alt)?;
+                    .gen_stmt(alt)?
+                    .exit;
                 if let Some(mut alt_exit) = alt_exit {
                     alt_exit.push_back(self.program.mem_pool.get_br(None));
                     alt_exit.set_true_bb(final_bb);
                 }
 
                 // Exit is final block
-                self.exit = final_bb;
+                self.exit = Some(final_bb);
             }
             Stmt::While(cond, body) => {
                 // Allocate basic blocks
@@ -125,20 +124,21 @@ impl<'a> FunctionKit<'a> {
                 let final_bb = self.program.mem_pool.new_basicblock(final_name);
 
                 // Redirect current exit to condition block
-                self.exit.set_true_bb(cond_bb);
-                self.exit.push_back(self.program.mem_pool.get_br(None));
+                exit.set_true_bb(cond_bb);
+                exit.push_back(self.program.mem_pool.get_br(None));
 
                 // Add statements and br to body block
                 let body_exit = self
                     .gen_function_kit(body_entry, Some(final_bb), Some(cond_bb))
-                    .gen_stmt(body)?;
+                    .gen_stmt(body)?
+                    .exit;
                 if let Some(mut body_exit) = body_exit {
                     body_exit.push_back(self.program.mem_pool.get_br(None));
                     body_exit.set_true_bb(cond_bb);
                 }
 
                 // Add condition and br to condition block
-                self.exit = cond_bb;
+                self.exit = Some(cond_bb);
                 cond_bb.set_true_bb(body_entry);
                 cond_bb.set_false_bb(final_bb);
                 let operand = self.gen_expr(cond)?.load(ValueType::Bool, self)?;
@@ -146,7 +146,7 @@ impl<'a> FunctionKit<'a> {
                 cond_bb.push_back(br);
 
                 // Exit is final block
-                self.exit = final_bb;
+                self.exit = Some(final_bb);
             }
             Stmt::DoWhile(body, cond) => {
                 // Allocate basic blocks
@@ -158,20 +158,21 @@ impl<'a> FunctionKit<'a> {
                 let final_bb = self.program.mem_pool.new_basicblock(final_name);
 
                 // Redirect current exit to body block
-                self.exit.set_true_bb(body_entry);
-                self.exit.push_back(self.program.mem_pool.get_br(None));
+                exit.set_true_bb(body_entry);
+                exit.push_back(self.program.mem_pool.get_br(None));
 
                 // Add statements and br to body block
                 let body_exit = self
                     .gen_function_kit(body_entry, Some(final_bb), Some(cond_bb))
-                    .gen_stmt(body)?;
+                    .gen_stmt(body)?
+                    .exit;
                 if let Some(mut body_exit) = body_exit {
                     body_exit.push_back(self.program.mem_pool.get_br(None));
                     body_exit.set_true_bb(cond_bb);
                 }
 
                 // Add condition and br to condition block
-                self.exit = cond_bb;
+                self.exit = Some(cond_bb);
                 cond_bb.set_true_bb(body_entry);
                 cond_bb.set_false_bb(final_bb);
                 let operand = self.gen_expr(cond)?.load(ValueType::Bool, self)?;
@@ -179,13 +180,13 @@ impl<'a> FunctionKit<'a> {
                 cond_bb.push_back(br);
 
                 // Exit is final block
-                self.exit = final_bb;
+                self.exit = Some(final_bb);
             }
             Stmt::For(_, _, _, _) => return Err(MiddleError::GenError),
             Stmt::Break => {
                 // Add br instruction to exit block
                 let br = self.program.mem_pool.get_br(None);
-                self.exit.push_back(br);
+                exit.push_back(br);
 
                 // When break statement appears, break_to must not be None
                 let Some(break_to) = self.break_to else {
@@ -193,15 +194,15 @@ impl<'a> FunctionKit<'a> {
                 };
 
                 // Rewrite next block to break destination
-                self.exit.set_true_bb(break_to);
+                exit.set_true_bb(break_to);
 
-                // Return None to indicate that the exit block can't be appended
-                return Ok(None);
+                // Exit block can't be appended further
+                self.exit = None;
             }
             Stmt::Continue => {
                 // Add br instruction to exit block
                 let br = self.program.mem_pool.get_br(None);
-                self.exit.push_back(br);
+                exit.push_back(br);
 
                 // When continue statement appears, continue_to must not be None
                 let Some(continue_to) = self.continue_to else {
@@ -209,10 +210,10 @@ impl<'a> FunctionKit<'a> {
                 };
 
                 // Rewrite next block to continue destination
-                self.exit.set_true_bb(continue_to);
+                exit.set_true_bb(continue_to);
 
-                // Return None to indicate that the exit block can't be appended
-                return Ok(None);
+                // Exit block can't be appended further
+                self.exit = None;
             }
             Stmt::Return(expr) => {
                 // Add returned result to exit block
@@ -223,23 +224,16 @@ impl<'a> FunctionKit<'a> {
 
                 // Add ret instruction to exit block
                 let ret = self.program.mem_pool.get_ret(return_value);
-                self.exit.push_back(ret);
-
-                // Return None to indicate that the exit block can't be appended
-                return Ok(None);
+                exit.push_back(ret);
             }
             Stmt::Block(stmts) => {
                 // Add statements to current block
                 for stmt in stmts.iter() {
-                    if self.gen_stmt(stmt)?.is_none() {
-                        // The rest of the code in this block will not be executed
-                        // because the exit block can't be appended
-                        return Ok(None);
-                    }
+                    self.gen_stmt(stmt)?;
                 }
             }
         }
-        Ok(Some(self.exit))
+        Ok(self)
     }
 
     /// Generate a declaration as a statement into the program
@@ -274,6 +268,9 @@ impl<'a> FunctionKit<'a> {
 
     /// Generate an expression as a statement into the program
     pub fn gen_expr(&mut self, expr: &Expr) -> Result<Value, MiddleError> {
+        let Some(mut exit) = self.exit else {
+            return Err(MiddleError::GenError);
+        };
         match expr {
             Expr::Var(x) => {
                 // Ensure variable is defined
@@ -322,7 +319,7 @@ impl<'a> FunctionKit<'a> {
 
                 // Call the function
                 let inst = self.program.mem_pool.get_call(*fun, operands);
-                self.exit.push_back(inst);
+                exit.push_back(inst);
                 Ok(Value::Operand(inst.into()))
             }
             Expr::Unary(op, expr) => self.gen_unary(op, expr),
@@ -333,6 +330,10 @@ impl<'a> FunctionKit<'a> {
 
     /// Generate a unary expression
     pub fn gen_unary(&mut self, op: &UnaryOp, expr: &Expr) -> Result<Value, MiddleError> {
+        let Some(mut exit) = self.exit else {
+            return Err(MiddleError::GenError);
+        };
+
         // Generate argument
         let val = self.gen_expr(expr)?;
 
@@ -350,7 +351,7 @@ impl<'a> FunctionKit<'a> {
                             .program
                             .mem_pool
                             .get_sub(Constant::Int(0).into(), operand);
-                        self.exit.push_back(inst);
+                        exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
                     ValueType::Float => {
@@ -358,7 +359,7 @@ impl<'a> FunctionKit<'a> {
                             .program
                             .mem_pool
                             .get_fsub(Constant::Float(0.0).into(), operand);
-                        self.exit.push_back(inst);
+                        exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
                     ValueType::Bool => {
@@ -368,8 +369,8 @@ impl<'a> FunctionKit<'a> {
                             .program
                             .mem_pool
                             .get_sub(Constant::Int(0).into(), zext.into());
-                        self.exit.push_back(zext);
-                        self.exit.push_back(sub);
+                        exit.push_back(zext);
+                        exit.push_back(sub);
                         Ok(Value::Operand(sub.into()))
                     }
                     _ => Err(MiddleError::GenError),
@@ -394,7 +395,7 @@ impl<'a> FunctionKit<'a> {
                     .program
                     .mem_pool
                     .get_xor(bool_op, Constant::Bool(true).into());
-                self.exit.push_back(inst);
+                exit.push_back(inst);
                 Ok(Value::Operand(inst.into()))
             }
             _ => Err(MiddleError::GenError),
@@ -408,6 +409,10 @@ impl<'a> FunctionKit<'a> {
         lhs: &Expr,
         rhs: &Expr,
     ) -> Result<Value, MiddleError> {
+        let Some(mut exit) = self.exit else {
+            return Err(MiddleError::GenError);
+        };
+
         // Generate arguments
         let lhs_val = self.gen_expr(lhs)?;
         let rhs_val = self.gen_expr(rhs)?;
@@ -426,12 +431,12 @@ impl<'a> FunctionKit<'a> {
                 match max_ty {
                     ValueType::Int => {
                         let inst = self.program.mem_pool.get_add(lop, rop);
-                        self.exit.push_back(inst);
+                        exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
                     ValueType::Float => {
                         let inst = self.program.mem_pool.get_fadd(lop, rop);
-                        self.exit.push_back(inst);
+                        exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
                     _ => Err(MiddleError::GenError),
@@ -446,12 +451,12 @@ impl<'a> FunctionKit<'a> {
                 match max_ty {
                     ValueType::Int => {
                         let inst = self.program.mem_pool.get_sub(lop, rop);
-                        self.exit.push_back(inst);
+                        exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
                     ValueType::Float => {
                         let inst = self.program.mem_pool.get_fsub(lop, rop);
-                        self.exit.push_back(inst);
+                        exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
                     _ => Err(MiddleError::GenError),
@@ -466,12 +471,12 @@ impl<'a> FunctionKit<'a> {
                 match max_ty {
                     ValueType::Int => {
                         let inst = self.program.mem_pool.get_mul(lop, rop);
-                        self.exit.push_back(inst);
+                        exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
                     ValueType::Float => {
                         let inst = self.program.mem_pool.get_fmul(lop, rop);
-                        self.exit.push_back(inst);
+                        exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
                     _ => Err(MiddleError::GenError),
@@ -486,12 +491,12 @@ impl<'a> FunctionKit<'a> {
                 match max_ty {
                     ValueType::Int => {
                         let inst = self.program.mem_pool.get_sdiv(lop, rop);
-                        self.exit.push_back(inst);
+                        exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
                     ValueType::Float => {
                         let inst = self.program.mem_pool.get_fdiv(lop, rop);
-                        self.exit.push_back(inst);
+                        exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
                     _ => Err(MiddleError::GenError),
@@ -504,7 +509,7 @@ impl<'a> FunctionKit<'a> {
 
                 // Add "signed rem" instruction, operand is the result of the instruction
                 let inst = self.program.mem_pool.get_srem(lop, rop);
-                self.exit.push_back(inst);
+                exit.push_back(inst);
                 Ok(Value::Operand(inst.into()))
             }
             // Bitwise operation on int is not required
@@ -525,7 +530,7 @@ impl<'a> FunctionKit<'a> {
                             .program
                             .mem_pool
                             .get_icmp(ICmpOp::Sgt, max_ty, lop, rop);
-                        self.exit.push_back(inst);
+                        exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
                     ValueType::Float => {
@@ -533,7 +538,7 @@ impl<'a> FunctionKit<'a> {
                             .program
                             .mem_pool
                             .get_fcmp(FCmpOp::Ugt, max_ty, lop, rop);
-                        self.exit.push_back(inst);
+                        exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
                     _ => Err(MiddleError::GenError),
@@ -551,7 +556,7 @@ impl<'a> FunctionKit<'a> {
                             .program
                             .mem_pool
                             .get_icmp(ICmpOp::Slt, max_ty, lop, rop);
-                        self.exit.push_back(inst);
+                        exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
                     ValueType::Float => {
@@ -559,7 +564,7 @@ impl<'a> FunctionKit<'a> {
                             .program
                             .mem_pool
                             .get_fcmp(FCmpOp::Ult, max_ty, lop, rop);
-                        self.exit.push_back(inst);
+                        exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
                     _ => Err(MiddleError::GenError),
@@ -577,7 +582,7 @@ impl<'a> FunctionKit<'a> {
                             .program
                             .mem_pool
                             .get_icmp(ICmpOp::Sge, max_ty, lop, rop);
-                        self.exit.push_back(inst);
+                        exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
                     ValueType::Float => {
@@ -585,7 +590,7 @@ impl<'a> FunctionKit<'a> {
                             .program
                             .mem_pool
                             .get_fcmp(FCmpOp::Uge, max_ty, lop, rop);
-                        self.exit.push_back(inst);
+                        exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
                     _ => Err(MiddleError::GenError),
@@ -603,7 +608,7 @@ impl<'a> FunctionKit<'a> {
                             .program
                             .mem_pool
                             .get_icmp(ICmpOp::Sle, max_ty, lop, rop);
-                        self.exit.push_back(inst);
+                        exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
                     ValueType::Float => {
@@ -611,7 +616,7 @@ impl<'a> FunctionKit<'a> {
                             .program
                             .mem_pool
                             .get_fcmp(FCmpOp::Ule, max_ty, lop, rop);
-                        self.exit.push_back(inst);
+                        exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
                     _ => Err(MiddleError::GenError),
@@ -626,7 +631,7 @@ impl<'a> FunctionKit<'a> {
                 match max_ty {
                     ValueType::Int => {
                         let inst = self.program.mem_pool.get_icmp(ICmpOp::Eq, max_ty, lop, rop);
-                        self.exit.push_back(inst);
+                        exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
                     ValueType::Float => {
@@ -634,7 +639,7 @@ impl<'a> FunctionKit<'a> {
                             .program
                             .mem_pool
                             .get_fcmp(FCmpOp::Ueq, max_ty, lop, rop);
-                        self.exit.push_back(inst);
+                        exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
                     _ => Err(MiddleError::GenError),
@@ -649,7 +654,7 @@ impl<'a> FunctionKit<'a> {
                 match max_ty {
                     ValueType::Int => {
                         let inst = self.program.mem_pool.get_icmp(ICmpOp::Ne, max_ty, lop, rop);
-                        self.exit.push_back(inst);
+                        exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
                     ValueType::Float => {
@@ -657,7 +662,7 @@ impl<'a> FunctionKit<'a> {
                             .program
                             .mem_pool
                             .get_fcmp(FCmpOp::Une, max_ty, lop, rop);
-                        self.exit.push_back(inst);
+                        exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
                     _ => Err(MiddleError::GenError),
@@ -670,7 +675,7 @@ impl<'a> FunctionKit<'a> {
 
                 // Add "and" instruction, operand is the result of the instruction
                 let inst = self.program.mem_pool.get_and(lop, rop);
-                self.exit.push_back(inst);
+                exit.push_back(inst);
                 Ok(Value::Operand(inst.into()))
             }
             BinaryOp::Or => {
@@ -680,7 +685,7 @@ impl<'a> FunctionKit<'a> {
 
                 // Add "or" instruction, operand is the result of the instruction
                 let inst = self.program.mem_pool.get_or(lop, rop);
-                self.exit.push_back(inst);
+                exit.push_back(inst);
                 Ok(Value::Operand(inst.into()))
             }
         }
