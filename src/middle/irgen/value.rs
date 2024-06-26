@@ -1,3 +1,6 @@
+use anyhow::{anyhow, Context, Result};
+
+use crate::context;
 use crate::errors::MiddleError;
 use crate::middle::ir::instruction::misc_inst::{FCmpOp, ICmpOp};
 use crate::middle::ir::{Constant, Operand, ValueType};
@@ -137,15 +140,11 @@ impl Value {
     /// For example, get_element_ptr([2, 8]) on a pointer to an array [n x i32]
     /// shifts it by (2 * n + 8) * sizeof i32.
     /// DO NOT FORGET THE FIRST INDEX
-    pub fn get_element_ptr(
-        self,
-        kit: &mut FunctionKit,
-        index: Vec<Operand>,
-    ) -> Result<Value, MiddleError> {
+    pub fn get_element_ptr(self, kit: &mut FunctionKit, index: Vec<Operand>) -> Result<Value> {
         let ty = self.get_type();
         match self {
-            Value::Operand(_) => Err(MiddleError::GenError),
-            Value::Array(_) => Err(MiddleError::GenError),
+            Value::Operand(_) => Err(anyhow!("can't GEP from operand")).with_context(|| context!()),
+            Value::Array(_) => Err(anyhow!("cannot GEP from array")).with_context(|| context!()),
             Value::Pointer(op) => {
                 // Add instruction to exit
                 let inst = kit.program.mem_pool.get_getelementptr(ty, op, index);
@@ -159,7 +158,7 @@ impl Value {
     }
 
     /// Assign a value to this value
-    pub fn assign(self, kit: &mut FunctionKit, val: Value) -> Result<(), MiddleError> {
+    pub fn assign(self, kit: &mut FunctionKit, val: Value) -> Result<()> {
         let target = self.get_type();
 
         // If target is array, load each element separately
@@ -182,12 +181,8 @@ impl Value {
 
         // Otherwise load element
         match self {
-            Value::Operand(_) => Err(MiddleError::CustomError(
-                "cannot assign to read-only operand".to_string(),
-            )),
-            Value::Array(_) => Err(MiddleError::CustomError(
-                "cannot assign to array".to_string(),
-            )),
+            Value::Operand(_) => Err(anyhow!("cannot assign operand")).with_context(|| context!()),
+            Value::Array(_) => Err(anyhow!("cannot assign to array")).with_context(|| context!()),
             Value::Pointer(ptr) => {
                 // Load operand from value first
                 let op = val.load(target, kit)?;

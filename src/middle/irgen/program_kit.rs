@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Context, Result};
 
 use crate::errors::MiddleError;
 use crate::frontend::{BinaryOp, Decl, Expr, Type, UnaryOp};
@@ -6,7 +6,7 @@ use crate::middle::ir::{Constant, FunPtr, Operand};
 use crate::middle::irgen::function_kit::FunctionKit;
 use crate::middle::irgen::value::Value;
 use crate::middle::irgen::{constant, value_type};
-use crate::{frontend, middle};
+use crate::{context, frontend, middle};
 use std::collections::HashMap;
 
 /// Kit for translating a program to middle IR
@@ -30,7 +30,7 @@ impl<'a> ProgramKit<'a> {
 
     /// Generate a declaration into the program
     /// Fails when declaration does not have a name
-    pub fn gen_decl(&mut self, decl: &Decl) -> Result<(), MiddleError> {
+    pub fn gen_decl(&mut self, decl: &Decl) -> Result<()> {
         match decl {
             Decl::Var(ty, id, val) | Decl::Const(ty, id, val) => {
                 // Get if value is global variable or constant
@@ -76,7 +76,7 @@ impl<'a> ProgramKit<'a> {
                 self.program.module.functions.push(fun_ptr);
                 Ok(())
             }
-            _ => Err(MiddleError::GenError),
+            _ => Err(anyhow!("invalid declaration")).with_context(|| context!()),
         }
     }
 
@@ -141,12 +141,12 @@ impl<'a> ProgramKit<'a> {
     }
 
     /// Generate constant expression
-    pub fn gen_const_expr(&mut self, expr: &Expr) -> Result<Constant, MiddleError> {
+    pub fn gen_const_expr(&mut self, expr: &Expr) -> Result<Constant> {
         match expr {
             Expr::Var(x) => {
                 // Ensure variable is defined
                 let Some(val) = self.env.get(x) else {
-                    return Err(MiddleError::CustomError(format!("{} not defined", x)));
+                    return Err(anyhow!("variable not defined")).with_context(|| context!());
                 };
 
                 // Make sure returned value is a constant
@@ -155,7 +155,7 @@ impl<'a> ProgramKit<'a> {
                 match val.clone() {
                     Value::Pointer(Operand::Global(gvar)) => Ok(gvar.initializer.clone()),
                     Value::Operand(Operand::Constant(val)) => Ok(val),
-                    _ => Err(MiddleError::CustomError(format!("{} isn't const", x))),
+                    _ => Err(anyhow!("variable is not a constant")).with_context(|| context!()),
                 }
             }
             Expr::Pack(ls) => Ok(Constant::Array(
@@ -163,24 +163,26 @@ impl<'a> ProgramKit<'a> {
                     .map(|x| self.gen_const_expr(x))
                     .collect::<Result<_, _>>()?,
             )),
-            Expr::Map(_) => Err(MiddleError::GenError),
-            Expr::Index(_, _) => Err(MiddleError::GenError),
-            Expr::Field(_, _) => Err(MiddleError::GenError),
-            Expr::Select(_, _) => Err(MiddleError::GenError),
+            Expr::Map(_) => Err(anyhow!("map is not implemented yet")).with_context(|| context!()),
+            Expr::Index(_, _) => Err(anyhow!("index not implemented")).with_context(|| context!()),
+            Expr::Field(_, _) => Err(anyhow!("field not implemented")).with_context(|| context!()),
+            Expr::Select(_, _) => Err(anyhow!("select not supported")).with_context(|| context!()),
             Expr::Int32(x) => Ok(Constant::Int(*x)),
             Expr::Float32(x) => Ok(Constant::Float(*x)),
-            Expr::String(_) => Err(MiddleError::GenError),
-            Expr::Char(_) => Err(MiddleError::GenError),
-            Expr::Bool(_) => Err(MiddleError::GenError),
-            Expr::Call(_, _) => Err(MiddleError::GenError),
+            Expr::String(_) => Err(anyhow!("string not implemented")).with_context(|| context!()),
+            Expr::Char(_) => Err(anyhow!("char not implemented")).with_context(|| context!()),
+            Expr::Bool(_) => Err(anyhow!("bool not implemented")).with_context(|| context!()),
+            Expr::Call(_, _) => Err(anyhow!("call not implemented")).with_context(|| context!()),
             Expr::Unary(op, expr) => self.gen_const_unary(op, expr),
             Expr::Binary(op, lhs, rhs) => self.gen_const_binary(op, lhs, rhs),
-            Expr::Conditional(_, _, _) => Err(MiddleError::GenError),
+            Expr::Conditional(_, _, _) => {
+                Err(anyhow!("conditional not implemented")).with_context(|| context!())
+            }
         }
     }
 
     /// Generate a unary expression
-    pub fn gen_const_unary(&mut self, op: &UnaryOp, expr: &Expr) -> Result<Constant, MiddleError> {
+    pub fn gen_const_unary(&mut self, op: &UnaryOp, expr: &Expr) -> Result<Constant> {
         // Generate constant
         let val = self.gen_const_expr(expr)?;
 
@@ -189,17 +191,12 @@ impl<'a> ProgramKit<'a> {
             UnaryOp::Neg => Ok(-val),
             UnaryOp::Pos => Ok(val),
             UnaryOp::Not => Ok(!val),
-            _ => Err(MiddleError::GenError),
+            _ => Err(anyhow!("unrecognized unary operator")).with_context(|| context!()),
         }
     }
 
     /// Generate a binary expression
-    pub fn gen_const_binary(
-        &mut self,
-        op: &BinaryOp,
-        lhs: &Expr,
-        rhs: &Expr,
-    ) -> Result<Constant, MiddleError> {
+    pub fn gen_const_binary(&mut self, op: &BinaryOp, lhs: &Expr, rhs: &Expr) -> Result<Constant> {
         // Generate constants
         let lv = self.gen_const_expr(lhs)?;
         let rv = self.gen_const_expr(rhs)?;
@@ -211,11 +208,11 @@ impl<'a> ProgramKit<'a> {
             BinaryOp::Mul => Ok(lv * rv),
             BinaryOp::Div => Ok(lv / rv),
             BinaryOp::Mod => Ok(lv % rv),
-            BinaryOp::Shr => Err(MiddleError::GenError),
-            BinaryOp::Shl => Err(MiddleError::GenError),
-            BinaryOp::BitAnd => Err(MiddleError::GenError),
-            BinaryOp::BitOr => Err(MiddleError::GenError),
-            BinaryOp::BitXor => Err(MiddleError::GenError),
+            BinaryOp::Shr => Err(anyhow!("shr is not implemented yet")).with_context(|| context!()),
+            BinaryOp::Shl => Err(anyhow!("shl is not implemented yet")).with_context(|| context!()),
+            BinaryOp::BitAnd => Err(anyhow!("bitand not implemented")).with_context(|| context!()),
+            BinaryOp::BitOr => Err(anyhow!("bitor not implemented")).with_context(|| context!()),
+            BinaryOp::BitXor => Err(anyhow!("bitxor not implemented")).with_context(|| context!()),
             BinaryOp::Gt => Ok(Constant::Bool(lv > rv)),
             BinaryOp::Lt => Ok(Constant::Bool(lv < rv)),
             BinaryOp::Ge => Ok(Constant::Bool(lv >= rv)),
