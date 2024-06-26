@@ -617,16 +617,16 @@ pub mod tests_mem2reg {
             br label %cond0
             
             %cond0:
-            %phi_37 = phi i32 [0, %entry], [%phi_38, %cond7]
-            %icmp_33 = icmp slt i32 %phi_37, 10
+            %phi_38 = phi i32 [0, %entry], [%phi_37, %cond7]
+            %icmp_33 = icmp slt i32 %phi_38, 10
             br i1 %icmp_33, label %body1, label %final2
             
             %body1:
-            %Add_8 = add i32, %phi_37, 2
+            %Add_8 = add i32, %phi_38, 2
             br label %cond3
             
             %final2:
-            ret %phi_37
+            ret %phi_38
             
             %cond3:
             %icmp_16 = icmp sgt i32 %Add_8, 5
@@ -639,15 +639,15 @@ pub mod tests_mem2reg {
             br label %final6
             
             %cond7:
-            %phi_38 = phi i32 [%Add_8, %body1], [%Add_23, %body8]
-            %icmp_27 = icmp slt i32 %phi_38, 8
+            %phi_37 = phi i32 [%Add_8, %body1], [%Add_23, %body8]
+            %icmp_27 = icmp slt i32 %phi_37, 8
             br i1 %icmp_27, label %body8, label %final9
             
             %final6:
             br label %cond0
             
             %body8:
-            %Add_23 = add i32, %phi_38, 1
+            %Add_23 = add i32, %phi_37, 1
             br label %cond7
             
             %final9:
