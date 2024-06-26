@@ -11,13 +11,16 @@ mod value_type;
 /// Generate middle IR from a frontend AST
 pub fn gen(program: &frontend::Program) -> Result<middle::Program, MiddleError> {
     let mut result = middle::Program::new();
-    ProgramKit {
+    let gen_result = ProgramKit {
         program: &mut result,
         env: HashMap::new(),
         fun_env: HashMap::new(),
     }
-    .gen(program)?;
-    Ok(result)
+    .gen(program);
+    match gen_result {
+        Ok(_) => Ok(result),
+        Err(_) => Err(MiddleError::GenError),
+    }
 }
 
 #[cfg(test)]

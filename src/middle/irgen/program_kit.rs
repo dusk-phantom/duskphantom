@@ -1,3 +1,5 @@
+use anyhow::Result;
+
 use crate::errors::MiddleError;
 use crate::frontend::{BinaryOp, Decl, Expr, Type, UnaryOp};
 use crate::middle::ir::{Constant, FunPtr, Operand};
@@ -16,7 +18,7 @@ pub struct ProgramKit<'a> {
 
 /// A program kit (top level) can generate declarations
 impl<'a> ProgramKit<'a> {
-    pub fn gen(mut self, program: &frontend::Program) -> Result<(), MiddleError> {
+    pub fn gen(mut self, program: &frontend::Program) -> Result<()> {
         for decl in program.module.iter() {
             self.gen_decl(decl)?;
         }
@@ -79,7 +81,7 @@ impl<'a> ProgramKit<'a> {
     }
 
     /// Generate an implementation into the program
-    pub fn gen_impl(&mut self, decl: &Decl) -> Result<(), MiddleError> {
+    pub fn gen_impl(&mut self, decl: &Decl) -> Result<()> {
         match decl {
             Decl::Func(Type::Function(_, params), id, Some(stmt)) => {
                 // Clone function env before mutating it
