@@ -1,6 +1,5 @@
 use anyhow::{anyhow, Context, Result};
 
-use crate::errors::MiddleError;
 use crate::frontend::{BinaryOp, Decl, Expr, Stmt, UnaryOp};
 use crate::middle::ir::instruction::misc_inst::{FCmpOp, ICmpOp};
 use crate::middle::ir::{BBPtr, Constant, FunPtr, ValueType};
@@ -246,7 +245,7 @@ impl<'a> FunctionKit<'a> {
     }
 
     /// Generate a declaration as a statement into the program
-    pub fn gen_decl(&mut self, decl: &Decl) -> Result<(), MiddleError> {
+    pub fn gen_decl(&mut self, decl: &Decl) -> Result<()> {
         match decl {
             Decl::Var(raw_ty, id, op) => {
                 // Allocate space for variable, add to environment
@@ -271,20 +270,20 @@ impl<'a> FunctionKit<'a> {
                 }
                 Ok(())
             }
-            _ => Err(MiddleError::GenError),
+            _ => Err(anyhow!("unrecognized declaration")).with_context(|| context!()),
         }
     }
 
     /// Generate an expression as a statement into the program
-    pub fn gen_expr(&mut self, expr: &Expr) -> Result<Value, MiddleError> {
+    pub fn gen_expr(&mut self, expr: &Expr) -> Result<Value> {
         let Some(mut exit) = self.exit else {
-            return Err(MiddleError::GenError);
+            return Err(anyhow!("exit block can't be appended")).with_context(|| context!());
         };
         match expr {
             Expr::Var(x) => {
                 // Ensure variable is defined
                 let Some(operand) = self.env.get(x) else {
-                    return Err(MiddleError::GenError);
+                    return Err(anyhow!("variable not defined")).with_context(|| context!());
                 };
 
                 // Clone the operand and return, this clones the underlying value or InstPtr
@@ -295,7 +294,7 @@ impl<'a> FunctionKit<'a> {
                     .map(|x| self.gen_expr(x))
                     .collect::<Result<_, _>>()?,
             )),
-            Expr::Map(_) => Err(MiddleError::GenError),
+            Expr::Map(_) => Err(anyhow!("map is not supported")).with_context(|| context!()),
             Expr::Index(x, v) => {
                 // Load index as integer
                 let ix = self.gen_expr(v)?.load(ValueType::Int, self)?;
@@ -304,13 +303,13 @@ impl<'a> FunctionKit<'a> {
                 self.gen_expr(x)?
                     .get_element_ptr(self, vec![Constant::Int(0).into(), ix])
             }
-            Expr::Field(_, _) => Err(MiddleError::GenError),
-            Expr::Select(_, _) => Err(MiddleError::GenError),
+            Expr::Field(_, _) => Err(anyhow!("field not supported")).with_context(|| context!()),
+            Expr::Select(_, _) => Err(anyhow!("select not supported")).with_context(|| context!()),
             Expr::Int32(x) => Ok(Constant::Int(*x).into()),
             Expr::Float32(x) => Ok(Constant::Float(*x).into()),
-            Expr::String(_) => Err(MiddleError::GenError),
-            Expr::Char(_) => Err(MiddleError::GenError),
-            Expr::Bool(_) => Err(MiddleError::GenError),
+            Expr::String(_) => Err(anyhow!("string not supported")).with_context(|| context!()),
+            Expr::Char(_) => Err(anyhow!("char not supported")).with_context(|| context!()),
+            Expr::Bool(_) => Err(anyhow!("bool not supported")).with_context(|| context!()),
             Expr::Call(func, args) => {
                 // Generate arguments
                 let mut operands = Vec::new();
@@ -320,10 +319,10 @@ impl<'a> FunctionKit<'a> {
 
                 // Ensure function is a defined variable
                 let Expr::Var(func) = *func.clone() else {
-                    return Err(MiddleError::GenError);
+                    return Err(anyhow!("function is not variable")).with_context(|| context!());
                 };
                 let Some(fun) = self.fun_env.get(&func) else {
-                    return Err(MiddleError::GenError);
+                    return Err(anyhow!("function not defined")).with_context(|| context!());
                 };
 
                 // Call the function
@@ -333,14 +332,16 @@ impl<'a> FunctionKit<'a> {
             }
             Expr::Unary(op, expr) => self.gen_unary(op, expr),
             Expr::Binary(op, lhs, rhs) => self.gen_binary(op, lhs, rhs),
-            Expr::Conditional(_, _, _) => Err(MiddleError::GenError),
+            Expr::Conditional(_, _, _) => {
+                Err(anyhow!("conditional not supported")).with_context(|| context!())
+            }
         }
     }
 
     /// Generate a unary expression
-    pub fn gen_unary(&mut self, op: &UnaryOp, expr: &Expr) -> Result<Value, MiddleError> {
+    pub fn gen_unary(&mut self, op: &UnaryOp, expr: &Expr) -> Result<Value> {
         let Some(mut exit) = self.exit else {
-            return Err(MiddleError::GenError);
+            return Err(anyhow!("exit block can't be appended")).with_context(|| context!());
         };
 
         // Generate argument
@@ -382,7 +383,7 @@ impl<'a> FunctionKit<'a> {
                         exit.push_back(sub);
                         Ok(Value::Operand(sub.into()))
                     }
-                    _ => Err(MiddleError::GenError),
+                    _ => Err(anyhow!("`-` for NaN")).with_context(|| context!()),
                 }
             }
             UnaryOp::Pos => {
@@ -392,7 +393,7 @@ impl<'a> FunctionKit<'a> {
                     ValueType::Int | ValueType::Float | ValueType::Bool => {
                         Ok(Value::Operand(operand))
                     }
-                    _ => Err(MiddleError::GenError),
+                    _ => Err(anyhow!("`+` for NaN")).with_context(|| context!()),
                 }
             }
             UnaryOp::Not => {
@@ -407,19 +408,14 @@ impl<'a> FunctionKit<'a> {
                 exit.push_back(inst);
                 Ok(Value::Operand(inst.into()))
             }
-            _ => Err(MiddleError::GenError),
+            _ => Err(anyhow!("unary operator not supported")).with_context(|| context!()),
         }
     }
 
     /// Generate a binary expression
-    pub fn gen_binary(
-        &mut self,
-        op: &BinaryOp,
-        lhs: &Expr,
-        rhs: &Expr,
-    ) -> Result<Value, MiddleError> {
+    pub fn gen_binary(&mut self, op: &BinaryOp, lhs: &Expr, rhs: &Expr) -> Result<Value> {
         let Some(mut exit) = self.exit else {
-            return Err(MiddleError::GenError);
+            return Err(anyhow!("exit block can't be appended")).with_context(|| context!());
         };
 
         // Generate arguments
@@ -448,7 +444,7 @@ impl<'a> FunctionKit<'a> {
                         exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
-                    _ => Err(MiddleError::GenError),
+                    _ => Err(anyhow!("`+` for NaN")).with_context(|| context!()),
                 }
             }
             BinaryOp::Sub => {
@@ -468,7 +464,7 @@ impl<'a> FunctionKit<'a> {
                         exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
-                    _ => Err(MiddleError::GenError),
+                    _ => Err(anyhow!("`-` for NaN")).with_context(|| context!()),
                 }
             }
             BinaryOp::Mul => {
@@ -488,7 +484,7 @@ impl<'a> FunctionKit<'a> {
                         exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
-                    _ => Err(MiddleError::GenError),
+                    _ => Err(anyhow!("`*` for NaN")).with_context(|| context!()),
                 }
             }
             BinaryOp::Div => {
@@ -508,7 +504,7 @@ impl<'a> FunctionKit<'a> {
                         exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
-                    _ => Err(MiddleError::GenError),
+                    _ => Err(anyhow!("`/` for NaN")).with_context(|| context!()),
                 }
             }
             BinaryOp::Mod => {
@@ -522,11 +518,11 @@ impl<'a> FunctionKit<'a> {
                 Ok(Value::Operand(inst.into()))
             }
             // Bitwise operation on int is not required
-            BinaryOp::Shr => Err(MiddleError::GenError),
-            BinaryOp::Shl => Err(MiddleError::GenError),
-            BinaryOp::BitAnd => Err(MiddleError::GenError),
-            BinaryOp::BitOr => Err(MiddleError::GenError),
-            BinaryOp::BitXor => Err(MiddleError::GenError),
+            BinaryOp::Shr => Err(anyhow!("`>>` not supported")).with_context(|| context!()),
+            BinaryOp::Shl => Err(anyhow!("`<<` not supported")).with_context(|| context!()),
+            BinaryOp::BitAnd => Err(anyhow!("`&` not supported")).with_context(|| context!()),
+            BinaryOp::BitOr => Err(anyhow!("`|` not supported")).with_context(|| context!()),
+            BinaryOp::BitXor => Err(anyhow!("`^` not supported")).with_context(|| context!()),
             BinaryOp::Gt => {
                 // Load operand as maximum type
                 let lop = lhs_val.load(max_ty.clone(), self)?;
@@ -550,7 +546,7 @@ impl<'a> FunctionKit<'a> {
                         exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
-                    _ => Err(MiddleError::GenError),
+                    _ => Err(anyhow!("`>` for NaN")).with_context(|| context!()),
                 }
             }
             BinaryOp::Lt => {
@@ -576,7 +572,7 @@ impl<'a> FunctionKit<'a> {
                         exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
-                    _ => Err(MiddleError::GenError),
+                    _ => Err(anyhow!("`<` for NaN")).with_context(|| context!()),
                 }
             }
             BinaryOp::Ge => {
@@ -602,7 +598,7 @@ impl<'a> FunctionKit<'a> {
                         exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
-                    _ => Err(MiddleError::GenError),
+                    _ => Err(anyhow!("`>=` for NaN")).with_context(|| context!()),
                 }
             }
             BinaryOp::Le => {
@@ -628,7 +624,7 @@ impl<'a> FunctionKit<'a> {
                         exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
-                    _ => Err(MiddleError::GenError),
+                    _ => Err(anyhow!("`<=` for NaN")).with_context(|| context!()),
                 }
             }
             BinaryOp::Eq => {
@@ -651,7 +647,7 @@ impl<'a> FunctionKit<'a> {
                         exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
-                    _ => Err(MiddleError::GenError),
+                    _ => Err(anyhow!("`==` for NaN")).with_context(|| context!()),
                 }
             }
             BinaryOp::Ne => {
@@ -674,7 +670,7 @@ impl<'a> FunctionKit<'a> {
                         exit.push_back(inst);
                         Ok(Value::Operand(inst.into()))
                     }
-                    _ => Err(MiddleError::GenError),
+                    _ => Err(anyhow!("`!=` for NaN")).with_context(|| context!()),
                 }
             }
             BinaryOp::And => {
