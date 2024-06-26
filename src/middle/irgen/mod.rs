@@ -1,4 +1,5 @@
-use crate::{errors::MiddleError, frontend, middle};
+use crate::{frontend, middle};
+use anyhow::Result;
 use program_kit::ProgramKit;
 use std::collections::HashMap;
 
@@ -9,18 +10,15 @@ mod value;
 mod value_type;
 
 /// Generate middle IR from a frontend AST
-pub fn gen(program: &frontend::Program) -> Result<middle::Program, MiddleError> {
+pub fn gen(program: &frontend::Program) -> Result<middle::Program> {
     let mut result = middle::Program::new();
-    let gen_result = ProgramKit {
+    ProgramKit {
         program: &mut result,
         env: HashMap::new(),
         fun_env: HashMap::new(),
     }
-    .gen(program);
-    match gen_result {
-        Ok(_) => Ok(result),
-        Err(_) => Err(MiddleError::GenError),
-    }
+    .gen(program)?;
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -373,7 +371,7 @@ mod tests {
     }
 
     #[test]
-    fn test_automatic_loop() {
+    fn test_default_exit() {
         let code = r#"
             int main() {
                 int a = 0;
@@ -430,6 +428,52 @@ mod tests {
         .join("\n");
         let program = parse(code).unwrap();
         assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Int32, \"a\", Some(Int32(0)))), While(Binary(Lt, Var(\"a\"), Int32(10)), Block([Expr(Some(Var(\"a\")), Binary(Add, Var(\"a\"), Int32(1))), If(Binary(Eq, Var(\"a\"), Int32(5)), Block([Break]), Block([]))])), Return(Some(Var(\"a\")))])))] }");
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_eq!(llvm_ir, expected);
+    }
+
+    #[test]
+    fn test_dead_code() {
+        let code = r#"
+            int main() {
+                while (1) {
+                    break;
+                    continue;
+                    return 0;
+                    break;
+                    return 0;
+                    continue;
+                    continue;
+                    return 1;
+                    break;
+                }
+                return 0;
+            }
+        "#;
+        let expected = r#"define i32 @main() {
+            %entry:
+            br label %cond0
+            
+            %cond0:
+            %icmp_6 = icmp ne i32 1, 0
+            br i1 %icmp_6, label %body1, label %final2
+            
+            %body1:
+            br label %final2
+            
+            %final2:
+            ret 0
+            
+            
+            }
+            "#
+        .split('\n')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>()
+        .join("\n");
+        let program = parse(code).unwrap();
+        assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([While(Int32(1), Block([Break, Continue, Return(Some(Int32(0))), Break, Return(Some(Int32(0))), Continue, Continue, Return(Some(Int32(1))), Break])), Return(Some(Int32(0)))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
         assert_eq!(llvm_ir, expected);

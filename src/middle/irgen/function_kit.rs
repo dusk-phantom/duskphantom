@@ -236,7 +236,9 @@ impl<'a> FunctionKit<'a> {
             Stmt::Block(stmts) => {
                 // Add statements to current block
                 for stmt in stmts.iter() {
-                    self.gen_stmt(stmt)?;
+                    if self.exit.is_some() {
+                        self.gen_stmt(stmt)?;
+                    }
                 }
             }
         }
