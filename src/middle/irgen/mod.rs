@@ -5,6 +5,16 @@ use std::collections::HashMap;
 
 mod constant;
 mod function_kit;
+mod gen_binary;
+mod gen_const_binary;
+mod gen_const_expr;
+mod gen_const_unary;
+mod gen_expr;
+mod gen_global_decl;
+mod gen_impl;
+mod gen_inner_decl;
+mod gen_stmt;
+mod gen_unary;
 mod program_kit;
 mod value;
 mod value_type;
