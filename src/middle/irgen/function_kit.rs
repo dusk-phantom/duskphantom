@@ -1,10 +1,12 @@
+use anyhow::{anyhow, Context, Result};
+
 use crate::errors::MiddleError;
 use crate::frontend::{BinaryOp, Decl, Expr, Stmt, UnaryOp};
-use crate::middle;
 use crate::middle::ir::instruction::misc_inst::{FCmpOp, ICmpOp};
 use crate::middle::ir::{BBPtr, Constant, FunPtr, ValueType};
 use crate::middle::irgen::value::Value;
 use crate::middle::irgen::{value, value_type};
+use crate::{context, middle};
 use std::collections::HashMap;
 
 /// Kit for translating a function to middle IR
@@ -48,9 +50,9 @@ impl<'a> FunctionKit<'a> {
     }
 
     /// Generate a statement into the program
-    pub fn gen_stmt(&mut self, stmt: &Stmt) -> Result<&Self, MiddleError> {
+    pub fn gen_stmt(&mut self, stmt: &Stmt) -> Result<&Self> {
         let Some(mut exit) = self.exit else {
-            return Err(MiddleError::GenError);
+            return Err(anyhow!("exit block can't be appended")).with_context(|| context!());
         };
         match stmt {
             Stmt::Nothing => (),
@@ -182,7 +184,10 @@ impl<'a> FunctionKit<'a> {
                 // Exit is final block
                 self.exit = Some(final_bb);
             }
-            Stmt::For(_, _, _, _) => return Err(MiddleError::GenError),
+            Stmt::For(_, _, _, _) => {
+                return Err(anyhow!("`for` statement can't be generated"))
+                    .with_context(|| context!());
+            }
             Stmt::Break => {
                 // Add br instruction to exit block
                 let br = self.program.mem_pool.get_br(None);
@@ -190,7 +195,8 @@ impl<'a> FunctionKit<'a> {
 
                 // When break statement appears, break_to must not be None
                 let Some(break_to) = self.break_to else {
-                    return Err(MiddleError::GenError);
+                    return Err(anyhow!("break without a valid destination"))
+                        .with_context(|| context!());
                 };
 
                 // Rewrite next block to break destination
@@ -206,7 +212,8 @@ impl<'a> FunctionKit<'a> {
 
                 // When continue statement appears, continue_to must not be None
                 let Some(continue_to) = self.continue_to else {
-                    return Err(MiddleError::GenError);
+                    return Err(anyhow!("continue without a valid destination"))
+                        .with_context(|| context!());
                 };
 
                 // Rewrite next block to continue destination
