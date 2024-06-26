@@ -123,7 +123,6 @@ impl<'a> ProgramKit<'a> {
                     program: self.program,
                     env: self.env.clone(),
                     fun_env: cloned_fun_env,
-                    entry,
                     exit: entry,
                     break_to: None,
                     continue_to: None,
@@ -131,7 +130,7 @@ impl<'a> ProgramKit<'a> {
                     counter: &mut counter,
                 };
                 kit.gen_stmt(stmt)?;
-                fun_ptr.entry = Some(kit.entry);
+                fun_ptr.entry = Some(entry);
                 fun_ptr.exit = Some(kit.exit);
                 Ok(())
             }
