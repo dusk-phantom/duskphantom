@@ -52,10 +52,10 @@ impl PhiPack {
 /// The mem2reg pass
 #[allow(unused)]
 pub fn mem2reg(entry: BBPtr, program: &mut Program) {
-    let mut variable_to_phi_insertion: HashMap<InstPtr, Vec<BBPtr>> =
+    let mut variable_to_phi_insertion: HashMap<InstPtr, HashSet<BBPtr>> =
         get_variable_to_phi_insertion(entry);
     let mut block_to_phi_insertion: HashMap<BBPtr, Vec<PhiPack>> =
-        insert_empty_phi(entry, program, &mut variable_to_phi_insertion);
+        insert_empty_phi(entry, program, variable_to_phi_insertion);
 
     // for each "phi" insert position, decide the value for each argument
     fn decide_variable_value(
@@ -173,15 +173,15 @@ pub fn mem2reg(entry: BBPtr, program: &mut Program) {
 fn insert_empty_phi(
     entry: BBPtr,
     program: &mut Program,
-    phi_insert_positions: &mut HashMap<InstPtr, Vec<BBPtr>>,
+    phi_insert_positions: HashMap<InstPtr, HashSet<BBPtr>>,
 ) -> HashMap<BBPtr, Vec<PhiPack>> {
     let mut block_to_phi_insertion: HashMap<BBPtr, Vec<PhiPack>> = HashMap::new();
-    for (variable, positions) in phi_insert_positions.iter_mut() {
-        for position in positions.iter_mut() {
+    for (variable, positions) in phi_insert_positions.into_iter() {
+        for mut position in positions.into_iter() {
             block_to_phi_insertion
-                .entry(*position)
+                .entry(position)
                 .or_default()
-                .push(PhiPack::new_from_variable(*variable, program, position));
+                .push(PhiPack::new_from_variable(variable, program, &mut position));
         }
     }
     block_to_phi_insertion
@@ -189,7 +189,7 @@ fn insert_empty_phi(
 
 /// Get places to insert "phi" instructions for each "alloca" instruction
 #[allow(unused)]
-fn get_variable_to_phi_insertion(entry: BBPtr) -> HashMap<InstPtr, Vec<BBPtr>> {
+fn get_variable_to_phi_insertion(entry: BBPtr) -> HashMap<InstPtr, HashSet<BBPtr>> {
     let mut phi_positions = HashMap::new();
 
     // for each "store", make insert position at the beginning of the dominance frontier
@@ -197,7 +197,7 @@ fn get_variable_to_phi_insertion(entry: BBPtr) -> HashMap<InstPtr, Vec<BBPtr>> {
         current_bb: BBPtr,
         visited: &mut HashSet<BBPtr>,
         df: &HashMap<BBPtr, HashSet<BBPtr>>,
-        phi_positions: &mut HashMap<InstPtr, Vec<BBPtr>>,
+        phi_positions: &mut HashMap<InstPtr, HashSet<BBPtr>>,
     ) {
         if visited.contains(&current_bb) {
             return;
@@ -213,7 +213,7 @@ fn get_variable_to_phi_insertion(entry: BBPtr) -> HashMap<InstPtr, Vec<BBPtr>> {
                 if let Operand::Instruction(inst) = store_ptr {
                     if inst.get_type() == InstType::Alloca {
                         for df_bb in df.get(&current_bb).unwrap_or(&HashSet::new()).iter() {
-                            phi_positions.entry(*inst).or_default().push(*df_bb);
+                            phi_positions.entry(*inst).or_default().insert(*df_bb);
                         }
                     }
                 }
@@ -339,76 +339,184 @@ pub mod tests_mem2reg {
     };
 
     #[test]
-    /// Optimize the following function:
-    ///
-    /// ```llvm
-    /// define i32 @main {
-    ///     %alloca_1 = alloca i32
-    ///     store i32 1, ptr %alloca_1
-    ///     %load_3 = load i32, ptr %alloca_1
-    ///     ret i32 %load_3
-    /// }
-    /// ```
-    ///
-    /// To:
-    ///
-    /// ```llvm
-    /// define i32 @main {
-    ///     %alloca_1 = alloca i32
-    ///     ret i32 1
-    /// }
-    /// ```
-    ///
-    /// `%alloca_1` is not removed because limitation of mem2reg pass (see code for details)
-    /// It should be removed by dead code elimination pass instead
     fn test_mem2reg_simple() {
         let code = r#"
-            int main() {
-                int a = 1;
-                return a;
-            }
+int main() {
+    int a = 1;
+    return a;
+}
         "#;
+        let expected_before_optimize = r#"define i32 @main() {
+%entry:
+%alloca_1 = alloca i32
+store i32 1, ptr %alloca_1
+%load_3 = load i32, ptr %alloca_1
+ret %load_3
+
+
+}
+"#;
+        let expected_after_optimize = r#"define i32 @main() {
+%entry:
+%alloca_1 = alloca i32
+ret 1
+
+
+}
+"#;
+
+        // check before optimization
         let parsed = parse(code).unwrap();
         let mut program = gen(&parsed).unwrap();
-        assert_eq!(
-            program.module.gen_llvm_ir(),
-            "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 1, ptr %alloca_1\n%load_3 = load i32, ptr %alloca_1\nret %load_3\n\n\n}\n"
-        );
+        assert_eq!(program.module.gen_llvm_ir(), expected_before_optimize);
 
-        // check optimization
+        // check after optimization
         mem2reg(program.module.functions[0].entry.unwrap(), &mut program);
-        assert_eq!(
-            program.module.gen_llvm_ir(),
-            "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nret 1\n\n\n}\n"
-        );
+        assert_eq!(program.module.gen_llvm_ir(), expected_after_optimize);
     }
 
     #[test]
-    fn test_mem2reg_simple_if() {
+    fn test_mem2reg_branch() {
         let code = r#"
-            int main() {
-                int x;
-                if (1) {
-                    x = 1;
-                } else {
-                    x = 2;
-                }
-                return x;
-            }
+int main() {
+    int x = 0;
+    if (x < 10) {
+        x = x + 1;
+    } else {
+        x = x + 9;
+    }
+    return x;
+}
         "#;
+        let expected_before_optimize = r#"define i32 @main() {
+%entry:
+%alloca_1 = alloca i32
+store i32 0, ptr %alloca_1
+br label %cond0
+
+%cond0:
+%load_8 = load i32, ptr %alloca_1
+%icmp_9 = icmp slt i32 %load_8, 10
+br i1 %icmp_9, label %then1, label %alt2
+
+%then1:
+%load_11 = load i32, ptr %alloca_1
+%Add_12 = add i32, %load_11, 1
+store i32 %Add_12, ptr %alloca_1
+br label %final3
+
+%alt2:
+%load_15 = load i32, ptr %alloca_1
+%Add_16 = add i32, %load_15, 9
+store i32 %Add_16, ptr %alloca_1
+br label %final3
+
+%final3:
+%load_19 = load i32, ptr %alloca_1
+ret %load_19
+
+
+}
+"#;
+        let expected_after_optimize = r#"define i32 @main() {
+%entry:
+%alloca_1 = alloca i32
+br label %cond0
+
+%cond0:
+%icmp_9 = icmp slt i32 0, 10
+br i1 %icmp_9, label %then1, label %alt2
+
+%then1:
+%Add_12 = add i32, 0, 1
+br label %final3
+
+%alt2:
+%Add_16 = add i32, 0, 9
+br label %final3
+
+%final3:
+%phi_21 = phi i32 [%Add_12, %then1], [%Add_16, %alt2]
+ret %phi_21
+
+
+}
+"#;
+
+        // check before optimization
         let parsed = parse(code).unwrap();
         let mut program = gen(&parsed).unwrap();
-        assert_eq!(
-            program.module.gen_llvm_ir(),
-            "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nbr label %cond0\n\n%cond0:\n%icmp_7 = icmp ne i32 1, 0\nbr i1 %icmp_7, label %then1, label %alt2\n\n%then1:\nstore i32 1, ptr %alloca_1\nbr label %final3\n\n%alt2:\nstore i32 2, ptr %alloca_1\nbr label %final3\n\n%final3:\n%load_13 = load i32, ptr %alloca_1\nret %load_13\n\n\n}\n"
-        );
+        assert_eq!(program.module.gen_llvm_ir(), expected_before_optimize);
 
-        // check optimization
+        // check after optimization
         mem2reg(program.module.functions[0].entry.unwrap(), &mut program);
-        assert_eq!(
-            program.module.gen_llvm_ir(),
-            "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nret 1\n\n\n}\n"
-        );
+        assert_eq!(program.module.gen_llvm_ir(), expected_after_optimize);
+    }
+
+    #[test]
+    fn test_mem2reg_loop() {
+        let code = r#"
+int main() {
+    int x = 0;
+    while (x < 10) {
+        x = x + 1;
+    }
+    return x;
+}
+        "#;
+        let expected_before_optimize = r#"define i32 @main() {
+%entry:
+%alloca_1 = alloca i32
+store i32 0, ptr %alloca_1
+br label %cond0
+
+%cond0:
+%load_7 = load i32, ptr %alloca_1
+%icmp_8 = icmp slt i32 %load_7, 10
+br i1 %icmp_8, label %body1, label %final2
+
+%body1:
+%load_10 = load i32, ptr %alloca_1
+%Add_11 = add i32, %load_10, 1
+store i32 %Add_11, ptr %alloca_1
+br label %cond0
+
+%final2:
+%load_14 = load i32, ptr %alloca_1
+ret %load_14
+
+
+}
+"#;
+        let expected_after_optimize = r#"define i32 @main() {
+%entry:
+%alloca_1 = alloca i32
+br label %cond0
+
+%cond0:
+%phi_16 = phi i32 [0, %entry], [%Add_11, %body1]
+%icmp_8 = icmp slt i32 %phi_16, 10
+br i1 %icmp_8, label %body1, label %final2
+
+%body1:
+%Add_11 = add i32, %phi_16, 1
+br label %cond0
+
+%final2:
+ret %phi_16
+
+
+}
+"#;
+
+        // check before optimization
+        let parsed = parse(code).unwrap();
+        let mut program = gen(&parsed).unwrap();
+        assert_eq!(program.module.gen_llvm_ir(), expected_before_optimize);
+
+        // check after optimization
+        mem2reg(program.module.functions[0].entry.unwrap(), &mut program);
+        assert_eq!(program.module.gen_llvm_ir(), expected_after_optimize);
     }
 
     #[test]
