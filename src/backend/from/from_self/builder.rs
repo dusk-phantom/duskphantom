@@ -2,11 +2,8 @@ use std::collections::HashMap;
 
 use crate::backend::*;
 
-use crate::middle::ir::{BasicBlock, Function};
-use crate::middle::{
-    self,
-    ir::{Constant, FunPtr, GlobalPtr},
-};
+use crate::middle;
+
 use crate::utils::mem::ObjPtr;
 
 use anyhow::Result;
@@ -35,7 +32,7 @@ impl IRBuilder {
         })
     }
 
-    pub fn build_global_var(llvm_global_vars: &Vec<GlobalPtr>) -> Result<Vec<Var>> {
+    pub fn build_global_var(llvm_global_vars: &Vec<middle::ir::GlobalPtr>) -> Result<Vec<Var>> {
         let mut global_vars = Vec::new();
 
         for global_var in llvm_global_vars {
@@ -43,7 +40,7 @@ impl IRBuilder {
             let name = &global_var.name.to_string(); // 这里的 name 是不带 @ 的
             dbg!(&name);
             match &global_var.initializer {
-                Constant::Int(value) => {
+                middle::ir::Constant::Int(value) => {
                     let var = Var::Prim(PrimVar::IntVar(IntVar {
                         name: name.to_string(),
                         init: Some(*value as i32),
@@ -51,7 +48,7 @@ impl IRBuilder {
                     }));
                     global_vars.push(var);
                 }
-                Constant::Float(value) => {
+                middle::ir::Constant::Float(value) => {
                     let var = Var::Prim(PrimVar::FloatVar(FloatVar {
                         name: name.to_string(),
                         init: Some(*value as f32),
@@ -59,7 +56,7 @@ impl IRBuilder {
                     }));
                     global_vars.push(var);
                 }
-                Constant::Bool(value) => {
+                middle::ir::Constant::Bool(value) => {
                     let var = Var::Prim(PrimVar::IntVar(IntVar {
                         name: name.to_string(),
                         init: Some(*value as i32),
@@ -67,13 +64,13 @@ impl IRBuilder {
                     }));
                     global_vars.push(var);
                 }
-                Constant::Array(arr) => {
+                middle::ir::Constant::Array(arr) => {
                     match arr.first().with_context(|| context!())? {
                         // 不可能出现: arr 是混合的
-                        Constant::Int(_) => {
+                        middle::ir::Constant::Int(_) => {
                             let mut init = Vec::new();
                             for (index, con) in arr.iter().enumerate() {
-                                if let Constant::Int(value) = con {
+                                if let middle::ir::Constant::Int(value) = con {
                                     init.push((index, *value as i32 as u32)); // FIXME 这里 i32 和 u32 注意
                                 } else {
                                     unreachable!();
@@ -87,10 +84,10 @@ impl IRBuilder {
                             });
                             global_vars.push(arr_var);
                         }
-                        Constant::Float(_) => {
+                        middle::ir::Constant::Float(_) => {
                             let mut init = Vec::new();
                             for (index, con) in arr.iter().enumerate() {
-                                if let Constant::Float(value) = con {
+                                if let middle::ir::Constant::Float(value) = con {
                                     init.push((index, *value as f32));
                                 } else {
                                     unreachable!();
@@ -104,10 +101,10 @@ impl IRBuilder {
                             });
                             global_vars.push(arr_var);
                         }
-                        Constant::Bool(_) => {
+                        middle::ir::Constant::Bool(_) => {
                             let mut init = Vec::new();
                             for (index, con) in arr.iter().enumerate() {
-                                if let Constant::Bool(value) = con {
+                                if let middle::ir::Constant::Bool(value) = con {
                                     init.push((index, *value as i32 as u32)); // FIXME 这里注意一下
                                 } else {
                                     unreachable!();
@@ -131,7 +128,7 @@ impl IRBuilder {
         Ok(global_vars)
     }
 
-    pub fn build_funcs(llvm_funcs: &Vec<FunPtr>) -> Result<Vec<Func>> {
+    pub fn build_funcs(llvm_funcs: &Vec<middle::ir::FunPtr>) -> Result<Vec<Func>> {
         let mut funcs = Vec::new();
         for f in llvm_funcs {
             // dbg!(&f);
@@ -172,7 +169,7 @@ impl IRBuilder {
     }
 
     fn build_other_bbs(
-        f: &ObjPtr<Function>,
+        f: &ObjPtr<middle::ir::Function>,
         stack_allocator: &mut StackAllocator,
         stack_slots: &mut HashMap<Name, StackSlot>,
         reg_gener: &mut RegGenerator,
@@ -187,7 +184,7 @@ impl IRBuilder {
     }
 
     fn build_bb(
-        bb: &ObjPtr<BasicBlock>,
+        bb: &ObjPtr<middle::ir::BasicBlock>,
         stack_allocator: &mut StackAllocator,
         stack_slots: &mut HashMap<Name, StackSlot>,
         reg_gener: &mut RegGenerator,
@@ -214,7 +211,7 @@ impl IRBuilder {
     }
 
     fn build_entry(
-        f: &ObjPtr<Function>,
+        f: &ObjPtr<middle::ir::Function>,
         stack_allocator: &mut StackAllocator,
         stack_slots: &mut HashMap<Name, StackSlot>,
         reg_gener: &mut RegGenerator,

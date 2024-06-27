@@ -2,11 +2,12 @@ use std::collections::HashMap;
 
 use anyhow::{anyhow, Context, Result};
 
-use crate::{
-    backend::{Operand, Reg, StackSlot},
-    context,
-    middle::{self, ir::Constant},
-};
+use crate::backend::{Operand, Reg, StackSlot};
+
+use crate::context;
+
+use crate::middle;
+use crate::middle::ir::Instruction;
 
 use super::*;
 use builder::IRBuilder;
@@ -29,14 +30,11 @@ impl IRBuilder {
             middle::ir::Operand::Constant(_) => todo!(),
             middle::ir::Operand::Global(_) => todo!(),
             middle::ir::Operand::Parameter(_) => todo!(),
-            middle::ir::Operand::Instruction(_) => todo!(),
-            // middle::ir::Operand::LocalOperand { name, ty: _ } => stack_slots
-            //     .get(name)
-            //     .ok_or(anyhow!("stack slot not found {}", name))
-            //     .with_context(|| context!())?
-            //     .into(),
-            // middle::ir::Operand::ConstantOperand(_) => todo!(),
-            // middle::ir::Operand::MetadataOperand => todo!(),
+            middle::ir::Operand::Instruction(instr) => stack_slots
+                .get(&instr.get_id().into())
+                .ok_or(anyhow!("stack slot not found {}", instr.get_id()))
+                .with_context(|| context!())?
+                .into(),
         })
     }
     pub fn local_var_from(
@@ -44,13 +42,13 @@ impl IRBuilder {
         regs: &HashMap<Name, Reg>,
     ) -> Result<Operand> {
         Ok(match operand {
-            // middle::ir::Operand::LocalOperand { name, ty: _ } => {
-            //     let reg = regs
-            //         .get(name)
-            //         .ok_or(anyhow!("local var not found {}", name))
-            //         .with_context(|| context!())?;
-            //     reg.into()
-            // }
+            middle::ir::Operand::Instruction(instr) => {
+                let reg = regs
+                    .get(&instr.get_id().into())
+                    .ok_or(anyhow!("local var not found {}", instr.get_id()))
+                    .with_context(|| context!())?;
+                reg.into()
+            }
             _ => {
                 return Err(anyhow!("operand is not local var:{}", operand))
                     .with_context(|| context!());
@@ -61,8 +59,8 @@ impl IRBuilder {
     pub fn const_from(operand: &middle::ir::Operand) -> Result<Operand> {
         Ok(match operand {
             middle::ir::Operand::Constant(con) => match con {
-                Constant::Int(val) => Operand::Imm((*val as i64).into()),
-                Constant::Float(fla) => Operand::Fmm((*fla as f64).into()),
+                middle::ir::Constant::Int(val) => Operand::Imm((*val as i64).into()),
+                middle::ir::Constant::Float(fla) => Operand::Fmm((*fla as f64).into()),
                 _ => todo!(),
             },
             _ => {
@@ -85,6 +83,7 @@ impl IRBuilder {
     #[allow(unused)]
     #[inline]
     pub fn global_name_from(operand: &middle::ir::Operand) -> Result<Name> {
+        unimplemented!();
         match operand {
             // middle::ir::Operand::LocalOperand { name: _, ty: _ } => {
             //     Err(anyhow!("local operand".to_string())).with_context(|| context!())
@@ -99,14 +98,17 @@ impl IRBuilder {
                 middle::ir::Constant::Array(_) => todo!(),
                 _ => todo!(),
             },
+            middle::ir::Operand::Instruction(instr) => {
+                Err(anyhow!("local operand".to_string())).with_context(|| context!())
+            }
             middle::ir::Operand::Global(_) => todo!(),
             middle::ir::Operand::Parameter(_) => todo!(),
-            middle::ir::Operand::Instruction(_) => todo!(),
         }
     }
 
     #[inline]
     pub fn func_name_from(operand: &middle::ir::Operand) -> Result<String> {
+        unimplemented!();
         /* TODO */
         let name: &str = match operand {
             middle::ir::Operand::Global(_) => {
