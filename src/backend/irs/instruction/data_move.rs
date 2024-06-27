@@ -2,74 +2,62 @@ use super::*;
 
 // 实现一些用于辅助的伪指令
 #[derive(Clone)]
-pub struct StoreInst{
-    dst:Reg,
-    src:StackSlot,
+pub struct StoreInst {
+    dst: StackSlot,
+    src: Reg,
 }
 #[derive(Clone)]
-pub struct LoadInst{
-    dst:StackSlot,
-    src:Reg,
+pub struct LoadInst {
+    dst: Reg,
+    src: StackSlot,
 }
-impl StoreInst{
-    pub fn new(dst:Reg,src:StackSlot)->Self{
-        Self{
-            dst,
-            src,
-        }
+impl StoreInst {
+    pub fn new(dst: StackSlot, src: Reg) -> Self {
+        Self { dst, src }
     }
-    pub fn dst(&self)->&Reg{
+    pub fn dst(&self) -> &StackSlot {
         &self.dst
     }
-    pub fn src(&self)->&StackSlot{
+    pub fn src(&self) -> &Reg {
         &self.src
     }
-    pub fn dst_mut(&mut self)->&mut Reg{
+    pub fn dst_mut(&mut self) -> &mut StackSlot {
         &mut self.dst
     }
-    pub fn src_mut(&mut self)->&mut StackSlot{
+
+    pub fn src_mut(&mut self) -> &mut Reg {
         &mut self.src
     }
-    pub fn gen_asm(&self)->String{
-        format!("store {},{}",self.dst.gen_asm(),self.src.start())
+    pub fn gen_asm(&self) -> String {
+        format!("store {},{}", self.src.gen_asm(), self.dst.gen_asm())
     }
 }
-impl LoadInst{
-    pub fn new(dst:StackSlot,src:Reg)->Self{
-        Self{
-            dst,
-            src,
-        }
+impl LoadInst {
+    pub fn new(dst: Reg, src: StackSlot) -> Self {
+        Self { dst, src }
     }
-    pub fn dst(&self)->&StackSlot{
+    pub fn dst(&self) -> &Reg {
         &self.dst
-    
     }
-    pub fn src(&self)->&Reg{
+    pub fn src(&self) -> &StackSlot {
         &self.src
     }
-    pub fn dst_mut(&mut self)->&mut StackSlot{
+    pub fn dst_mut(&mut self) -> &mut Reg {
         &mut self.dst
-    
     }
-    pub fn src_mut(&mut self)->&mut Reg{
+    pub fn src_mut(&mut self) -> &mut StackSlot {
         &mut self.src
     }
-    pub fn gen_asm(&self)->String{
-        format!("load {},{}",self.dst.start(),self.src.gen_asm())
+    pub fn gen_asm(&self) -> String {
+        format!("load {},{}", self.dst.gen_asm(), self.src.gen_asm())
     }
-
 }
-
-
-
 
 impl_mem_inst!(LdInst, "ld");
 impl_mem_inst!(SdInst, "sd");
 impl_mem_inst!(SwInst, "sw");
 impl_mem_inst!(LwInst, "lw");
 impl_two_op_inst!(LiInst, "li");
-
 
 // la
 #[derive(Clone)]
