@@ -1,5 +1,5 @@
 use core::panic;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::middle::{
     ir::{
@@ -52,15 +52,15 @@ impl PhiPack {
 /// The mem2reg pass
 #[allow(unused)]
 pub fn mem2reg(entry: BBPtr, program: &mut Program) {
-    let mut variable_to_phi_insertion: HashMap<InstPtr, HashSet<BBPtr>> =
+    let mut variable_to_phi_insertion: BTreeMap<InstPtr, BTreeSet<BBPtr>> =
         get_variable_to_phi_insertion(entry);
-    let mut block_to_phi_insertion: HashMap<BBPtr, Vec<PhiPack>> =
+    let mut block_to_phi_insertion: BTreeMap<BBPtr, Vec<PhiPack>> =
         insert_empty_phi(entry, program, variable_to_phi_insertion);
 
     // for each "phi" insert position, decide the value for each argument
     fn decide_variable_value(
         variable: InstPtr,
-        current_variable_value: &[HashMap<InstPtr, PhiArg>],
+        current_variable_value: &[BTreeMap<InstPtr, PhiArg>],
     ) -> (BBPtr, Operand) {
         for frame in current_variable_value.iter().rev() {
             if let Some(value) = frame.get(&variable) {
@@ -74,9 +74,9 @@ pub fn mem2reg(entry: BBPtr, program: &mut Program) {
     // this will also remove "load" and "store" instructions when possible
     fn decide_values_start_from(
         entry: BBPtr,
-        visited: &mut HashSet<BBPtr>,
-        current_variable_value: &mut Vec<HashMap<InstPtr, PhiArg>>,
-        block_to_phi_insertion: &mut HashMap<BBPtr, Vec<PhiPack>>,
+        visited: &mut BTreeSet<BBPtr>,
+        current_variable_value: &mut Vec<BTreeMap<InstPtr, PhiArg>>,
+        block_to_phi_insertion: &mut BTreeMap<BBPtr, Vec<PhiPack>>,
     ) {
         // decide value for each "phi" instruction to add
         for mut phi in block_to_phi_insertion
@@ -147,7 +147,7 @@ pub fn mem2reg(entry: BBPtr, program: &mut Program) {
 
         // visit all successors
         for succ in entry.get_succ_bb() {
-            current_variable_value.push(HashMap::new());
+            current_variable_value.push(BTreeMap::new());
             decide_values_start_from(
                 *succ,
                 visited,
@@ -161,21 +161,21 @@ pub fn mem2reg(entry: BBPtr, program: &mut Program) {
     // start mem2reg pass from the entry block
     decide_values_start_from(
         entry,
-        &mut HashSet::new(),
-        &mut vec![HashMap::new()],
+        &mut BTreeSet::new(),
+        &mut vec![BTreeMap::new()],
         &mut block_to_phi_insertion,
     );
 }
 
 /// Insert empty "phi" for basic blocks starting from `entry`
-/// Returns a mapping from basic block to inserted "phi" instructions
+/// Returns a BTreeMapping from basic block to inserted "phi" instructions
 #[allow(unused)]
 fn insert_empty_phi(
     entry: BBPtr,
     program: &mut Program,
-    phi_insert_positions: HashMap<InstPtr, HashSet<BBPtr>>,
-) -> HashMap<BBPtr, Vec<PhiPack>> {
-    let mut block_to_phi_insertion: HashMap<BBPtr, Vec<PhiPack>> = HashMap::new();
+    phi_insert_positions: BTreeMap<InstPtr, BTreeSet<BBPtr>>,
+) -> BTreeMap<BBPtr, Vec<PhiPack>> {
+    let mut block_to_phi_insertion: BTreeMap<BBPtr, Vec<PhiPack>> = BTreeMap::new();
     for (variable, positions) in phi_insert_positions.into_iter() {
         for mut position in positions.into_iter() {
             block_to_phi_insertion
@@ -189,15 +189,15 @@ fn insert_empty_phi(
 
 /// Get places to insert "phi" instructions for each "alloca" instruction
 #[allow(unused)]
-fn get_variable_to_phi_insertion(entry: BBPtr) -> HashMap<InstPtr, HashSet<BBPtr>> {
-    let mut phi_positions = HashMap::new();
+fn get_variable_to_phi_insertion(entry: BBPtr) -> BTreeMap<InstPtr, BTreeSet<BBPtr>> {
+    let mut phi_positions = BTreeMap::new();
 
     // for each "store", make insert position at the beginning of the dominance frontier
     fn dfs_insertion(
         current_bb: BBPtr,
-        visited: &mut HashSet<BBPtr>,
-        df: &HashMap<BBPtr, HashSet<BBPtr>>,
-        phi_positions: &mut HashMap<InstPtr, HashSet<BBPtr>>,
+        visited: &mut BTreeSet<BBPtr>,
+        df: &BTreeMap<BBPtr, BTreeSet<BBPtr>>,
+        phi_positions: &mut BTreeMap<InstPtr, BTreeSet<BBPtr>>,
     ) {
         if visited.contains(&current_bb) {
             return;
@@ -212,7 +212,7 @@ fn get_variable_to_phi_insertion(entry: BBPtr) -> HashMap<InstPtr, HashSet<BBPtr
                 // only insert "phi" when store destination is a constant pointer
                 if let Operand::Instruction(inst) = store_ptr {
                     if inst.get_type() == InstType::Alloca {
-                        for df_bb in df.get(&current_bb).unwrap_or(&HashSet::new()).iter() {
+                        for df_bb in df.get(&current_bb).unwrap_or(&BTreeSet::new()).iter() {
                             phi_positions.entry(*inst).or_default().insert(*df_bb);
                         }
                     }
@@ -225,7 +225,7 @@ fn get_variable_to_phi_insertion(entry: BBPtr) -> HashMap<InstPtr, HashSet<BBPtr
     }
     dfs_insertion(
         entry,
-        &mut HashSet::new(),
+        &mut BTreeSet::new(),
         &get_dominance_frontiers(entry),
         &mut phi_positions,
     );
@@ -236,9 +236,9 @@ fn get_variable_to_phi_insertion(entry: BBPtr) -> HashMap<InstPtr, HashSet<BBPtr
 
 /// Get dominance frontiers of each basic block in the function
 #[allow(unused)]
-fn get_dominance_frontiers(entry: BBPtr) -> HashMap<BBPtr, HashSet<BBPtr>> {
+fn get_dominance_frontiers(entry: BBPtr) -> BTreeMap<BBPtr, BTreeSet<BBPtr>> {
     let idoms = get_immediate_dominators(entry);
-    let mut df = HashMap::new();
+    let mut df = BTreeMap::new();
 
     // calculate dominance frontiers
     for (bb, idom) in idoms.iter() {
@@ -248,7 +248,7 @@ fn get_dominance_frontiers(entry: BBPtr) -> HashMap<BBPtr, HashSet<BBPtr>> {
         for pred in bb.get_pred_bb() {
             let mut runner = *pred;
             while runner != idoms[bb] {
-                df.entry(runner).or_insert(HashSet::new()).insert(*bb);
+                df.entry(runner).or_insert(BTreeSet::new()).insert(*bb);
                 runner = idoms[&runner];
             }
         }
@@ -260,15 +260,15 @@ fn get_dominance_frontiers(entry: BBPtr) -> HashMap<BBPtr, HashSet<BBPtr>> {
 
 /// Get immediate dominators of each basic block in the function
 #[allow(unused)]
-fn get_immediate_dominators(entry: BBPtr) -> HashMap<BBPtr, BBPtr> {
-    let mut idoms = HashMap::new();
+fn get_immediate_dominators(entry: BBPtr) -> BTreeMap<BBPtr, BBPtr> {
+    let mut idoms = BTreeMap::new();
     idoms.insert(entry, entry);
 
     // calculate postorder with dfs
     fn dfs_postorder(
         current_bb: BBPtr,
-        visited: &mut HashSet<BBPtr>,
-        postorder_map: &mut HashMap<BBPtr, i32>,
+        visited: &mut BTreeSet<BBPtr>,
+        postorder_map: &mut BTreeMap<BBPtr, i32>,
         postorder_array: &mut Vec<BBPtr>,
     ) {
         if visited.contains(&current_bb) {
@@ -281,11 +281,11 @@ fn get_immediate_dominators(entry: BBPtr) -> HashMap<BBPtr, BBPtr> {
         postorder_map.insert(current_bb, postorder_map.len() as i32);
         postorder_array.push(current_bb);
     }
-    let mut postorder_map = HashMap::new();
+    let mut postorder_map = BTreeMap::new();
     let mut postorder_array = Vec::new();
     dfs_postorder(
         entry,
-        &mut HashSet::new(),
+        &mut BTreeSet::new(),
         &mut postorder_map,
         &mut postorder_array,
     );
@@ -294,8 +294,8 @@ fn get_immediate_dominators(entry: BBPtr) -> HashMap<BBPtr, BBPtr> {
     fn intersect(
         mut n: BBPtr,
         mut m: BBPtr,
-        postorder_map: &HashMap<BBPtr, i32>,
-        idoms: &HashMap<BBPtr, BBPtr>,
+        postorder_map: &BTreeMap<BBPtr, i32>,
+        idoms: &BTreeMap<BBPtr, BBPtr>,
     ) -> BBPtr {
         while n != m {
             while postorder_map[&n] < postorder_map[&m] {
@@ -617,16 +617,16 @@ pub mod tests_mem2reg {
             br label %cond0
             
             %cond0:
-            %phi_38 = phi i32 [0, %entry], [%phi_37, %cond7]
-            %icmp_33 = icmp slt i32 %phi_38, 10
+            %phi_37 = phi i32 [0, %entry], [%phi_38, %cond7]
+            %icmp_33 = icmp slt i32 %phi_37, 10
             br i1 %icmp_33, label %body1, label %final2
             
             %body1:
-            %Add_8 = add i32, %phi_38, 2
+            %Add_8 = add i32, %phi_37, 2
             br label %cond3
             
             %final2:
-            ret %phi_38
+            ret %phi_37
             
             %cond3:
             %icmp_16 = icmp sgt i32 %Add_8, 5
@@ -639,15 +639,15 @@ pub mod tests_mem2reg {
             br label %final6
             
             %cond7:
-            %phi_37 = phi i32 [%Add_8, %body1], [%Add_23, %body8]
-            %icmp_27 = icmp slt i32 %phi_37, 8
+            %phi_38 = phi i32 [%Add_8, %body1], [%Add_23, %body8]
+            %icmp_27 = icmp slt i32 %phi_38, 8
             br i1 %icmp_27, label %body8, label %final9
             
             %final6:
             br label %cond0
             
             %body8:
-            %Add_23 = add i32, %phi_37, 1
+            %Add_23 = add i32, %phi_38, 1
             br label %cond7
             
             %final9:

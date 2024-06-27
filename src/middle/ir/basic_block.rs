@@ -178,6 +178,26 @@ impl Extend<InstPtr> for BasicBlock {
     }
 }
 
+impl PartialEq for BasicBlock {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+
+impl PartialOrd for BasicBlock {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Eq for BasicBlock {}
+
+impl Ord for BasicBlock {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.name.cmp(&other.name)
+    }
+}
+
 pub struct BasicBlockIterator {
     cur: InstPtr,
     next: Option<InstPtr>,
