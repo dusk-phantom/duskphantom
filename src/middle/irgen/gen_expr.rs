@@ -5,6 +5,8 @@ use crate::middle::irgen::function_kit::FunctionKit;
 use crate::middle::irgen::value::Value;
 use anyhow::{anyhow, Context};
 
+use super::library_function::get_library_return_type;
+
 impl<'a> FunctionKit<'a> {
     /// Generate an expression as a statement into the program
     pub fn gen_expr(&mut self, expr: &Expr) -> anyhow::Result<Value> {
@@ -53,12 +55,21 @@ impl<'a> FunctionKit<'a> {
                 let Expr::Var(func) = *func.clone() else {
                     return Err(anyhow!("function is not variable")).with_context(|| context!());
                 };
-                let Some(fun) = self.fun_env.get(&func) else {
-                    return Err(anyhow!("function not defined")).with_context(|| context!());
+                let fun = match self.fun_env.get(&func) {
+                    Some(fun) => *fun,
+                    None => match get_library_return_type(&func) {
+                        Some(return_type) => {
+                            // Allocate the library function
+                            self.program.mem_pool.new_function(func, return_type)
+                        }
+                        None => {
+                            return Err(anyhow!("function not defined")).with_context(|| context!())
+                        }
+                    },
                 };
 
                 // Call the function
-                let inst = self.program.mem_pool.get_call(*fun, operands);
+                let inst = self.program.mem_pool.get_call(fun, operands);
                 exit.push_back(inst);
                 Ok(Value::Operand(inst.into()))
             }
