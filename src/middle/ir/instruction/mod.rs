@@ -327,6 +327,26 @@ pub trait Instruction: Display {
     fn gen_llvm_ir(&self) -> String;
 }
 
+impl PartialEq for dyn Instruction {
+    fn eq(&self, other: &Self) -> bool {
+        self.get_id() == other.get_id()
+    }
+}
+
+impl Eq for dyn Instruction {}
+
+impl PartialOrd for dyn Instruction {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.get_id().cmp(&other.get_id()))
+    }
+}
+
+impl Ord for dyn Instruction {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.get_id().cmp(&other.get_id())
+    }
+}
+
 /// Downcasts a `dyn instruction` to a `&T`, where `T` is a concrete `Instruction` type.
 ///
 /// # Example

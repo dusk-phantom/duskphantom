@@ -52,6 +52,26 @@ impl<T> PartialEq for ObjPtr<T> {
 
 impl<T> Eq for ObjPtr<T> {}
 
+/// Deterministic ordering for ObjPtr.
+/// Comparing by pointer address is non-deterministic, so we compare by the object itself.
+impl<T> PartialOrd for ObjPtr<T>
+where
+    T: PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.as_ref().partial_cmp(other.as_ref())
+    }
+}
+
+impl<T> Ord for ObjPtr<T>
+where
+    T: Ord,
+{
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.as_ref().cmp(other.as_ref())
+    }
+}
+
 impl<T> Hash for ObjPtr<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         std::ptr::hash(self.as_ref(), state)
