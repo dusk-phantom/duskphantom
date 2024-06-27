@@ -87,11 +87,11 @@ impl IRBuilder {
     ) -> Result<Vec<Inst>> {
         let name = alloca.dest.clone();
         let ty = alloca.allocated_type.clone();
-        let bits = match ty.as_ref() {
-            llvm_ir::Type::IntegerType { bits } => *bits,
+        let num_byte = match ty.as_ref() {
+            llvm_ir::Type::IntegerType { bits } => Self::count_num_byte(*bits as usize)?,
             _ => todo!(),
         };
-        let ss = stack_allocator.alloc(bits as usize);
+        let ss = stack_allocator.alloc(num_byte as usize);
         stack_slots.insert(name.clone(), ss);
         Ok(vec![])
     }

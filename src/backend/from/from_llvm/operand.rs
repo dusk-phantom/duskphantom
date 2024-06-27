@@ -6,6 +6,16 @@ use builder::IRBuilder;
 use llvm_ir::{Constant, Name};
 
 impl IRBuilder {
+    pub fn count_num_byte(bits: usize) -> Result<usize> {
+        if bits % 8 == 0 {
+            Ok(bits / 8)
+        } else if bits % 4 == 0 {
+            Ok(bits / 8 + 1)
+        } else {
+            Err(anyhow!("invalid bits: {}", bits)).with_context(|| context!())
+        }
+    }
+
     pub fn is_ty_int(ty: &llvm_ir::Type) -> bool {
         matches!(ty, llvm_ir::Type::IntegerType { bits: _ })
     }
