@@ -1,6 +1,6 @@
 /// StackSlot: represents a stack slot, which is a contiguous memory region on the stack.
 
-#[derive(Debug, Clone,Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct StackSlot {
     start: usize,
     size: usize,
@@ -36,14 +36,16 @@ impl StackAllocator {
     pub fn new() -> StackAllocator {
         StackAllocator { alloc_from: 0 }
     }
-    pub fn alloc(&mut self, size: usize) -> StackSlot {
+    // alloc num byte size memory
+    pub fn alloc(&mut self, num_byte: usize) -> StackSlot {
         let ret = StackSlot {
             start: self.alloc_from,
-            size,
+            size: num_byte,
         };
-        self.alloc_from += size;
+        self.alloc_from += num_byte;
         ret
     }
+    // return how many byte had been allocated
     pub fn allocated(&self) -> usize {
         self.alloc_from
     }
