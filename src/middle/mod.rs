@@ -15,7 +15,10 @@ pub struct Program {
 }
 
 pub fn gen(program: &frontend::Program) -> Result<Program, MiddleError> {
-    irgen::gen(program)
+    match irgen::gen(program) {
+        Ok(program) => Ok(program),
+        Err(_) => Err(MiddleError::GenError),
+    }
 }
 
 pub fn optimize(_program: &mut Program) {
