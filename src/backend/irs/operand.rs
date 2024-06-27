@@ -3,7 +3,7 @@ use std::ops::Deref;
 
 use super::{BackendError, StackSlot};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Operand {
     Reg(Reg),
     Imm(Imm),
@@ -11,7 +11,7 @@ pub enum Operand {
     StackSlot(StackSlot),
     Label(Label),
 }
-#[derive(Clone,Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Reg {
     id: u32,
     is_usual: bool,
@@ -27,11 +27,11 @@ impl Reg {
         self.is_usual
     }
 }
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Imm(i64);
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Fmm(f64);
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Label(String);
 
 // impl from for Operand
@@ -80,7 +80,7 @@ impl From<&str> for Operand {
         Self::Label(Label(val.to_string()))
     }
 }
-impl From<String> for Operand{
+impl From<String> for Operand {
     fn from(value: String) -> Self {
         Self::Label(Label(value))
     }
@@ -196,8 +196,7 @@ pub const REG_FT9: Reg = Reg::new(29, false);
 pub const REG_FT10: Reg = Reg::new(30, false);
 pub const REG_FT11: Reg = Reg::new(31, false);
 
-
-pub struct RegGenerator{
+pub struct RegGenerator {
     usual_counter: ParalCounter,
     float_counter: ParalCounter,
 }
@@ -209,7 +208,7 @@ impl Default for RegGenerator {
         }
     }
 }
-impl RegGenerator{
+impl RegGenerator {
     pub fn new() -> Self {
         Self::default()
     }
@@ -222,7 +221,6 @@ impl RegGenerator{
         Reg::new(id as u32, false)
     }
 }
-
 
 impl Reg {
     #[inline]
@@ -332,7 +330,6 @@ impl Reg {
     pub fn is_virtual(&self) -> bool {
         !self.is_phisic()
     }
-    
 }
 impl Imm {
     pub fn gen_asm(&self) -> String {
@@ -433,7 +430,6 @@ impl TryInto<StackSlot> for Operand {
     }
 }
 
-
 impl TryInto<Label> for Operand {
     type Error = BackendError;
     fn try_into(self) -> Result<Label, Self::Error> {
@@ -446,36 +442,38 @@ impl TryInto<Label> for Operand {
     }
 }
 
-impl From<&Reg> for Operand{
+impl From<&Reg> for Operand {
     fn from(value: &Reg) -> Self {
         Operand::Reg(*value)
     }
 }
-impl From<&StackSlot> for Operand{
+impl From<&StackSlot> for Operand {
     fn from(value: &StackSlot) -> Self {
         Operand::StackSlot(*value)
     }
 }
 
-
 /// 单元测试
 #[cfg(test)]
 pub mod tests {
-    use std::{collections::HashSet, sync::{Arc, Mutex}};
+    use std::{
+        collections::HashSet,
+        sync::{Arc, Mutex},
+    };
 
     use super::*;
 
     #[test]
     fn test_gen_reg() {
-        let mut regs:HashSet<Reg> = HashSet::new();
-        let reg_gener=RegGenerator::new();
-        let reg_gener=Arc::new(Mutex::new(reg_gener));
+        let mut regs: HashSet<Reg> = HashSet::new();
+        let reg_gener = RegGenerator::new();
+        let reg_gener = Arc::new(Mutex::new(reg_gener));
         let mut handlers = vec![];
         for _ in 0..10 {
             let reg_gener = Arc::clone(&reg_gener);
             let handler = std::thread::spawn(move || {
                 let mut regs = HashSet::new();
-                let mut reg_gener=reg_gener.lock().unwrap();
+                let mut reg_gener = reg_gener.lock().unwrap();
                 for _ in 0..1000 {
                     let reg = reg_gener.gen_virtual_usual_reg();
                     regs.insert(reg);

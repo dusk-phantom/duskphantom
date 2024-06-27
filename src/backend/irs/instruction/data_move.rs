@@ -1,12 +1,12 @@
 use super::*;
 
 // 实现一些用于辅助的伪指令
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct StoreInst {
     dst: StackSlot,
     src: Reg,
 }
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct LoadInst {
     dst: Reg,
     src: StackSlot,
@@ -60,7 +60,7 @@ impl_mem_inst!(LwInst, "lw");
 impl_two_op_inst!(LiInst, "li");
 
 // la
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct LaInst(Reg, Label);
 impl LaInst {
     pub fn new(dst: Reg, label: Label) -> Self {
