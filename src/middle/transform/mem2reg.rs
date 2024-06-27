@@ -146,15 +146,22 @@ pub fn mem2reg(entry: BBPtr, program: &mut Program) {
         }
 
         // visit all successors
-        for succ in entry.get_succ_bb() {
-            current_variable_value.push(BTreeMap::new());
+        let successors = entry.get_succ_bb();
+        let need_new_frame = successors.len() > 1;
+        for succ in successors {
+            // only add new frame if there is more than one successors
+            if need_new_frame {
+                current_variable_value.push(BTreeMap::new());
+            }
             decide_values_start_from(
                 *succ,
                 visited,
                 current_variable_value,
                 block_to_phi_insertion,
             );
-            current_variable_value.pop();
+            if need_new_frame {
+                current_variable_value.pop();
+            }
         }
     }
 
