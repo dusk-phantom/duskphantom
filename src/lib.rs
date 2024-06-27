@@ -35,7 +35,7 @@ pub fn compile(
     let mut program = backend::gen(&program)?;
     if opt_flag {
         backend::optimize(&mut program);
-    }else{
+    } else {
         backend::phisicalize(&mut program);
     }
     // check valid
@@ -44,7 +44,7 @@ pub fn compile(
             for func in module.funcs.iter() {
                 for bb in func.iter_bbs() {
                     for inst in bb.insts() {
-                        if ! inst.check_valid() {
+                        if !inst.check_valid() {
                             panic!("invalid inst: {:?}", &inst.gen_asm());
                         }
                     }
@@ -52,7 +52,6 @@ pub fn compile(
             }
         }
     }
-
 
     let asm = program.gen_asm();
     let output = if !asm_flag { asm2bin(asm) } else { asm };
@@ -77,19 +76,20 @@ pub fn compile_clang(
     if let Some(ll_path) = ll_path {
         std::fs::write(ll_path, program.gen_ll()).map_err(CompilerError::IOError)?;
     }
-    let mut program = backend::gen_from_clang(&program).map_err(|e|BackendError::GenFromLlvmError(format!("{e:?}")))?;
+    let mut program = backend::gen_from_clang(&program)
+        .map_err(|e| BackendError::GenFromLlvmError(format!("{e:?}")))?;
     if opt_flag {
         backend::optimize(&mut program);
     } else {
         backend::phisicalize(&mut program);
     }
-     // check valid
+    // check valid
     {
         for module in program.modules.iter() {
             for func in module.funcs.iter() {
                 for bb in func.iter_bbs() {
                     for inst in bb.insts() {
-                        if ! inst.check_valid() {
+                        if !inst.check_valid() {
                             panic!("invalid inst: {:?}", &inst.gen_asm());
                         }
                     }
@@ -149,7 +149,7 @@ pub fn compile_self_llc(
     let tmp_cfile = builder.suffix(".c").tempfile().unwrap();
     let tmp_llvm_file = builder.suffix(".ll").tempfile().unwrap();
     fs::write(&tmp_llvm_file, llvm_ir.as_bytes())?;
-    let llvm=llvm_ir::Module::from_ir_path(&tmp_llvm_file).expect("llvm ir file not found");
+    let llvm = llvm_ir::Module::from_ir_path(&tmp_llvm_file).expect("llvm ir file not found");
     let program = clang_frontend::Program {
         tmp_cfile,
         tmp_llvm_file,
