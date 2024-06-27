@@ -7,11 +7,11 @@ use crate::middle::{
     self,
     ir::{Constant, FunPtr, GlobalPtr},
 };
-use crate::utils::mem::{ObjPool, ObjPtr};
+use crate::utils::mem::ObjPtr;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use llvm_ir::Name;
-use var::{ArrVar, Var};
+use var::{ArrVar, FloatVar, IntVar, PrimVar, Var};
 
 pub struct IRBuilder;
 
@@ -40,52 +40,52 @@ impl IRBuilder {
 
         for global_var in llvm_global_vars {
             // dbg!(&global_var);
-            let name = &global_var.name.to_string()[1..]; // FIXME 是不是这样 ？ 有待验证
-            if let c = &global_var.initializer {
-                match c {
-                    Constant::Int(value) => {
-                        let var = var::Var::Prim(var::PrimVar::IntVar(var::IntVar {
-                            name: name.to_string(),
-                            init: Some(*value as i32),
-                            is_const: false,
-                        }));
-                        global_vars.push(var);
-                    }
-                    Constant::Float(value) => {
-                        let var = var::Var::Prim(var::PrimVar::FloatVar(var::FloatVar {
-                            name: name.to_string(),
-                            init: Some(*value as f32),
-                            is_const: false,
-                        }));
-                        global_vars.push(var);
-                    }
-                    Constant::Bool(value) => {
-                        let var = var::Var::Prim(var::PrimVar::IntVar(var::IntVar {
-                            name: name.to_string(),
-                            init: Some(*value as i32),
-                            is_const: false,
-                        }));
-                        global_vars.push(var);
-                    }
-                    Constant::Array(arr) => {
-                        match arr.first().unwrap() /* FIXME unwrap */ {
+            let name = &global_var.name.to_string(); // 这里的 name 是不带 @ 的
+            dbg!(&name);
+            match &global_var.initializer {
+                Constant::Int(value) => {
+                    let var = Var::Prim(PrimVar::IntVar(IntVar {
+                        name: name.to_string(),
+                        init: Some(*value as i32),
+                        is_const: false, // TODO
+                    }));
+                    global_vars.push(var);
+                }
+                Constant::Float(value) => {
+                    let var = Var::Prim(PrimVar::FloatVar(FloatVar {
+                        name: name.to_string(),
+                        init: Some(*value as f32),
+                        is_const: false,
+                    }));
+                    global_vars.push(var);
+                }
+                Constant::Bool(value) => {
+                    let var = Var::Prim(PrimVar::IntVar(IntVar {
+                        name: name.to_string(),
+                        init: Some(*value as i32),
+                        is_const: false,
+                    }));
+                    global_vars.push(var);
+                }
+                Constant::Array(arr) => {
+                    match arr.first().with_context(|| context!())? {
+                        // 不可能出现: arr 是混合的
                         Constant::Int(_) => {
                             let mut init = Vec::new();
                             for (index, con) in arr.iter().enumerate() {
                                 if let Constant::Int(value) = con {
-                                    init.push((index, *value as i32));
+                                    init.push((index, *value as i32 as u32)); // FIXME 这里 i32 和 u32 注意
                                 } else {
                                     unreachable!();
                                 }
                             }
-                            unimplemented!();
-                            // let arr_var = var::Var::IntArr(ArrVar::<i32> {
-                            //     name: name.to_string(),
-                            //     capacity: arr.len(),
-                            //     init,
-                            //     is_const: false /* TODO */,
-                            // });
-                            // global_vars.push(arr_var);
+                            let arr_var = Var::IntArr(ArrVar::<u32> {
+                                name: name.to_string(),
+                                capacity: arr.len(),
+                                init,
+                                is_const: false,
+                            });
+                            global_vars.push(arr_var);
                         }
                         Constant::Float(_) => {
                             let mut init = Vec::new();
@@ -96,11 +96,11 @@ impl IRBuilder {
                                     unreachable!();
                                 }
                             }
-                            let arr_var = var::Var::FloatArr(ArrVar::<f32> {
+                            let arr_var = Var::FloatArr(ArrVar::<f32> {
                                 name: name.to_string(),
                                 capacity: arr.len(),
                                 init,
-                                is_const: false /* TODO */,
+                                is_const: false, /* TODO */
                             });
                             global_vars.push(arr_var);
                         }
@@ -108,24 +108,22 @@ impl IRBuilder {
                             let mut init = Vec::new();
                             for (index, con) in arr.iter().enumerate() {
                                 if let Constant::Bool(value) = con {
-                                    init.push((index, *value as i32));
+                                    init.push((index, *value as i32 as u32)); // FIXME 这里注意一下
                                 } else {
                                     unreachable!();
                                 }
                             }
-                            unimplemented!();
-                            // let arr_var = var::Var::IntArr(ArrVar::<i32> {
-                            //     name: name.to_string(),
-                            //     capacity: arr.len(),
-                            //     init,
-                            //     is_const: false /* TODO */,
-                            // });
-                            // global_vars.push(arr_var);
+                            let arr_var = Var::IntArr(ArrVar::<u32> {
+                                name: name.to_string(),
+                                capacity: arr.len(),
+                                init,
+                                is_const: false,
+                            });
+                            global_vars.push(arr_var);
                         }
                         _ => {
-                            /* FIXME */ unreachable!();
+                            unreachable!();
                         }
-                    }
                     }
                 }
             }
@@ -223,31 +221,34 @@ impl IRBuilder {
         regs: &mut HashMap<Name, Reg>,
     ) -> Result<Block> {
         // let bb = f.basic_blocks.first().expect("func must have entry");
+        let bb = f.entry.with_context(|| context!())?;
+        let mut insts: Vec<Inst> = Vec::new();
         // let mut insts = Vec::new();
-        // for (i, param) in f.parameters.iter().enumerate() {
-        //     if i <= 7 {
-        //         let reg = if IRBuilder::is_ty_int(&param.ty) {
-        //             Reg::new(REG_A0.id() + i as u32, true)
-        //         } else if IRBuilder::is_ty_float(&param.ty) {
-        //             Reg::new(REG_FA0.id() + i as u32, true)
-        //         } else {
-        //             unimplemented!();
-        //         };
-        //         regs.insert(param.name.clone(), reg);
-        //     } else {
-        //         unimplemented!();
-        //     }
-        // }
-        // for inst in &bb.instrs {
-        //     let gen_insts =
-        //         Self::build_instruction(inst, stack_allocator, stack_slots, reg_gener, regs)
-        //             .with_context(|| context!())?;
-        //     insts.extend(gen_insts);
-        // }
-        // insts.extend(Self::build_term_inst(&bb.term, regs)?);
+        for (i, param) in f.params.iter().enumerate() {
+            if i <= 7 {
+                let reg = if IRBuilder::is_ty_int(&param.value_type) {
+                    Reg::new(REG_A0.id() + i as u32, true)
+                } else if IRBuilder::is_ty_float(&param.value_type) {
+                    Reg::new(REG_FA0.id() + i as u32, true)
+                } else {
+                    // TODO 还有 Array 之类的
+                    unimplemented!();
+                };
+                regs.insert(param.name.clone().into(), reg);
+            } else {
+                unimplemented!();
+            }
+        }
+
+        for inst in bb.iter() {
+            let gen_insts =
+                Self::build_instruction(&inst, stack_allocator, stack_slots, reg_gener, regs)
+                    .with_context(|| context!())?;
+            insts.extend(gen_insts);
+        }
+        insts.extend(Self::build_term_inst(&bb.get_last_inst(), regs)?);
         let mut entry = Block::new("entry".to_string());
-        // entry.extend_insts(insts);
-        todo!();
+        entry.extend_insts(insts);
         Ok(entry)
     }
 }

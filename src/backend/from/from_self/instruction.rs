@@ -1,5 +1,6 @@
 use crate::backend::*;
 use crate::middle::ir::instruction::memory_op_inst::{Alloca, Store};
+use crate::middle::ir::instruction::terminator_inst::{Br, Ret};
 use crate::middle::ir::instruction::{downcast_ref, InstType};
 use crate::middle::ir::{Instruction, ValueType};
 use crate::utils::mem::ObjPtr;
@@ -183,46 +184,53 @@ impl IRBuilder {
     }
 
     pub fn build_term_inst(
-        term: &middle::ir::instruction::terminator_inst::Ret,
+        term: &ObjPtr<Box<dyn Instruction>>,
         regs: &mut HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
         let mut ret_insts: Vec<Inst> = Vec::new();
         // dbg!(term);
 
-        // match term {
-        //     llvm_ir::Terminator::Ret(r) => {
-        //         if let Some(op) = &r.return_operand {
-        //             match op {
-        //                 llvm_ir::Operand::LocalOperand { name, ty } => {
-        //                     let reg = regs.get(name).ok_or(anyhow!("").context(context!()))?;
-        //                     let mv_inst = match ty.as_ref() {
-        //                         llvm_ir::Type::IntegerType { bits: _ } => {
-        //                             MvInst::new(REG_A0.into(), reg.into())
-        //                         }
-        //                         llvm_ir::Type::FPType(_) => MvInst::new(REG_FA0.into(), reg.into()),
-        //                         _ => unimplemented!(),
-        //                     };
-        //                     ret_insts.push(mv_inst.into());
-        //                     ret_insts.push(Inst::Ret);
-        //                 }
-        //                 llvm_ir::Operand::ConstantOperand(c) => match c.as_ref() {
-        //                     Constant::Int { bits: _, value } => {
-        //                         let imm = (*value as i64).into();
-        //                         let addi = AddInst::new(REG_A0.into(), REG_ZERO.into(), imm);
-        //                         ret_insts.push(addi.into());
-        //                         ret_insts.push(Inst::Ret);
-        //                     }
-        //                     Constant::Float(_) => todo!(),
-        //                     _ => todo!(),
-        //                 },
-        //                 llvm_ir::Operand::MetadataOperand => todo!(),
-        //             }
-        //         } else {
-        //             unimplemented!();
-        //         }
-        //     }
-        //     _ => todo!(),
-        // }
+        match term.get_type() {
+            InstType::Ret => {
+                let ret = downcast_ref::<Ret>(term.as_ref().as_ref());
+                if !ret.is_void() {
+                    let op = ret.get_return_value();
+                    match op {
+                        middle::ir::Operand::Constant(c) => match c {
+                            middle::ir::Constant::Int(value) => {
+                                let imm = (*value as i64).into();
+                                let addi = AddInst::new(REG_A0.into(), REG_ZERO.into(), imm);
+                                ret_insts.push(addi.into());
+                                ret_insts.push(Inst::Ret);
+                            }
+                            middle::ir::Constant::Float(_) => todo!(),
+                            middle::ir::Constant::Bool(_) => todo!(),
+                            middle::ir::Constant::Array(_) => todo!(),
+                        },
+                        middle::ir::Operand::Instruction(instr) => {
+                            let name: Name = instr.get_id().into();
+                            let reg = regs.get(&name).ok_or(anyhow!("").context(context!()))?;
+                            let mv_inst = match instr.get_type() {
+                                _ => unreachable!(),
+                            };
+                        }
+                        _ => unreachable!(),
+                    }
+                } else {
+                    unimplemented!();
+                }
+            }
+            InstType::Br => {
+                // let br = downcast_ref::<Br>(term.as_ref().as_ref());
+                // let target = br.get_target();
+                // let jmp = JmpInst::new(target.into());
+                // ret_insts.push(jmp.into());
+            }
+            _ => {
+                unreachable!();
+            }
+        }
+
         Ok(ret_insts)
     }
 
