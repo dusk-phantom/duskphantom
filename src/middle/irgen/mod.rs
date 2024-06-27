@@ -15,6 +15,7 @@ mod gen_impl;
 mod gen_inner_decl;
 mod gen_stmt;
 mod gen_unary;
+mod library_function;
 mod program_kit;
 mod value;
 mod value_type;
@@ -499,11 +500,29 @@ mod tests {
                 return x;
             }
         "#;
+        let expected = r#"@x = dso_local global i32 4
+        @y = dso_local global i32 8
+        define i32 @main() {
+        %entry:
+        %load_1 = load i32, ptr @x
+        %load_2 = load i32, ptr @y
+        %Add_3 = add i32, %load_1, %load_2
+        store i32 %Add_3, ptr @x
+        %load_5 = load i32, ptr @x
+        ret %load_5
+        
+        
+        }
+        "#
+        .split('\n')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>()
+        .join("\n");
         let program = parse(code).unwrap();
         assert_eq!(format!("{:?}", program), "Program { module: [Var(Int32, \"x\", Some(Int32(4))), Var(Int32, \"y\", Some(Int32(8))), Func(Function(Int32, []), \"main\", Some(Block([Expr(Some(Var(\"x\")), Binary(Add, Var(\"x\"), Var(\"y\"))), Return(Some(Var(\"x\")))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
-        assert_eq!(llvm_ir, "@x = dso_local global i32 4\n@y = dso_local global i32 8\ndefine i32 @main() {\n%entry:\n%load_1 = load i32, ptr @x\n%load_2 = load i32, ptr @y\n%Add_3 = add i32, %load_1, %load_2\nstore i32 %Add_3, ptr @x\n%load_5 = load i32, ptr @x\nret %load_5\n\n\n}\n");
+        assert_eq!(llvm_ir, expected);
     }
 
     #[test]
@@ -516,11 +535,34 @@ mod tests {
                 return z;
             }
         "#;
+        let expected = r#"define i32 @main() {
+            %entry:
+            %alloca_1 = alloca i32
+            store i32 1, ptr %alloca_1
+            %alloca_3 = alloca float
+            store float 2, ptr %alloca_3
+            %alloca_5 = alloca float
+            %load_6 = load i32, ptr %alloca_1
+            %itofp_7 = sitofp i32 %load_6 to float
+            %load_8 = load float, ptr %alloca_3
+            %FAdd_9 = fadd float, %itofp_7, %load_8
+            store float %FAdd_9, ptr %alloca_5
+            %load_11 = load float, ptr %alloca_5
+            %fptoi_12 = fptosi float %load_11 to i32
+            ret %fptoi_12
+            
+            
+            }
+            "#
+        .split('\n')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>()
+        .join("\n");
         let program = parse(code).unwrap();
         assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Int32, \"x\", Some(Int32(1)))), Decl(Var(Float32, \"y\", Some(Float32(2.0)))), Decl(Var(Float32, \"z\", Some(Binary(Add, Var(\"x\"), Var(\"y\"))))), Return(Some(Var(\"z\")))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
-        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 1, ptr %alloca_1\n%alloca_3 = alloca float\nstore float 2, ptr %alloca_3\n%alloca_5 = alloca float\n%load_6 = load i32, ptr %alloca_1\n%itofp_7 = sitofp i32 %load_6 to float\n%load_8 = load float, ptr %alloca_3\n%FAdd_9 = fadd float, %itofp_7, %load_8\nstore float %FAdd_9, ptr %alloca_5\n%load_11 = load float, ptr %alloca_5\n%fptoi_12 = fptosi float %load_11 to i32\nret %fptoi_12\n\n\n}\n");
+        assert_eq!(llvm_ir, expected);
     }
 
     #[test]
@@ -530,11 +572,27 @@ mod tests {
                 return (3 > 1) + (4 > 2);
             }
         "#;
+        let expected = r#"define i32 @main() {
+            %entry:
+            %icmp_1 = icmp sgt i32 3, 1
+            %icmp_2 = icmp sgt i32 4, 2
+            %zext_3 = zext i1 %icmp_1 to i32
+            %zext_4 = zext i1 %icmp_2 to i32
+            %Add_5 = add i32, %zext_3, %zext_4
+            ret %Add_5
+            
+            
+            }
+            "#
+        .split('\n')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>()
+        .join("\n");
         let program = parse(code).unwrap();
         assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Return(Some(Binary(Add, Binary(Gt, Int32(3), Int32(1)), Binary(Gt, Int32(4), Int32(2)))))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
-        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%icmp_1 = icmp sgt i32 3, 1\n%icmp_2 = icmp sgt i32 4, 2\n%zext_3 = zext i1 %icmp_1 to i32\n%zext_4 = zext i1 %icmp_2 to i32\n%Add_5 = add i32, %zext_3, %zext_4\nret %Add_5\n\n\n}\n");
+        assert_eq!(llvm_ir, expected);
     }
 
     #[test]
@@ -544,11 +602,25 @@ mod tests {
                 return arg;
             }
         "#;
+        let expected = r#"define i32 @main(i32 arg) {
+            %entry:
+            %alloca_1 = alloca i32
+            store i32 %arg, ptr %alloca_1
+            %load_3 = load i32, ptr %alloca_1
+            ret %load_3
+            
+            
+            }
+            "#
+        .split('\n')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>()
+        .join("\n");
         let program = parse(code).unwrap();
         assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, [TypedIdent { ty: Int32, id: Some(\"arg\") }]), \"main\", Some(Block([Return(Some(Var(\"arg\")))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
-        assert_eq!(llvm_ir, "define i32 @main(i32 arg) {\n%entry:\n%alloca_1 = alloca i32\nstore i32 %arg, ptr %alloca_1\n%load_3 = load i32, ptr %alloca_1\nret %load_3\n\n\n}\n");
+        assert_eq!(llvm_ir, expected);
     }
 
     #[test]
@@ -562,11 +634,34 @@ mod tests {
                 return x + 1;
             }
         "#;
+        let expected = r#"define i32 @main() {
+            %entry:
+            %fptoi_1 = fptosi float 1.7 to i32
+            %call_2 = call i32 @f(i32 %fptoi_1)
+            ret %call_2
+            
+            
+            }
+            define i32 @f(i32 x) {
+            %entry:
+            %alloca_5 = alloca i32
+            store i32 %x, ptr %alloca_5
+            %load_7 = load i32, ptr %alloca_5
+            %Add_8 = add i32, %load_7, 1
+            ret %Add_8
+            
+            
+            }
+            "#
+        .split('\n')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>()
+        .join("\n");
         let program = parse(code).unwrap();
         assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Return(Some(Call(Var(\"f\"), [Float32(1.7)])))]))), Func(Function(Int32, [TypedIdent { ty: Int32, id: Some(\"x\") }]), \"f\", Some(Block([Return(Some(Binary(Add, Var(\"x\"), Int32(1))))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
-        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%fptoi_1 = fptosi float 1.7 to i32\n%call_2 = call i32 @f(i32 %fptoi_1)\nret %call_2\n\n\n}\ndefine i32 @f(i32 x) {\n%entry:\n%alloca_5 = alloca i32\nstore i32 %x, ptr %alloca_5\n%load_7 = load i32, ptr %alloca_5\n%Add_8 = add i32, %load_7, 1\nret %Add_8\n\n\n}\n");
+        assert_eq!(llvm_ir, expected);
     }
 
     #[test]
@@ -580,11 +675,34 @@ mod tests {
                 return x + 1;
             }
         "#;
+        let expected = r#"define i32 @main() {
+            %entry:
+            %call_1 = call i32 @f(i32 1)
+            %call_2 = call i32 @f(i32 %call_1)
+            ret %call_2
+            
+            
+            }
+            define i32 @f(i32 x) {
+            %entry:
+            %alloca_5 = alloca i32
+            store i32 %x, ptr %alloca_5
+            %load_7 = load i32, ptr %alloca_5
+            %Add_8 = add i32, %load_7, 1
+            ret %Add_8
+            
+            
+            }
+            "#
+        .split('\n')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>()
+        .join("\n");
         let program = parse(code).unwrap();
         assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Return(Some(Call(Var(\"f\"), [Call(Var(\"f\"), [Int32(1)])])))]))), Func(Function(Int32, [TypedIdent { ty: Int32, id: Some(\"x\") }]), \"f\", Some(Block([Return(Some(Binary(Add, Var(\"x\"), Int32(1))))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
-        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%call_1 = call i32 @f(i32 1)\n%call_2 = call i32 @f(i32 %call_1)\nret %call_2\n\n\n}\ndefine i32 @f(i32 x) {\n%entry:\n%alloca_5 = alloca i32\nstore i32 %x, ptr %alloca_5\n%load_7 = load i32, ptr %alloca_5\n%Add_8 = add i32, %load_7, 1\nret %Add_8\n\n\n}\n");
+        assert_eq!(llvm_ir, expected);
     }
 
     #[test]
@@ -596,11 +714,25 @@ mod tests {
                 return PI;
             }
         "#;
+        let expected = r#"@PI = dso_local constant float 3.1415925
+        define i32 @main() {
+        %entry:
+        %load_1 = load float, ptr @PI
+        %fptoi_2 = fptosi float %load_1 to i32
+        ret %fptoi_2
+        
+        
+        }
+        "#
+        .split('\n')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>()
+        .join("\n");
         let program = parse(code).unwrap();
         assert_eq!(format!("{:?}", program), "Program { module: [Const(Float32, \"PI\", Some(Float32(3.1415925))), Func(Function(Int32, []), \"main\", Some(Block([Return(Some(Var(\"PI\")))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
-        assert_eq!(llvm_ir, "@PI = dso_local constant float 3.1415925\ndefine i32 @main() {\n%entry:\n%load_1 = load float, ptr @PI\n%fptoi_2 = fptosi float %load_1 to i32\nret %fptoi_2\n\n\n}\n");
+        assert_eq!(llvm_ir, expected);
     }
 
     #[test]
@@ -612,11 +744,26 @@ mod tests {
                 return A[0];
             }
         "#;
+        let expected = r#"@A = dso_local constant [2 x float] [i32 1, i32 4]
+        define i32 @main() {
+        %entry:
+        %getelementptr_1 = getelementptr [2 x float], ptr @A, i32 0, i32 0
+        %load_2 = load float, ptr %getelementptr_1
+        %fptoi_3 = fptosi float %load_2 to i32
+        ret %fptoi_3
+        
+        
+        }
+        "#
+        .split('\n')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>()
+        .join("\n");
         let program = parse(code).unwrap();
         assert_eq!(format!("{:?}", program), "Program { module: [Const(Array(Float32, 2), \"A\", Some(Pack([Int32(1), Int32(4)]))), Func(Function(Int32, []), \"main\", Some(Block([Return(Some(Index(Var(\"A\"), Int32(0))))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
-        assert_eq!(llvm_ir, "@A = dso_local constant [2 x float] [i32 1, i32 4]\ndefine i32 @main() {\n%entry:\n%getelementptr_1 = getelementptr [2 x float], ptr @A, i32 0, i32 0\n%load_2 = load float, ptr %getelementptr_1\n%fptoi_3 = fptosi float %load_2 to i32\nret %fptoi_3\n\n\n}\n");
+        assert_eq!(llvm_ir, expected);
     }
 
     #[test]
@@ -628,11 +775,23 @@ mod tests {
                 return A[1][1];
             }
         "#;
+        let expected = r#"@A = dso_local constant [2 x [3 x float]] [[3 x i32] [i32 1, i32 1, i32 4], [3 x i32] [i32 5, i32 1, i32 4]]
+        define i32 @main() {
+        %entry:
+        %getelementptr_1 = getelementptr [2 x [3 x float]], ptr @A, i32 0, i32 1
+        %getelementptr_2 = getelementptr [3 x float], ptr %getelementptr_1, i32 0, i32 1
+        %load_3 = load float, ptr %getelementptr_2
+        %fptoi_4 = fptosi float %load_3 to i32
+        ret %fptoi_4
+        
+        
+        }
+        "#.split('\n').map(|x| x.trim()).collect::<Vec<&str>>().join("\n");
         let program = parse(code).unwrap();
         assert_eq!(format!("{:?}", program), "Program { module: [Const(Array(Array(Float32, 3), 2), \"A\", Some(Pack([Pack([Int32(1), Int32(1), Int32(4)]), Pack([Int32(5), Int32(1), Int32(4)])]))), Func(Function(Int32, []), \"main\", Some(Block([Return(Some(Index(Index(Var(\"A\"), Int32(1)), Int32(1))))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
-        assert_eq!(llvm_ir, "@A = dso_local constant [2 x [3 x float]] [[3 x i32] [i32 1, i32 1, i32 4], [3 x i32] [i32 5, i32 1, i32 4]]\ndefine i32 @main() {\n%entry:\n%getelementptr_1 = getelementptr [2 x [3 x float]], ptr @A, i32 0, i32 1\n%getelementptr_2 = getelementptr [3 x float], ptr %getelementptr_1, i32 0, i32 1\n%load_3 = load float, ptr %getelementptr_2\n%fptoi_4 = fptosi float %load_3 to i32\nret %fptoi_4\n\n\n}\n");
+        assert_eq!(llvm_ir, expected);
     }
 
     #[test]
@@ -643,11 +802,50 @@ mod tests {
                 return A[1][1];
             }
         "#;
+        let expected = r#"define i32 @main() {
+            %entry:
+            %alloca_1 = alloca [2 x [3 x float]]
+            %getelementptr_2 = getelementptr [2 x [3 x float]], ptr %alloca_1, i32 0, i32 0
+            %getelementptr_3 = getelementptr [3 x float], ptr %getelementptr_2, i32 0
+            %getelementptr_4 = getelementptr [3 x float], ptr %getelementptr_3, i32 0, i32 0
+            %getelementptr_5 = getelementptr float, ptr %getelementptr_4, i32 0
+            %itofp_6 = sitofp i32 1 to float
+            store float %itofp_6, ptr %getelementptr_5
+            %getelementptr_8 = getelementptr float, ptr %getelementptr_4, i32 1
+            %itofp_9 = sitofp i32 1 to float
+            store float %itofp_9, ptr %getelementptr_8
+            %getelementptr_11 = getelementptr float, ptr %getelementptr_4, i32 2
+            %itofp_12 = sitofp i32 4 to float
+            store float %itofp_12, ptr %getelementptr_11
+            %getelementptr_14 = getelementptr [3 x float], ptr %getelementptr_2, i32 1
+            %getelementptr_15 = getelementptr [3 x float], ptr %getelementptr_14, i32 0, i32 0
+            %getelementptr_16 = getelementptr float, ptr %getelementptr_15, i32 0
+            %itofp_17 = sitofp i32 5 to float
+            store float %itofp_17, ptr %getelementptr_16
+            %getelementptr_19 = getelementptr float, ptr %getelementptr_15, i32 1
+            %itofp_20 = sitofp i32 1 to float
+            store float %itofp_20, ptr %getelementptr_19
+            %getelementptr_22 = getelementptr float, ptr %getelementptr_15, i32 2
+            %itofp_23 = sitofp i32 4 to float
+            store float %itofp_23, ptr %getelementptr_22
+            %getelementptr_25 = getelementptr [2 x [3 x float]], ptr %alloca_1, i32 0, i32 1
+            %getelementptr_26 = getelementptr [3 x float], ptr %getelementptr_25, i32 0, i32 1
+            %load_27 = load float, ptr %getelementptr_26
+            %fptoi_28 = fptosi float %load_27 to i32
+            ret %fptoi_28
+            
+            
+            }
+            "#
+        .split('\n')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>()
+        .join("\n");
         let program = parse(code).unwrap();
         assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Array(Array(Float32, 3), 2), \"A\", Some(Pack([Pack([Int32(1), Int32(1), Int32(4)]), Pack([Int32(5), Int32(1), Int32(4)])])))), Return(Some(Index(Index(Var(\"A\"), Int32(1)), Int32(1))))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
-        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca [2 x [3 x float]]\n%getelementptr_2 = getelementptr [2 x [3 x float]], ptr %alloca_1, i32 0, i32 0\n%getelementptr_3 = getelementptr [3 x float], ptr %getelementptr_2, i32 0\n%getelementptr_4 = getelementptr [3 x float], ptr %getelementptr_3, i32 0, i32 0\n%getelementptr_5 = getelementptr float, ptr %getelementptr_4, i32 0\n%itofp_6 = sitofp i32 1 to float\nstore float %itofp_6, ptr %getelementptr_5\n%getelementptr_8 = getelementptr float, ptr %getelementptr_4, i32 1\n%itofp_9 = sitofp i32 1 to float\nstore float %itofp_9, ptr %getelementptr_8\n%getelementptr_11 = getelementptr float, ptr %getelementptr_4, i32 2\n%itofp_12 = sitofp i32 4 to float\nstore float %itofp_12, ptr %getelementptr_11\n%getelementptr_14 = getelementptr [3 x float], ptr %getelementptr_2, i32 1\n%getelementptr_15 = getelementptr [3 x float], ptr %getelementptr_14, i32 0, i32 0\n%getelementptr_16 = getelementptr float, ptr %getelementptr_15, i32 0\n%itofp_17 = sitofp i32 5 to float\nstore float %itofp_17, ptr %getelementptr_16\n%getelementptr_19 = getelementptr float, ptr %getelementptr_15, i32 1\n%itofp_20 = sitofp i32 1 to float\nstore float %itofp_20, ptr %getelementptr_19\n%getelementptr_22 = getelementptr float, ptr %getelementptr_15, i32 2\n%itofp_23 = sitofp i32 4 to float\nstore float %itofp_23, ptr %getelementptr_22\n%getelementptr_25 = getelementptr [2 x [3 x float]], ptr %alloca_1, i32 0, i32 1\n%getelementptr_26 = getelementptr [3 x float], ptr %getelementptr_25, i32 0, i32 1\n%load_27 = load float, ptr %getelementptr_26\n%fptoi_28 = fptosi float %load_27 to i32\nret %fptoi_28\n\n\n}\n");
+        assert_eq!(llvm_ir, expected);
     }
 
     #[test]
@@ -659,11 +857,32 @@ mod tests {
                 return A[0];
             }
         "#;
+        let expected = r#"define i32 @main() {
+            %entry:
+            %alloca_1 = alloca [1 x i32]
+            %getelementptr_2 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 0
+            %getelementptr_3 = getelementptr i32, ptr %getelementptr_2, i32 0
+            store i32 0, ptr %getelementptr_3
+            %getelementptr_5 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 0
+            %load_6 = load i32, ptr %getelementptr_5
+            %getelementptr_7 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 %load_6
+            store i32 1, ptr %getelementptr_7
+            %getelementptr_9 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 0
+            %load_10 = load i32, ptr %getelementptr_9
+            ret %load_10
+            
+            
+            }
+            "#
+        .split('\n')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>()
+        .join("\n");
         let program = parse(code).unwrap();
         assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Array(Int32, 1), \"A\", Some(Pack([Int32(0)])))), Expr(Some(Index(Var(\"A\"), Index(Var(\"A\"), Int32(0)))), Int32(1)), Return(Some(Index(Var(\"A\"), Int32(0))))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
-        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca [1 x i32]\n%getelementptr_2 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 0\n%getelementptr_3 = getelementptr i32, ptr %getelementptr_2, i32 0\nstore i32 0, ptr %getelementptr_3\n%getelementptr_5 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 0\n%load_6 = load i32, ptr %getelementptr_5\n%getelementptr_7 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 %load_6\nstore i32 1, ptr %getelementptr_7\n%getelementptr_9 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 0\n%load_10 = load i32, ptr %getelementptr_9\nret %load_10\n\n\n}\n");
+        assert_eq!(llvm_ir, expected);
     }
 
     #[test]
@@ -682,11 +901,59 @@ mod tests {
                 return z;
             }
         "#;
+        let expected = r#"define i32 @main() {
+            %entry:
+            %alloca_1 = alloca float
+            store float 5.4, ptr %alloca_1
+            %alloca_3 = alloca i32
+            store i32 8, ptr %alloca_3
+            %alloca_5 = alloca i32
+            store i32 0, ptr %alloca_5
+            br label %cond0
+            
+            %cond0:
+            %load_12 = load float, ptr %alloca_1
+            %fcmp_13 = fcmp une float %load_12, 0
+            br i1 %fcmp_13, label %then1, label %alt2
+            
+            %then1:
+            store i32 1, ptr %alloca_5
+            br label %final3
+            
+            %alt2:
+            br label %final3
+            
+            %final3:
+            br label %cond4
+            
+            %cond4:
+            %load_23 = load i32, ptr %alloca_3
+            %icmp_24 = icmp ne i32 %load_23, 0
+            br i1 %icmp_24, label %then5, label %alt6
+            
+            %then5:
+            store i32 2, ptr %alloca_5
+            br label %final7
+            
+            %alt6:
+            br label %final7
+            
+            %final7:
+            %load_29 = load i32, ptr %alloca_5
+            ret %load_29
+            
+            
+            }
+            "#
+        .split('\n')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>()
+        .join("\n");
         let program = parse(code).unwrap();
         assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Float32, \"a\", Some(Float32(5.4)))), Decl(Var(Int32, \"b\", Some(Int32(8)))), Decl(Var(Int32, \"z\", Some(Int32(0)))), If(Var(\"a\"), Block([Expr(Some(Var(\"z\")), Int32(1))]), Block([])), If(Var(\"b\"), Block([Expr(Some(Var(\"z\")), Int32(2))]), Block([])), Return(Some(Var(\"z\")))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
-        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca float\nstore float 5.4, ptr %alloca_1\n%alloca_3 = alloca i32\nstore i32 8, ptr %alloca_3\n%alloca_5 = alloca i32\nstore i32 0, ptr %alloca_5\nbr label %cond0\n\n%cond0:\n%load_12 = load float, ptr %alloca_1\n%fcmp_13 = fcmp une float %load_12, 0\nbr i1 %fcmp_13, label %then1, label %alt2\n\n%then1:\nstore i32 1, ptr %alloca_5\nbr label %final3\n\n%alt2:\nbr label %final3\n\n%final3:\nbr label %cond4\n\n%cond4:\n%load_23 = load i32, ptr %alloca_3\n%icmp_24 = icmp ne i32 %load_23, 0\nbr i1 %icmp_24, label %then5, label %alt6\n\n%then5:\nstore i32 2, ptr %alloca_5\nbr label %final7\n\n%alt6:\nbr label %final7\n\n%final7:\n%load_29 = load i32, ptr %alloca_5\nret %load_29\n\n\n}\n");
+        assert_eq!(llvm_ir, expected);
     }
 
     #[test]
@@ -697,11 +964,29 @@ mod tests {
                 return !+-x;
             }
         "#;
+        let expected = r#"define i32 @main() {
+            %entry:
+            %alloca_1 = alloca i32
+            store i32 1, ptr %alloca_1
+            %load_3 = load i32, ptr %alloca_1
+            %Sub_4 = sub i32, 0, %load_3
+            %icmp_5 = icmp ne i32 %Sub_4, 0
+            %Xor_6 = xor i1, %icmp_5, true
+            %zext_7 = zext i1 %Xor_6 to i32
+            ret %zext_7
+            
+            
+            }
+            "#
+        .split('\n')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>()
+        .join("\n");
         let program = parse(code).unwrap();
         assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Int32, \"x\", Some(Int32(1)))), Return(Some(Unary(Not, Unary(Pos, Unary(Neg, Var(\"x\"))))))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
-        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca i32\nstore i32 1, ptr %alloca_1\n%load_3 = load i32, ptr %alloca_1\n%Sub_4 = sub i32, 0, %load_3\n%icmp_5 = icmp ne i32 %Sub_4, 0\n%Xor_6 = xor i1, %icmp_5, true\n%zext_7 = zext i1 %Xor_6 to i32\nret %zext_7\n\n\n}\n");
+        assert_eq!(llvm_ir, expected);
     }
 
     #[test]
