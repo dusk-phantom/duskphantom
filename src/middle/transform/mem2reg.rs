@@ -175,7 +175,7 @@ pub fn mem2reg(entry: BBPtr, program: &mut Program) {
 }
 
 /// Insert empty "phi" for basic blocks starting from `entry`
-/// Returns a BTreeMapping from basic block to inserted "phi" instructions
+/// Returns a mapping from basic block to inserted "phi" instructions
 #[allow(unused)]
 fn insert_empty_phi(
     entry: BBPtr,
