@@ -102,12 +102,13 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
-        dbg!(store);
+        // dbg!(store);
         let address = &store.address;
         let val = &store.value;
         let address = Self::address_from(address, stack_slots).with_context(|| context!())?;
         // dbg!(address.gen_asm());
         let val: Operand = Self::value_from(val, regs).with_context(|| context!())?;
+        // dbg!(&val);
         let mut ret: Vec<Inst> = Vec::new();
         match val {
             Operand::Imm(imm) => {
@@ -122,9 +123,14 @@ impl IRBuilder {
                 return Err(anyhow!("store instruction with float value".to_string(),))
                     .with_context(|| context!());
             }
-            _ => (),
+            Operand::Reg(reg) => {
+                let src = reg;
+                let sd = StoreInst::new(address.try_into()?, src);
+                ret.push(sd.into());
+            }
+            _ => unimplemented!("store instruction with other value"),
         }
-        dbg!(&ret);
+        // dbg!(&ret);
         Ok(ret)
     }
 
