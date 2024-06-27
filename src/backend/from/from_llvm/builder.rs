@@ -106,14 +106,8 @@ impl IRBuilder {
             )? {
                 m_f.push_bb(bb);
             }
-            // count stack size,
-            // let stack_size = stack_allocator.allocated();
-            // // align to 16
-            // let stack_size = if stack_size % 16 == 0 {
-            //     stack_size
-            // } else {
-            //     stack_size - stack_size % 16 + 16
-            // };
+
+            *m_f.stack_allocator_mut() = Some(stack_allocator);
             funcs.push(m_f);
         }
         Ok(funcs)
