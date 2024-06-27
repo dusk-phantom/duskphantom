@@ -1,6 +1,6 @@
-use crate::config::CONFIG;
 use super::*;
 use super::{block::Block, gen_asm::GenTool};
+use crate::config::CONFIG;
 use rayon::prelude::*;
 
 #[allow(unused)]
@@ -8,6 +8,8 @@ use rayon::prelude::*;
 pub struct Func {
     name: String,
     args: Vec<String>,
+    // stack_allocator,
+    stack_allocator: Option<StackAllocator>,
     // entry block
     entry: Block,
     // basic blocks
@@ -42,9 +44,16 @@ impl Func {
         Func {
             name,
             args,
+            stack_allocator: None,
             other_bbs: Vec::new(),
             entry,
         }
+    }
+    pub fn stack_allocator(&self) -> Option<&StackAllocator> {
+        self.stack_allocator.as_ref()
+    }
+    pub fn stack_allocator_mut(&mut self) -> &mut Option<StackAllocator> {
+        &mut self.stack_allocator
     }
     pub fn push_bb(&mut self, bb: Block) {
         self.other_bbs.push(bb);
@@ -66,26 +75,19 @@ impl Func {
 
     // count stack_size this func need
     #[allow(unused)]
-    pub fn stack_size(&self) -> Result<usize,BackendError> {
+    pub fn stack_size(&self) -> Result<usize, BackendError> {
         let mut size = 0;
         for bb in self.iter_bbs() {
             for inst in bb.insts() {
                 match inst {
                     Inst::Ld(inst) => {
-                        let offset=inst.offset();
-                        let base=inst.base();
-                        
-                    },
-                    Inst::Sd(inst) => {
-
-                    },
-                    Inst::Lw(inst) =>{
-
-                    },
-                    Inst::Sw(inst) => {
-
-                    },
-                    _ =>todo!(),
+                        let offset = inst.offset();
+                        let base = inst.base();
+                    }
+                    Inst::Sd(inst) => {}
+                    Inst::Lw(inst) => {}
+                    Inst::Sw(inst) => {}
+                    _ => todo!(),
                 }
             }
         }
@@ -113,26 +115,25 @@ impl<'a> Iterator for BBIter<'a> {
     }
 }
 
-
 #[cfg(test)]
-mod tests{
+mod tests {
     #[test]
-    fn test_iter_bb_order(){
+    fn test_iter_bb_order() {
         use super::*;
-        let mut func=Func::default();
-        let entry=Block::new("entry".to_string());
-        let bb1=Block::new("bb1".to_string());
-        let bb2=Block::new("bb4".to_string());
-        let bb3=Block::new("bb3".to_string());
-        func.entry=entry;
+        let mut func = Func::default();
+        let entry = Block::new("entry".to_string());
+        let bb1 = Block::new("bb1".to_string());
+        let bb2 = Block::new("bb4".to_string());
+        let bb3 = Block::new("bb3".to_string());
+        func.entry = entry;
         func.other_bbs.push(bb1);
         func.other_bbs.push(bb2);
         func.other_bbs.push(bb3);
-        let mut iter=func.iter_bbs();
-        assert_eq!(iter.next().unwrap().label(),"entry");
-        assert_eq!(iter.next().unwrap().label(),"bb1");
-        assert_eq!(iter.next().unwrap().label(),"bb4");
-        assert_eq!(iter.next().unwrap().label(),"bb3");
+        let mut iter = func.iter_bbs();
+        assert_eq!(iter.next().unwrap().label(), "entry");
+        assert_eq!(iter.next().unwrap().label(), "bb1");
+        assert_eq!(iter.next().unwrap().label(), "bb4");
+        assert_eq!(iter.next().unwrap().label(), "bb3");
         assert!(iter.next().is_none());
     }
 }
