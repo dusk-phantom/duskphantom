@@ -198,38 +198,28 @@ impl IRBuilder {
         let call_inst = CallInst::new(f_name.to_string().into()).into();
         ret.push(call_inst);
 
-        unimplemented!();
+        let dest_name = call.get_id();
 
-        // // let func_ty = &call.type_id();
-        // let dst_reg: Reg = match func_ty.as_ref() {
-        //     llvm_ir::Type::FuncType {
-        //         result_type,
-        //         param_types,
-        //         is_var_arg,
-        //     } => match result_type.as_ref() {
-        //         llvm_ir::Type::FPType(_) => {
-        //             let dst = reg_gener.gen_virtual_float_reg();
-        //             let mv = MvInst::new(dst.into(), REG_FA0.into());
-        //             ret.push(mv.into());
-        //             dst
-        //         }
-        //         llvm_ir::Type::IntegerType { bits } => {
-        //             let dst = reg_gener.gen_virtual_usual_reg();
-        //             let mv = MvInst::new(dst.into(), REG_A0.into());
-        //             ret.push(mv.into());
-        //             dst
-        //         }
-        //         _ => {
-        //             unimplemented!();
-        //         }
-        //     },
-        //     _ => {
-        //         unimplemented!("function type");
-        //     }
-        // };
-        // regs.insert(dest.clone(), dst_reg);
-        // // FIXME: process arguments
-        // // unimplemented!("process arguments");
+        let func = call.func;
+        let dst_reg: Reg = match func.return_type {
+            ValueType::Void => todo!(),
+            ValueType::Int => {
+                let dst = reg_gener.gen_virtual_usual_reg();
+                let mv = MvInst::new(dst.into(), REG_A0.into());
+                ret.push(mv.into());
+                dst
+            }
+            ValueType::Float => {
+                let dst = reg_gener.gen_virtual_float_reg();
+                let mv = MvInst::new(dst.into(), REG_FA0.into());
+                ret.push(mv.into());
+                dst
+            }
+            ValueType::Bool => todo!(),
+            ValueType::Array(_, _) => todo!(),
+            ValueType::Pointer(_) => todo!(),
+        };
+        regs.insert(dest_name.into(), dst_reg);
 
         Ok(ret)
     }
