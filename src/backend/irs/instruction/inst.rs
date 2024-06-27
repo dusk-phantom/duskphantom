@@ -1,4 +1,3 @@
-
 use super::*;
 
 // 缺少浮点数的相关指令
@@ -30,7 +29,7 @@ use super::*;
 // fnmsub.s  rd, rs1, rs2, rs3 // f[rd] = -(f[rs1] * f[rs2] - f[rs3])
 // fsub.s
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Inst {
     // 拓展
     // sext.w
@@ -77,7 +76,6 @@ pub enum Inst {
     Ble(BleInst),
     Bgt(BgtInst),
     Bge(BgeInst),
-    
 
     Call(CallInst),
     Tail(TailInst),
@@ -89,7 +87,6 @@ pub enum Inst {
 // addw
 // and
 // andi
-
 
 // slli
 // slliw
@@ -113,10 +110,6 @@ pub enum Inst {
 // jalr
 // jr
 
-
-
-
-
 impl Inst {
     pub fn gen_asm(&self) -> String {
         match self {
@@ -135,7 +128,7 @@ impl Inst {
             Inst::Sw(inst) => inst.gen_asm(),
             Inst::Lw(inst) => inst.gen_asm(),
             Inst::La(inst) => inst.gen_asm(),
-            Inst::Li(inst)=>inst.gen_asm(),
+            Inst::Li(inst) => inst.gen_asm(),
             Inst::Load(inst) => inst.gen_asm(),
             Inst::Store(inst) => inst.gen_asm(),
             Inst::Jmp(inst) => inst.gen_asm(),
@@ -151,14 +144,13 @@ impl Inst {
             Inst::And(inst) => inst.gen_asm(),
             Inst::Or(inst) => inst.gen_asm(),
             Inst::Xor(inst) => inst.gen_asm(),
-            Inst::Tail(inst) =>inst.gen_asm(),
+            Inst::Tail(inst) => inst.gen_asm(),
         }
     }
 }
 
-
 //*********************************************************************************
-// impl From<T> for Inst 
+// impl From<T> for Inst
 // and impl TryFrom<Inst> for T
 // T is the specific instruction type
 //*********************************************************************************
@@ -172,26 +164,25 @@ impl_inst_convert!(DivInst, Div);
 impl_inst_convert!(NegInst, Neg);
 
 // for bit count operation
-impl_inst_convert!(AndInst,And);
-impl_inst_convert!(OrInst,Or);
-impl_inst_convert!(XorInst,Xor);
+impl_inst_convert!(AndInst, And);
+impl_inst_convert!(OrInst, Or);
+impl_inst_convert!(XorInst, Xor);
 impl_inst_convert!(SllInst, Sll);
 impl_inst_convert!(SrlInst, Srl);
-impl_inst_convert!(SltInst,Slt);
+impl_inst_convert!(SltInst, Slt);
 
 // inst for data transfer
 impl_inst_convert!(MvInst, Mv);
 impl_inst_convert!(LaInst, La);
 impl_inst_convert!(SdInst, Sd);
 impl_inst_convert!(LdInst, Ld);
-impl_inst_convert!(LwInst,Lw);
-impl_inst_convert!(SwInst,Sw);
-impl_inst_convert!(LiInst,Li);
-impl_inst_convert!(LoadInst,Load);
-impl_inst_convert!(StoreInst,Store);
+impl_inst_convert!(LwInst, Lw);
+impl_inst_convert!(SwInst, Sw);
+impl_inst_convert!(LiInst, Li);
+impl_inst_convert!(LoadInst, Load);
+impl_inst_convert!(StoreInst, Store);
 
 // inst for control flow
 impl_inst_convert!(JmpInst, Jmp);
 impl_inst_convert!(CallInst, Call);
 impl_inst_convert!(TailInst, Tail);
-

@@ -12,7 +12,7 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
-        dbg!(&inst);
+        // dbg!(&inst);
         match inst {
             llvm_ir::Instruction::Add(_) => todo!(),
             llvm_ir::Instruction::Sub(_) => todo!(),
@@ -102,12 +102,12 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
+        dbg!(store);
         let address = &store.address;
         let val = &store.value;
         let address = Self::address_from(address, stack_slots).with_context(|| context!())?;
-        dbg!(address.gen_asm());
+        // dbg!(address.gen_asm());
         let val: Operand = Self::value_from(val, regs).with_context(|| context!())?;
-        dbg!("gg");
         let mut ret: Vec<Inst> = Vec::new();
         match val {
             Operand::Imm(imm) => {
@@ -124,6 +124,7 @@ impl IRBuilder {
             }
             _ => (),
         }
+        dbg!(&ret);
         Ok(ret)
     }
 
@@ -158,7 +159,7 @@ impl IRBuilder {
         regs: &mut HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
         let mut ret_insts: Vec<Inst> = Vec::new();
-        dbg!(term);
+        // dbg!(term);
         match term {
             llvm_ir::Terminator::Ret(r) => {
                 if let Some(op) = &r.return_operand {
@@ -216,7 +217,7 @@ impl IRBuilder {
         ret.push(call_inst);
 
         if let Some(dest) = &call.dest {
-            dbg!(dest);
+            // dbg!(dest);
             let func_ty = &call.function_ty;
             let dst_reg: Reg = match func_ty.as_ref() {
                 llvm_ir::Type::FuncType {
