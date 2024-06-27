@@ -84,6 +84,7 @@ pub fn compile_clang(
         backend::phisicalize(&mut program);
     }
     // check valid
+    #[cfg(not(feature = "gen_virtual_asm"))]
     {
         for module in program.modules.iter() {
             for func in module.funcs.iter() {

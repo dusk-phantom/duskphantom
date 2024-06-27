@@ -113,7 +113,8 @@ impl IRBuilder {
             Operand::Imm(imm) => {
                 let dst = reg_gener.gen_virtual_usual_reg();
                 let li = AddInst::new(dst.into(), REG_ZERO.into(), imm.into());
-                let sd = StoreInst::new(dst, address.try_into()?);
+                let src = dst;
+                let sd = StoreInst::new(address.try_into()?, src);
                 ret.push(li.into());
                 ret.push(sd.into());
             }
@@ -131,11 +132,24 @@ impl IRBuilder {
         load: &llvm_ir::instruction::Load,
         stack_slots: &mut HashMap<Name, StackSlot>,
         reg_gener: &mut RegGenerator,
-        regs: &HashMap<Name, Reg>,
+        regs: &mut HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
-        dbg!(load);
+        // dbg!(load);
         let mut ret: Vec<Inst> = Vec::new();
-        todo!();
+        if regs.contains_key(&load.dest) {
+            unimplemented!();
+        }
+        let dst_reg = if Self::is_ty_int(&load.loaded_ty) {
+            reg_gener.gen_virtual_usual_reg()
+        } else if Self::is_ty_float(&load.loaded_ty) {
+            reg_gener.gen_virtual_float_reg()
+        } else {
+            unimplemented!();
+        };
+        regs.insert(load.dest.clone(), dst_reg);
+        let address = Self::address_from(&load.address, stack_slots).with_context(|| context!())?;
+        let ld = LoadInst::new(dst_reg, address.try_into()?);
+        ret.push(ld.into());
         Ok(ret)
     }
 
