@@ -1,10 +1,9 @@
 use crate::backend::*;
-use crate::middle::ir::instruction::memory_op_inst::{Alloca, Store};
-use crate::middle::ir::instruction::terminator_inst::{Br, Ret};
-use crate::middle::ir::instruction::{downcast_ref, InstType};
-use crate::middle::ir::{Instruction, ValueType};
 use crate::utils::mem::ObjPtr;
 use crate::{context, middle};
+
+use crate::middle::ir::instruction::downcast_ref;
+use crate::middle::ir::{Instruction, ValueType};
 
 use super::*;
 
@@ -25,108 +24,54 @@ impl IRBuilder {
         regs: &mut HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
         match inst.get_type() {
-            InstType::Add => {
-                todo!();
-            }
-            InstType::FAdd => {
-                todo!();
-            }
-            InstType::Sub => {
-                todo!();
-            }
-            InstType::FSub => {
-                todo!();
-            }
-            InstType::Mul => {
-                todo!();
-            }
-            InstType::FMul => {
-                todo!();
-            }
-            InstType::UDiv => {
-                todo!();
-            }
-            InstType::SDiv => {
-                todo!();
-            }
-            InstType::FDiv => {
-                todo!();
-            }
-            InstType::URem => {
-                todo!();
-            }
-            InstType::SRem => {
-                todo!();
-            }
-            InstType::Shl => {
-                todo!();
-            }
-            InstType::LShr => {
-                todo!();
-            }
-            InstType::AShr => {
-                todo!();
-            }
-            InstType::And => {
-                todo!();
-            }
-            InstType::Or => {
-                todo!();
-            }
-            InstType::Xor => todo!(),
-            InstType::Ret => {
-                todo!();
-            }
-            InstType::Br => {
-                todo!();
-            }
-            InstType::Alloca => {
-                let alloca = downcast_ref::<Alloca>(inst.as_ref().as_ref());
+            middle::ir::instruction::InstType::Alloca => {
+                let alloca = downcast_ref::<middle::ir::instruction::memory_op_inst::Alloca>(
+                    inst.as_ref().as_ref(),
+                );
                 Self::build_alloca_inst(alloca, stack_allocator, stack_slots)
             }
-            InstType::Load => {
-                todo!();
-            }
-            InstType::Store => {
-                let store = downcast_ref::<Store>(inst.as_ref().as_ref());
+            middle::ir::instruction::InstType::Store => {
+                let store = downcast_ref::<middle::ir::instruction::memory_op_inst::Store>(
+                    inst.as_ref().as_ref(),
+                );
                 Self::build_store_inst(store, stack_slots, reg_gener, regs)
             }
-            InstType::GetElementPtr => {
-                todo!();
-            }
-            InstType::ZextTo => {
-                todo!();
-            }
-            InstType::SextTo => {
-                todo!();
-            }
-            InstType::ItoFp => {
-                todo!();
-            }
-            InstType::FpToI => {
-                todo!();
-            }
-            InstType::ICmp => {
-                todo!();
-            }
-            InstType::FCmp => {
-                todo!();
-            }
-            InstType::Phi => {
-                todo!();
-            }
-            InstType::Call => {
-                todo!();
-            }
-            _ => {
-                unreachable!()
-            }
+            middle::ir::instruction::InstType::Head => todo!(),
+            middle::ir::instruction::InstType::Add => todo!(),
+            middle::ir::instruction::InstType::FAdd => todo!(),
+            middle::ir::instruction::InstType::Sub => todo!(),
+            middle::ir::instruction::InstType::FSub => todo!(),
+            middle::ir::instruction::InstType::Mul => todo!(),
+            middle::ir::instruction::InstType::FMul => todo!(),
+            middle::ir::instruction::InstType::UDiv => todo!(),
+            middle::ir::instruction::InstType::SDiv => todo!(),
+            middle::ir::instruction::InstType::FDiv => todo!(),
+            middle::ir::instruction::InstType::URem => todo!(),
+            middle::ir::instruction::InstType::SRem => todo!(),
+            middle::ir::instruction::InstType::Shl => todo!(),
+            middle::ir::instruction::InstType::LShr => todo!(),
+            middle::ir::instruction::InstType::AShr => todo!(),
+            middle::ir::instruction::InstType::And => todo!(),
+            middle::ir::instruction::InstType::Or => todo!(),
+            middle::ir::instruction::InstType::Xor => todo!(),
+            middle::ir::instruction::InstType::Ret => todo!(),
+            middle::ir::instruction::InstType::Br => todo!(),
+            middle::ir::instruction::InstType::Load => todo!(),
+            middle::ir::instruction::InstType::GetElementPtr => todo!(),
+            middle::ir::instruction::InstType::ZextTo => todo!(),
+            middle::ir::instruction::InstType::SextTo => todo!(),
+            middle::ir::instruction::InstType::ItoFp => todo!(),
+            middle::ir::instruction::InstType::FpToI => todo!(),
+            middle::ir::instruction::InstType::ICmp => todo!(),
+            middle::ir::instruction::InstType::FCmp => todo!(),
+            middle::ir::instruction::InstType::Phi => todo!(),
+            middle::ir::instruction::InstType::Call => todo!(),
         }
     }
 
     /// alloca instruction only instruct allocating memory on stack,not generate one-one instruction
     fn build_alloca_inst(
-        alloca: &Alloca,
+        alloca: &middle::ir::instruction::memory_op_inst::Alloca,
         stack_allocator: &mut StackAllocator,
         stack_slots: &mut HashMap<Name, StackSlot>,
     ) -> Result<Vec<Inst>> {
@@ -142,7 +87,7 @@ impl IRBuilder {
     }
 
     pub fn build_store_inst(
-        store: &Store,
+        store: &middle::ir::instruction::memory_op_inst::Store,
         stack_slots: &mut HashMap<Name, StackSlot>,
         reg_gener: &mut RegGenerator,
         regs: &HashMap<Name, Reg>,
@@ -191,8 +136,10 @@ impl IRBuilder {
         // dbg!(term);
 
         match term.get_type() {
-            InstType::Ret => {
-                let ret = downcast_ref::<Ret>(term.as_ref().as_ref());
+            middle::ir::instruction::InstType::Ret => {
+                let ret = downcast_ref::<middle::ir::instruction::terminator_inst::Ret>(
+                    term.as_ref().as_ref(),
+                );
                 if !ret.is_void() {
                     let op = ret.get_return_value();
                     match op {
@@ -210,9 +157,13 @@ impl IRBuilder {
                         middle::ir::Operand::Instruction(instr) => {
                             let name: Name = instr.get_id().into();
                             let reg = regs.get(&name).ok_or(anyhow!("").context(context!()))?;
-                            let mv_inst = match instr.get_type() {
-                                _ => unreachable!(),
+                            let mv_inst = match instr.get_value_type() {
+                                ValueType::Int => MvInst::new(REG_A0.into(), reg.clone().into()),
+                                ValueType::Float => unimplemented!(),
+                                _ => todo!(),
                             };
+                            ret_insts.push(mv_inst.into());
+                            ret_insts.push(Inst::Ret);
                         }
                         _ => unreachable!(),
                     }
@@ -220,11 +171,8 @@ impl IRBuilder {
                     unimplemented!();
                 }
             }
-            InstType::Br => {
-                // let br = downcast_ref::<Br>(term.as_ref().as_ref());
-                // let target = br.get_target();
-                // let jmp = JmpInst::new(target.into());
-                // ret_insts.push(jmp.into());
+            middle::ir::instruction::InstType::Br => {
+                todo!();
             }
             _ => {
                 unreachable!();
