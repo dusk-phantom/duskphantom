@@ -301,10 +301,13 @@ impl Instruction for Call {
             self.get_value_type(),
             &self.func.name
         );
-        for op in self.get_operand() {
+        let operands = self.get_operand();
+        for op in operands {
             res.push_str(&format!("{} {}, ", op.get_type(), op));
         }
-        res.truncate(res.len() - 2);
+        if !operands.is_empty() {
+            res.truncate(res.len() - 2);
+        }
         res.push(')');
         res
     }
