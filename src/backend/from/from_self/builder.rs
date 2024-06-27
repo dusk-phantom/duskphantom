@@ -190,23 +190,17 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
     ) -> Result<Block> {
-        let mut m_bb = Block::new(
-            bb.name
-                .to_string()
-                .strip_prefix('%')
-                .unwrap_or(&bb.name.to_string())
-                .to_string(),
-        );
-        // for inst in bb.iter() {
-        //     let gen_insts =
-        //         Self::build_instruction(&inst, stack_allocator, stack_slots, reg_gener, regs)
-        //             .with_context(|| context!())?;
-        //     m_bb.extend_insts(gen_insts);
-        // }
-        // // FIXME
-        // let gen_insts = Self::build_term_inst(&bb, regs).with_context(|| context!())?;
-        // m_bb.extend_insts(gen_insts);
-        todo!();
+        let mut m_bb = Block::new(bb.name.clone());
+        for inst in bb.iter() {
+            let gen_insts =
+                Self::build_instruction(&inst, stack_allocator, stack_slots, reg_gener, regs)
+                    .with_context(|| context!())?;
+            m_bb.extend_insts(gen_insts);
+        }
+        // FIXME
+        let gen_insts =
+            Self::build_term_inst(&bb.get_last_inst(), regs).with_context(|| context!())?;
+        m_bb.extend_insts(gen_insts);
         Ok(m_bb)
     }
 
