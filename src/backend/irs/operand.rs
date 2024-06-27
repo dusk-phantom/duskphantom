@@ -147,6 +147,8 @@ pub const REG_A4: Reg = Reg::new(14, true);
 pub const REG_A5: Reg = Reg::new(15, true);
 pub const REG_A6: Reg = Reg::new(16, true);
 pub const REG_A7: Reg = Reg::new(17, true);
+
+// other registers
 pub const REG_S2: Reg = Reg::new(18, true);
 pub const REG_S3: Reg = Reg::new(19, true);
 pub const REG_S4: Reg = Reg::new(20, true);
@@ -163,9 +165,12 @@ pub const REG_T5: Reg = Reg::new(30, true);
 pub const REG_T6: Reg = Reg::new(31, true);
 
 // 浮点寄存器
+
+// float registers for temporary
 pub const REG_FT0: Reg = Reg::new(0, false);
 pub const REG_FT1: Reg = Reg::new(1, false);
 pub const REG_FT2: Reg = Reg::new(2, false);
+
 pub const REG_FT3: Reg = Reg::new(3, false);
 pub const REG_FT4: Reg = Reg::new(4, false);
 pub const REG_FT5: Reg = Reg::new(5, false);
@@ -173,6 +178,8 @@ pub const REG_FT6: Reg = Reg::new(6, false);
 pub const REG_FT7: Reg = Reg::new(7, false);
 pub const REG_FS0: Reg = Reg::new(8, false);
 pub const REG_FS1: Reg = Reg::new(9, false);
+/* float argument registers */
+// used for return value
 pub const REG_FA0: Reg = Reg::new(10, false);
 pub const REG_FA1: Reg = Reg::new(11, false);
 pub const REG_FA2: Reg = Reg::new(12, false);
@@ -181,6 +188,7 @@ pub const REG_FA4: Reg = Reg::new(14, false);
 pub const REG_FA5: Reg = Reg::new(15, false);
 pub const REG_FA6: Reg = Reg::new(16, false);
 pub const REG_FA7: Reg = Reg::new(17, false);
+// other registers
 pub const REG_FS2: Reg = Reg::new(18, false);
 pub const REG_FS3: Reg = Reg::new(19, false);
 pub const REG_FS4: Reg = Reg::new(20, false);
