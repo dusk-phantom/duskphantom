@@ -60,8 +60,8 @@ pub fn mem2reg(entry: BBPtr, program: &mut Program) {
     // for each "phi" insert position, decide the value for each argument
     fn decide_variable_value(
         variable: InstPtr,
-        current_variable_value: &[BTreeMap<InstPtr, PhiArg>],
-    ) -> (BBPtr, Operand) {
+        current_variable_value: &[BTreeMap<InstPtr, Operand>],
+    ) -> Operand {
         for frame in current_variable_value.iter().rev() {
             if let Some(value) = frame.get(&variable) {
                 return value.clone();
@@ -73,32 +73,33 @@ pub fn mem2reg(entry: BBPtr, program: &mut Program) {
     // start from entry node, decide the value for each "phi" instruction
     // this will also remove "load" and "store" instructions when possible
     fn decide_values_start_from(
-        entry: BBPtr,
+        parent_bb: Option<BBPtr>,
+        current_bb: BBPtr,
         visited: &mut BTreeSet<BBPtr>,
-        current_variable_value: &mut Vec<BTreeMap<InstPtr, PhiArg>>,
+        current_variable_value: &mut Vec<BTreeMap<InstPtr, Operand>>,
         block_to_phi_insertion: &mut BTreeMap<BBPtr, Vec<PhiPack>>,
     ) {
         // decide value for each "phi" instruction to add
         for mut phi in block_to_phi_insertion
-            .get_mut(&entry)
+            .get_mut(&current_bb)
             .unwrap_or(&mut vec![])
             .iter_mut()
         {
-            let new_phi_arg = decide_variable_value(phi.variable, current_variable_value);
-            phi.add_argument(new_phi_arg);
+            let value = decide_variable_value(phi.variable, current_variable_value);
+            phi.add_argument((parent_bb.unwrap(), value));
             current_variable_value
                 .last_mut()
                 .unwrap()
-                .insert(phi.variable, (entry, Operand::Instruction(phi.inst)));
+                .insert(phi.variable, Operand::Instruction(phi.inst));
         }
 
         // do not continue if visited
         // "phi" instruction can be added multiple times for each basic block
         // so it's put before this
-        if visited.contains(&entry) {
+        if visited.contains(&current_bb) {
             return;
         }
-        visited.insert(entry);
+        visited.insert(current_bb);
 
         // iterate all instructions and:
         //
@@ -107,10 +108,7 @@ pub fn mem2reg(entry: BBPtr, program: &mut Program) {
         //
         // bypass if featured variable is not a constant pointer,
         // for example if it's calculated from "getelementptr"
-        //
-        // does not remove "alloca" because it doesn't check if array is being accessed,
-        // we use dead code elimination instead to remove unused "alloca"
-        for mut inst in entry.iter() {
+        for mut inst in current_bb.iter() {
             match inst.get_type() {
                 InstType::Store => {
                     let store_operands = inst.get_operand();
@@ -123,7 +121,7 @@ pub fn mem2reg(entry: BBPtr, program: &mut Program) {
                             current_variable_value
                                 .last_mut()
                                 .unwrap()
-                                .insert(*variable, (entry, store_value.clone()));
+                                .insert(*variable, store_value.clone());
                             inst.remove_self();
                         }
                     }
@@ -135,9 +133,9 @@ pub fn mem2reg(entry: BBPtr, program: &mut Program) {
                     // replace only when load source is a constant pointer
                     if let Operand::Instruction(variable) = load_ptr {
                         if variable.get_type() == InstType::Alloca {
-                            let (_, new_value) =
+                            let current_value =
                                 decide_variable_value(*variable, current_variable_value);
-                            inst.replace_self(&new_value);
+                            inst.replace_self(&current_value);
                         }
                     }
                 }
@@ -146,7 +144,7 @@ pub fn mem2reg(entry: BBPtr, program: &mut Program) {
         }
 
         // visit all successors
-        let successors = entry.get_succ_bb();
+        let successors = current_bb.get_succ_bb();
         let need_new_frame = successors.len() > 1;
         for succ in successors {
             // only add new frame if there is more than one successors
@@ -154,6 +152,7 @@ pub fn mem2reg(entry: BBPtr, program: &mut Program) {
                 current_variable_value.push(BTreeMap::new());
             }
             decide_values_start_from(
+                Some(current_bb),
                 *succ,
                 visited,
                 current_variable_value,
@@ -167,6 +166,7 @@ pub fn mem2reg(entry: BBPtr, program: &mut Program) {
 
     // start mem2reg pass from the entry block
     decide_values_start_from(
+        None,
         entry,
         &mut BTreeSet::new(),
         &mut vec![BTreeMap::new()],
@@ -624,7 +624,7 @@ pub mod tests_mem2reg {
             br label %cond0
             
             %cond0:
-            %phi_37 = phi i32 [0, %entry], [%phi_38, %cond7]
+            %phi_37 = phi i32 [0, %entry], [%phi_38, %final6]
             %icmp_33 = icmp slt i32 %phi_37, 10
             br i1 %icmp_33, label %body1, label %final2
             
@@ -646,7 +646,7 @@ pub mod tests_mem2reg {
             br label %final6
             
             %cond7:
-            %phi_38 = phi i32 [%Add_8, %body1], [%Add_23, %body8]
+            %phi_38 = phi i32 [%Add_8, %then4], [%Add_23, %body8]
             %icmp_27 = icmp slt i32 %phi_38, 8
             br i1 %icmp_27, label %body8, label %final9
             
