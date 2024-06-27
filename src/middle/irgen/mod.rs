@@ -998,11 +998,33 @@ mod tests {
                 return x && y;
             }
         "#;
+        let expected = r#"define i32 @main() {
+            %entry:
+            %alloca_1 = alloca i1
+            %icmp_2 = icmp slt i32 1, 2
+            store i1 %icmp_2, ptr %alloca_1
+            %alloca_4 = alloca i1
+            %itofp_5 = sitofp i32 1 to float
+            %fcmp_6 = fcmp ult float %itofp_5, 1.1
+            store i1 %fcmp_6, ptr %alloca_4
+            %load_8 = load i1, ptr %alloca_1
+            %load_9 = load i1, ptr %alloca_4
+            %And_10 = and i1, %load_8, %load_9
+            %zext_11 = zext i1 %And_10 to i32
+            ret %zext_11
+            
+            
+            }
+            "#
+        .split('\n')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>()
+        .join("\n");
         let program = parse(code).unwrap();
         assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Boolean, \"x\", Some(Binary(Lt, Int32(1), Int32(2))))), Decl(Var(Boolean, \"y\", Some(Binary(Lt, Int32(1), Float32(1.1))))), Return(Some(Binary(And, Var(\"x\"), Var(\"y\"))))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
-        assert_eq!(llvm_ir, "define i32 @main() {\n%entry:\n%alloca_1 = alloca i1\n%icmp_2 = icmp slt i32 1, 2\nstore i1 %icmp_2, ptr %alloca_1\n%alloca_4 = alloca i1\n%itofp_5 = sitofp i32 1 to float\n%fcmp_6 = fcmp ult float %itofp_5, 1.1\nstore i1 %fcmp_6, ptr %alloca_4\n%load_8 = load i1, ptr %alloca_1\n%load_9 = load i1, ptr %alloca_4\n%And_10 = and i1, %load_8, %load_9\n%zext_11 = zext i1 %And_10 to i32\nret %zext_11\n\n\n}\n");
+        assert_eq!(llvm_ir, expected);
     }
 
     #[test]
@@ -1014,13 +1036,59 @@ mod tests {
                 return x + y;
             }
         "#;
+        let expected = r#"@x = dso_local constant i32 4
+            @y = dso_local constant i32 16
+            define i32 @main() {
+            %entry:
+            %load_1 = load i32, ptr @x
+            %load_2 = load i32, ptr @y
+            %Add_3 = add i32, %load_1, %load_2
+            ret %Add_3
+            
+            
+            }
+            "#
+        .split('\n')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>()
+        .join("\n");
         let program = parse(code).unwrap();
         assert_eq!(format!("{:?}", program), "Program { module: [Const(Int32, \"x\", Some(Binary(Add, Int32(1), Int32(3)))), Const(Int32, \"y\", Some(Binary(Mul, Var(\"x\"), Var(\"x\")))), Func(Function(Int32, []), \"main\", Some(Block([Return(Some(Binary(Add, Var(\"x\"), Var(\"y\"))))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
-        assert_eq!(
-            llvm_ir,
-            "@x = dso_local constant i32 4\n@y = dso_local constant i32 16\ndefine i32 @main() {\n%entry:\n%load_1 = load i32, ptr @x\n%load_2 = load i32, ptr @y\n%Add_3 = add i32, %load_1, %load_2\nret %Add_3\n\n\n}\n"
-        );
+        assert_eq!(llvm_ir, expected);
+    }
+
+    #[test]
+    fn test_library_function() {
+        let code = r#"
+            int main() {
+                int x = getint();
+                putint(x + 3);
+                return 0;
+            }
+        "#;
+        let expected = r#"define i32 @main() {
+            %entry:
+            %alloca_1 = alloca i32
+            %call_2 = call i32 @getint()
+            store i32 %call_2, ptr %alloca_1
+            %load_4 = load i32, ptr %alloca_1
+            %Add_5 = add i32, %load_4, 3
+            %call_6 = call void @putint(i32 %Add_5)
+            ret 0
+            
+            
+            }
+            "#
+        .split('\n')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>()
+        .join("\n");
+        let program = parse(code).unwrap();
+        assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Int32, \"x\", Some(Call(Var(\"getint\"), [])))), Expr(None, Call(Var(\"putint\"), [Binary(Add, Var(\"x\"), Int32(3))])), Return(Some(Int32(0)))])))] }");
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_eq!(llvm_ir, expected);
     }
 }
