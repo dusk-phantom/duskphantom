@@ -695,6 +695,92 @@ pub mod tests_mem2reg {
     }
 
     #[test]
+    fn test_mem2reg_array() {
+        let code = r#"
+            int main() {
+                int arr[1] = {8};
+                f(arr);
+                putarray(1, arr);
+                return 0;
+            }
+
+            int f(int a[]) {
+                a[0] = 1;
+                return a[0];
+            }
+        "#;
+        let expected_before_optimize = r#"define i32 @main() {
+            %entry:
+            %alloca_1 = alloca [1 x i32]
+            %getelementptr_2 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 0
+            %getelementptr_3 = getelementptr i32, ptr %getelementptr_2, i32 0
+            store i32 8, ptr %getelementptr_3
+            %getelementptr_5 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 0
+            %call_6 = call i32 @f(i32* %getelementptr_5)
+            %getelementptr_7 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 0
+            %call_8 = call void @putarray(i32 1, i32* %getelementptr_7)
+            ret 0
+            
+            
+            }
+            define i32 @f(i32* a) {
+            %entry:
+            %alloca_11 = alloca i32*
+            store i32* %a, ptr %alloca_11
+            %load_13 = load i32*, ptr %alloca_11
+            store i32 1, ptr %load_13
+            %load_15 = load i32*, ptr %alloca_11
+            %load_16 = load i32, ptr %load_15
+            ret %load_16
+            
+            
+            }
+            "#
+        .split('\n')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>()
+        .join("\n");
+        let expected_after_optimize = r#"define i32 @main() {
+            %entry:
+            %alloca_1 = alloca [1 x i32]
+            %getelementptr_2 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 0
+            %getelementptr_3 = getelementptr i32, ptr %getelementptr_2, i32 0
+            store i32 8, ptr %getelementptr_3
+            %getelementptr_5 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 0
+            %call_6 = call i32 @f(i32* %getelementptr_5)
+            %getelementptr_7 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 0
+            %call_8 = call void @putarray(i32 1, i32* %getelementptr_7)
+            ret 0
+            
+            
+            }
+            define i32 @f(i32* a) {
+            %entry:
+            %alloca_11 = alloca i32*
+            store i32 1, ptr %a
+            %load_16 = load i32, ptr %a
+            ret %load_16
+            
+            
+            }
+            "#
+        .split('\n')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>()
+        .join("\n");
+
+        // Check before optimization
+        let parsed = parse(code).unwrap();
+        let mut program = gen(&parsed).unwrap();
+        assert_eq!(program.module.gen_llvm_ir(), expected_before_optimize);
+
+        // Check after optimization
+        mem2reg(program.module.functions[0].entry.unwrap(), &mut program).unwrap();
+        mem2reg(program.module.functions[1].entry.unwrap(), &mut program).unwrap();
+        assert_eq!(program.module.gen_llvm_ir(), expected_after_optimize);
+    }
+
+    #[test]
     fn test_get_idoms() {
         let mut program = Program::new();
 
