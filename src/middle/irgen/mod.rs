@@ -1143,4 +1143,117 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         assert_eq!(llvm_ir, expected);
     }
+
+    #[test]
+    fn test_lazy_eval() {
+        let code = r#"
+            int main() {
+                int x = getint();
+                (x > 1) && f(x);
+                return 0;
+            }
+
+            int f(int x) {
+                putint(x);
+                return x;
+            }
+        "#;
+        let expected = r#"define i32 @main() {
+            %entry:
+            %alloca_1 = alloca i32
+            %call_2 = call i32 @getint()
+            store i32 %call_2, ptr %alloca_1
+            %load_6 = load i32, ptr %alloca_1
+            %icmp_7 = icmp sgt i32 %load_6, 1
+            br i1 %icmp_7, label %alt0, label %final1
+            
+            %alt0:
+            %load_9 = load i32, ptr %alloca_1
+            %call_10 = call i32 @f(i32 %load_9)
+            %icmp_11 = icmp ne i32 %call_10, 0
+            br label %final1
+            
+            %final1:
+            %phi_13 = phi i1 [false, %entry], [%icmp_11, %alt0]
+            ret 0
+            
+            
+            }
+            define i32 @f(i32 x) {
+            %entry:
+            %alloca_16 = alloca i32
+            store i32 %x, ptr %alloca_16
+            %load_18 = load i32, ptr %alloca_16
+            %call_19 = call void @putint(i32 %load_18)
+            %load_20 = load i32, ptr %alloca_16
+            ret %load_20
+            
+            
+            }
+            "#
+        .split('\n')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>()
+        .join("\n");
+        let program = parse(code).unwrap();
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_eq!(llvm_ir, expected);
+    }
+
+    #[test]
+    fn test_lazy_eval_with_if() {
+        let code = r#"
+            int main() {
+                int x = getint();
+                if (x > 1 && x < 3) {
+                    putint(x);
+                }
+                return 0;
+            }
+        "#;
+        let expected = r#"define i32 @main() {
+            %entry:
+            %alloca_1 = alloca i32
+            %call_2 = call i32 @getint()
+            store i32 %call_2, ptr %alloca_1
+            br label %cond0
+            
+            %cond0:
+            %load_11 = load i32, ptr %alloca_1
+            %icmp_12 = icmp sgt i32 %load_11, 1
+            br i1 %icmp_12, label %alt4, label %final5
+            
+            %alt4:
+            %load_14 = load i32, ptr %alloca_1
+            %icmp_15 = icmp slt i32 %load_14, 3
+            br label %final5
+            
+            %final5:
+            %phi_17 = phi i1 [false, %cond0], [%icmp_15, %alt4]
+            br i1 %phi_17, label %then1, label %alt2
+            
+            %then1:
+            %load_19 = load i32, ptr %alloca_1
+            %call_20 = call void @putint(i32 %load_19)
+            br label %final3
+            
+            %alt2:
+            br label %final3
+            
+            %final3:
+            ret 0
+            
+            
+            }
+            "#
+        .split('\n')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>()
+        .join("\n");
+        let program = parse(code).unwrap();
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_eq!(llvm_ir, expected);
+    }
 }
