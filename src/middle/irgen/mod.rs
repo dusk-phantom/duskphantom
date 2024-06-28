@@ -1059,11 +1059,17 @@ mod tests {
             %itofp_5 = sitofp i32 1 to float
             %fcmp_6 = fcmp ult float %itofp_5, 1.1
             store i1 %fcmp_6, ptr %alloca_4
-            %load_8 = load i1, ptr %alloca_1
-            %load_9 = load i1, ptr %alloca_4
-            %And_10 = and i1, %load_8, %load_9
-            %zext_11 = zext i1 %And_10 to i32
-            ret %zext_11
+            %load_10 = load i1, ptr %alloca_1
+            br i1 %load_10, label %alt0, label %final1
+            
+            %alt0:
+            %load_12 = load i1, ptr %alloca_4
+            br label %final1
+            
+            %final1:
+            %phi_14 = phi i1 [false, %entry], [%load_12, %alt0]
+            %zext_15 = zext i1 %phi_14 to i32
+            ret %zext_15
             
             
             }
