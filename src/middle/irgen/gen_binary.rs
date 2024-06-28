@@ -1,7 +1,7 @@
 use crate::context;
 use crate::frontend::{BinaryOp, Expr};
 use crate::middle::ir::instruction::misc_inst::{FCmpOp, ICmpOp};
-use crate::middle::ir::ValueType;
+use crate::middle::ir::{Constant, ValueType};
 use crate::middle::irgen::function_kit::FunctionKit;
 use crate::middle::irgen::value::Value;
 use anyhow::{anyhow, Context};
@@ -13,16 +13,14 @@ impl<'a> FunctionKit<'a> {
             return Err(anyhow!("exit block can't be appended")).with_context(|| context!());
         };
 
-        // Generate arguments
-        let lhs_val = self.gen_expr(lhs)?;
-        let rhs_val = self.gen_expr(rhs)?;
-
-        // Calculate maximum type for operator polymorphism
-        let max_ty = lhs_val.get_type().max_with(&rhs_val.get_type());
-
         // Apply operation
         match op {
             BinaryOp::Add => {
+                // Generate arguments and get type to cast
+                let lhs_val = self.gen_expr(lhs)?;
+                let rhs_val = self.gen_expr(rhs)?;
+                let max_ty = lhs_val.get_type().max_with(&rhs_val.get_type());
+
                 // Load operand as maximum type
                 let lop = lhs_val.load(max_ty.clone(), self)?;
                 let rop = rhs_val.load(max_ty.clone(), self)?;
@@ -43,6 +41,11 @@ impl<'a> FunctionKit<'a> {
                 }
             }
             BinaryOp::Sub => {
+                // Generate arguments and get type to cast
+                let lhs_val = self.gen_expr(lhs)?;
+                let rhs_val = self.gen_expr(rhs)?;
+                let max_ty = lhs_val.get_type().max_with(&rhs_val.get_type());
+
                 // Load operand as maximum type
                 let lop = lhs_val.load(max_ty.clone(), self)?;
                 let rop = rhs_val.load(max_ty.clone(), self)?;
@@ -63,6 +66,11 @@ impl<'a> FunctionKit<'a> {
                 }
             }
             BinaryOp::Mul => {
+                // Generate arguments and get type to cast
+                let lhs_val = self.gen_expr(lhs)?;
+                let rhs_val = self.gen_expr(rhs)?;
+                let max_ty = lhs_val.get_type().max_with(&rhs_val.get_type());
+
                 // Load operand as maximum type
                 let lop = lhs_val.load(max_ty.clone(), self)?;
                 let rop = rhs_val.load(max_ty.clone(), self)?;
@@ -83,6 +91,11 @@ impl<'a> FunctionKit<'a> {
                 }
             }
             BinaryOp::Div => {
+                // Generate arguments and get type to cast
+                let lhs_val = self.gen_expr(lhs)?;
+                let rhs_val = self.gen_expr(rhs)?;
+                let max_ty = lhs_val.get_type().max_with(&rhs_val.get_type());
+
                 // Load operand as maximum type
                 let lop = lhs_val.load(max_ty.clone(), self)?;
                 let rop = rhs_val.load(max_ty.clone(), self)?;
@@ -103,6 +116,10 @@ impl<'a> FunctionKit<'a> {
                 }
             }
             BinaryOp::Mod => {
+                // Generate arguments and get type to cast
+                let lhs_val = self.gen_expr(lhs)?;
+                let rhs_val = self.gen_expr(rhs)?;
+
                 // Load operand as integers
                 let lop = lhs_val.load(ValueType::Int, self)?;
                 let rop = rhs_val.load(ValueType::Int, self)?;
@@ -119,6 +136,11 @@ impl<'a> FunctionKit<'a> {
             BinaryOp::BitOr => Err(anyhow!("`|` not supported")).with_context(|| context!()),
             BinaryOp::BitXor => Err(anyhow!("`^` not supported")).with_context(|| context!()),
             BinaryOp::Gt => {
+                // Generate arguments and get type to cast
+                let lhs_val = self.gen_expr(lhs)?;
+                let rhs_val = self.gen_expr(rhs)?;
+                let max_ty = lhs_val.get_type().max_with(&rhs_val.get_type());
+
                 // Load operand as maximum type
                 let lop = lhs_val.load(max_ty.clone(), self)?;
                 let rop = rhs_val.load(max_ty.clone(), self)?;
@@ -145,6 +167,11 @@ impl<'a> FunctionKit<'a> {
                 }
             }
             BinaryOp::Lt => {
+                // Generate arguments and get type to cast
+                let lhs_val = self.gen_expr(lhs)?;
+                let rhs_val = self.gen_expr(rhs)?;
+                let max_ty = lhs_val.get_type().max_with(&rhs_val.get_type());
+
                 // Load operand as maximum type
                 let lop = lhs_val.load(max_ty.clone(), self)?;
                 let rop = rhs_val.load(max_ty.clone(), self)?;
@@ -171,6 +198,11 @@ impl<'a> FunctionKit<'a> {
                 }
             }
             BinaryOp::Ge => {
+                // Generate arguments and get type to cast
+                let lhs_val = self.gen_expr(lhs)?;
+                let rhs_val = self.gen_expr(rhs)?;
+                let max_ty = lhs_val.get_type().max_with(&rhs_val.get_type());
+
                 // Load operand as maximum type
                 let lop = lhs_val.load(max_ty.clone(), self)?;
                 let rop = rhs_val.load(max_ty.clone(), self)?;
@@ -197,6 +229,11 @@ impl<'a> FunctionKit<'a> {
                 }
             }
             BinaryOp::Le => {
+                // Generate arguments and get type to cast
+                let lhs_val = self.gen_expr(lhs)?;
+                let rhs_val = self.gen_expr(rhs)?;
+                let max_ty = lhs_val.get_type().max_with(&rhs_val.get_type());
+
                 // Load operand as maximum type
                 let lop = lhs_val.load(max_ty.clone(), self)?;
                 let rop = rhs_val.load(max_ty.clone(), self)?;
@@ -223,6 +260,11 @@ impl<'a> FunctionKit<'a> {
                 }
             }
             BinaryOp::Eq => {
+                // Generate arguments and get type to cast
+                let lhs_val = self.gen_expr(lhs)?;
+                let rhs_val = self.gen_expr(rhs)?;
+                let max_ty = lhs_val.get_type().max_with(&rhs_val.get_type());
+
                 // Load operand as maximum type
                 let lop = lhs_val.load(max_ty.clone(), self)?;
                 let rop = rhs_val.load(max_ty.clone(), self)?;
@@ -246,6 +288,11 @@ impl<'a> FunctionKit<'a> {
                 }
             }
             BinaryOp::Ne => {
+                // Generate arguments and get type to cast
+                let lhs_val = self.gen_expr(lhs)?;
+                let rhs_val = self.gen_expr(rhs)?;
+                let max_ty = lhs_val.get_type().max_with(&rhs_val.get_type());
+
                 // Load operand as maximum type
                 let lop = lhs_val.load(max_ty.clone(), self)?;
                 let rop = rhs_val.load(max_ty.clone(), self)?;
@@ -269,23 +316,67 @@ impl<'a> FunctionKit<'a> {
                 }
             }
             BinaryOp::And => {
-                // Load operands as bool
-                let lop = lhs_val.load(ValueType::Bool, self)?;
-                let rop = rhs_val.load(ValueType::Bool, self)?;
+                // Allocate basic blocks
+                let alt_name: String = self.unique_name("alt");
+                let alt_entry = self.program.mem_pool.new_basicblock(alt_name);
+                let final_name = self.unique_name("final");
+                let mut final_entry = self.program.mem_pool.new_basicblock(final_name);
 
-                // Add "and" instruction, operand is the result of the instruction
-                let inst = self.program.mem_pool.get_and(lop, rop);
-                exit.push_back(inst);
+                // Load left operand to primary block, jump to alt or final block
+                let lop = self.gen_expr(lhs)?.load(ValueType::Bool, self)?;
+                let mut primary_exit = self.exit.unwrap();
+                primary_exit.push_back(self.program.mem_pool.get_br(Some(lop)));
+                primary_exit.set_true_bb(alt_entry);
+                primary_exit.set_false_bb(final_entry);
+
+                // Load right operand to alt block, jump to final block
+                self.exit = Some(alt_entry);
+                let rop = self.gen_expr(rhs)?.load(ValueType::Bool, self)?;
+                let mut alt_exit: crate::utils::mem::ObjPtr<crate::middle::ir::BasicBlock> =
+                    self.exit.unwrap();
+                alt_exit.push_back(self.program.mem_pool.get_br(None));
+                alt_exit.set_true_bb(final_entry);
+
+                // Get `&&` result with "phi" instruction in final block
+                self.exit = Some(final_entry);
+                let inst = self.program.mem_pool.get_phi(
+                    ValueType::Bool,
+                    vec![
+                        (Constant::Bool(false).into(), primary_exit),
+                        (rop, alt_exit),
+                    ],
+                );
+                final_entry.push_back(inst);
                 Ok(Value::ReadOnly(inst.into()))
             }
             BinaryOp::Or => {
-                // Load operands as bool
-                let lop = lhs_val.load(ValueType::Bool, self)?;
-                let rop = rhs_val.load(ValueType::Bool, self)?;
+                // Allocate basic blocks
+                let alt_name: String = self.unique_name("alt");
+                let alt_entry = self.program.mem_pool.new_basicblock(alt_name);
+                let final_name = self.unique_name("final");
+                let mut final_entry = self.program.mem_pool.new_basicblock(final_name);
 
-                // Add "or" instruction, operand is the result of the instruction
-                let inst = self.program.mem_pool.get_or(lop, rop);
-                exit.push_back(inst);
+                // Load left operand to primary block, jump to final or alt block
+                let lop = self.gen_expr(lhs)?.load(ValueType::Bool, self)?;
+                let mut primary_exit = self.exit.unwrap();
+                primary_exit.push_back(self.program.mem_pool.get_br(Some(lop)));
+                primary_exit.set_true_bb(final_entry);
+                primary_exit.set_false_bb(alt_entry);
+
+                // Load right operand to alt block, jump to final block
+                self.exit = Some(alt_entry);
+                let rop = self.gen_expr(rhs)?.load(ValueType::Bool, self)?;
+                let mut alt_exit = self.exit.unwrap();
+                alt_exit.push_back(self.program.mem_pool.get_br(None));
+                alt_exit.set_true_bb(final_entry);
+
+                // Get `||` result with "phi" instruction in final block
+                self.exit = Some(final_entry);
+                let inst = self.program.mem_pool.get_phi(
+                    ValueType::Bool,
+                    vec![(Constant::Bool(true).into(), primary_exit), (rop, alt_exit)],
+                );
+                final_entry.push_back(inst);
                 Ok(Value::ReadOnly(inst.into()))
             }
         }
