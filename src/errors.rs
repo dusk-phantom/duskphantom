@@ -55,6 +55,8 @@ pub enum BackendError {
     GenFromLlvmError(String),
     #[error("internal consistency error: {0}")]
     InternalConsistencyError(String),
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
 }
 
 /// 全局 错误处理函数

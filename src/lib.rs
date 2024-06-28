@@ -36,7 +36,7 @@ pub fn compile(
     if opt_flag {
         backend::optimize(&mut program);
     } else {
-        backend::phisicalize(&mut program);
+        backend::phisicalize(&mut program)?;
     }
     // check valid
     {
@@ -81,7 +81,7 @@ pub fn compile_clang(
     if opt_flag {
         backend::optimize(&mut program);
     } else {
-        backend::phisicalize(&mut program);
+        backend::phisicalize(&mut program)?;
     }
     // check valid
     #[cfg(not(feature = "gen_virtual_asm"))]

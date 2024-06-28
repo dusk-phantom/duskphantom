@@ -72,27 +72,6 @@ impl Func {
             idx: 0,
         }
     }
-
-    // count stack_size this func need
-    #[allow(unused)]
-    pub fn stack_size(&self) -> Result<usize, BackendError> {
-        let mut size = 0;
-        for bb in self.iter_bbs() {
-            for inst in bb.insts() {
-                match inst {
-                    Inst::Ld(inst) => {
-                        let offset = inst.offset();
-                        let base = inst.base();
-                    }
-                    Inst::Sd(inst) => {}
-                    Inst::Lw(inst) => {}
-                    Inst::Sw(inst) => {}
-                    _ => todo!(),
-                }
-            }
-        }
-        Ok(size)
-    }
 }
 
 pub struct BBIter<'a> {
