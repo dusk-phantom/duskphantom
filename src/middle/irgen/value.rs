@@ -1,7 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 
 use crate::context;
-use crate::errors::MiddleError;
 use crate::middle::ir::instruction::misc_inst::{FCmpOp, ICmpOp};
 use crate::middle::ir::{Constant, Operand, ValueType};
 use crate::middle::irgen::function_kit::FunctionKit;
@@ -10,8 +9,8 @@ use crate::middle::irgen::function_kit::FunctionKit;
 /// An operand can not be assigned to, while a pointed value can
 #[derive(Clone)]
 pub enum Value {
-    Operand(Operand),
-    Pointer(Operand),
+    ReadOnly(Operand),
+    ReadWrite(Operand),
 
     /// An array of values.
     /// Values in the array must all have the same type.
@@ -23,13 +22,13 @@ pub fn alloc(ty: ValueType, kit: &mut FunctionKit) -> Value {
     // Add instruction to exit
     let inst = kit.program.mem_pool.get_alloca(ty, 1);
     kit.exit.unwrap().push_back(inst);
-    Value::Pointer(inst.into())
+    Value::ReadWrite(inst.into())
 }
 
 /// A constant can be converted to a value
 impl From<Constant> for Value {
     fn from(val: Constant) -> Self {
-        Value::Operand(Operand::Constant(val))
+        Value::ReadOnly(Operand::Constant(val))
     }
 }
 
@@ -38,70 +37,90 @@ impl Value {
     /// Get the type of value
     pub fn get_type(&self) -> ValueType {
         match self {
-            Value::Operand(op) => op.get_type(),
-            Value::Pointer(op) => match op.get_type() {
-                // Inside `Pointer` is the pointer to given value,
+            Value::ReadOnly(operand) => operand.get_type(),
+            Value::ReadWrite(pointer) => match pointer.get_type() {
+                // Inside `ReadWrite` is the pointer to given value,
                 // we're just getting type of the value
                 ValueType::Pointer(ty) => *ty,
                 _ => panic!("invalid pointer generated, whose content is not a pointer"),
             },
-            Value::Array(op) => {
+            Value::Array(operand) => {
                 // Inside `Array` is an array of values,
                 // we're getting type of the array
-                let ty = op[0].get_type();
-                ValueType::Array(Box::new(ty), op.len())
+                let ty = operand[0].get_type();
+                ValueType::Array(Box::new(ty), operand.len())
             }
         }
     }
 
     /// Load the value as an operand
-    pub fn load(self, target: ValueType, kit: &mut FunctionKit) -> Result<Operand, MiddleError> {
-        // Load raw
-        let ty = self.get_type();
-        let raw = match self {
-            Value::Operand(op) => op,
-            Value::Pointer(op) => {
-                // Add instruction to exit
-                let inst = kit.program.mem_pool.get_load(ty.clone(), op);
+    pub fn load(self, target: ValueType, kit: &mut FunctionKit) -> Result<Operand> {
+        let mut value_type = self.get_type();
+
+        // Load uncast operand
+        //
+        // If this is a read-write value, load the operand from pointer,
+        // otherwise just return the operand
+        //
+        // If underlying value is array, we can't get its value by `load`,
+        // instead get its reference by `getelementptr`, and change `value_type` from
+        // value type `[n * element_type]` to reference type `element_type*`
+        let uncast_operand = match self {
+            Value::ReadOnly(operand) => operand,
+            Value::ReadWrite(pointer) => {
+                let inst = match value_type {
+                    ValueType::Array(ref element_type, _) => {
+                        // This GEP changes `[n x element_type]*` to `element_type*`
+                        let inst = kit.program.mem_pool.get_getelementptr(
+                            value_type.clone(),
+                            pointer,
+                            vec![Constant::Int(0).into(), Constant::Int(0).into()],
+                        );
+
+                        // Array can't be loaded directly, instead pass array by reference
+                        // So the `value_type` is changed to reference accordingly
+                        value_type = ValueType::Pointer((*element_type.clone()).into());
+                        inst
+                    }
+                    _ => kit.program.mem_pool.get_load(value_type.clone(), pointer),
+                };
                 kit.exit.unwrap().push_back(inst);
                 inst.into()
             }
             Value::Array(_) => {
                 // Array is not loadable
-                return Err(MiddleError::CustomError(
-                    "array is not loadable".to_string(),
-                ));
+                return Err(anyhow!("array is not loadable")).with_context(|| context!());
             }
         };
 
         // Return directly if type matches
-        if ty == target {
-            return Ok(raw);
+        if value_type == target {
+            return Ok(uncast_operand);
         }
 
         // Convert type if not match
-        match (ty, target) {
+        match (value_type, target) {
             (ValueType::Int, ValueType::Float) => {
                 // Direct convert
-                let inst = kit.program.mem_pool.get_itofp(raw);
+                let inst = kit.program.mem_pool.get_itofp(uncast_operand);
                 kit.exit.unwrap().push_back(inst);
                 Ok(inst.into())
             }
             (ValueType::Float, ValueType::Int) => {
                 // Direct convert
-                let inst = kit.program.mem_pool.get_fptoi(raw);
+                let inst = kit.program.mem_pool.get_fptoi(uncast_operand);
                 kit.exit.unwrap().push_back(inst);
                 Ok(inst.into())
             }
             (ValueType::Bool, ValueType::Int) => {
                 // Direct convert
-                let inst = kit.program.mem_pool.get_zext(raw);
+                let inst = kit.program.mem_pool.get_zext(uncast_operand);
                 kit.exit.unwrap().push_back(inst);
                 Ok(inst.into())
             }
             (ValueType::Bool, ValueType::Float) => {
                 // Convert to int first and then float
-                let inst = kit.program.mem_pool.get_zext(raw);
+                let inst = kit.program.mem_pool.get_zext(uncast_operand);
                 let inst = kit.program.mem_pool.get_itofp(inst.into());
                 kit.exit.unwrap().push_back(inst);
                 Ok(inst.into())
@@ -111,7 +130,7 @@ impl Value {
                 let inst = kit.program.mem_pool.get_icmp(
                     ICmpOp::Ne,
                     ValueType::Int,
-                    raw,
+                    uncast_operand,
                     Constant::Int(0).into(),
                 );
                 kit.exit.unwrap().push_back(inst);
@@ -122,37 +141,49 @@ impl Value {
                 let inst = kit.program.mem_pool.get_fcmp(
                     FCmpOp::Une,
                     ValueType::Float,
-                    raw,
+                    uncast_operand,
                     Constant::Float(0.0).into(),
                 );
                 kit.exit.unwrap().push_back(inst);
                 Ok(inst.into())
             }
-            (ty, target) => Err(MiddleError::CustomError(format!(
-                "cannot load from {} to {}",
-                ty, target,
-            ))),
+            (ty, target) => {
+                Err(anyhow!("cannot load from {} to {}", ty, target)).with_context(|| context!())
+            }
         }
     }
 
     /// Shift the underlying pointer (if exists)
+    ///
     /// Element of index is [shift by whole, shift by primary element, ...]
+    ///
     /// For example, get_element_ptr([2, 8]) on a pointer to an array [n x i32]
     /// shifts it by (2 * n + 8) * sizeof i32.
-    /// DO NOT FORGET THE FIRST INDEX
-    pub fn get_element_ptr(self, kit: &mut FunctionKit, index: Vec<Operand>) -> Result<Value> {
-        let ty = self.get_type();
+    ///
+    /// If current value type is pointer, it will be treated as array,
+    /// and `getelementptr` for array equivalents to `load` for pointer
+    pub fn getelementptr(self, kit: &mut FunctionKit, index: Vec<Operand>) -> Result<Value> {
+        let value_type = self.get_type();
         match self {
-            Value::Operand(_) => Err(anyhow!("can't GEP from operand")).with_context(|| context!()),
+            Value::ReadOnly(_) => {
+                Err(anyhow!("can't GEP from operand")).with_context(|| context!())
+            }
             Value::Array(_) => Err(anyhow!("cannot GEP from array")).with_context(|| context!()),
-            Value::Pointer(op) => {
-                // Add instruction to exit
-                let inst = kit.program.mem_pool.get_getelementptr(ty, op, index);
+            Value::ReadWrite(pointer) => {
+                let inst = match value_type {
+                    // Treat pointer as array here, convert `element_type**` to `element_type*` with `load`
+                    ValueType::Pointer(_) => kit.program.mem_pool.get_load(value_type, pointer),
+
+                    // Convert `[n x element_type]*` to `element_type*` with `getelementptr`
+                    _ => kit
+                        .program
+                        .mem_pool
+                        .get_getelementptr(value_type, pointer, index),
+                };
                 kit.exit.unwrap().push_back(inst);
 
                 // Construct new value
-                // TODO Type of pointer should be shrunk (as "get element" states)
-                Ok(Value::Pointer(inst.into()))
+                Ok(Value::ReadWrite(inst.into()))
             }
         }
     }
@@ -165,13 +196,13 @@ impl Value {
         if let Value::Array(arr) = val {
             // Get first sub-pointer
             let initial_ptr =
-                self.get_element_ptr(kit, vec![Constant::Int(0).into(), Constant::Int(0).into()])?;
+                self.getelementptr(kit, vec![Constant::Int(0).into(), Constant::Int(0).into()])?;
 
             // Iterate all sub-pointers
             for (i, elem) in arr.into_iter().enumerate() {
                 let sub_ptr = initial_ptr
                     .clone()
-                    .get_element_ptr(kit, vec![Constant::Int(i as i32).into()])?;
+                    .getelementptr(kit, vec![Constant::Int(i as i32).into()])?;
 
                 // Assign element to sub-pointer
                 sub_ptr.assign(kit, elem)?;
@@ -181,9 +212,9 @@ impl Value {
 
         // Otherwise load element
         match self {
-            Value::Operand(_) => Err(anyhow!("cannot assign operand")).with_context(|| context!()),
+            Value::ReadOnly(_) => Err(anyhow!("cannot assign operand")).with_context(|| context!()),
             Value::Array(_) => Err(anyhow!("cannot assign to array")).with_context(|| context!()),
-            Value::Pointer(ptr) => {
+            Value::ReadWrite(ptr) => {
                 // Load operand from value first
                 let op = val.load(target, kit)?;
 

@@ -34,18 +34,27 @@ impl<'a> ProgramKit<'a> {
 
                 // Add global variable (pointer) to environment
                 self.env
-                    .insert(id.clone(), Value::Pointer(global_val.into()));
+                    .insert(id.clone(), Value::ReadWrite(global_val.into()));
 
                 // Add global variable to program
                 self.program.module.global_variables.push(global_val);
                 Ok(())
             }
-            Decl::Func(Type::Function(return_ty, _), id, _) => {
+            Decl::Func(Type::Function(return_ty, params), id, _) => {
                 // Get function type
                 let fty = value_type::translate_type(return_ty);
 
                 // Create function
-                let fun_ptr = self.program.mem_pool.new_function(id.clone(), fty.clone());
+                let mut fun_ptr = self.program.mem_pool.new_function(id.clone(), fty.clone());
+
+                // Generate parameters
+                for param in params.iter() {
+                    let param = self.program.mem_pool.new_parameter(
+                        param.id.clone().unwrap_or("_".to_string()),
+                        value_type::translate_type(&param.ty),
+                    );
+                    fun_ptr.params.push(param);
+                }
 
                 // Add function to environment
                 self.fun_env.insert(id.clone(), fun_ptr);

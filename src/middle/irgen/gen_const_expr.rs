@@ -19,8 +19,8 @@ impl<'a> ProgramKit<'a> {
                 // If operand is a global variable, convert it to constant
                 // because the global variable's value is not mutated yet
                 match val.clone() {
-                    Value::Pointer(Operand::Global(gvar)) => Ok(gvar.initializer.clone()),
-                    Value::Operand(Operand::Constant(val)) => Ok(val),
+                    Value::ReadWrite(Operand::Global(gvar)) => Ok(gvar.initializer.clone()),
+                    Value::ReadOnly(Operand::Constant(val)) => Ok(val),
                     _ => Err(anyhow!("variable is not a constant")).with_context(|| context!()),
                 }
             }

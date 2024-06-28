@@ -13,9 +13,9 @@ mod gen_expr;
 mod gen_global_decl;
 mod gen_impl;
 mod gen_inner_decl;
+mod gen_library_function;
 mod gen_stmt;
 mod gen_unary;
-mod library_function;
 mod program_kit;
 mod value;
 mod value_type;
@@ -880,6 +880,58 @@ mod tests {
         .join("\n");
         let program = parse(code).unwrap();
         assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Array(Int32, 1), \"A\", Some(Pack([Int32(0)])))), Expr(Some(Index(Var(\"A\"), Index(Var(\"A\"), Int32(0)))), Int32(1)), Return(Some(Index(Var(\"A\"), Int32(0))))])))] }");
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_eq!(llvm_ir, expected);
+    }
+
+    #[test]
+    fn test_pointer() {
+        let code = r#"
+            int main() {
+                int arr[1] = {8};
+                f(arr);
+                putarray(1, arr);
+                return 0;
+            }
+
+            int f(int a[]) {
+                a[0] = 1;
+                return a[0];
+            }
+        "#;
+        let expected = r#"define i32 @main() {
+            %entry:
+            %alloca_1 = alloca [1 x i32]
+            %getelementptr_2 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 0
+            %getelementptr_3 = getelementptr i32, ptr %getelementptr_2, i32 0
+            store i32 8, ptr %getelementptr_3
+            %getelementptr_5 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 0
+            %call_6 = call i32 @f(i32* %getelementptr_5)
+            %getelementptr_7 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 0
+            %call_8 = call void @putarray(i32 1, i32* %getelementptr_7)
+            ret 0
+            
+            
+            }
+            define i32 @f(i32* a) {
+            %entry:
+            %alloca_11 = alloca i32*
+            store i32* %a, ptr %alloca_11
+            %load_13 = load i32*, ptr %alloca_11
+            store i32 1, ptr %load_13
+            %load_15 = load i32*, ptr %alloca_11
+            %load_16 = load i32, ptr %load_15
+            ret %load_16
+            
+            
+            }
+            "#
+        .split('\n')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>()
+        .join("\n");
+        let program = parse(code).unwrap();
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
         assert_eq!(llvm_ir, expected);

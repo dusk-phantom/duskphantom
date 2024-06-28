@@ -1,15 +1,14 @@
 use crate::errors::MiddleError;
-use crate::frontend::{Decl, Type};
+use crate::frontend::Decl;
 use crate::middle::irgen::function_kit::FunctionKit;
 use crate::middle::irgen::program_kit::ProgramKit;
 use crate::middle::irgen::value::Value;
-use crate::middle::irgen::value_type;
 
 impl<'a> ProgramKit<'a> {
     /// Generate an implementation into the program
     pub fn gen_impl(&mut self, decl: &Decl) -> anyhow::Result<()> {
         match decl {
-            Decl::Func(Type::Function(_, params), id, Some(stmt)) => {
+            Decl::Func(_, id, Some(stmt)) => {
                 // Clone function env before mutating it
                 let cloned_fun_env = self.fun_env.clone();
 
@@ -22,27 +21,22 @@ impl<'a> ProgramKit<'a> {
                 let mut entry = self.program.mem_pool.new_basicblock(entry_name);
 
                 // Fill parameters
-                for param in params.iter() {
-                    let param = self.program.mem_pool.new_parameter(
-                        param.id.clone().ok_or(MiddleError::GenError)?,
-                        value_type::translate_type(&param.ty),
-                    );
-
-                    // Add parameter to function
-                    fun_ptr.params.push(param);
-
+                for param in fun_ptr.params.iter() {
                     // Add parameter to entry
                     let alloc = self
                         .program
                         .mem_pool
                         .get_alloca(param.value_type.clone(), 1);
-                    let store = self.program.mem_pool.get_store(param.into(), alloc.into());
+                    let store = self
+                        .program
+                        .mem_pool
+                        .get_store((*param).into(), alloc.into());
                     entry.push_back(alloc);
                     entry.push_back(store);
 
                     // Add parameter to env
                     self.env
-                        .insert(param.name.clone(), Value::Pointer(alloc.into()));
+                        .insert(param.name.clone(), Value::ReadWrite(alloc.into()));
                 }
 
                 // Build function

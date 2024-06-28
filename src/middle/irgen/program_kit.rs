@@ -15,6 +15,7 @@ pub struct ProgramKit<'a> {
 /// A program kit (top level) can generate declarations
 impl<'a> ProgramKit<'a> {
     pub fn gen(mut self, program: &frontend::Program) -> Result<()> {
+        self.gen_library_function();
         for decl in program.module.iter() {
             self.gen_global_decl(decl)?;
         }

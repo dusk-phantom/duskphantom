@@ -32,12 +32,12 @@ impl<'a> FunctionKit<'a> {
                     ValueType::Int => {
                         let inst = self.program.mem_pool.get_add(lop, rop);
                         exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
+                        Ok(Value::ReadOnly(inst.into()))
                     }
                     ValueType::Float => {
                         let inst = self.program.mem_pool.get_fadd(lop, rop);
                         exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
+                        Ok(Value::ReadOnly(inst.into()))
                     }
                     _ => Err(anyhow!("`+` for NaN")).with_context(|| context!()),
                 }
@@ -52,12 +52,12 @@ impl<'a> FunctionKit<'a> {
                     ValueType::Int => {
                         let inst = self.program.mem_pool.get_sub(lop, rop);
                         exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
+                        Ok(Value::ReadOnly(inst.into()))
                     }
                     ValueType::Float => {
                         let inst = self.program.mem_pool.get_fsub(lop, rop);
                         exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
+                        Ok(Value::ReadOnly(inst.into()))
                     }
                     _ => Err(anyhow!("`-` for NaN")).with_context(|| context!()),
                 }
@@ -72,12 +72,12 @@ impl<'a> FunctionKit<'a> {
                     ValueType::Int => {
                         let inst = self.program.mem_pool.get_mul(lop, rop);
                         exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
+                        Ok(Value::ReadOnly(inst.into()))
                     }
                     ValueType::Float => {
                         let inst = self.program.mem_pool.get_fmul(lop, rop);
                         exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
+                        Ok(Value::ReadOnly(inst.into()))
                     }
                     _ => Err(anyhow!("`*` for NaN")).with_context(|| context!()),
                 }
@@ -92,12 +92,12 @@ impl<'a> FunctionKit<'a> {
                     ValueType::Int => {
                         let inst = self.program.mem_pool.get_sdiv(lop, rop);
                         exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
+                        Ok(Value::ReadOnly(inst.into()))
                     }
                     ValueType::Float => {
                         let inst = self.program.mem_pool.get_fdiv(lop, rop);
                         exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
+                        Ok(Value::ReadOnly(inst.into()))
                     }
                     _ => Err(anyhow!("`/` for NaN")).with_context(|| context!()),
                 }
@@ -110,7 +110,7 @@ impl<'a> FunctionKit<'a> {
                 // Add "signed rem" instruction, operand is the result of the instruction
                 let inst = self.program.mem_pool.get_srem(lop, rop);
                 exit.push_back(inst);
-                Ok(Value::Operand(inst.into()))
+                Ok(Value::ReadOnly(inst.into()))
             }
             // Bitwise operation on int is not required
             BinaryOp::Shr => Err(anyhow!("`>>` not supported")).with_context(|| context!()),
@@ -131,7 +131,7 @@ impl<'a> FunctionKit<'a> {
                             .mem_pool
                             .get_icmp(ICmpOp::Sgt, max_ty, lop, rop);
                         exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
+                        Ok(Value::ReadOnly(inst.into()))
                     }
                     ValueType::Float => {
                         let inst = self
@@ -139,7 +139,7 @@ impl<'a> FunctionKit<'a> {
                             .mem_pool
                             .get_fcmp(FCmpOp::Ugt, max_ty, lop, rop);
                         exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
+                        Ok(Value::ReadOnly(inst.into()))
                     }
                     _ => Err(anyhow!("`>` for NaN")).with_context(|| context!()),
                 }
@@ -157,7 +157,7 @@ impl<'a> FunctionKit<'a> {
                             .mem_pool
                             .get_icmp(ICmpOp::Slt, max_ty, lop, rop);
                         exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
+                        Ok(Value::ReadOnly(inst.into()))
                     }
                     ValueType::Float => {
                         let inst = self
@@ -165,7 +165,7 @@ impl<'a> FunctionKit<'a> {
                             .mem_pool
                             .get_fcmp(FCmpOp::Ult, max_ty, lop, rop);
                         exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
+                        Ok(Value::ReadOnly(inst.into()))
                     }
                     _ => Err(anyhow!("`<` for NaN")).with_context(|| context!()),
                 }
@@ -183,7 +183,7 @@ impl<'a> FunctionKit<'a> {
                             .mem_pool
                             .get_icmp(ICmpOp::Sge, max_ty, lop, rop);
                         exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
+                        Ok(Value::ReadOnly(inst.into()))
                     }
                     ValueType::Float => {
                         let inst = self
@@ -191,7 +191,7 @@ impl<'a> FunctionKit<'a> {
                             .mem_pool
                             .get_fcmp(FCmpOp::Uge, max_ty, lop, rop);
                         exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
+                        Ok(Value::ReadOnly(inst.into()))
                     }
                     _ => Err(anyhow!("`>=` for NaN")).with_context(|| context!()),
                 }
@@ -209,7 +209,7 @@ impl<'a> FunctionKit<'a> {
                             .mem_pool
                             .get_icmp(ICmpOp::Sle, max_ty, lop, rop);
                         exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
+                        Ok(Value::ReadOnly(inst.into()))
                     }
                     ValueType::Float => {
                         let inst = self
@@ -217,7 +217,7 @@ impl<'a> FunctionKit<'a> {
                             .mem_pool
                             .get_fcmp(FCmpOp::Ule, max_ty, lop, rop);
                         exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
+                        Ok(Value::ReadOnly(inst.into()))
                     }
                     _ => Err(anyhow!("`<=` for NaN")).with_context(|| context!()),
                 }
@@ -232,7 +232,7 @@ impl<'a> FunctionKit<'a> {
                     ValueType::Int => {
                         let inst = self.program.mem_pool.get_icmp(ICmpOp::Eq, max_ty, lop, rop);
                         exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
+                        Ok(Value::ReadOnly(inst.into()))
                     }
                     ValueType::Float => {
                         let inst = self
@@ -240,7 +240,7 @@ impl<'a> FunctionKit<'a> {
                             .mem_pool
                             .get_fcmp(FCmpOp::Ueq, max_ty, lop, rop);
                         exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
+                        Ok(Value::ReadOnly(inst.into()))
                     }
                     _ => Err(anyhow!("`==` for NaN")).with_context(|| context!()),
                 }
@@ -255,7 +255,7 @@ impl<'a> FunctionKit<'a> {
                     ValueType::Int => {
                         let inst = self.program.mem_pool.get_icmp(ICmpOp::Ne, max_ty, lop, rop);
                         exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
+                        Ok(Value::ReadOnly(inst.into()))
                     }
                     ValueType::Float => {
                         let inst = self
@@ -263,7 +263,7 @@ impl<'a> FunctionKit<'a> {
                             .mem_pool
                             .get_fcmp(FCmpOp::Une, max_ty, lop, rop);
                         exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
+                        Ok(Value::ReadOnly(inst.into()))
                     }
                     _ => Err(anyhow!("`!=` for NaN")).with_context(|| context!()),
                 }
@@ -276,7 +276,7 @@ impl<'a> FunctionKit<'a> {
                 // Add "and" instruction, operand is the result of the instruction
                 let inst = self.program.mem_pool.get_and(lop, rop);
                 exit.push_back(inst);
-                Ok(Value::Operand(inst.into()))
+                Ok(Value::ReadOnly(inst.into()))
             }
             BinaryOp::Or => {
                 // Load operands as bool
@@ -286,7 +286,7 @@ impl<'a> FunctionKit<'a> {
                 // Add "or" instruction, operand is the result of the instruction
                 let inst = self.program.mem_pool.get_or(lop, rop);
                 exit.push_back(inst);
-                Ok(Value::Operand(inst.into()))
+                Ok(Value::ReadOnly(inst.into()))
             }
         }
     }

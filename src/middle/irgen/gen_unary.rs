@@ -30,7 +30,7 @@ impl<'a> FunctionKit<'a> {
                             .mem_pool
                             .get_sub(Constant::Int(0).into(), operand);
                         exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
+                        Ok(Value::ReadOnly(inst.into()))
                     }
                     ValueType::Float => {
                         let inst = self
@@ -38,7 +38,7 @@ impl<'a> FunctionKit<'a> {
                             .mem_pool
                             .get_fsub(Constant::Float(0.0).into(), operand);
                         exit.push_back(inst);
-                        Ok(Value::Operand(inst.into()))
+                        Ok(Value::ReadOnly(inst.into()))
                     }
                     ValueType::Bool => {
                         // Convert to int and then make negative
@@ -49,7 +49,7 @@ impl<'a> FunctionKit<'a> {
                             .get_sub(Constant::Int(0).into(), zext.into());
                         exit.push_back(zext);
                         exit.push_back(sub);
-                        Ok(Value::Operand(sub.into()))
+                        Ok(Value::ReadOnly(sub.into()))
                     }
                     _ => Err(anyhow!("`-` for NaN")).with_context(|| context!()),
                 }
@@ -59,7 +59,7 @@ impl<'a> FunctionKit<'a> {
                 let operand = val.load(ty.clone(), self)?;
                 match ty {
                     ValueType::Int | ValueType::Float | ValueType::Bool => {
-                        Ok(Value::Operand(operand))
+                        Ok(Value::ReadOnly(operand))
                     }
                     _ => Err(anyhow!("`+` for NaN")).with_context(|| context!()),
                 }
@@ -74,7 +74,7 @@ impl<'a> FunctionKit<'a> {
                     .mem_pool
                     .get_xor(bool_op, Constant::Bool(true).into());
                 exit.push_back(inst);
-                Ok(Value::Operand(inst.into()))
+                Ok(Value::ReadOnly(inst.into()))
             }
             _ => Err(anyhow!("unary operator not supported")).with_context(|| context!()),
         }
