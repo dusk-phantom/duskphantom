@@ -6,7 +6,7 @@ use builder::IRBuilder;
 use llvm_ir::{Constant, Name};
 
 impl IRBuilder {
-    pub fn count_num_byte(bits: usize) -> Result<usize> {
+    pub fn count_num_byte(bits: u32) -> Result<u32> {
         if bits % 8 == 0 {
             Ok(bits / 8)
         } else if bits % 4 == 0 {

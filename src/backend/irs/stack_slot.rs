@@ -2,19 +2,19 @@
 
 #[derive(Debug, Clone, Copy)]
 pub struct StackSlot {
-    start: usize,
-    size: usize,
+    start: u32,
+    size: u32,
 }
 impl StackSlot {
     /// get the start address of the stack slot,stack_slot[start]=<s> means
     /// this stack slot if from <s>(sp) to <e>(sp)
-    pub fn start(&self) -> usize {
+    pub fn start(&self) -> u32 {
         self.start
     }
-    pub fn end(&self) -> usize {
+    pub fn end(&self) -> u32 {
         self.start + self.size
     }
-    pub fn size(&self) -> usize {
+    pub fn size(&self) -> u32 {
         self.size
     }
 
@@ -25,7 +25,7 @@ impl StackSlot {
 
 // StackAllocator: a simple stack allocator for stack slots.
 pub struct StackAllocator {
-    alloc_from: usize,
+    alloc_from: u32,
 }
 impl Default for StackAllocator {
     fn default() -> Self {
@@ -37,7 +37,7 @@ impl StackAllocator {
         StackAllocator { alloc_from: 0 }
     }
     // alloc num byte size memory
-    pub fn alloc(&mut self, num_byte: usize) -> StackSlot {
+    pub fn alloc(&mut self, num_byte: u32) -> StackSlot {
         let ret = StackSlot {
             start: self.alloc_from,
             size: num_byte,
@@ -46,7 +46,7 @@ impl StackAllocator {
         ret
     }
     // return how many byte had been allocated
-    pub fn allocated(&self) -> usize {
+    pub fn allocated(&self) -> u32 {
         self.alloc_from
     }
 }
