@@ -80,7 +80,7 @@ impl IRBuilder {
             ValueType::Int => 4usize, // 4B
             _ => todo!(),             // TODO
         };
-        let ss = stack_allocator.alloc(bits as usize);
+        let ss = stack_allocator.alloc(bits);
         stack_slots.insert(name.into(), ss);
         Ok(vec![])
     }
