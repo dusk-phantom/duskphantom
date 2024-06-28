@@ -80,7 +80,7 @@ impl IRBuilder {
             ValueType::Int => 4usize, // 4B
             _ => todo!(),             // TODO
         };
-        let ss = stack_allocator.alloc(bits);
+        let ss = stack_allocator.alloc(bits as u32);
         stack_slots.insert(name.into(), ss);
         Ok(vec![])
     }
@@ -101,7 +101,8 @@ impl IRBuilder {
             Operand::Imm(imm) => {
                 let dst = reg_gener.gen_virtual_usual_reg();
                 let li = AddInst::new(dst.into(), REG_ZERO.into(), imm.into());
-                let sd = StoreInst::new(dst, address.try_into()?);
+                let src = dst;
+                let sd = StoreInst::new(address.try_into()?, src);
                 ret.push(li.into());
                 ret.push(sd.into());
             }
