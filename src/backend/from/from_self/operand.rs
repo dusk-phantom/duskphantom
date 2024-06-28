@@ -7,7 +7,6 @@ use crate::backend::{Operand, Reg, StackSlot};
 use crate::context;
 
 use crate::middle;
-use crate::middle::ir::Instruction;
 
 use super::*;
 use builder::IRBuilder;
@@ -108,7 +107,6 @@ impl IRBuilder {
 
     #[inline]
     pub fn func_name_from(operand: &middle::ir::Operand) -> Result<String> {
-        unimplemented!();
         /* TODO */
         let name: &str = match operand {
             middle::ir::Operand::Global(_) => {

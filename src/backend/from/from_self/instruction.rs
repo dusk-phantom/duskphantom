@@ -12,7 +12,6 @@ use anyhow::{Context, Result};
 use anyhow::Ok;
 use builder::IRBuilder;
 use llvm_ir::Name;
-use std::any::Any;
 use std::collections::HashMap;
 
 impl IRBuilder {
@@ -158,7 +157,7 @@ impl IRBuilder {
                             let name: Name = instr.get_id().into();
                             let reg = regs.get(&name).ok_or(anyhow!("").context(context!()))?;
                             let mv_inst = match instr.get_value_type() {
-                                ValueType::Int => MvInst::new(REG_A0.into(), reg.clone().into()),
+                                ValueType::Int => MvInst::new(REG_A0.into(), (*reg).into()),
                                 ValueType::Float => unimplemented!(),
                                 _ => todo!(),
                             };
