@@ -43,7 +43,7 @@ impl IRBuilder {
                 middle::ir::Constant::Int(value) => {
                     let var = Var::Prim(PrimVar::IntVar(IntVar {
                         name: name.to_string(),
-                        init: Some(*value as i32),
+                        init: Some(*value),
                         is_const: false, // TODO
                     }));
                     global_vars.push(var);
@@ -51,7 +51,7 @@ impl IRBuilder {
                 middle::ir::Constant::Float(value) => {
                     let var = Var::Prim(PrimVar::FloatVar(FloatVar {
                         name: name.to_string(),
-                        init: Some(*value as f32),
+                        init: Some(*value),
                         is_const: false,
                     }));
                     global_vars.push(var);
@@ -71,7 +71,7 @@ impl IRBuilder {
                             let mut init = Vec::new();
                             for (index, con) in arr.iter().enumerate() {
                                 if let middle::ir::Constant::Int(value) = con {
-                                    init.push((index, *value as i32 as u32)); // FIXME 这里 i32 和 u32 注意
+                                    init.push((index, *value as u32)); // FIXME 这里 i32 和 u32 注意
                                 } else {
                                     unreachable!();
                                 }
@@ -88,7 +88,7 @@ impl IRBuilder {
                             let mut init = Vec::new();
                             for (index, con) in arr.iter().enumerate() {
                                 if let middle::ir::Constant::Float(value) = con {
-                                    init.push((index, *value as f32));
+                                    init.push((index, *value));
                                 } else {
                                     unreachable!();
                                 }
