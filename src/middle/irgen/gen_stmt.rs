@@ -191,8 +191,9 @@ impl<'a> FunctionKit<'a> {
                 };
 
                 // Add ret instruction to exit block
-                let ret = self.program.mem_pool.get_ret(return_value);
-                exit.push_back(ret);
+                if let Some(mut exit) = self.exit {
+                    exit.push_back(self.program.mem_pool.get_ret(return_value));
+                }
             }
             Stmt::Block(stmts) => {
                 // Add statements to current block
