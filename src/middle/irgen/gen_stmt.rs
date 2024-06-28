@@ -30,25 +30,26 @@ impl<'a> FunctionKit<'a> {
             Stmt::If(cond, then, alt) => {
                 // Allocate basic blocks
                 let cond_name = self.unique_name("cond");
-                let mut cond_bb = self.program.mem_pool.new_basicblock(cond_name);
+                let cond_entry = self.program.mem_pool.new_basicblock(cond_name);
                 let then_name = self.unique_name("then");
                 let then_entry = self.program.mem_pool.new_basicblock(then_name);
                 let alt_name = self.unique_name("alt");
                 let alt_entry = self.program.mem_pool.new_basicblock(alt_name);
                 let final_name = self.unique_name("final");
-                let final_bb = self.program.mem_pool.new_basicblock(final_name);
+                let final_entry = self.program.mem_pool.new_basicblock(final_name);
 
                 // Redirect exit to condition block
-                exit.set_true_bb(cond_bb);
+                exit.set_true_bb(cond_entry);
                 exit.push_back(self.program.mem_pool.get_br(None));
 
                 // Add condition and br to condition block
-                self.exit = Some(cond_bb);
+                self.exit = Some(cond_entry);
                 let operand = self.gen_expr(cond)?.load(ValueType::Bool, self)?;
-                let br = self.program.mem_pool.get_br(Some(operand));
-                cond_bb.push_back(br);
-                cond_bb.set_true_bb(then_entry);
-                cond_bb.set_false_bb(alt_entry);
+                if let Some(mut cond_exit) = self.exit {
+                    cond_exit.push_back(self.program.mem_pool.get_br(Some(operand)));
+                    cond_exit.set_true_bb(then_entry);
+                    cond_exit.set_false_bb(alt_entry);
+                }
 
                 // Add statements and br to then branch
                 // Retain break_to and continue_to
@@ -58,7 +59,7 @@ impl<'a> FunctionKit<'a> {
                     .exit;
                 if let Some(mut then_exit) = then_exit {
                     then_exit.push_back(self.program.mem_pool.get_br(None));
-                    then_exit.set_true_bb(final_bb);
+                    then_exit.set_true_bb(final_entry);
                 }
 
                 // Add statements and br to alt branch
@@ -68,54 +69,55 @@ impl<'a> FunctionKit<'a> {
                     .exit;
                 if let Some(mut alt_exit) = alt_exit {
                     alt_exit.push_back(self.program.mem_pool.get_br(None));
-                    alt_exit.set_true_bb(final_bb);
+                    alt_exit.set_true_bb(final_entry);
                 }
 
                 // Exit is final block
-                self.exit = Some(final_bb);
+                self.exit = Some(final_entry);
             }
             Stmt::While(cond, body) => {
                 // Allocate basic blocks
                 let cond_name = self.unique_name("cond");
-                let mut cond_bb = self.program.mem_pool.new_basicblock(cond_name);
+                let cond_entry = self.program.mem_pool.new_basicblock(cond_name);
                 let body_name = self.unique_name("body");
                 let body_entry = self.program.mem_pool.new_basicblock(body_name);
                 let final_name = self.unique_name("final");
-                let final_bb = self.program.mem_pool.new_basicblock(final_name);
+                let final_entry = self.program.mem_pool.new_basicblock(final_name);
 
                 // Redirect current exit to condition block
-                exit.set_true_bb(cond_bb);
+                exit.set_true_bb(cond_entry);
                 exit.push_back(self.program.mem_pool.get_br(None));
 
                 // Add statements and br to body block
                 let body_exit = self
-                    .gen_function_kit(body_entry, Some(final_bb), Some(cond_bb))
+                    .gen_function_kit(body_entry, Some(final_entry), Some(cond_entry))
                     .gen_stmt(body)?
                     .exit;
                 if let Some(mut body_exit) = body_exit {
                     body_exit.push_back(self.program.mem_pool.get_br(None));
-                    body_exit.set_true_bb(cond_bb);
+                    body_exit.set_true_bb(cond_entry);
                 }
 
                 // Add condition and br to condition block
-                self.exit = Some(cond_bb);
-                cond_bb.set_true_bb(body_entry);
-                cond_bb.set_false_bb(final_bb);
+                self.exit = Some(cond_entry);
                 let operand = self.gen_expr(cond)?.load(ValueType::Bool, self)?;
-                let br = self.program.mem_pool.get_br(Some(operand));
-                cond_bb.push_back(br);
+                if let Some(mut cond_exit) = self.exit {
+                    cond_exit.push_back(self.program.mem_pool.get_br(Some(operand)));
+                    cond_exit.set_true_bb(body_entry);
+                    cond_exit.set_false_bb(final_entry);
+                }
 
                 // Exit is final block
-                self.exit = Some(final_bb);
+                self.exit = Some(final_entry);
             }
             Stmt::DoWhile(body, cond) => {
                 // Allocate basic blocks
                 let body_name = self.unique_name("body");
                 let body_entry = self.program.mem_pool.new_basicblock(body_name);
                 let cond_name = self.unique_name("cond");
-                let mut cond_bb = self.program.mem_pool.new_basicblock(cond_name);
+                let cond_entry = self.program.mem_pool.new_basicblock(cond_name);
                 let final_name = self.unique_name("final");
-                let final_bb = self.program.mem_pool.new_basicblock(final_name);
+                let final_entry = self.program.mem_pool.new_basicblock(final_name);
 
                 // Redirect current exit to body block
                 exit.set_true_bb(body_entry);
@@ -123,24 +125,25 @@ impl<'a> FunctionKit<'a> {
 
                 // Add statements and br to body block
                 let body_exit = self
-                    .gen_function_kit(body_entry, Some(final_bb), Some(cond_bb))
+                    .gen_function_kit(body_entry, Some(final_entry), Some(cond_entry))
                     .gen_stmt(body)?
                     .exit;
                 if let Some(mut body_exit) = body_exit {
                     body_exit.push_back(self.program.mem_pool.get_br(None));
-                    body_exit.set_true_bb(cond_bb);
+                    body_exit.set_true_bb(cond_entry);
                 }
 
                 // Add condition and br to condition block
-                self.exit = Some(cond_bb);
-                cond_bb.set_true_bb(body_entry);
-                cond_bb.set_false_bb(final_bb);
+                self.exit = Some(cond_entry);
                 let operand = self.gen_expr(cond)?.load(ValueType::Bool, self)?;
-                let br = self.program.mem_pool.get_br(Some(operand));
-                cond_bb.push_back(br);
+                if let Some(mut cond_exit) = self.exit {
+                    cond_exit.push_back(self.program.mem_pool.get_br(Some(operand)));
+                    cond_exit.set_true_bb(body_entry);
+                    cond_exit.set_false_bb(final_entry);
+                }
 
                 // Exit is final block
-                self.exit = Some(final_bb);
+                self.exit = Some(final_entry);
             }
             Stmt::For(_, _, _, _) => {
                 return Err(anyhow!("`for` statement can't be generated"))
