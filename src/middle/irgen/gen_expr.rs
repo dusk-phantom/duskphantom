@@ -63,9 +63,18 @@ impl<'a> FunctionKit<'a> {
                     }
                 } else {
                     for (i, arg) in args.iter().enumerate() {
-                        // Support constant argument for dynamic library functions like `putf`
+                        // Support constant argument only for dynamic library functions like `putf`
                         let arg = if is_argument_const(&func_name, i) {
-                            self.gen_program_kit().gen_const_expr(arg)?.into()
+                            let constant = self.gen_program_kit().gen_const_expr(arg)?;
+                            let name = self.unique_name("format");
+                            let gvar = self.program.mem_pool.new_global_variable(
+                                name,
+                                constant.get_type(),
+                                false,
+                                constant,
+                            );
+                            self.program.module.global_variables.push(gvar);
+                            Value::ReadWrite(gvar.into()).load_uncast(self)?.0
                         } else {
                             self.gen_expr(arg)?.load_uncast(self)?.0
                         };
