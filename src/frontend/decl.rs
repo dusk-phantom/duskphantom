@@ -1,4 +1,4 @@
-use winnow::error::ErrMode;
+use winnow::error::{ErrMode, ErrorKind};
 
 use super::*;
 
@@ -96,7 +96,7 @@ pub fn assignment(input: &mut &str, left_type: Type) -> PResult<Decl> {
     let left_val = lval.parse_next(input)?;
     let typed_ident = acc_lval(left_type, left_val);
     let Some(id) = typed_ident.id else {
-        return Err(ErrMode::Cut(ContextError::new()));
+        return Err(ErrMode::from_error_kind(input, ErrorKind::Verify).cut());
     };
 
     // Parse optional assignment.

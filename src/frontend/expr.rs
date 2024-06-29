@@ -86,10 +86,7 @@ pub fn prefix(input: &mut &str) -> PResult<Expr> {
             curly(separated(0.., expr, token(","))).map(Expr::Pack),
             curly(separated(0.., map_entry, token(","))).map(Expr::Map)
         )),
-        '0'..='9' => alt((
-            pad(float).map(Expr::Float32),
-            pad(int).map(Expr::Int32),
-        )),
+        '.' | '0'..='9' => pad(constant_number),
         '"' => pad(string_lit).map(Expr::String),
         '\'' => pad(char_lit).map(Expr::Char),
         'f' => token("false").value(Expr::Bool(false)),
@@ -154,7 +151,7 @@ pub mod tests_expr {
     #[test]
     fn test_minimal() {
         let code = "80";
-        match int.parse(code) {
+        match usize.parse(code) {
             Ok(result) => assert_eq!(result, 80),
             Err(err) => panic!("failed to parse {}: {}", code, err),
         }
