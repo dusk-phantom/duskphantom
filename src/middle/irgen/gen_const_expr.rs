@@ -35,7 +35,11 @@ impl<'a> ProgramKit<'a> {
             Expr::Select(_, _) => Err(anyhow!("select not supported")).with_context(|| context!()),
             Expr::Int32(x) => Ok(Constant::Int(*x)),
             Expr::Float32(x) => Ok(Constant::Float(*x)),
-            Expr::String(_) => Err(anyhow!("string not implemented")).with_context(|| context!()),
+            Expr::String(str) => Ok(Constant::Array(
+                str.chars()
+                    .map(|x| Constant::Int(x as i32))
+                    .collect::<Vec<_>>(),
+            )),
             Expr::Char(_) => Err(anyhow!("char not implemented")).with_context(|| context!()),
             Expr::Bool(_) => Err(anyhow!("bool not implemented")).with_context(|| context!()),
             Expr::Call(_, _) => Err(anyhow!("call not implemented")).with_context(|| context!()),

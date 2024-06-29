@@ -1262,4 +1262,35 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         assert_eq!(llvm_ir, expected);
     }
+
+    #[test]
+    fn test_putf() {
+        let code = r#"
+            int main() {
+                int x = getint();
+                putf("x = %d", x);
+                return 0;
+            }
+        "#;
+        let expected = r#"define i32 @main() {
+            %entry:
+            %alloca_1 = alloca i32
+            %call_2 = call i32 @getint()
+            store i32 %call_2, ptr %alloca_1
+            %load_4 = load i32, ptr %alloca_1
+            %call_5 = call void @putf([6 x i32] [i32 120, i32 32, i32 61, i32 32, i32 37, i32 100], i32 %load_4)
+            ret 0
+            
+            
+            }
+            "#
+        .split('\n')
+        .map(|x| x.trim())
+        .collect::<Vec<&str>>()
+        .join("\n");
+        let program = parse(code).unwrap();
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_eq!(llvm_ir, expected);
+    }
 }
