@@ -1272,18 +1272,20 @@ mod tests {
                 return 0;
             }
         "#;
-        let expected = r#"define i32 @main() {
-            %entry:
-            %alloca_1 = alloca i32
-            %call_2 = call i32 @getint()
-            store i32 %call_2, ptr %alloca_1
-            %load_4 = load i32, ptr %alloca_1
-            %call_5 = call void @putf([6 x i32] [i32 120, i32 32, i32 61, i32 32, i32 37, i32 100], i32 %load_4)
-            ret 0
-            
-            
-            }
-            "#
+        let expected = r#"@format0 = dso_local constant [7 x i32] [i32 120, i32 32, i32 61, i32 32, i32 37, i32 100, i32 0]
+        define i32 @main() {
+        %entry:
+        %alloca_1 = alloca i32
+        %call_2 = call i32 @getint()
+        store i32 %call_2, ptr %alloca_1
+        %getelementptr_4 = getelementptr [7 x i32], ptr @format0, i32 0, i32 0
+        %load_5 = load i32, ptr %alloca_1
+        %call_6 = call void @putf(i32* %getelementptr_4, i32 %load_5)
+        ret 0
+        
+        
+        }
+        "#
         .split('\n')
         .map(|x| x.trim())
         .collect::<Vec<&str>>()
