@@ -50,5 +50,10 @@ impl<'a> ProgramKit<'a> {
         );
         insert("starttime", ValueType::Void, vec![]);
         insert("stoptime", ValueType::Void, vec![]);
+        insert("putf", ValueType::Void, vec![]);
     }
+}
+
+pub fn is_argument_const(func_name: &str, index: usize) -> bool {
+    func_name == "putf" && index == 0
 }

@@ -53,22 +53,22 @@ impl Value {
         }
     }
 
-    /// Load the value as an operand
-    pub fn load(self, target: ValueType, kit: &mut FunctionKit) -> Result<Operand> {
-        let mut value_type = self.get_type();
+    /// Load the value as an operand without type-cast,
+    /// returns the loaded operand along with it's type.
+    ///
+    /// The type changes to pointer when attempt to load array,
+    /// i.e. `[n x element_type]*` is treated as `element_type**`,
+    /// causing arrays to be passed by reference.
+    pub fn load_uncast(self, kit: &mut FunctionKit) -> Result<(Operand, ValueType)> {
+        let value_type = self.get_type();
 
         // Load uncast operand
-        //
         // If this is a read-write value, load the operand from pointer,
         // otherwise just return the operand
-        //
-        // If underlying value is array, we can't get its value by `load`,
-        // instead get its reference by `getelementptr`, and change `value_type` from
-        // value type `[n * element_type]` to reference type `element_type*`
-        let uncast_operand = match self {
-            Value::ReadOnly(operand) => operand,
+        match self {
+            Value::ReadOnly(operand) => Ok((operand, value_type)),
             Value::ReadWrite(pointer) => {
-                let inst = match value_type {
+                let (inst, loaded_type) = match value_type {
                     ValueType::Array(ref element_type, _) => {
                         // This GEP changes `[n x element_type]*` to `element_type*`
                         let inst = kit.program.mem_pool.get_getelementptr(
@@ -79,27 +79,35 @@ impl Value {
 
                         // Array can't be loaded directly, instead pass array by reference
                         // So the `value_type` is changed to reference accordingly
-                        value_type = ValueType::Pointer((*element_type.clone()).into());
-                        inst
+                        (inst, ValueType::Pointer((*element_type.clone()).into()))
                     }
-                    _ => kit.program.mem_pool.get_load(value_type.clone(), pointer),
+                    _ => (
+                        // This load changes `element_type**` to `element_type*
+                        kit.program.mem_pool.get_load(value_type.clone(), pointer),
+                        value_type,
+                    ),
                 };
                 kit.exit.unwrap().push_back(inst);
-                inst.into()
+                Ok((inst.into(), loaded_type))
             }
             Value::Array(_) => {
                 // Array is not loadable
-                return Err(anyhow!("array is not loadable")).with_context(|| context!());
+                Err(anyhow!("array is not loadable")).with_context(|| context!())
             }
-        };
+        }
+    }
+
+    /// Load the value as an operand
+    pub fn load(self, target: ValueType, kit: &mut FunctionKit) -> Result<Operand> {
+        let (uncast_operand, loaded_type) = self.load_uncast(kit)?;
 
         // Return directly if type matches
-        if value_type == target {
+        if loaded_type == target {
             return Ok(uncast_operand);
         }
 
         // Convert type if not match
-        match (value_type, target) {
+        match (loaded_type, target) {
             (ValueType::Int, ValueType::Float) => {
                 // Direct convert
                 let inst = kit.program.mem_pool.get_itofp(uncast_operand);
@@ -161,7 +169,8 @@ impl Value {
     /// shifts it by (2 * n + 8) * sizeof i32.
     ///
     /// If current value type is pointer, it will be treated as array,
-    /// and `getelementptr` for array equivalents to `load` for pointer
+    /// i.e. `element_type**` is treated as `[n * element_type]*`,
+    /// making array reference act like an array.
     pub fn getelementptr(self, kit: &mut FunctionKit, index: Vec<Operand>) -> Result<Value> {
         let value_type = self.get_type();
         match self {
