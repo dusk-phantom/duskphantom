@@ -77,18 +77,31 @@ int main() {
     fn test_number() {
         let code = r#"
 int main() {
-    int x = 3;
-    float y = 3.7;
-    int z1 = 0xFACE;
-    int z2 = 0Xbad4;
-    int w = 0777;
+    int a0 = 3;
+    int a1 = 0xFACE;
+    int a2 = 0Xbad4;
+    int a3 = 0777;
+    float b0 = 3.7;
+    float b1 = 2.;
+    float b2 = .9;
+    float c0 = 2.3e+4;
+    float c1 = 0.5e-9;
+    float c2 = 1e3;
+    float c3 = 2.e4;
+    float c4 = .5e1;
+    float d0 = 0x1.ep+3;
+    float d1 = 0x8.Ap-3;
+    float d2 = 0xFp3;
+    float d3 = 0Xfp3;
+    float d4 = 0xc.p3;
+    float d5 = 0x.Dp3;
 }
 "#;
         match parse(code) {
             Ok(result) => {
                 assert_eq!(
                     format!("{:?}", result),
-                    "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Int32, \"x\", Some(Int32(3)))), Decl(Var(Float32, \"y\", Some(Float32(3.7)))), Decl(Var(Int32, \"z1\", Some(Int32(64206)))), Decl(Var(Int32, \"z2\", Some(Int32(47828)))), Decl(Var(Int32, \"w\", Some(Int32(511))))])))] }"
+                    "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Int32, \"a0\", Some(Int32(3)))), Decl(Var(Int32, \"a1\", Some(Int32(64206)))), Decl(Var(Int32, \"a2\", Some(Int32(47828)))), Decl(Var(Int32, \"a3\", Some(Int32(511)))), Decl(Var(Float32, \"b0\", Some(Float32(3.7)))), Decl(Var(Float32, \"b1\", Some(Float32(2.0)))), Decl(Var(Float32, \"b2\", Some(Float32(0.9)))), Decl(Var(Float32, \"c0\", Some(Float32(23000.0)))), Decl(Var(Float32, \"c1\", Some(Float32(5e-10)))), Decl(Var(Float32, \"c2\", Some(Float32(1000.0)))), Decl(Var(Float32, \"c3\", Some(Float32(20000.0)))), Decl(Var(Float32, \"c4\", Some(Float32(5.0)))), Decl(Var(Float32, \"d0\", Some(Float32(15.0)))), Decl(Var(Float32, \"d1\", Some(Float32(1.078125)))), Decl(Var(Float32, \"d2\", Some(Float32(120.0)))), Decl(Var(Float32, \"d3\", Some(Float32(120.0)))), Decl(Var(Float32, \"d4\", Some(Float32(96.0)))), Decl(Var(Float32, \"d5\", Some(Float32(6.5))))])))] }"
                 )
             }
             Err(err) => match err {
