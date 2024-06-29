@@ -74,6 +74,31 @@ int main() {
     }
 
     #[test]
+    fn test_number() {
+        let code = r#"
+int main() {
+    int x = 3;
+    float y = 3.7;
+    int z1 = 0xFACE;
+    int z2 = 0Xbad4;
+    int w = 0777;
+}
+"#;
+        match parse(code) {
+            Ok(result) => {
+                assert_eq!(
+                    format!("{:?}", result),
+                    "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Int32, \"x\", Some(Int32(3)))), Decl(Var(Float32, \"y\", Some(Float32(3.7)))), Decl(Var(Int32, \"z1\", Some(Int32(64206)))), Decl(Var(Int32, \"z2\", Some(Int32(47828)))), Decl(Var(Int32, \"w\", Some(Int32(511))))])))] }"
+                )
+            }
+            Err(err) => match err {
+                FrontendError::ParseError(s) => panic!("{}", s),
+                FrontendError::OptimizeError => panic!("optimize error"),
+            },
+        }
+    }
+
+    #[test]
     fn test_assign() {
         let code = "int n = 3;";
         match parse(code) {
