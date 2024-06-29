@@ -22,15 +22,33 @@ pub fn ident(input: &mut &str) -> PResult<String> {
 
 /// Parser of an integer.
 pub fn int(input: &mut &str) -> PResult<i32> {
-    take_while(1.., '0'..='9')
-        .map(|s: &str| s.parse().unwrap())
+    let is_oct_or_hex = opt("0").parse_next(input)?.is_some();
+    let is_hex = opt(alt(("x", "X"))).parse_next(input)?.is_some();
+    let radix = if is_hex {
+        16
+    } else if is_oct_or_hex {
+        8
+    } else {
+        10
+    };
+    take_while(1.., ('0'..='9', 'a'..='z', 'A'..='Z'))
+        .map(|s: &str| i32::from_str_radix(s, radix).unwrap())
         .parse_next(input)
 }
 
 /// Parser of a usize.
 pub fn usize(input: &mut &str) -> PResult<usize> {
-    take_while(1.., '0'..='9')
-        .map(|s: &str| s.parse().unwrap())
+    let is_oct_or_hex = opt("0").parse_next(input)?.is_some();
+    let is_hex = opt(alt(("x", "X"))).parse_next(input)?.is_some();
+    let radix = if is_oct_or_hex {
+        8
+    } else if is_hex {
+        16
+    } else {
+        10
+    };
+    take_while(1.., ('0'..='9', 'a'..='z', 'A'..='Z'))
+        .map(|s: &str| usize::from_str_radix(s, radix).unwrap())
         .parse_next(input)
 }
 
