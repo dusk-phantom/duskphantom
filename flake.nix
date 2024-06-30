@@ -16,7 +16,7 @@
         ];
       in {
         devShell = pkgs.mkShell {
-          buildInputs = with pkgs; [ clang llvm_16 rustup ];
+          buildInputs = with pkgs; [ clang llvm_16 rustup glib gcc ];
 
           RUSTC_VERSION = overrides.toolchain.channel;
 
@@ -33,6 +33,7 @@
             git config --global core.editor "nvim"
           '';
 
+          # 这是一个 lambda
           RUSTFLAGS = builtins.map (a: "-L ${a}/lib") [
             # add libraries here (e.g. pkgs.libvmi)
           ];
