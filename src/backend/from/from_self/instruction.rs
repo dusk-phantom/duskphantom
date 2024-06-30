@@ -35,7 +35,7 @@ impl IRBuilder {
                 );
                 Self::build_store_inst(store, stack_slots, reg_gener, regs)
             }
-            middle::ir::instruction::InstType::Head => todo!(),
+            middle::ir::instruction::InstType::Head => unreachable!(), // 应该是不能有 Head 出现的
             middle::ir::instruction::InstType::Add => todo!(),
             middle::ir::instruction::InstType::FAdd => todo!(),
             middle::ir::instruction::InstType::Sub => todo!(),
@@ -78,7 +78,7 @@ impl IRBuilder {
         let ty = alloca.value_type.clone();
         let bits = match ty {
             ValueType::Int => 4usize, // 4B
-            _ => todo!(),             // TODO
+            _ => todo!(),             // TODO 如果是其他大小的指令
         };
         let ss = stack_allocator.alloc(bits as u32);
         stack_slots.insert(name.into(), ss);
@@ -95,7 +95,6 @@ impl IRBuilder {
         let val = &store.get_value();
         let address = Self::address_from(address, stack_slots).with_context(|| context!())?;
         let val = Self::value_from(val, regs).with_context(|| context!())?;
-        dbg!("gg");
         let mut ret: Vec<Inst> = Vec::new();
         match val {
             Operand::Imm(imm) => {
