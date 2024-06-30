@@ -106,29 +106,24 @@ impl IRBuilder {
     }
 
     #[inline]
-    pub fn func_name_from(operand: &middle::ir::Operand) -> Result<String> {
-        /* TODO */
-        let name: &str = match operand {
-            middle::ir::Operand::Global(_) => {
-                /* TODO */
-                Err(anyhow!("local operand".to_string())).with_context(|| context!())
-            }
-            middle::ir::Operand::Constant(con) => match con {
-                middle::ir::Constant::Int(_) => todo!(),
-                middle::ir::Constant::Float(_) => todo!(),
-                middle::ir::Constant::Bool(_) => todo!(),
-                middle::ir::Constant::Array(_) => todo!(),
-                /* TODO */
-                // Constant::GlobalReference { name, ty: _ } => Ok(name.clone()),
-            },
-            /* TODO */
-            middle::ir::Operand::Parameter(_) => todo!(),
-            middle::ir::Operand::Instruction(_) => todo!(),
-        }?;
-        let f_name = name.to_string();
-        let f_name = &f_name
-            .strip_prefix('%')
-            .ok_or(anyhow!("").context(context!()))?;
-        Ok(f_name.to_string())
+    pub fn func_name_from(_operand: &middle::ir::Operand) -> Result<String> {
+        unimplemented!();
+        // let name: &str = match operand {
+        //     middle::ir::Operand::Global(_) => {
+        //         /* TODO */
+        //         Err(anyhow!("local operand".to_string())).with_context(|| context!())
+        //     }
+        //     middle::ir::Operand::Constant(_) => {
+        //         Err(anyhow!("local operand".to_string())).with_context(|| context!())
+        //     }
+        //     /* TODO */
+        //     middle::ir::Operand::Parameter(_) => todo!(),
+        //     middle::ir::Operand::Instruction(_) => todo!(),
+        // }?;
+        // let f_name = name.to_string();
+        // let f_name = &f_name
+        //     .strip_prefix('%')
+        //     .ok_or(anyhow!("").context(context!()))?;
+        // Ok(f_name.to_string())
     }
 }

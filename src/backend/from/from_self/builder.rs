@@ -44,7 +44,7 @@ impl IRBuilder {
                     let var = Var::Prim(PrimVar::IntVar(IntVar {
                         name: name.to_string(),
                         init: Some(*value),
-                        is_const: false, // TODO
+                        is_const: false, // TODO 这个可能要删掉
                     }));
                     global_vars.push(var);
                 }
@@ -97,7 +97,7 @@ impl IRBuilder {
                                 name: name.to_string(),
                                 capacity: arr.len(),
                                 init,
-                                is_const: false, /* TODO */
+                                is_const: false,
                             });
                             global_vars.push(arr_var);
                         }
@@ -222,11 +222,12 @@ impl IRBuilder {
                 } else if IRBuilder::is_ty_float(&param.value_type) {
                     Reg::new(REG_FA0.id() + i as u32, true)
                 } else {
-                    // TODO 还有 Array 之类的
+                    // TODO 如果传入的参数有 数组
                     unimplemented!();
                 };
                 regs.insert(param.name.clone().into(), reg);
             } else {
+                // TODO 如果参数的个数大于 7
                 unimplemented!();
             }
         }
