@@ -5,8 +5,6 @@ use crate::middle::irgen::function_kit::FunctionKit;
 use crate::middle::irgen::value::Value;
 use anyhow::{anyhow, Context};
 
-use super::library_function::get_library_return_type;
-
 impl<'a> FunctionKit<'a> {
     /// Generate an expression as a statement into the program
     pub fn gen_expr(&mut self, expr: &Expr) -> anyhow::Result<Value> {
@@ -35,7 +33,7 @@ impl<'a> FunctionKit<'a> {
 
                 // Generate GEP
                 self.gen_expr(x)?
-                    .get_element_ptr(self, vec![Constant::Int(0).into(), ix])
+                    .getelementptr(self, vec![Constant::Int(0).into(), ix])
             }
             Expr::Field(_, _) => Err(anyhow!("field not supported")).with_context(|| context!()),
             Expr::Select(_, _) => Err(anyhow!("select not supported")).with_context(|| context!()),
@@ -45,33 +43,26 @@ impl<'a> FunctionKit<'a> {
             Expr::Char(_) => Err(anyhow!("char not supported")).with_context(|| context!()),
             Expr::Bool(_) => Err(anyhow!("bool not supported")).with_context(|| context!()),
             Expr::Call(func, args) => {
-                // Generate arguments
-                let mut operands = Vec::new();
-                for arg in args.iter() {
-                    operands.push(self.gen_expr(arg)?.load(ValueType::Int, self)?);
-                }
-
                 // Ensure function is a defined variable
-                let Expr::Var(func) = *func.clone() else {
+                let Expr::Var(func_name) = *func.clone() else {
                     return Err(anyhow!("function is not variable")).with_context(|| context!());
                 };
-                let fun = match self.fun_env.get(&func) {
-                    Some(fun) => *fun,
-                    None => match get_library_return_type(&func) {
-                        Some(return_type) => {
-                            // Allocate the library function
-                            self.program.mem_pool.new_function(func, return_type)
-                        }
-                        None => {
-                            return Err(anyhow!("function not defined")).with_context(|| context!())
-                        }
-                    },
+                let Some(func_ref) = self.fun_env.get(&func_name) else {
+                    return Err(anyhow!("function not defined")).with_context(|| context!());
                 };
+                let func_ptr = *func_ref;
+
+                // Generate arguments
+                let mut operands = Vec::new();
+                for (param, arg) in func_ptr.params.iter().zip(args.iter()) {
+                    let arg = self.gen_expr(arg)?.load(param.value_type.clone(), self)?;
+                    operands.push(arg);
+                }
 
                 // Call the function
-                let inst = self.program.mem_pool.get_call(fun, operands);
+                let inst = self.program.mem_pool.get_call(func_ptr, operands);
                 exit.push_back(inst);
-                Ok(Value::Operand(inst.into()))
+                Ok(Value::ReadOnly(inst.into()))
             }
             Expr::Unary(op, expr) => self.gen_unary(op, expr),
             Expr::Binary(op, lhs, rhs) => self.gen_binary(op, lhs, rhs),
