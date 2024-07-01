@@ -1,4 +1,5 @@
 use std::{
+    fmt::Debug,
     hash::{Hash, Hasher},
     ops::{Deref, DerefMut},
     ptr::NonNull,
@@ -87,6 +88,12 @@ impl<T> From<&T> for ObjPtr<T> {
 impl<T> From<&mut T> for ObjPtr<T> {
     fn from(ptr: &mut T) -> Self {
         Self::new(ptr)
+    }
+}
+
+impl<T> Debug for ObjPtr<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:p}", self.as_ref())
     }
 }
 

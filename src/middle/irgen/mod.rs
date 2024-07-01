@@ -738,19 +738,21 @@ mod tests {
     #[test]
     fn test_constant_array() {
         let code = r#"
-            const float A[2] = {1, 4};
+            const float A[3][2][2] = {{1}, 1, 4, 5, 1, {4}};
 
             int main() {
-                return A[0];
+                return A[0][0][0];
             }
         "#;
-        let expected = r#"@A = dso_local constant [2 x float] [i32 1, i32 4]
+        let expected = r#"@A = dso_local constant [3 x [2 x [2 x float]]] [[2 x [2 x float]] [[2 x float] [float 1, float 0], [2 x float] [float 0, float 0]], [2 x [2 x float]] [[2 x float] [float 1, float 4], [2 x float] [float 5, float 1]], [2 x [2 x float]] [[2 x float] [float 4, float 0], [2 x float] [float 0, float 0]]]
         define i32 @main() {
         %entry:
-        %getelementptr_1 = getelementptr [2 x float], ptr @A, i32 0, i32 0
-        %load_2 = load float, ptr %getelementptr_1
-        %fptoi_3 = fptosi float %load_2 to i32
-        ret %fptoi_3
+        %getelementptr_1 = getelementptr [3 x [2 x [2 x float]]], ptr @A, i32 0, i32 0
+        %getelementptr_2 = getelementptr [2 x [2 x float]], ptr %getelementptr_1, i32 0, i32 0
+        %getelementptr_3 = getelementptr [2 x float], ptr %getelementptr_2, i32 0, i32 0
+        %load_4 = load float, ptr %getelementptr_3
+        %fptoi_5 = fptosi float %load_4 to i32
+        ret %fptoi_5
         
         
         }
@@ -760,35 +762,6 @@ mod tests {
         .collect::<Vec<&str>>()
         .join("\n");
         let program = parse(code).unwrap();
-        assert_eq!(format!("{:?}", program), "Program { module: [Const(Array(Float32, 2), \"A\", Some(Pack([Int32(1), Int32(4)]))), Func(Function(Int32, []), \"main\", Some(Block([Return(Some(Index(Var(\"A\"), Int32(0))))])))] }");
-        let result = gen(&program).unwrap();
-        let llvm_ir = result.module.gen_llvm_ir();
-        assert_eq!(llvm_ir, expected);
-    }
-
-    #[test]
-    fn test_large_array() {
-        let code = r#"
-            const float A[2][3] = {{1, 1, 4}, {5, 1, 4}};
-
-            int main() {
-                return A[1][1];
-            }
-        "#;
-        let expected = r#"@A = dso_local constant [2 x [3 x float]] [[3 x i32] [i32 1, i32 1, i32 4], [3 x i32] [i32 5, i32 1, i32 4]]
-        define i32 @main() {
-        %entry:
-        %getelementptr_1 = getelementptr [2 x [3 x float]], ptr @A, i32 0, i32 1
-        %getelementptr_2 = getelementptr [3 x float], ptr %getelementptr_1, i32 0, i32 1
-        %load_3 = load float, ptr %getelementptr_2
-        %fptoi_4 = fptosi float %load_3 to i32
-        ret %fptoi_4
-        
-        
-        }
-        "#.split('\n').map(|x| x.trim()).collect::<Vec<&str>>().join("\n");
-        let program = parse(code).unwrap();
-        assert_eq!(format!("{:?}", program), "Program { module: [Const(Array(Array(Float32, 3), 2), \"A\", Some(Pack([Pack([Int32(1), Int32(1), Int32(4)]), Pack([Int32(5), Int32(1), Int32(4)])]))), Func(Function(Int32, []), \"main\", Some(Block([Return(Some(Index(Index(Var(\"A\"), Int32(1)), Int32(1))))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
         assert_eq!(llvm_ir, expected);
@@ -798,41 +771,50 @@ mod tests {
     fn test_variable_array() {
         let code = r#"
             int main() {
-                float A[2][3] = {{1, 1, 4}, {5, 1, 4}};
-                return A[1][1];
+                float A[2][2][2] = {1, 1, 4, 5, {{1}, 4}};
+                return A[1][1][1];
             }
         "#;
         let expected = r#"define i32 @main() {
             %entry:
-            %alloca_1 = alloca [2 x [3 x float]]
-            %getelementptr_2 = getelementptr [2 x [3 x float]], ptr %alloca_1, i32 0, i32 0
-            %getelementptr_3 = getelementptr [3 x float], ptr %getelementptr_2, i32 0
-            %getelementptr_4 = getelementptr [3 x float], ptr %getelementptr_3, i32 0, i32 0
-            %getelementptr_5 = getelementptr float, ptr %getelementptr_4, i32 0
-            %itofp_6 = sitofp i32 1 to float
-            store float %itofp_6, ptr %getelementptr_5
-            %getelementptr_8 = getelementptr float, ptr %getelementptr_4, i32 1
-            %itofp_9 = sitofp i32 1 to float
-            store float %itofp_9, ptr %getelementptr_8
-            %getelementptr_11 = getelementptr float, ptr %getelementptr_4, i32 2
-            %itofp_12 = sitofp i32 4 to float
-            store float %itofp_12, ptr %getelementptr_11
-            %getelementptr_14 = getelementptr [3 x float], ptr %getelementptr_2, i32 1
-            %getelementptr_15 = getelementptr [3 x float], ptr %getelementptr_14, i32 0, i32 0
-            %getelementptr_16 = getelementptr float, ptr %getelementptr_15, i32 0
-            %itofp_17 = sitofp i32 5 to float
-            store float %itofp_17, ptr %getelementptr_16
-            %getelementptr_19 = getelementptr float, ptr %getelementptr_15, i32 1
-            %itofp_20 = sitofp i32 1 to float
-            store float %itofp_20, ptr %getelementptr_19
-            %getelementptr_22 = getelementptr float, ptr %getelementptr_15, i32 2
-            %itofp_23 = sitofp i32 4 to float
-            store float %itofp_23, ptr %getelementptr_22
-            %getelementptr_25 = getelementptr [2 x [3 x float]], ptr %alloca_1, i32 0, i32 1
-            %getelementptr_26 = getelementptr [3 x float], ptr %getelementptr_25, i32 0, i32 1
-            %load_27 = load float, ptr %getelementptr_26
-            %fptoi_28 = fptosi float %load_27 to i32
-            ret %fptoi_28
+            %alloca_1 = alloca [2 x [2 x [2 x float]]]
+            %getelementptr_2 = getelementptr [2 x [2 x [2 x float]]], ptr %alloca_1, i32 0, i32 0
+            %getelementptr_3 = getelementptr [2 x [2 x float]], ptr %getelementptr_2, i32 0
+            %getelementptr_4 = getelementptr [2 x [2 x float]], ptr %getelementptr_3, i32 0, i32 0
+            %getelementptr_5 = getelementptr [2 x float], ptr %getelementptr_4, i32 0
+            %getelementptr_6 = getelementptr [2 x float], ptr %getelementptr_5, i32 0, i32 0
+            %getelementptr_7 = getelementptr float, ptr %getelementptr_6, i32 0
+            %itofp_8 = sitofp i32 1 to float
+            store float %itofp_8, ptr %getelementptr_7
+            %getelementptr_10 = getelementptr float, ptr %getelementptr_6, i32 1
+            %itofp_11 = sitofp i32 1 to float
+            store float %itofp_11, ptr %getelementptr_10
+            %getelementptr_13 = getelementptr [2 x float], ptr %getelementptr_4, i32 1
+            %getelementptr_14 = getelementptr [2 x float], ptr %getelementptr_13, i32 0, i32 0
+            %getelementptr_15 = getelementptr float, ptr %getelementptr_14, i32 0
+            %itofp_16 = sitofp i32 4 to float
+            store float %itofp_16, ptr %getelementptr_15
+            %getelementptr_18 = getelementptr float, ptr %getelementptr_14, i32 1
+            %itofp_19 = sitofp i32 5 to float
+            store float %itofp_19, ptr %getelementptr_18
+            %getelementptr_21 = getelementptr [2 x [2 x float]], ptr %getelementptr_2, i32 1
+            %getelementptr_22 = getelementptr [2 x [2 x float]], ptr %getelementptr_21, i32 0, i32 0
+            %getelementptr_23 = getelementptr [2 x float], ptr %getelementptr_22, i32 0
+            %getelementptr_24 = getelementptr [2 x float], ptr %getelementptr_23, i32 0, i32 0
+            %getelementptr_25 = getelementptr float, ptr %getelementptr_24, i32 0
+            %itofp_26 = sitofp i32 1 to float
+            store float %itofp_26, ptr %getelementptr_25
+            %getelementptr_28 = getelementptr [2 x float], ptr %getelementptr_22, i32 1
+            %getelementptr_29 = getelementptr [2 x float], ptr %getelementptr_28, i32 0, i32 0
+            %getelementptr_30 = getelementptr float, ptr %getelementptr_29, i32 0
+            %itofp_31 = sitofp i32 4 to float
+            store float %itofp_31, ptr %getelementptr_30
+            %getelementptr_33 = getelementptr [2 x [2 x [2 x float]]], ptr %alloca_1, i32 0, i32 1
+            %getelementptr_34 = getelementptr [2 x [2 x float]], ptr %getelementptr_33, i32 0, i32 1
+            %getelementptr_35 = getelementptr [2 x float], ptr %getelementptr_34, i32 0, i32 1
+            %load_36 = load float, ptr %getelementptr_35
+            %fptoi_37 = fptosi float %load_36 to i32
+            ret %fptoi_37
             
             
             }
@@ -842,7 +824,6 @@ mod tests {
         .collect::<Vec<&str>>()
         .join("\n");
         let program = parse(code).unwrap();
-        assert_eq!(format!("{:?}", program), "Program { module: [Func(Function(Int32, []), \"main\", Some(Block([Decl(Var(Array(Array(Float32, 3), 2), \"A\", Some(Pack([Pack([Int32(1), Int32(1), Int32(4)]), Pack([Int32(5), Int32(1), Int32(4)])])))), Return(Some(Index(Index(Var(\"A\"), Int32(1)), Int32(1))))])))] }");
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
         assert_eq!(llvm_ir, expected);

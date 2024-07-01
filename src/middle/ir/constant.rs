@@ -1,11 +1,11 @@
 use super::*;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Constant {
     Int(i32),
     Float(f32),
     Bool(bool),
-    Array(Vec<Constant>)
+    Array(Vec<Constant>),
 }
 
 impl std::fmt::Display for Constant {

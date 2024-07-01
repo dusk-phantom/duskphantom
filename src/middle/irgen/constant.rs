@@ -1,27 +1,58 @@
-use crate::errors::MiddleError;
-use crate::frontend::Type;
+use anyhow::{anyhow, Context, Result};
+
+use crate::context;
 use crate::middle::ir::{Constant, ValueType};
 use std::cmp;
+use std::collections::VecDeque;
 use std::ops;
 
 /// Convert a type to its default constant
-pub fn type_to_const(ty: &Type) -> Result<Constant, MiddleError> {
+pub fn type_to_const(ty: &ValueType) -> Result<Constant> {
     match ty {
-        Type::Void => Err(MiddleError::GenError),
-        Type::Int32 => Ok(Constant::Int(0)),
-        Type::Float32 => Ok(Constant::Float(0.0)),
-        Type::String => Err(MiddleError::GenError),
-        Type::Char => Err(MiddleError::GenError),
-        Type::Boolean => Ok(Constant::Bool(false)),
-        Type::Pointer(_) => Err(MiddleError::GenError),
-        Type::Array(ty, num) => {
+        ValueType::Void => {
+            Err(anyhow!("Cannot convert void type to constant")).with_context(|| context!())
+        }
+        ValueType::Int => Ok(Constant::Int(0)),
+        ValueType::Float => Ok(Constant::Float(0.0)),
+        ValueType::Bool => Ok(Constant::Bool(false)),
+        ValueType::Pointer(_) => {
+            Err(anyhow!("Cannot convert pointer type to constant")).with_context(|| context!())
+        }
+        ValueType::Array(ty, num) => {
             let inner_const = type_to_const(ty)?;
             Ok(Constant::Array(vec![inner_const; *num]))
         }
-        Type::Function(_, _) => Err(MiddleError::GenError),
-        Type::Enum(_) => Err(MiddleError::GenError),
-        Type::Union(_) => Err(MiddleError::GenError),
-        Type::Struct(_) => Err(MiddleError::GenError),
+    }
+}
+
+/// Collapse a possibly flattened constant array to nested
+///
+/// # Panics
+/// Please make sure `arr` is non-empty.
+pub fn collapse_array(arr: &mut VecDeque<Constant>, ty: &ValueType) -> Result<Constant> {
+    if let ValueType::Array(element_ty, len) = ty {
+        let mut new_arr: Vec<Constant> = vec![];
+        for _ in 0..*len {
+            let Some(first_item) = arr.pop_front() else {
+                // TODO use zero initializer
+                new_arr.push(collapse_array(arr, element_ty)?);
+                continue;
+            };
+            if let Constant::Array(arr) = first_item {
+                // First element is array, sub-array is nested
+                new_arr.push(collapse_array(&mut VecDeque::from(arr), element_ty)?);
+            } else {
+                // First element is non-array, sub-array is flattened
+                arr.push_front(first_item);
+                new_arr.push(collapse_array(arr, element_ty)?);
+            }
+        }
+        Ok(Constant::Array(new_arr))
+    } else if let Some(val) = arr.pop_front() {
+        Ok(val)
+    } else {
+        // TODO use zero initializer
+        type_to_const(ty)
     }
 }
 
@@ -55,6 +86,24 @@ impl From<Constant> for bool {
             Constant::Float(x) => x != 0.0,
             Constant::Bool(x) => x,
             _ => panic!("Cannot cast {} to bool", val),
+        }
+    }
+}
+
+impl Constant {
+    pub fn cast(self, ty: &ValueType) -> Self {
+        match ty {
+            ValueType::Int => Into::<i32>::into(self).into(),
+            ValueType::Float => Into::<f32>::into(self).into(),
+            ValueType::Bool => Into::<bool>::into(self).into(),
+            ValueType::Array(element_ty, _) => {
+                let arr = match self {
+                    Constant::Array(arr) => arr,
+                    _ => panic!("Cannot convert {} to array", self),
+                };
+                Constant::Array(arr.into_iter().map(|x| x.cast(element_ty)).collect())
+            }
+            _ => self,
         }
     }
 }
