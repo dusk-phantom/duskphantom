@@ -41,37 +41,11 @@ impl IRBuilder {
                 let add = downcast_ref::<middle::ir::instruction::binary_inst::Add>(
                     inst.as_ref().as_ref(),
                 );
+                let lhs =
+                    Self::int_operand_from(add.get_lhs(), regs).with_context(|| context!())?;
+                let rhs =
+                    Self::int_operand_from(add.get_rhs(), regs).with_context(|| context!())?;
 
-                let lhs = match add.get_lhs() {
-                    middle::ir::Operand::Constant(con) => {
-                        if let middle::ir::Constant::Int(i) = con {
-                            Operand::Imm((*i as i64).into())
-                        } else {
-                            unreachable!();
-                        }
-                    }
-                    middle::ir::Operand::Instruction(instr) => {
-                        let name: Name = instr.get_id().into();
-                        let reg = regs.get(&name).ok_or(anyhow!("").context(context!()))?;
-                        (*reg).into()
-                    }
-                    _ => unreachable!(),
-                };
-                let rhs = match add.get_rhs() {
-                    middle::ir::Operand::Constant(con) => {
-                        if let middle::ir::Constant::Int(i) = con {
-                            Operand::Imm((*i as i64).into())
-                        } else {
-                            unreachable!();
-                        }
-                    }
-                    middle::ir::Operand::Instruction(instr) => {
-                        let name: Name = instr.get_id().into();
-                        let reg = regs.get(&name).ok_or(anyhow!("").context(context!()))?;
-                        (*reg).into()
-                    }
-                    _ => unreachable!(),
-                };
                 let dst = reg_gener.gen_virtual_usual_reg();
                 let inst = AddInst::new(dst.into(), lhs, rhs);
                 Ok(vec![Inst::Add(inst)])

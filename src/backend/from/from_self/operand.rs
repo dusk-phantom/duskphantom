@@ -57,6 +57,56 @@ impl IRBuilder {
         })
     }
 
+    pub fn float_operand_from(
+        operand: &middle::ir::Operand,
+        float_regs: &HashMap<Name, Reg>,
+    ) -> Result<Operand> {
+        match operand {
+            middle::ir::Operand::Constant(con) => {
+                if let middle::ir::Constant::Float(f) = con {
+                    Ok(Operand::Fmm((*f as f64).into()))
+                } else {
+                    Err(anyhow!("float-type inst, but receive imm"))
+                }
+            }
+            middle::ir::Operand::Instruction(instr) => {
+                let name: Name = instr.get_id().into();
+                let freg = float_regs
+                    .get(&name)
+                    .ok_or(anyhow!("").context(context!()))?;
+                Ok((*freg).into())
+            }
+            _ => Err(anyhow!(
+                "float-type inst, but receive not neither reg nor fmm"
+            )),
+        }
+    }
+
+    pub fn int_operand_from(
+        operand: &middle::ir::Operand,
+        usual_regs: &HashMap<Name, Reg>,
+    ) -> Result<Operand> {
+        match operand {
+            middle::ir::Operand::Constant(con) => {
+                if let middle::ir::Constant::Int(i) = con {
+                    Ok(Operand::Imm((*i as i64).into()))
+                } else {
+                    Err(anyhow!("int type add inst, but receive fmm"))
+                }
+            }
+            middle::ir::Operand::Instruction(instr) => {
+                let name: Name = instr.get_id().into();
+                let ireg = usual_regs
+                    .get(&name)
+                    .ok_or(anyhow!("").context(context!()))?;
+                Ok((*ireg).into())
+            }
+            _ => Err(anyhow!(
+                "int type add inst, but receive not neither reg nor imm"
+            )),
+        }
+    }
+
     pub fn const_from(operand: &middle::ir::Operand) -> Result<Operand> {
         Ok(match operand {
             middle::ir::Operand::Constant(con) => match con {
