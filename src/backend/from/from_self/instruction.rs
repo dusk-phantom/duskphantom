@@ -1,4 +1,5 @@
 use crate::backend::*;
+use crate::middle::ir::instruction::binary_inst::BinaryInst;
 use crate::utils::mem::ObjPtr;
 use crate::{context, middle};
 
@@ -36,7 +37,16 @@ impl IRBuilder {
                 Self::build_store_inst(store, stack_slots, reg_gener, regs)
             }
             middle::ir::instruction::InstType::Head => unreachable!(), // 应该是不能有 Head 出现的
-            middle::ir::instruction::InstType::Add => todo!(),
+            middle::ir::instruction::InstType::Add => {
+                let add = downcast_ref::<middle::ir::instruction::binary_inst::Add>(
+                    inst.as_ref().as_ref(),
+                );
+                let lhs = add.get_lhs();
+                let rhs = add.get_rhs();
+                // let inst = AddInst::new(, lhs, rhs);
+
+                todo!()
+            }
             middle::ir::instruction::InstType::FAdd => todo!(),
             middle::ir::instruction::InstType::Sub => todo!(),
             middle::ir::instruction::InstType::FSub => todo!(),
