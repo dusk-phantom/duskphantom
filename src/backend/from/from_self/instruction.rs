@@ -41,11 +41,40 @@ impl IRBuilder {
                 let add = downcast_ref::<middle::ir::instruction::binary_inst::Add>(
                     inst.as_ref().as_ref(),
                 );
-                let lhs = add.get_lhs();
-                let rhs = add.get_rhs();
-                // let inst = AddInst::new(, lhs, rhs);
 
-                todo!()
+                let lhs = match add.get_lhs() {
+                    middle::ir::Operand::Constant(con) => {
+                        if let middle::ir::Constant::Int(i) = con {
+                            Operand::Imm((*i as i64).into())
+                        } else {
+                            unreachable!();
+                        }
+                    }
+                    middle::ir::Operand::Instruction(instr) => {
+                        let name: Name = instr.get_id().into();
+                        let reg = regs.get(&name).ok_or(anyhow!("").context(context!()))?;
+                        (*reg).into()
+                    }
+                    _ => unreachable!(),
+                };
+                let rhs = match add.get_rhs() {
+                    middle::ir::Operand::Constant(con) => {
+                        if let middle::ir::Constant::Int(i) = con {
+                            Operand::Imm((*i as i64).into())
+                        } else {
+                            unreachable!();
+                        }
+                    }
+                    middle::ir::Operand::Instruction(instr) => {
+                        let name: Name = instr.get_id().into();
+                        let reg = regs.get(&name).ok_or(anyhow!("").context(context!()))?;
+                        (*reg).into()
+                    }
+                    _ => unreachable!(),
+                };
+                let dst = reg_gener.gen_virtual_usual_reg();
+                let inst = AddInst::new(dst.into(), lhs, rhs);
+                Ok(vec![Inst::Add(inst)])
             }
             middle::ir::instruction::InstType::FAdd => todo!(),
             middle::ir::instruction::InstType::Sub => todo!(),
@@ -105,18 +134,16 @@ impl IRBuilder {
         // 有三种来源: 1. 全局变量 2. alloca 3. get_element_ptr
         let address: &&middle::ir::Operand = &store.get_ptr();
         let val = &store.get_value();
-        // address
+        // address 这个地址是 stack 上的地址
         let address = Self::address_from(address, stack_slots).with_context(|| context!())?;
         let val = Self::value_from(val, regs).with_context(|| context!())?;
         let mut ret: Vec<Inst> = Vec::new();
         match val {
             Operand::Imm(imm) => {
-                let dst = reg_gener.gen_virtual_usual_reg();
-                // li dst, imm
-                let li = AddInst::new(dst.into(), REG_ZERO.into(), imm.into());
-                // sd src, address
+                let dst = reg_gener.gen_virtual_usual_reg(); // 分配一个临时的 dest, 用来存储 imm, 因此 sd reg, stack_slot
+                let li = AddInst::new(dst.into(), REG_ZERO.into(), imm.into()); // li dst, imm
                 let src = dst;
-                let sd = StoreInst::new(address.try_into()?, src);
+                let sd = StoreInst::new(address.try_into()?, src); // sd src, stack_slot
                 ret.push(li.into());
                 ret.push(sd.into());
             }
@@ -206,10 +233,10 @@ impl IRBuilder {
         regs: &mut HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
         // let dst = &call.dest;
-        let dst = &call.get_id();
+        // let dst = &call.get_id();
         let f_name = &call.func.name;
         let mut ret: Vec<Inst> = Vec::new();
-        let call_inst = CallInst::new(f_name.to_string().into()).into();
+        let call_inst = CallInst::new(f_name.to_string().into()).into(); // call <label>
         ret.push(call_inst);
 
         let dest_name = call.get_id();
@@ -233,7 +260,7 @@ impl IRBuilder {
             ValueType::Array(_, _) => todo!(),
             ValueType::Pointer(_) => todo!(),
         };
-        regs.insert(dest_name.into(), dst_reg);
+        regs.insert(dest_name.into(), dst_reg); // 1. dest_name 来自于 ir 的 虚拟寄存器 2. dst_reg 是新分配的 后端的虚拟寄存器
 
         Ok(ret)
     }
