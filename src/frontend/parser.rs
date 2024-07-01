@@ -1,3 +1,6 @@
+use hexf_parse::parse_hexf32;
+use winnow::error::{ErrMode, ErrorKind};
+
 use super::*;
 
 /// Parser of a word that begins with letter,
@@ -20,26 +23,85 @@ pub fn ident(input: &mut &str) -> PResult<String> {
     word.verify(|x| !KEYWORDS.contains(&x)).parse_next(input)
 }
 
-/// Parser of an integer.
-pub fn int(input: &mut &str) -> PResult<i32> {
-    take_while(1.., '0'..='9')
-        .map(|s: &str| s.parse().unwrap())
-        .parse_next(input)
+/// Match decimal or hexadecimal numbers.
+pub fn match_numbers<'a>(input: &mut &'a str, is_hex: bool, min_count: usize) -> PResult<&'a str> {
+    if is_hex {
+        take_while(min_count.., ('0'..='9', 'a'..='f', 'A'..='F')).parse_next(input)
+    } else {
+        take_while(min_count.., '0'..='9').parse_next(input)
+    }
 }
 
 /// Parser of a usize.
 pub fn usize(input: &mut &str) -> PResult<usize> {
-    take_while(1.., '0'..='9')
-        .map(|s: &str| s.parse().unwrap())
-        .parse_next(input)
+    let is_oct_or_hex = opt("0").parse_next(input)?.is_some();
+    let is_hex = opt(alt(("x", "X"))).parse_next(input)?.is_some();
+    let radix = if is_oct_or_hex {
+        8
+    } else if is_hex {
+        16
+    } else {
+        10
+    };
+
+    // Octal number matches 8 and 9, but will error anyways
+    // Empty number throws recoverable error
+    let number = match_numbers(input, is_hex, 1)?;
+    usize::from_str_radix(number, radix)
+        .map_err(|_| ErrMode::from_error_kind(input, ErrorKind::Verify).cut())
 }
 
-/// Parser of a float.
-pub fn float(input: &mut &str) -> PResult<f32> {
-    let upper = take_while(0.., '0'..='9').parse_next(input)?;
-    let _ = '.'.parse_next(input)?;
-    let lower = take_while(1.., '0'..='9').parse_next(input)?;
-    Ok(format!("{}.{}", upper, lower).parse().unwrap())
+/// Parser of a constant number.
+pub fn constant_number(input: &mut &str) -> PResult<Expr> {
+    let hex_prefix = opt(alt(("0x", "0X"))).parse_next(input)?.unwrap_or("");
+    let is_hex = !hex_prefix.is_empty();
+    let exponent_charset: (&str, &str) = if is_hex { ("p", "P") } else { ("e", "E") };
+    let before_point = match_numbers(input, is_hex, 0)?;
+    let point = opt(".").parse_next(input)?.unwrap_or("");
+    let after_point = match_numbers(input, is_hex, 0)?;
+    let exponent_indicator = opt(alt(exponent_charset)).parse_next(input)?.unwrap_or("");
+    if point.is_empty() && exponent_indicator.is_empty() {
+        // Number is empty, throw recoverable error
+        if before_point.is_empty() {
+            return Err(ErrMode::from_error_kind(input, ErrorKind::Verify));
+        }
+
+        // If number exists, but no point and exponent, parse `before_point` as int instead
+        let radix = if is_hex {
+            16
+        } else if before_point.starts_with('0') {
+            8
+        } else {
+            10
+        };
+        return i32::from_str_radix(before_point, radix)
+            .map_err(|_| ErrMode::from_error_kind(input, ErrorKind::Verify).cut())
+            .map(Expr::Int32);
+    }
+
+    // Read exponent value only if there is exponent indicator ("e" | "E" | "p" | "P")
+    let number = if exponent_indicator.is_empty() {
+        format!("{}{}{}{}", hex_prefix, before_point, point, after_point)
+    } else {
+        let sign = opt(alt(("+", "-"))).parse_next(input)?.unwrap_or("");
+        let exponent = match_numbers(input, false, 1).map_err(|e| e.cut())?;
+        format!(
+            "{}{}{}{}{}{}{}",
+            hex_prefix, before_point, point, after_point, exponent_indicator, sign, exponent
+        )
+    };
+
+    // Parse the number as float
+    if is_hex {
+        parse_hexf32(&number, false)
+            .map_err(|_| ErrMode::from_error_kind(input, ErrorKind::Verify).cut())
+            .map(Expr::Float32)
+    } else {
+        number
+            .parse()
+            .map_err(|_| ErrMode::from_error_kind(input, ErrorKind::Verify).cut())
+            .map(Expr::Float32)
+    }
 }
 
 /// Parser of a string literal.
