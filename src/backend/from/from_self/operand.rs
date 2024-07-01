@@ -27,13 +27,15 @@ impl IRBuilder {
     ) -> Result<Operand> {
         Ok(match operand {
             middle::ir::Operand::Constant(_) => todo!(),
+            // TODO store 中的 dst 可能是 全局变量
             middle::ir::Operand::Global(_) => todo!(),
             middle::ir::Operand::Parameter(_) => todo!(),
+            // 来源于 get_element_ptr 或者是 alloca
             middle::ir::Operand::Instruction(instr) => stack_slots
                 .get(&instr.get_id().into())
                 .ok_or(anyhow!("stack slot not found {}", instr.get_id()))
                 .with_context(|| context!())?
-                .into(),
+                .into(), // 这个 into 将 stackslot -> operand
         })
     }
     pub fn local_var_from(
