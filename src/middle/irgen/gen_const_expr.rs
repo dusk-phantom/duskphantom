@@ -3,11 +3,11 @@ use crate::frontend::Expr;
 use crate::middle::ir::{Constant, Operand};
 use crate::middle::irgen::program_kit::ProgramKit;
 use crate::middle::irgen::value::Value;
-use anyhow::{anyhow, Context};
+use anyhow::{anyhow, Context, Result};
 
 impl<'a> ProgramKit<'a> {
     /// Generate constant expression
-    pub fn gen_const_expr(&mut self, expr: &Expr) -> anyhow::Result<Constant> {
+    pub fn gen_const_expr(&mut self, expr: &Expr) -> Result<Constant> {
         match expr {
             Expr::Var(x) => {
                 // Ensure variable is defined
