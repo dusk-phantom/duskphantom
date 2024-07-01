@@ -5,6 +5,8 @@ use crate::middle::irgen::function_kit::FunctionKit;
 use crate::middle::irgen::value::Value;
 use anyhow::{anyhow, Context};
 
+use super::gen_library_function::is_argument_const;
+
 impl<'a> FunctionKit<'a> {
     /// Generate an expression as a statement into the program
     pub fn gen_expr(&mut self, expr: &Expr) -> anyhow::Result<Value> {
@@ -54,9 +56,30 @@ impl<'a> FunctionKit<'a> {
 
                 // Generate arguments
                 let mut operands = Vec::new();
-                for (param, arg) in func_ptr.params.iter().zip(args.iter()) {
-                    let arg = self.gen_expr(arg)?.load(param.value_type.clone(), self)?;
-                    operands.push(arg);
+                if func_ptr.params.len() == args.len() {
+                    for (param, arg) in func_ptr.params.iter().zip(args.iter()) {
+                        let arg = self.gen_expr(arg)?.load(param.value_type.clone(), self)?;
+                        operands.push(arg);
+                    }
+                } else {
+                    for (i, arg) in args.iter().enumerate() {
+                        // Support constant argument only for dynamic library functions like `putf`
+                        let arg = if is_argument_const(&func_name, i) {
+                            let constant = self.gen_program_kit().gen_const_expr(arg)?;
+                            let name = self.unique_name("format");
+                            let gvar = self.program.mem_pool.new_global_variable(
+                                name,
+                                constant.get_type(),
+                                false,
+                                constant,
+                            );
+                            self.program.module.global_variables.push(gvar);
+                            Value::ReadWrite(gvar.into()).load_uncast(self)?.0
+                        } else {
+                            self.gen_expr(arg)?.load_uncast(self)?.0
+                        };
+                        operands.push(arg);
+                    }
                 }
 
                 // Call the function
