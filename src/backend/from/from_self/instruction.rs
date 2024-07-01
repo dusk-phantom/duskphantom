@@ -101,15 +101,20 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
-        let address = &store.get_ptr();
+        // 这个 address
+        // 有三种来源: 1. 全局变量 2. alloca 3. get_element_ptr
+        let address: &&middle::ir::Operand = &store.get_ptr();
         let val = &store.get_value();
+        // address
         let address = Self::address_from(address, stack_slots).with_context(|| context!())?;
         let val = Self::value_from(val, regs).with_context(|| context!())?;
         let mut ret: Vec<Inst> = Vec::new();
         match val {
             Operand::Imm(imm) => {
                 let dst = reg_gener.gen_virtual_usual_reg();
+                // li dst, imm
                 let li = AddInst::new(dst.into(), REG_ZERO.into(), imm.into());
+                // sd src, address
                 let src = dst;
                 let sd = StoreInst::new(address.try_into()?, src);
                 ret.push(li.into());
