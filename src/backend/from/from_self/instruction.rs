@@ -47,6 +47,7 @@ impl IRBuilder {
                     Self::int_operand_from(add.get_rhs(), regs).with_context(|| context!())?;
 
                 let dst = reg_gener.gen_virtual_usual_reg();
+                regs.insert(add.get_id().into(), dst);
                 let inst = AddInst::new(dst.into(), lhs, rhs);
                 Ok(vec![Inst::Add(inst)])
             }
@@ -60,6 +61,7 @@ impl IRBuilder {
                 let rhs =
                     Self::int_operand_from(sub.get_rhs(), regs).with_context(|| context!())?;
                 let dst = reg_gener.gen_virtual_usual_reg();
+                regs.insert(sub.get_id().into(), dst);
                 let inst = SubInst::new(dst.into(), lhs, rhs);
                 Ok(vec![Inst::Sub(inst)])
             }
@@ -73,6 +75,7 @@ impl IRBuilder {
                 let rhs =
                     Self::int_operand_from(mul.get_rhs(), regs).with_context(|| context!())?;
                 let dst = reg_gener.gen_virtual_usual_reg();
+                regs.insert(mul.get_id().into(), dst);
                 let inst = MulInst::new(dst.into(), lhs, rhs);
                 Ok(vec![Inst::Mul(inst)])
             }
@@ -103,6 +106,7 @@ impl IRBuilder {
                 let rhs =
                     Self::int_operand_from(shl.get_rhs(), regs).with_context(|| context!())?;
                 let dst = reg_gener.gen_virtual_usual_reg();
+                regs.insert(shl.get_id().into(), dst);
                 let inst = SllInst::new(dst.into(), lhs, rhs);
                 Ok(vec![Inst::Sll(inst)])
             }
@@ -115,6 +119,7 @@ impl IRBuilder {
                 let rhs =
                     Self::int_operand_from(lshr.get_rhs(), regs).with_context(|| context!())?;
                 let dst = reg_gener.gen_virtual_usual_reg();
+                regs.insert(lshr.get_id().into(), dst);
                 let inst = SrlInst::new(dst.into(), lhs, rhs);
                 Ok(vec![Inst::Srl(inst)])
             }
@@ -127,6 +132,7 @@ impl IRBuilder {
                 let rhs =
                     Self::int_operand_from(ashr.get_rhs(), regs).with_context(|| context!())?;
                 let dst = reg_gener.gen_virtual_usual_reg();
+                regs.insert(ashr.get_id().into(), dst);
                 let inst = SraInst::new(dst.into(), lhs, rhs);
                 Ok(vec![Inst::SRA(inst)])
             }
@@ -139,6 +145,7 @@ impl IRBuilder {
                 let rhs =
                     Self::int_operand_from(and.get_rhs(), regs).with_context(|| context!())?;
                 let dst = reg_gener.gen_virtual_usual_reg();
+                regs.insert(and.get_id().into(), dst);
                 let inst = AndInst::new(dst.into(), lhs, rhs);
                 Ok(vec![Inst::And(inst)])
             }
@@ -149,6 +156,7 @@ impl IRBuilder {
                 let lhs = Self::int_operand_from(or.get_lhs(), regs).with_context(|| context!())?;
                 let rhs = Self::int_operand_from(or.get_rhs(), regs).with_context(|| context!())?;
                 let dst = reg_gener.gen_virtual_usual_reg();
+                regs.insert(or.get_id().into(), dst);
                 let inst = OrInst::new(dst.into(), lhs, rhs);
                 Ok(vec![Inst::Or(inst)])
             }
@@ -161,10 +169,18 @@ impl IRBuilder {
                 let rhs =
                     Self::int_operand_from(xor.get_rhs(), regs).with_context(|| context!())?;
                 let dst = reg_gener.gen_virtual_usual_reg();
+                regs.insert(xor.get_id().into(), dst);
                 let inst = XorInst::new(dst.into(), lhs, rhs);
                 Ok(vec![Inst::Xor(inst)])
             }
-            middle::ir::instruction::InstType::Ret => todo!(),
+            middle::ir::instruction::InstType::Ret => {
+                let ret = downcast_ref::<middle::ir::instruction::terminator_inst::Ret>(
+                    inst.as_ref().as_ref(),
+                );
+                ret.get_return_value();
+
+                todo!();
+            }
             middle::ir::instruction::InstType::Br => todo!(),
             middle::ir::instruction::InstType::Load => todo!(),
             middle::ir::instruction::InstType::GetElementPtr => todo!(),
