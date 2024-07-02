@@ -59,7 +59,7 @@ impl IRBuilder {
 
     pub fn float_operand_from(
         operand: &middle::ir::Operand,
-        float_regs: &HashMap<Name, Reg>,
+        regs: &HashMap<Name, Reg>,
     ) -> Result<Operand> {
         match operand {
             middle::ir::Operand::Constant(con) => {
@@ -71,9 +71,7 @@ impl IRBuilder {
             }
             middle::ir::Operand::Instruction(instr) => {
                 let name: Name = instr.get_id().into();
-                let freg = float_regs
-                    .get(&name)
-                    .ok_or(anyhow!("").context(context!()))?;
+                let freg = regs.get(&name).ok_or(anyhow!("").context(context!()))?;
                 Ok((*freg).into())
             }
             _ => Err(anyhow!(
@@ -84,7 +82,7 @@ impl IRBuilder {
 
     pub fn int_operand_from(
         operand: &middle::ir::Operand,
-        usual_regs: &HashMap<Name, Reg>,
+        regs: &HashMap<Name, Reg>,
     ) -> Result<Operand> {
         match operand {
             middle::ir::Operand::Constant(con) => {
@@ -96,9 +94,7 @@ impl IRBuilder {
             }
             middle::ir::Operand::Instruction(instr) => {
                 let name: Name = instr.get_id().into();
-                let ireg = usual_regs
-                    .get(&name)
-                    .ok_or(anyhow!("").context(context!()))?;
+                let ireg = regs.get(&name).ok_or(anyhow!("").context(context!()))?;
                 Ok((*ireg).into())
             }
             _ => Err(anyhow!(
