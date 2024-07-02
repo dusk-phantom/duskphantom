@@ -222,7 +222,7 @@ impl IRBuilder {
                 } else if IRBuilder::is_ty_float(&param.value_type) {
                     Reg::new(REG_FA0.id() + i as u32, true)
                 } else {
-                    // TODO 如果传入的参数有 数组
+                    // TODO 如果传入的参数有 数组 、 浮点数
                     unimplemented!();
                 };
                 regs.insert(param.name.clone().into(), reg);
