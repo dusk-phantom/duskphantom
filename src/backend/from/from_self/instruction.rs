@@ -51,21 +51,119 @@ impl IRBuilder {
                 Ok(vec![Inst::Add(inst)])
             }
             middle::ir::instruction::InstType::FAdd => todo!(),
-            middle::ir::instruction::InstType::Sub => todo!(),
+            middle::ir::instruction::InstType::Sub => {
+                let sub = downcast_ref::<middle::ir::instruction::binary_inst::Sub>(
+                    inst.as_ref().as_ref(),
+                );
+                let lhs =
+                    Self::int_operand_from(sub.get_lhs(), regs).with_context(|| context!())?;
+                let rhs =
+                    Self::int_operand_from(sub.get_rhs(), regs).with_context(|| context!())?;
+                let dst = reg_gener.gen_virtual_usual_reg();
+                let inst = SubInst::new(dst.into(), lhs, rhs);
+                Ok(vec![Inst::Sub(inst)])
+            }
             middle::ir::instruction::InstType::FSub => todo!(),
-            middle::ir::instruction::InstType::Mul => todo!(),
+            middle::ir::instruction::InstType::Mul => {
+                let mul = downcast_ref::<middle::ir::instruction::binary_inst::Mul>(
+                    inst.as_ref().as_ref(),
+                );
+                let lhs =
+                    Self::int_operand_from(mul.get_lhs(), regs).with_context(|| context!())?;
+                let rhs =
+                    Self::int_operand_from(mul.get_rhs(), regs).with_context(|| context!())?;
+                let dst = reg_gener.gen_virtual_usual_reg();
+                let inst = MulInst::new(dst.into(), lhs, rhs);
+                Ok(vec![Inst::Mul(inst)])
+            }
             middle::ir::instruction::InstType::FMul => todo!(),
-            middle::ir::instruction::InstType::UDiv => todo!(),
+            middle::ir::instruction::InstType::UDiv => {
+                todo!();
+                // let mul = downcast_ref::<middle::ir::instruction::binary_inst::Mul>(
+                //     inst.as_ref().as_ref(),
+                // );
+                // let lhs =
+                //     Self::int_operand_from(mul.get_lhs(), regs).with_context(|| context!())?;
+                // let rhs =
+                //     Self::int_operand_from(mul.get_rhs(), regs).with_context(|| context!())?;
+                // let dst = reg_gener.gen_virtual_usual_reg();
+                // let inst = MulInst::new(dst.into(), lhs, rhs);
+                // Ok(vec![Inst::Mul(inst)])
+            }
             middle::ir::instruction::InstType::SDiv => todo!(),
             middle::ir::instruction::InstType::FDiv => todo!(),
             middle::ir::instruction::InstType::URem => todo!(),
             middle::ir::instruction::InstType::SRem => todo!(),
-            middle::ir::instruction::InstType::Shl => todo!(),
-            middle::ir::instruction::InstType::LShr => todo!(),
-            middle::ir::instruction::InstType::AShr => todo!(),
-            middle::ir::instruction::InstType::And => todo!(),
-            middle::ir::instruction::InstType::Or => todo!(),
-            middle::ir::instruction::InstType::Xor => todo!(),
+            middle::ir::instruction::InstType::Shl => {
+                let shl = downcast_ref::<middle::ir::instruction::binary_inst::Shl>(
+                    inst.as_ref().as_ref(),
+                );
+                let lhs =
+                    Self::int_operand_from(shl.get_lhs(), regs).with_context(|| context!())?;
+                let rhs =
+                    Self::int_operand_from(shl.get_rhs(), regs).with_context(|| context!())?;
+                let dst = reg_gener.gen_virtual_usual_reg();
+                let inst = SllInst::new(dst.into(), lhs, rhs);
+                Ok(vec![Inst::Sll(inst)])
+            }
+            middle::ir::instruction::InstType::LShr => {
+                let lshr = downcast_ref::<middle::ir::instruction::binary_inst::LShr>(
+                    inst.as_ref().as_ref(),
+                );
+                let lhs =
+                    Self::int_operand_from(lshr.get_lhs(), regs).with_context(|| context!())?;
+                let rhs =
+                    Self::int_operand_from(lshr.get_rhs(), regs).with_context(|| context!())?;
+                let dst = reg_gener.gen_virtual_usual_reg();
+                let inst = SrlInst::new(dst.into(), lhs, rhs);
+                Ok(vec![Inst::Srl(inst)])
+            }
+            middle::ir::instruction::InstType::AShr => {
+                let ashr = downcast_ref::<middle::ir::instruction::binary_inst::AShr>(
+                    inst.as_ref().as_ref(),
+                );
+                let lhs =
+                    Self::int_operand_from(ashr.get_lhs(), regs).with_context(|| context!())?;
+                let rhs =
+                    Self::int_operand_from(ashr.get_rhs(), regs).with_context(|| context!())?;
+                let dst = reg_gener.gen_virtual_usual_reg();
+                let inst = SraInst::new(dst.into(), lhs, rhs);
+                Ok(vec![Inst::SRA(inst)])
+            }
+            middle::ir::instruction::InstType::And => {
+                let and = downcast_ref::<middle::ir::instruction::binary_inst::And>(
+                    inst.as_ref().as_ref(),
+                );
+                let lhs =
+                    Self::int_operand_from(and.get_lhs(), regs).with_context(|| context!())?;
+                let rhs =
+                    Self::int_operand_from(and.get_rhs(), regs).with_context(|| context!())?;
+                let dst = reg_gener.gen_virtual_usual_reg();
+                let inst = AndInst::new(dst.into(), lhs, rhs);
+                Ok(vec![Inst::And(inst)])
+            }
+            middle::ir::instruction::InstType::Or => {
+                let or = downcast_ref::<middle::ir::instruction::binary_inst::Or>(
+                    inst.as_ref().as_ref(),
+                );
+                let lhs = Self::int_operand_from(or.get_lhs(), regs).with_context(|| context!())?;
+                let rhs = Self::int_operand_from(or.get_rhs(), regs).with_context(|| context!())?;
+                let dst = reg_gener.gen_virtual_usual_reg();
+                let inst = OrInst::new(dst.into(), lhs, rhs);
+                Ok(vec![Inst::Or(inst)])
+            }
+            middle::ir::instruction::InstType::Xor => {
+                let xor = downcast_ref::<middle::ir::instruction::binary_inst::Xor>(
+                    inst.as_ref().as_ref(),
+                );
+                let lhs =
+                    Self::int_operand_from(xor.get_lhs(), regs).with_context(|| context!())?;
+                let rhs =
+                    Self::int_operand_from(xor.get_rhs(), regs).with_context(|| context!())?;
+                let dst = reg_gener.gen_virtual_usual_reg();
+                let inst = XorInst::new(dst.into(), lhs, rhs);
+                Ok(vec![Inst::Xor(inst)])
+            }
             middle::ir::instruction::InstType::Ret => todo!(),
             middle::ir::instruction::InstType::Br => todo!(),
             middle::ir::instruction::InstType::Load => todo!(),
