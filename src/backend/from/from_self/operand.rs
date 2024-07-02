@@ -7,6 +7,8 @@ use crate::backend::{Operand, Reg, StackSlot};
 use crate::context;
 
 use crate::middle;
+use crate::middle::ir::Instruction;
+use crate::utils::mem::ObjPtr;
 
 use super::*;
 use builder::IRBuilder;
@@ -38,92 +40,50 @@ impl IRBuilder {
                 .into(), // 这个 into 将 stackslot -> operand
         })
     }
+
     pub fn local_var_from(
-        operand: &middle::ir::Operand,
+        instr: &ObjPtr<Box<dyn Instruction>>,
         regs: &HashMap<Name, Reg>,
     ) -> Result<Operand> {
-        Ok(match operand {
-            middle::ir::Operand::Instruction(instr) => {
-                let reg = regs
-                    .get(&instr.get_id().into())
-                    .ok_or(anyhow!("local var not found {}", instr.get_id()))
-                    .with_context(|| context!())?;
-                reg.into()
-            }
-            _ => {
-                return Err(anyhow!("operand is not local var:{}", operand))
-                    .with_context(|| context!());
-            }
-        })
+        let name: Name = instr.get_id().into();
+        let reg = regs
+            .get(&name)
+            .ok_or(anyhow!("local var not found {}", instr.get_id()))
+            .with_context(|| context!())?;
+        Ok((*reg).into())
     }
-
-    pub fn float_operand_from(
-        operand: &middle::ir::Operand,
-        regs: &HashMap<Name, Reg>,
-    ) -> Result<Operand> {
-        match operand {
-            middle::ir::Operand::Constant(con) => {
-                if let middle::ir::Constant::Float(f) = con {
-                    Ok(Operand::Fmm((*f as f64).into()))
-                } else {
-                    Err(anyhow!("float-type inst, but receive imm"))
-                }
-            }
-            middle::ir::Operand::Instruction(instr) => {
-                let name: Name = instr.get_id().into();
-                let freg = regs.get(&name).ok_or(anyhow!("").context(context!()))?;
-                Ok((*freg).into())
-            }
-            _ => Err(anyhow!(
-                "float-type inst, but receive not neither reg nor fmm"
-            )),
-        }
-    }
-
-    pub fn int_operand_from(
-        operand: &middle::ir::Operand,
-        regs: &HashMap<Name, Reg>,
-    ) -> Result<Operand> {
-        match operand {
-            middle::ir::Operand::Constant(con) => {
-                if let middle::ir::Constant::Int(i) = con {
-                    Ok(Operand::Imm((*i as i64).into()))
-                } else {
-                    Err(anyhow!("int type add inst, but receive fmm"))
-                }
-            }
-            middle::ir::Operand::Instruction(instr) => {
-                let name: Name = instr.get_id().into();
-                let ireg = regs.get(&name).ok_or(anyhow!("").context(context!()))?;
-                Ok((*ireg).into())
-            }
-            _ => Err(anyhow!(
-                "int type add inst, but receive not neither reg nor imm"
-            )),
-        }
-    }
-
-    pub fn const_from(operand: &middle::ir::Operand) -> Result<Operand> {
-        Ok(match operand {
-            middle::ir::Operand::Constant(con) => match con {
-                middle::ir::Constant::Int(val) => Operand::Imm((*val as i64).into()),
-                middle::ir::Constant::Float(fla) => Operand::Fmm((*fla as f64).into()),
-                _ => todo!(),
-            },
-            _ => {
-                return Err(anyhow!("operand is not constant:{}", operand))
+    pub fn const_from(con: &middle::ir::Constant) -> Result<Operand> {
+        Ok(match con {
+            middle::ir::Constant::Int(val) => Operand::Imm((*val as i64).into()),
+            middle::ir::Constant::Float(fla) => Operand::Fmm((*fla as f64).into()),
+            middle::ir::Constant::Bool(boo) => Operand::Imm((*boo as i64).into()),
+            middle::ir::Constant::Array(_) => {
+                return Err(anyhow!("const_from operand cann't not be array:{}", con))
                     .with_context(|| context!())
             }
         })
     }
+    pub fn parameter_from(
+        param: &ObjPtr<middle::ir::Parameter>,
+        regs: &HashMap<Name, Reg>,
+    ) -> Result<Operand> {
+        todo!();
+    }
 
-    pub fn value_from(operand: &middle::ir::Operand, regs: &HashMap<Name, Reg>) -> Result<Operand> {
-        if let Ok(c) = Self::const_from(operand) {
-            Ok(c)
-        } else if let Ok(c) = Self::local_var_from(operand, regs) {
-            Ok(c)
-        } else {
-            Err(anyhow!("value neither is reg or const:{}", operand)).with_context(|| context!())
+    /// 要不是 instruction 的输出, 要不是 constant
+    pub fn local_operand_from(
+        operand: &middle::ir::Operand,
+        regs: &HashMap<Name, Reg>,
+    ) -> Result<Operand> {
+        match operand {
+            middle::ir::Operand::Constant(con) => Self::const_from(con),
+            middle::ir::Operand::Parameter(param) => Self::parameter_from(param, regs),
+            middle::ir::Operand::Instruction(instr) => Self::local_var_from(instr, regs),
+            middle::ir::Operand::Global(glo) => Err(anyhow!(
+                "local_operand_from operand cann't not be global:{}",
+                glo
+            ))
+            .with_context(|| context!()),
         }
     }
 
