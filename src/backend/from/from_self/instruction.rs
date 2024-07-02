@@ -42,24 +42,37 @@ impl IRBuilder {
                     inst.as_ref().as_ref(),
                 );
                 let lhs =
-                    Self::int_operand_from(add.get_lhs(), regs).with_context(|| context!())?;
+                    Self::local_operand_from(add.get_lhs(), regs).with_context(|| context!())?;
                 let rhs =
-                    Self::int_operand_from(add.get_rhs(), regs).with_context(|| context!())?;
+                    Self::local_operand_from(add.get_rhs(), regs).with_context(|| context!())?;
 
                 let dst = reg_gener.gen_virtual_usual_reg();
                 regs.insert(add.get_id().into(), dst);
                 let inst = AddInst::new(dst.into(), lhs, rhs);
                 Ok(vec![Inst::Add(inst)])
             }
-            middle::ir::instruction::InstType::FAdd => todo!(),
+            middle::ir::instruction::InstType::FAdd => {
+                let add = downcast_ref::<middle::ir::instruction::binary_inst::FAdd>(
+                    inst.as_ref().as_ref(),
+                );
+                let lhs =
+                    Self::local_operand_from(add.get_lhs(), regs).with_context(|| context!())?;
+                let rhs =
+                    Self::local_operand_from(add.get_rhs(), regs).with_context(|| context!())?;
+
+                let dst = reg_gener.gen_virtual_usual_reg();
+                regs.insert(add.get_id().into(), dst);
+                let inst = AddInst::new(dst.into(), lhs, rhs);
+                Ok(vec![Inst::Add(inst)])
+            }
             middle::ir::instruction::InstType::Sub => {
                 let sub = downcast_ref::<middle::ir::instruction::binary_inst::Sub>(
                     inst.as_ref().as_ref(),
                 );
                 let lhs =
-                    Self::int_operand_from(sub.get_lhs(), regs).with_context(|| context!())?;
+                    Self::local_operand_from(sub.get_lhs(), regs).with_context(|| context!())?;
                 let rhs =
-                    Self::int_operand_from(sub.get_rhs(), regs).with_context(|| context!())?;
+                    Self::local_operand_from(sub.get_rhs(), regs).with_context(|| context!())?;
                 let dst = reg_gener.gen_virtual_usual_reg();
                 regs.insert(sub.get_id().into(), dst);
                 let inst = SubInst::new(dst.into(), lhs, rhs);
@@ -71,9 +84,9 @@ impl IRBuilder {
                     inst.as_ref().as_ref(),
                 );
                 let lhs =
-                    Self::int_operand_from(mul.get_lhs(), regs).with_context(|| context!())?;
+                    Self::local_operand_from(mul.get_lhs(), regs).with_context(|| context!())?;
                 let rhs =
-                    Self::int_operand_from(mul.get_rhs(), regs).with_context(|| context!())?;
+                    Self::local_operand_from(mul.get_rhs(), regs).with_context(|| context!())?;
                 let dst = reg_gener.gen_virtual_usual_reg();
                 regs.insert(mul.get_id().into(), dst);
                 let inst = MulInst::new(dst.into(), lhs, rhs);
@@ -86,9 +99,9 @@ impl IRBuilder {
                 //     inst.as_ref().as_ref(),
                 // );
                 // let lhs =
-                //     Self::int_operand_from(mul.get_lhs(), regs).with_context(|| context!())?;
+                //     Self::local_operand_from(mul.get_lhs(), regs).with_context(|| context!())?;
                 // let rhs =
-                //     Self::int_operand_from(mul.get_rhs(), regs).with_context(|| context!())?;
+                //     Self::local_operand_from(mul.get_rhs(), regs).with_context(|| context!())?;
                 // let dst = reg_gener.gen_virtual_usual_reg();
                 // let inst = MulInst::new(dst.into(), lhs, rhs);
                 // Ok(vec![Inst::Mul(inst)])
@@ -102,9 +115,9 @@ impl IRBuilder {
                     inst.as_ref().as_ref(),
                 );
                 let lhs =
-                    Self::int_operand_from(shl.get_lhs(), regs).with_context(|| context!())?;
+                    Self::local_operand_from(shl.get_lhs(), regs).with_context(|| context!())?;
                 let rhs =
-                    Self::int_operand_from(shl.get_rhs(), regs).with_context(|| context!())?;
+                    Self::local_operand_from(shl.get_rhs(), regs).with_context(|| context!())?;
                 let dst = reg_gener.gen_virtual_usual_reg();
                 regs.insert(shl.get_id().into(), dst);
                 let inst = SllInst::new(dst.into(), lhs, rhs);
@@ -115,9 +128,9 @@ impl IRBuilder {
                     inst.as_ref().as_ref(),
                 );
                 let lhs =
-                    Self::int_operand_from(lshr.get_lhs(), regs).with_context(|| context!())?;
+                    Self::local_operand_from(lshr.get_lhs(), regs).with_context(|| context!())?;
                 let rhs =
-                    Self::int_operand_from(lshr.get_rhs(), regs).with_context(|| context!())?;
+                    Self::local_operand_from(lshr.get_rhs(), regs).with_context(|| context!())?;
                 let dst = reg_gener.gen_virtual_usual_reg();
                 regs.insert(lshr.get_id().into(), dst);
                 let inst = SrlInst::new(dst.into(), lhs, rhs);
@@ -128,9 +141,9 @@ impl IRBuilder {
                     inst.as_ref().as_ref(),
                 );
                 let lhs =
-                    Self::int_operand_from(ashr.get_lhs(), regs).with_context(|| context!())?;
+                    Self::local_operand_from(ashr.get_lhs(), regs).with_context(|| context!())?;
                 let rhs =
-                    Self::int_operand_from(ashr.get_rhs(), regs).with_context(|| context!())?;
+                    Self::local_operand_from(ashr.get_rhs(), regs).with_context(|| context!())?;
                 let dst = reg_gener.gen_virtual_usual_reg();
                 regs.insert(ashr.get_id().into(), dst);
                 let inst = SraInst::new(dst.into(), lhs, rhs);
@@ -141,9 +154,9 @@ impl IRBuilder {
                     inst.as_ref().as_ref(),
                 );
                 let lhs =
-                    Self::int_operand_from(and.get_lhs(), regs).with_context(|| context!())?;
+                    Self::local_operand_from(and.get_lhs(), regs).with_context(|| context!())?;
                 let rhs =
-                    Self::int_operand_from(and.get_rhs(), regs).with_context(|| context!())?;
+                    Self::local_operand_from(and.get_rhs(), regs).with_context(|| context!())?;
                 let dst = reg_gener.gen_virtual_usual_reg();
                 regs.insert(and.get_id().into(), dst);
                 let inst = AndInst::new(dst.into(), lhs, rhs);
@@ -153,8 +166,10 @@ impl IRBuilder {
                 let or = downcast_ref::<middle::ir::instruction::binary_inst::Or>(
                     inst.as_ref().as_ref(),
                 );
-                let lhs = Self::int_operand_from(or.get_lhs(), regs).with_context(|| context!())?;
-                let rhs = Self::int_operand_from(or.get_rhs(), regs).with_context(|| context!())?;
+                let lhs =
+                    Self::local_operand_from(or.get_lhs(), regs).with_context(|| context!())?;
+                let rhs =
+                    Self::local_operand_from(or.get_rhs(), regs).with_context(|| context!())?;
                 let dst = reg_gener.gen_virtual_usual_reg();
                 regs.insert(or.get_id().into(), dst);
                 let inst = OrInst::new(dst.into(), lhs, rhs);
@@ -165,9 +180,9 @@ impl IRBuilder {
                     inst.as_ref().as_ref(),
                 );
                 let lhs =
-                    Self::int_operand_from(xor.get_lhs(), regs).with_context(|| context!())?;
+                    Self::local_operand_from(xor.get_lhs(), regs).with_context(|| context!())?;
                 let rhs =
-                    Self::int_operand_from(xor.get_rhs(), regs).with_context(|| context!())?;
+                    Self::local_operand_from(xor.get_rhs(), regs).with_context(|| context!())?;
                 let dst = reg_gener.gen_virtual_usual_reg();
                 regs.insert(xor.get_id().into(), dst);
                 let inst = XorInst::new(dst.into(), lhs, rhs);
@@ -177,9 +192,8 @@ impl IRBuilder {
                 let ret = downcast_ref::<middle::ir::instruction::terminator_inst::Ret>(
                     inst.as_ref().as_ref(),
                 );
-                ret.get_return_value();
-
-                todo!();
+                let lhs = ret.get_return_value();
+                Self::build_ret_inst(ret, regs)
             }
             middle::ir::instruction::InstType::Br => todo!(),
             middle::ir::instruction::InstType::Load => todo!(),
@@ -221,10 +235,10 @@ impl IRBuilder {
         // 这个 address
         // 有三种来源: 1. 全局变量 2. alloca 3. get_element_ptr
         let address: &&middle::ir::Operand = &store.get_ptr();
-        let val = &store.get_value();
         // address 这个地址是 stack 上的地址
         let address = Self::address_from(address, stack_slots).with_context(|| context!())?;
-        let val = Self::value_from(val, regs).with_context(|| context!())?;
+        let val = &store.get_value();
+        let val = Self::local_operand_from(val, regs).with_context(|| context!())?;
         let mut ret: Vec<Inst> = Vec::new();
         match val {
             Operand::Imm(imm) => {
@@ -257,6 +271,55 @@ impl IRBuilder {
         Ok(ret)
     }
 
+    // TODO
+    pub fn build_ret_inst(
+        ret: &middle::ir::instruction::terminator_inst::Ret,
+        regs: &mut HashMap<Name, Reg>,
+    ) -> Result<Vec<Inst>> {
+        let mut ret_insts: Vec<Inst> = Vec::new();
+        if !ret.is_void() {
+            let op = ret.get_return_value();
+            match op {
+                middle::ir::Operand::Constant(c) => match c {
+                    middle::ir::Constant::Int(i) => {
+                        let imm = (*i as i64).into();
+                        let addi = AddInst::new(REG_A0.into(), REG_ZERO.into(), imm);
+                        ret_insts.push(addi.into());
+                        ret_insts.push(Inst::Ret);
+                    }
+                    middle::ir::Constant::Float(f) => {
+                        let imm = (*f as f64).into();
+                        todo!();
+                        let addi = AddInst::new(REG_A0.into(), REG_ZERO.into(), imm);
+                        ret_insts.push(addi.into());
+                        ret_insts.push(Inst::Ret);
+                    }
+                    middle::ir::Constant::Bool(_) => todo!(),
+                    middle::ir::Constant::Array(_) => {
+                        return Err(anyhow!("return array is not allow:{}", op))
+                            .with_context(|| context!())
+                    }
+                },
+                middle::ir::Operand::Instruction(instr) => {
+                    let name: Name = instr.get_id().into();
+                    let reg = regs.get(&name).ok_or(anyhow!("").context(context!()))?;
+                    let mv_inst = match instr.get_value_type() {
+                        ValueType::Int => MvInst::new(REG_A0.into(), (*reg).into()),
+                        ValueType::Float => unimplemented!(),
+                        _ => todo!(),
+                    };
+                    ret_insts.push(mv_inst.into());
+                    ret_insts.push(Inst::Ret);
+                }
+                middle::ir::Operand::Global(_) => todo!(),
+                middle::ir::Operand::Parameter(_) => todo!(), // _ => unreachable!(),
+            }
+        } else {
+            unimplemented!();
+        }
+        todo!()
+    }
+
     pub fn build_term_inst(
         term: &ObjPtr<Box<dyn Instruction>>,
         regs: &mut HashMap<Name, Reg>,
@@ -269,36 +332,6 @@ impl IRBuilder {
                 let ret = downcast_ref::<middle::ir::instruction::terminator_inst::Ret>(
                     term.as_ref().as_ref(),
                 );
-                if !ret.is_void() {
-                    let op = ret.get_return_value();
-                    match op {
-                        middle::ir::Operand::Constant(c) => match c {
-                            middle::ir::Constant::Int(value) => {
-                                let imm = (*value as i64).into();
-                                let addi = AddInst::new(REG_A0.into(), REG_ZERO.into(), imm);
-                                ret_insts.push(addi.into());
-                                ret_insts.push(Inst::Ret);
-                            }
-                            middle::ir::Constant::Float(_) => todo!(),
-                            middle::ir::Constant::Bool(_) => todo!(),
-                            middle::ir::Constant::Array(_) => todo!(),
-                        },
-                        middle::ir::Operand::Instruction(instr) => {
-                            let name: Name = instr.get_id().into();
-                            let reg = regs.get(&name).ok_or(anyhow!("").context(context!()))?;
-                            let mv_inst = match instr.get_value_type() {
-                                ValueType::Int => MvInst::new(REG_A0.into(), (*reg).into()),
-                                ValueType::Float => unimplemented!(),
-                                _ => todo!(),
-                            };
-                            ret_insts.push(mv_inst.into());
-                            ret_insts.push(Inst::Ret);
-                        }
-                        _ => unreachable!(),
-                    }
-                } else {
-                    unimplemented!();
-                }
             }
             middle::ir::instruction::InstType::Br => {
                 todo!();
@@ -320,35 +353,45 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
-        // let dst = &call.dest;
-        // let dst = &call.get_id();
-        let f_name = &call.func.name;
         let mut ret: Vec<Inst> = Vec::new();
+
+        let f_name = &call.func.name; // 要跳转的函数名
+        let params = call.get_operand(); // 参数列表
+
+        // 调用惯例
+
         let call_inst = CallInst::new(f_name.to_string().into()).into(); // call <label>
         ret.push(call_inst);
 
         let dest_name = call.get_id();
 
         let func = call.func;
-        let dst_reg: Reg = match func.return_type {
+
+        match func.return_type {
             ValueType::Void => todo!(),
             ValueType::Int => {
-                let dst = reg_gener.gen_virtual_usual_reg();
+                let dst = reg_gener.gen_virtual_usual_reg(); // 分配一个虚拟寄存器
                 let mv = MvInst::new(dst.into(), REG_A0.into());
-                ret.push(mv.into());
-                dst
+                ret.push(mv.into()); // 插入 mv 指令
+                regs.insert(dest_name.into(), dst); // 绑定中端的 id 和 虚拟寄存器
             }
             ValueType::Float => {
                 let dst = reg_gener.gen_virtual_float_reg();
                 let mv = MvInst::new(dst.into(), REG_FA0.into());
                 ret.push(mv.into());
-                dst
+                regs.insert(dest_name.into(), dst);
             }
-            ValueType::Bool => todo!(),
-            ValueType::Array(_, _) => todo!(),
-            ValueType::Pointer(_) => todo!(),
+            ValueType::Bool => {
+                let dst = reg_gener.gen_virtual_usual_reg();
+                let mv = MvInst::new(dst.into(), REG_A0.into());
+                ret.push(mv.into());
+                regs.insert(dest_name.into(), dst);
+            }
+            _ => {
+                return Err(anyhow!("sysy only return: void | float | int".to_string()))
+                    .with_context(|| context!())
+            }
         };
-        regs.insert(dest_name.into(), dst_reg); // 1. dest_name 来自于 ir 的 虚拟寄存器 2. dst_reg 是新分配的 后端的虚拟寄存器
 
         Ok(ret)
     }
