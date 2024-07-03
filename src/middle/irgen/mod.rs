@@ -59,7 +59,7 @@ mod tests {
             %Add_8 = add i32, %load_6, %load_7
             store i32 %Add_8, ptr %alloca_5
             %load_10 = load i32, ptr %alloca_5
-            ret %load_10
+            ret i32 %load_10
             
             
             }
@@ -115,7 +115,7 @@ mod tests {
             
             %final3:
             %load_18 = load i32, ptr %alloca_1
-            ret %load_18
+            ret i32 %load_18
             
             
             }
@@ -161,7 +161,7 @@ mod tests {
             
             %final2:
             %load_14 = load i32, ptr %alloca_1
-            ret %load_14
+            ret i32 %load_14
             
             
             }
@@ -207,7 +207,7 @@ mod tests {
             
             %final2:
             %load_14 = load i32, ptr %alloca_1
-            ret %load_14
+            ret i32 %load_14
             
             
             }
@@ -254,7 +254,7 @@ mod tests {
             
             %final2:
             %load_14 = load i32, ptr %alloca_1
-            ret %load_14
+            ret i32 %load_14
             
             
             }
@@ -303,7 +303,7 @@ mod tests {
             
             %final2:
             %load_14 = load i32, ptr %alloca_1
-            ret %load_14
+            ret i32 %load_14
             
             
             }
@@ -354,7 +354,7 @@ mod tests {
             
             %final2:
             %load_24 = load i32, ptr %alloca_1
-            ret %load_24
+            ret i32 %load_24
             
             %cond3:
             %load_15 = load i32, ptr %alloca_1
@@ -414,7 +414,7 @@ mod tests {
             
             %final2:
             %load_24 = load i32, ptr %alloca_1
-            ret %load_24
+            ret i32 %load_24
             
             %cond3:
             %load_15 = load i32, ptr %alloca_1
@@ -474,7 +474,7 @@ mod tests {
             br label %final2
             
             %final2:
-            ret 0
+            ret i32 0
             
             
             }
@@ -501,18 +501,18 @@ mod tests {
             }
         "#;
         let expected = r#"@x = dso_local global i32 4
-        @y = dso_local global i32 8
-        define i32 @main() {
-        %entry:
-        %load_1 = load i32, ptr @x
-        %load_2 = load i32, ptr @y
-        %Add_3 = add i32, %load_1, %load_2
-        store i32 %Add_3, ptr @x
-        %load_5 = load i32, ptr @x
-        ret %load_5
-        
-        
-        }
+            @y = dso_local global i32 8
+            define i32 @main() {
+            %entry:
+            %load_1 = load i32, ptr @x
+            %load_2 = load i32, ptr @y
+            %Add_3 = add i32, %load_1, %load_2
+            store i32 %Add_3, ptr @x
+            %load_5 = load i32, ptr @x
+            ret i32 %load_5
+            
+            
+            }
         "#
         .split('\n')
         .map(|x| x.trim())
@@ -549,7 +549,7 @@ mod tests {
             store float %FAdd_9, ptr %alloca_5
             %load_11 = load float, ptr %alloca_5
             %fptoi_12 = fptosi float %load_11 to i32
-            ret %fptoi_12
+            ret i32 %fptoi_12
             
             
             }
@@ -579,7 +579,7 @@ mod tests {
             %zext_3 = zext i1 %icmp_1 to i32
             %zext_4 = zext i1 %icmp_2 to i32
             %Add_5 = add i32, %zext_3, %zext_4
-            ret %Add_5
+            ret i32 %Add_5
             
             
             }
@@ -607,7 +607,7 @@ mod tests {
             %alloca_1 = alloca i32
             store i32 %arg, ptr %alloca_1
             %load_3 = load i32, ptr %alloca_1
-            ret %load_3
+            ret i32 %load_3
             
             
             }
@@ -638,7 +638,7 @@ mod tests {
             %entry:
             %fptoi_1 = fptosi float 1.7 to i32
             %call_2 = call i32 @f(i32 %fptoi_1)
-            ret %call_2
+            ret i32 %call_2
             
             
             }
@@ -648,7 +648,7 @@ mod tests {
             store i32 %x, ptr %alloca_5
             %load_7 = load i32, ptr %alloca_5
             %Add_8 = add i32, %load_7, 1
-            ret %Add_8
+            ret i32 %Add_8
             
             
             }
@@ -679,7 +679,7 @@ mod tests {
             %entry:
             %call_1 = call i32 @f(i32 1)
             %call_2 = call i32 @f(i32 %call_1)
-            ret %call_2
+            ret i32 %call_2
             
             
             }
@@ -689,7 +689,7 @@ mod tests {
             store i32 %x, ptr %alloca_5
             %load_7 = load i32, ptr %alloca_5
             %Add_8 = add i32, %load_7, 1
-            ret %Add_8
+            ret i32 %Add_8
             
             
             }
@@ -715,14 +715,14 @@ mod tests {
             }
         "#;
         let expected = r#"@PI = dso_local constant float 3.1415925
-        define i32 @main() {
-        %entry:
-        %load_1 = load float, ptr @PI
-        %fptoi_2 = fptosi float %load_1 to i32
-        ret %fptoi_2
-        
-        
-        }
+            define i32 @main() {
+            %entry:
+            %load_1 = load float, ptr @PI
+            %fptoi_2 = fptosi float %load_1 to i32
+            ret i32 %fptoi_2
+            
+            
+            }
         "#
         .split('\n')
         .map(|x| x.trim())
@@ -745,17 +745,17 @@ mod tests {
             }
         "#;
         let expected = r#"@A = dso_local constant [3 x [2 x [2 x float]]] [[2 x [2 x float]] [[2 x float] [float 1, float 0], [2 x float] [float 0, float 0]], [2 x [2 x float]] [[2 x float] [float 1, float 4], [2 x float] [float 5, float 1]], [2 x [2 x float]] [[2 x float] [float 4, float 0], [2 x float] [float 0, float 0]]]
-        define i32 @main() {
-        %entry:
-        %getelementptr_1 = getelementptr [3 x [2 x [2 x float]]], ptr @A, i32 0, i32 0
-        %getelementptr_2 = getelementptr [2 x [2 x float]], ptr %getelementptr_1, i32 0, i32 0
-        %getelementptr_3 = getelementptr [2 x float], ptr %getelementptr_2, i32 0, i32 0
-        %load_4 = load float, ptr %getelementptr_3
-        %fptoi_5 = fptosi float %load_4 to i32
-        ret %fptoi_5
-        
-        
-        }
+            define i32 @main() {
+            %entry:
+            %getelementptr_1 = getelementptr [3 x [2 x [2 x float]]], ptr @A, i32 0, i32 0
+            %getelementptr_2 = getelementptr [2 x [2 x float]], ptr %getelementptr_1, i32 0, i32 0
+            %getelementptr_3 = getelementptr [2 x float], ptr %getelementptr_2, i32 0, i32 0
+            %load_4 = load float, ptr %getelementptr_3
+            %fptoi_5 = fptosi float %load_4 to i32
+            ret i32 %fptoi_5
+            
+            
+            }
         "#
         .split('\n')
         .map(|x| x.trim())
@@ -814,7 +814,7 @@ mod tests {
             %getelementptr_35 = getelementptr [2 x float], ptr %getelementptr_34, i32 0, i32 1
             %load_36 = load float, ptr %getelementptr_35
             %fptoi_37 = fptosi float %load_36 to i32
-            ret %fptoi_37
+            ret i32 %fptoi_37
             
             
             }
@@ -850,7 +850,7 @@ mod tests {
             store i32 1, ptr %getelementptr_7
             %getelementptr_9 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 0
             %load_10 = load i32, ptr %getelementptr_9
-            ret %load_10
+            ret i32 %load_10
             
             
             }
@@ -891,7 +891,7 @@ mod tests {
             %call_6 = call i32 @f(i32* %getelementptr_5)
             %getelementptr_7 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 0
             %call_8 = call void @putarray(i32 1, i32* %getelementptr_7)
-            ret 0
+            ret i32 0
             
             
             }
@@ -903,7 +903,7 @@ mod tests {
             store i32 1, ptr %load_13
             %load_15 = load i32*, ptr %alloca_11
             %load_16 = load i32, ptr %load_15
-            ret %load_16
+            ret i32 %load_16
             
             
             }
@@ -973,7 +973,7 @@ mod tests {
             
             %final7:
             %load_29 = load i32, ptr %alloca_5
-            ret %load_29
+            ret i32 %load_29
             
             
             }
@@ -1006,7 +1006,7 @@ mod tests {
             %icmp_5 = icmp ne i32 %Sub_4, 0
             %Xor_6 = xor i1, %icmp_5, true
             %zext_7 = zext i1 %Xor_6 to i32
-            ret %zext_7
+            ret i32 %zext_7
             
             
             }
@@ -1050,7 +1050,7 @@ mod tests {
             %final1:
             %phi_14 = phi i1 [false, %entry], [%load_12, %alt0]
             %zext_15 = zext i1 %phi_14 to i32
-            ret %zext_15
+            ret i32 %zext_15
             
             
             }
@@ -1082,7 +1082,7 @@ mod tests {
             %load_1 = load i32, ptr @x
             %load_2 = load i32, ptr @y
             %Add_3 = add i32, %load_1, %load_2
-            ret %Add_3
+            ret i32 %Add_3
             
             
             }
@@ -1115,7 +1115,7 @@ mod tests {
             %load_4 = load i32, ptr %alloca_1
             %Add_5 = add i32, %load_4, 3
             %call_6 = call void @putint(i32 %Add_5)
-            ret 0
+            ret i32 0
             
             
             }
@@ -1162,7 +1162,7 @@ mod tests {
             
             %final1:
             %phi_13 = phi i1 [false, %entry], [%icmp_11, %alt0]
-            ret 0
+            ret i32 0
             
             
             }
@@ -1173,7 +1173,7 @@ mod tests {
             %load_18 = load i32, ptr %alloca_16
             %call_19 = call void @putint(i32 %load_18)
             %load_20 = load i32, ptr %alloca_16
-            ret %load_20
+            ret i32 %load_20
             
             
             }
@@ -1229,7 +1229,7 @@ mod tests {
             br label %final3
             
             %final3:
-            ret 0
+            ret i32 0
             
             
             }
@@ -1254,18 +1254,18 @@ mod tests {
             }
         "#;
         let expected = r#"@format0 = dso_local constant [7 x i32] [i32 120, i32 32, i32 61, i32 32, i32 37, i32 100, i32 0]
-        define i32 @main() {
-        %entry:
-        %alloca_1 = alloca i32
-        %call_2 = call i32 @getint()
-        store i32 %call_2, ptr %alloca_1
-        %getelementptr_4 = getelementptr [7 x i32], ptr @format0, i32 0, i32 0
-        %load_5 = load i32, ptr %alloca_1
-        %call_6 = call void @putf(i32* %getelementptr_4, i32 %load_5)
-        ret 0
-        
-        
-        }
+            define i32 @main() {
+            %entry:
+            %alloca_1 = alloca i32
+            %call_2 = call i32 @getint()
+            store i32 %call_2, ptr %alloca_1
+            %getelementptr_4 = getelementptr [7 x i32], ptr @format0, i32 0, i32 0
+            %load_5 = load i32, ptr %alloca_1
+            %call_6 = call void @putf(i32* %getelementptr_4, i32 %load_5)
+            ret i32 0
+            
+            
+            }
         "#
         .split('\n')
         .map(|x| x.trim())

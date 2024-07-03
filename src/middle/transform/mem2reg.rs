@@ -374,7 +374,7 @@ pub mod tests_mem2reg {
             %alloca_1 = alloca i32
             store i32 1, ptr %alloca_1
             %load_3 = load i32, ptr %alloca_1
-            ret %load_3
+            ret i32 %load_3
 
 
             }
@@ -386,7 +386,7 @@ pub mod tests_mem2reg {
         let expected_after_optimize = r#"define i32 @main() {
             %entry:
             %alloca_1 = alloca i32
-            ret 1
+            ret i32 1
 
 
             }
@@ -444,7 +444,7 @@ pub mod tests_mem2reg {
 
             %final3:
             %load_19 = load i32, ptr %alloca_1
-            ret %load_19
+            ret i32 %load_19
 
 
             }
@@ -472,7 +472,7 @@ pub mod tests_mem2reg {
 
             %final3:
             %phi_21 = phi i32 [%Add_12, %then1], [%Add_16, %alt2]
-            ret %phi_21
+            ret i32 %phi_21
 
 
             }
@@ -522,7 +522,7 @@ pub mod tests_mem2reg {
             
             %final2:
             %load_14 = load i32, ptr %alloca_1
-            ret %load_14
+            ret i32 %load_14
             
             
             }
@@ -546,7 +546,7 @@ pub mod tests_mem2reg {
             br label %cond0
             
             %final2:
-            ret %phi_16
+            ret i32 %phi_16
             
             
             }
@@ -597,7 +597,7 @@ pub mod tests_mem2reg {
             
             %final2:
             %load_35 = load i32, ptr %alloca_1
-            ret %load_35
+            ret i32 %load_35
             
             %cond3:
             %load_15 = load i32, ptr %alloca_1
@@ -649,7 +649,7 @@ pub mod tests_mem2reg {
             br label %cond3
             
             %final2:
-            ret %phi_37
+            ret i32 %phi_37
             
             %cond3:
             %icmp_16 = icmp sgt i32 %Add_8, 5
@@ -719,7 +719,7 @@ pub mod tests_mem2reg {
             %call_6 = call i32 @f(i32* %getelementptr_5)
             %getelementptr_7 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 0
             %call_8 = call void @putarray(i32 1, i32* %getelementptr_7)
-            ret 0
+            ret i32 0
             
             
             }
@@ -731,7 +731,7 @@ pub mod tests_mem2reg {
             store i32 1, ptr %load_13
             %load_15 = load i32*, ptr %alloca_11
             %load_16 = load i32, ptr %load_15
-            ret %load_16
+            ret i32 %load_16
             
             
             }
@@ -750,7 +750,7 @@ pub mod tests_mem2reg {
             %call_6 = call i32 @f(i32* %getelementptr_5)
             %getelementptr_7 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 0
             %call_8 = call void @putarray(i32 1, i32* %getelementptr_7)
-            ret 0
+            ret i32 0
             
             
             }
@@ -759,7 +759,7 @@ pub mod tests_mem2reg {
             %alloca_11 = alloca i32*
             store i32 1, ptr %a
             %load_16 = load i32, ptr %a
-            ret %load_16
+            ret i32 %load_16
             
             
             }
