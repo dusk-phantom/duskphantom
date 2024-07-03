@@ -1,24 +1,21 @@
-use std::collections::HashMap;
-
-use crate::backend::*;
-
-use crate::middle;
-
-use crate::utils::mem::ObjPtr;
-
 use anyhow::Result;
-use llvm_ir::Name;
+use std::collections::HashMap;
 use var::{ArrVar, FloatVar, IntVar, PrimVar, Var};
+
+use super::Address;
+use crate::backend::*;
+use crate::middle;
+use crate::utils::mem::ObjPtr;
 
 pub struct IRBuilder;
 
 impl IRBuilder {
     pub fn gen_from_self(program: &middle::Program) -> Result<Program> {
-        let llvm_module = &program.module;
+        let self_module = &program.module;
         // dbg!(&llvm.types);
-        let global_vars = Self::build_global_var(&llvm_module.global_variables)?;
+        let global_vars = Self::build_global_var(&self_module.global_variables)?;
         // dbg!(&global_vars);
-        let funcs = Self::build_funcs(&llvm_module.functions)?;
+        let funcs = Self::build_funcs(&self_module.functions)?;
 
         let mdl = module::Module {
             name: "main".to_string(),
@@ -32,10 +29,10 @@ impl IRBuilder {
         })
     }
 
-    pub fn build_global_var(llvm_global_vars: &Vec<middle::ir::GlobalPtr>) -> Result<Vec<Var>> {
+    pub fn build_global_var(self_global_vars: &Vec<middle::ir::GlobalPtr>) -> Result<Vec<Var>> {
         let mut global_vars = Vec::new();
 
-        for global_var in llvm_global_vars {
+        for global_var in self_global_vars {
             // dbg!(&global_var);
             let name = &global_var.name.to_string(); // 这里的 name 是不带 @ 的
             dbg!(&name);
@@ -73,7 +70,8 @@ impl IRBuilder {
                                 if let middle::ir::Constant::Int(value) = con {
                                     init.push((index, *value as u32)); // FIXME 这里 i32 和 u32 注意
                                 } else {
-                                    unreachable!();
+                                    return Err(anyhow!("arr can't be mixed with int and others"))
+                                        .with_context(|| context!());
                                 }
                             }
                             let arr_var = Var::IntArr(ArrVar::<u32> {
@@ -90,7 +88,10 @@ impl IRBuilder {
                                 if let middle::ir::Constant::Float(value) = con {
                                     init.push((index, *value));
                                 } else {
-                                    unreachable!();
+                                    return Err(anyhow!(
+                                        "arr can't be mixed with float and others"
+                                    ))
+                                    .with_context(|| context!());
                                 }
                             }
                             let arr_var = Var::FloatArr(ArrVar::<f32> {
@@ -107,7 +108,8 @@ impl IRBuilder {
                                 if let middle::ir::Constant::Bool(value) = con {
                                     init.push((index, *value as i32 as u32)); // FIXME 这里注意一下
                                 } else {
-                                    unreachable!();
+                                    return Err(anyhow!("arr can't be mixed with bool and others"))
+                                        .with_context(|| context!());
                                 }
                             }
                             let arr_var = Var::IntArr(ArrVar::<u32> {
@@ -118,6 +120,7 @@ impl IRBuilder {
                             });
                             global_vars.push(arr_var);
                         }
+                        // TODO 是否有全局初始化过的二维数组 ？
                         _ => {
                             unreachable!();
                         }
@@ -128,26 +131,26 @@ impl IRBuilder {
         Ok(global_vars)
     }
 
-    pub fn build_funcs(llvm_funcs: &Vec<middle::ir::FunPtr>) -> Result<Vec<Func>> {
+    pub fn build_funcs(self_funcs: &Vec<middle::ir::FunPtr>) -> Result<Vec<Func>> {
         let mut funcs = Vec::new();
-        for f in llvm_funcs {
+        for fu in self_funcs {
             // dbg!(&f);
-            let args: Vec<String> = f.params.iter().map(|p| p.name.to_string()).collect();
-            let mut reg_gener = RegGenerator::new();
-            let mut regs: HashMap<Name, Reg> = HashMap::new();
+            let args: Vec<String> = fu.params.iter().map(|p| p.name.to_string()).collect();
+            let mut reg_gener = RegGenerator::new(); // 一个 func 绑定一个 reg_gener
+            let mut regs: HashMap<Address, Reg> = HashMap::new();
             let mut stack_allocator = StackAllocator::new();
-            let mut stack_slots: HashMap<Name, StackSlot> = HashMap::new();
+            let mut stack_slots: HashMap<Address, StackSlot> = HashMap::new();
             let entry = Self::build_entry(
-                f,
+                fu,
                 &mut stack_allocator,
                 &mut stack_slots,
                 &mut reg_gener,
                 &mut regs,
             )?;
-            let mut m_f = Func::new(f.name.to_string(), args, entry);
+            let mut m_f = Func::new(fu.name.to_string(), args, entry);
 
             for bb in Self::build_other_bbs(
-                f,
+                fu,
                 &mut stack_allocator,
                 &mut stack_slots,
                 &mut reg_gener,
@@ -169,26 +172,29 @@ impl IRBuilder {
     }
 
     fn build_other_bbs(
-        f: &ObjPtr<middle::ir::Function>,
+        func: &ObjPtr<middle::ir::Function>,
         stack_allocator: &mut StackAllocator,
-        stack_slots: &mut HashMap<Name, StackSlot>,
+        stack_slots: &mut HashMap<Address, StackSlot>,
         reg_gener: &mut RegGenerator,
-        regs: &mut HashMap<Name, Reg>,
+        regs: &mut HashMap<Address, Reg>,
     ) -> Result<Vec<Block>> {
-        let mut ret: Vec<Block> = Vec::new();
-        for ptr_bb in f.dfs_iter() {
-            let m_bb = Self::build_bb(&ptr_bb, stack_allocator, stack_slots, reg_gener, regs)?;
-            ret.push(m_bb);
-        }
-        Ok(ret)
+        // let mut blocks: Vec<Block> = Vec::new();
+        // for ptr_bb in f.dfs_iter() {
+        //     let m_bb = Self::build_bb(&ptr_bb, stack_allocator, stack_slots, reg_gener, regs)?;
+        //     blocks.push(m_bb);
+        // }
+        // Ok(blocks)
+        func.dfs_iter()
+            .map(|ptr_bb| Self::build_bb(&ptr_bb, stack_allocator, stack_slots, reg_gener, regs))
+            .collect()
     }
 
     fn build_bb(
         bb: &ObjPtr<middle::ir::BasicBlock>,
         stack_allocator: &mut StackAllocator,
-        stack_slots: &mut HashMap<Name, StackSlot>,
+        stack_slots: &mut HashMap<Address, StackSlot>,
         reg_gener: &mut RegGenerator,
-        regs: &mut HashMap<Name, Reg>,
+        regs: &mut HashMap<Address, Reg>,
     ) -> Result<Block> {
         let mut m_bb = Block::new(bb.name.clone());
         for inst in bb.iter() {
@@ -197,7 +203,6 @@ impl IRBuilder {
                     .with_context(|| context!())?;
             m_bb.extend_insts(gen_insts);
         }
-        // FIXME
         let gen_insts =
             Self::build_term_inst(&bb.get_last_inst(), regs).with_context(|| context!())?;
         m_bb.extend_insts(gen_insts);
@@ -205,27 +210,65 @@ impl IRBuilder {
     }
 
     fn build_entry(
-        f: &ObjPtr<middle::ir::Function>,
+        func: &ObjPtr<middle::ir::Function>,
         stack_allocator: &mut StackAllocator,
-        stack_slots: &mut HashMap<Name, StackSlot>,
+        stack_slots: &mut HashMap<Address, StackSlot>,
         reg_gener: &mut RegGenerator,
-        regs: &mut HashMap<Name, Reg>,
+        regs: &mut HashMap<Address, Reg>,
     ) -> Result<Block> {
         // let bb = f.basic_blocks.first().expect("func must have entry");
-        let bb = f.entry.with_context(|| context!())?;
+        let bb = func.entry.with_context(|| context!())?;
         let mut insts: Vec<Inst> = Vec::new();
-        // let mut insts = Vec::new();
-        for (i, param) in f.params.iter().enumerate() {
+
+        // 函数的形参
+        for (i, param) in func.params.iter().enumerate() {
             if i <= 7 {
-                let reg = if IRBuilder::is_ty_int(&param.value_type) {
-                    Reg::new(REG_A0.id() + i as u32, true)
-                } else if IRBuilder::is_ty_float(&param.value_type) {
-                    Reg::new(REG_FA0.id() + i as u32, true)
-                } else {
-                    // TODO 如果传入的参数有 数组 、 浮点数
-                    unimplemented!();
+                let reg: Reg = match &param.value_type {
+                    // 返回生成的 虚拟寄存器
+                    middle::ir::ValueType::Void => {
+                        return Err(anyhow!(
+                            "it is impossible to receive void-type parameter: {}",
+                            param
+                        ))
+                    }
+                    middle::ir::ValueType::Array(_, _) => {
+                        return Err(anyhow!("array should be pointer {}", param))
+                    }
+                    middle::ir::ValueType::Int => {
+                        let reg = reg_gener.gen_virtual_usual_reg();
+                        insts.push(Inst::Mv(MvInst::new(
+                            reg.into(),
+                            Reg::new(REG_A0.id() + i as u32, true).into(),
+                        )));
+                        reg
+                    }
+                    middle::ir::ValueType::Float => {
+                        let reg = reg_gener.gen_virtual_float_reg();
+                        insts.push(Inst::Mv(MvInst::new(
+                            reg.into(),
+                            Reg::new(REG_FA0.id() + i as u32, true).into(),
+                        )));
+                        reg
+                    }
+                    middle::ir::ValueType::Bool => {
+                        let reg = reg_gener.gen_virtual_usual_reg();
+                        insts.push(Inst::Mv(MvInst::new(
+                            reg.into(),
+                            Reg::new(REG_A0.id() + i as u32, true).into(),
+                        )));
+                        reg
+                    }
+                    middle::ir::ValueType::Pointer(_typ) => {
+                        let reg = reg_gener.gen_virtual_usual_reg();
+                        insts.push(Inst::Mv(MvInst::new(
+                            reg.into(),
+                            Reg::new(REG_A0.id() + i as u32, true).into(),
+                        )));
+                        reg
+                    }
                 };
-                regs.insert(param.name.clone().into(), reg);
+
+                regs.insert(param.as_ref() as *const _ as Address, reg);
             } else {
                 // TODO 如果参数的个数大于 7
                 unimplemented!();
