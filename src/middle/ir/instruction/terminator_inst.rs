@@ -74,7 +74,7 @@ impl Instruction for Ret {
         if self.is_void() {
             "ret void".to_string()
         } else {
-            format!("ret {}", self.get_return_value())
+            format!("ret {} {}", self.get_value_type(), self.get_return_value())
         }
     }
 }
