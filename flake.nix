@@ -16,7 +16,7 @@
         ];
       in {
         devShell = pkgs.mkShell {
-          buildInputs = with pkgs; [ clang llvm_16 rustup glib gcc ];
+          buildInputs = with pkgs; [ clang llvm_16 rustup glib gcc libxml2 ];
 
           RUSTC_VERSION = overrides.toolchain.channel;
 
