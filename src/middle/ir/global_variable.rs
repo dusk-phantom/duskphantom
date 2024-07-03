@@ -55,6 +55,9 @@ impl GlobalVariable {
     pub fn get_user(&self) -> &[InstPtr] {
         &self.user
     }
+    pub fn get_user_mut(&mut self) -> &mut Vec<InstPtr> {
+        &mut self.user
+    }
     /// # Safety
     /// FIXME: explain why it is unsafe,and describe the safety requirements
     pub unsafe fn add_user(&mut self, inst: InstPtr) {

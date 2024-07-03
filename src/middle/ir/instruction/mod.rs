@@ -249,6 +249,8 @@ pub trait Instruction: Display {
 
     /// Remove current instruction from the `BasicBlock`.
     /// This operation will remove the current instruction from the `BasicBlock` and clear the current operand.
+    /// # Panics
+    /// Same to move_self
     fn remove_self(&mut self) {
         unsafe {
             let id = self.get_id();
@@ -258,10 +260,17 @@ pub trait Instruction: Display {
 
             manager.prev = None;
             manager.next = None;
-            manager.operand.iter_mut().for_each(|op| {
-                if let Operand::Instruction(inst) = op {
+            manager.operand.iter_mut().for_each(|op| match op {
+                Operand::Instruction(inst) => {
                     inst.get_user_mut().retain(|user| user.get_id() != id);
                 }
+                Operand::Global(gl) => {
+                    gl.get_user_mut().retain(|user| user.get_id() != id);
+                }
+                Operand::Parameter(par) => {
+                    par.get_user_mut().retain(|user| user.get_id() != id);
+                }
+                Operand::Constant(_) => {}
             });
             manager.operand.clear();
         }
