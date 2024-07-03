@@ -13,8 +13,6 @@ use crate::utils::mem::ObjPtr;
 use super::*;
 use builder::IRBuilder;
 
-use llvm_ir::Name;
-
 impl IRBuilder {
     pub fn is_ty_int(ty: &middle::ir::ValueType) -> bool {
         matches!(ty, middle::ir::ValueType::Int)
@@ -25,7 +23,7 @@ impl IRBuilder {
 
     pub fn address_from(
         operand: &middle::ir::Operand,
-        stack_slots: &HashMap<Name, StackSlot>,
+        stack_slots: &HashMap<Address, StackSlot>,
     ) -> Result<Operand> {
         Ok(match operand {
             middle::ir::Operand::Constant(_) => todo!(),
@@ -34,8 +32,11 @@ impl IRBuilder {
             middle::ir::Operand::Parameter(_) => todo!(),
             // 来源于 get_element_ptr 或者是 alloca
             middle::ir::Operand::Instruction(instr) => stack_slots
-                .get(&instr.get_id().into())
-                .ok_or(anyhow!("stack slot not found {}", instr.get_id()))
+                .get(&(instr.as_ref().as_ref() as *const dyn Instruction as *const () as Address))
+                .ok_or(anyhow!(
+                    "stack slot not found {}",
+                    (instr.as_ref().as_ref() as *const dyn Instruction as *const () as Address)
+                ))
                 .with_context(|| context!())?
                 .into(), // 这个 into 将 stackslot -> operand
         })
@@ -43,12 +44,15 @@ impl IRBuilder {
 
     pub fn local_var_from(
         instr: &ObjPtr<Box<dyn Instruction>>,
-        regs: &HashMap<Name, Reg>,
+        regs: &HashMap<Address, Reg>,
     ) -> Result<Operand> {
-        let name: Name = instr.get_id().into();
+        let addr = instr.as_ref().as_ref() as *const dyn Instruction as *const () as Address;
         let reg = regs
-            .get(&name)
-            .ok_or(anyhow!("local var not found {}", instr.get_id()))
+            .get(&addr)
+            .ok_or(anyhow!(
+                "local var not found {}",
+                instr.as_ref().as_ref() as *const dyn Instruction as *const () as Address
+            ))
             .with_context(|| context!())?;
         Ok((*reg).into())
     }
@@ -65,15 +69,23 @@ impl IRBuilder {
     }
     pub fn parameter_from(
         param: &ObjPtr<middle::ir::Parameter>,
-        regs: &HashMap<Name, Reg>,
+        regs: &HashMap<Address, Reg>,
     ) -> Result<Operand> {
-        todo!();
+        let addr = param.as_ref() as *const _ as Address;
+        let reg = regs
+            .get(&addr)
+            .ok_or(anyhow!(
+                "local var not found {}",
+                param.as_ref() as *const _ as Address
+            ))
+            .with_context(|| context!())?;
+        Ok((*reg).into())
     }
 
     /// 要不是 instruction 的输出, 要不是 constant
     pub fn local_operand_from(
         operand: &middle::ir::Operand,
-        regs: &HashMap<Name, Reg>,
+        regs: &HashMap<Address, Reg>,
     ) -> Result<Operand> {
         match operand {
             middle::ir::Operand::Constant(con) => Self::const_from(con),
@@ -89,7 +101,7 @@ impl IRBuilder {
 
     #[allow(unused)]
     #[inline]
-    pub fn global_name_from(operand: &middle::ir::Operand) -> Result<Name> {
+    pub fn global_name_from(operand: &middle::ir::Operand) -> Result<Address> {
         unimplemented!();
         match operand {
             // middle::ir::Operand::LocalOperand { name: _, ty: _ } => {

@@ -267,7 +267,6 @@ impl IRBuilder {
                         reg
                     }
                 };
-
                 regs.insert(param.as_ref() as *const _ as Address, reg);
             } else {
                 // TODO 如果参数的个数大于 7
