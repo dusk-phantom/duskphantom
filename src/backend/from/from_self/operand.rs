@@ -104,13 +104,7 @@ impl IRBuilder {
     pub fn global_name_from(operand: &middle::ir::Operand) -> Result<Address> {
         unimplemented!();
         match operand {
-            // middle::ir::Operand::LocalOperand { name: _, ty: _ } => {
-            //     Err(anyhow!("local operand".to_string())).with_context(|| context!())
-            // }
             middle::ir::Operand::Constant(con) => match con {
-                // Constant::GlobalReference { name, ty: _ } => Ok(name.clone()),
-                // Ok(llvm_ir::Name::from(glo.name))
-                // middle::ir::Operand::Global(glo) => todo!(),
                 middle::ir::Constant::Int(_) => todo!(),
                 middle::ir::Constant::Float(_) => todo!(),
                 middle::ir::Constant::Bool(_) => todo!(),

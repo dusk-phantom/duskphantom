@@ -193,8 +193,6 @@ impl IRBuilder {
                 let ret = downcast_ref::<middle::ir::instruction::terminator_inst::Ret>(
                     inst.as_ref().as_ref(),
                 );
-                let lhs = ret.get_return_value();
-                todo!();
                 Self::build_ret_inst(ret, regs)
             }
             middle::ir::instruction::InstType::Br => todo!(),
@@ -371,6 +369,40 @@ impl IRBuilder {
         Ok(ret_insts)
     }
 
+    pub fn build_br_inst(
+        br: &middle::ir::instruction::terminator_inst::Br,
+        regs: &mut HashMap<Address, Reg>,
+    ) -> Result<Vec<Inst>> {
+        let mut br_insts: Vec<Inst> = Vec::new();
+
+        let cur = br
+            .get_parent_bb()
+            .ok_or(anyhow!("iffalse get error",))
+            .with_context(|| context!())?;
+
+        let succs = cur.get_succ_bb();
+
+        if br.is_cond_br() {
+            let cond = br.get_cond();
+            let iftrue = succs
+                .get(0)
+                .ok_or(anyhow!("iftrue get error",))
+                .with_context(|| context!())?;
+
+            let iffalse = succs
+                .get(1)
+                .ok_or(anyhow!("iftrue get error",))
+                .with_context(|| context!())?;
+        } else {
+            let succ = succs
+                .get(0)
+                .ok_or(anyhow!("iftrue get error",))
+                .with_context(|| context!())?;
+        }
+
+        Ok(br_insts)
+    }
+
     /// 不是 ret 就是 br
     pub fn build_term_inst(
         term: &ObjPtr<Box<dyn middle::ir::Instruction>>,
@@ -379,20 +411,26 @@ impl IRBuilder {
         let mut ret_insts: Vec<Inst> = Vec::new();
         // dbg!(term);
 
-        match term.get_type() {
+        let insts = match term.get_type() {
             middle::ir::instruction::InstType::Ret => {
                 let ret = downcast_ref::<middle::ir::instruction::terminator_inst::Ret>(
                     term.as_ref().as_ref(),
                 );
+                Self::build_ret_inst(ret, regs)?
             }
             middle::ir::instruction::InstType::Br => {
+                let br = downcast_ref::<middle::ir::instruction::terminator_inst::Br>(
+                    term.as_ref().as_ref(),
+                );
                 todo!();
             }
             _ => {
                 return Err(anyhow!("get_last_inst only to be ret or br"))
                     .with_context(|| context!())
             }
-        }
+        };
+
+        ret_insts.extend(insts);
 
         Ok(ret_insts)
     }
@@ -412,7 +450,6 @@ impl IRBuilder {
         let params = call.get_operand(); // 参数列表
 
         // 调用惯例
-
         let call_inst = CallInst::new(f_name.to_string().into()).into(); // call <label>
         ret.push(call_inst);
 
@@ -421,7 +458,7 @@ impl IRBuilder {
         let func = call.func;
 
         match func.return_type {
-            middle::ir::ValueType::Void => todo!(),
+            middle::ir::ValueType::Void => {}
             middle::ir::ValueType::Int => {
                 let dst = reg_gener.gen_virtual_usual_reg(); // 分配一个虚拟寄存器
                 let mv = MvInst::new(dst.into(), REG_A0.into());
