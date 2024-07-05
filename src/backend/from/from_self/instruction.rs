@@ -1,5 +1,5 @@
-use crate::backend::*;
 use crate::utils::mem::ObjPtr;
+use crate::{backend::*, ssa2tac_binary_float, ssa2tac_binary_usual};
 use crate::{context, middle};
 
 use crate::middle::ir::instruction::binary_inst::BinaryInst;
@@ -23,6 +23,9 @@ impl IRBuilder {
         regs: &mut HashMap<Address, Reg>,
     ) -> Result<Vec<Inst>> {
         match inst.get_type() {
+            middle::ir::instruction::InstType::Head => {
+                Err(anyhow!("head should not be in backend")).with_context(|| context!())
+            } // 应该是不能有 Head 出现的
             middle::ir::instruction::InstType::Alloca => {
                 let alloca = downcast_ref::<middle::ir::instruction::memory_op_inst::Alloca>(
                     inst.as_ref().as_ref(),
@@ -35,147 +38,53 @@ impl IRBuilder {
                 );
                 Self::build_store_inst(store, stack_slots, reg_gener, regs)
             }
-            middle::ir::instruction::InstType::Head => {
-                Err(anyhow!("head should not be in backend")).with_context(|| context!())
-            } // 应该是不能有 Head 出现的
             middle::ir::instruction::InstType::Add => {
-                let add = downcast_ref::<middle::ir::instruction::binary_inst::Add>(
-                    inst.as_ref().as_ref(),
-                );
-                let lhs =
-                    Self::local_operand_from(add.get_lhs(), regs).with_context(|| context!())?;
-                let rhs =
-                    Self::local_operand_from(add.get_rhs(), regs).with_context(|| context!())?;
-
-                let dst = reg_gener.gen_virtual_usual_reg();
-                regs.insert(add as *const _ as Address, dst);
-                let inst = AddInst::new(dst.into(), lhs, rhs);
-                Ok(vec![Inst::Add(inst)])
+                ssa2tac_binary_usual!(inst, regs, reg_gener, Add, Add, AddInst)
             }
             middle::ir::instruction::InstType::FAdd => {
-                let add = downcast_ref::<middle::ir::instruction::binary_inst::FAdd>(
-                    inst.as_ref().as_ref(),
-                );
-                let lhs =
-                    Self::local_operand_from(add.get_lhs(), regs).with_context(|| context!())?;
-                let rhs =
-                    Self::local_operand_from(add.get_rhs(), regs).with_context(|| context!())?;
-
-                let dst = reg_gener.gen_virtual_usual_reg();
-                regs.insert(add as *const _ as Address, dst);
-                let inst = AddInst::new(dst.into(), lhs, rhs);
-                Ok(vec![Inst::Add(inst)])
+                ssa2tac_binary_float!(inst, regs, reg_gener, FAdd, Add, AddInst)
             }
             middle::ir::instruction::InstType::Sub => {
-                let sub = downcast_ref::<middle::ir::instruction::binary_inst::Sub>(
-                    inst.as_ref().as_ref(),
-                );
-                let lhs =
-                    Self::local_operand_from(sub.get_lhs(), regs).with_context(|| context!())?;
-                let rhs =
-                    Self::local_operand_from(sub.get_rhs(), regs).with_context(|| context!())?;
-                let dst = reg_gener.gen_virtual_usual_reg();
-                regs.insert(sub as *const _ as Address, dst);
-                let inst = SubInst::new(dst.into(), lhs, rhs);
-                Ok(vec![Inst::Sub(inst)])
+                ssa2tac_binary_usual!(inst, regs, reg_gener, Sub, Sub, SubInst)
             }
-            middle::ir::instruction::InstType::FSub => todo!(),
+            // 通过类型转换，可以做到: FAdd 的输入一定是 Float 类型的寄存器
+            middle::ir::instruction::InstType::FSub => {
+                ssa2tac_binary_float!(inst, regs, reg_gener, FSub, Sub, SubInst)
+            }
             middle::ir::instruction::InstType::Mul => {
-                let mul = downcast_ref::<middle::ir::instruction::binary_inst::Mul>(
-                    inst.as_ref().as_ref(),
-                );
-                let lhs =
-                    Self::local_operand_from(mul.get_lhs(), regs).with_context(|| context!())?;
-                let rhs =
-                    Self::local_operand_from(mul.get_rhs(), regs).with_context(|| context!())?;
-                let dst = reg_gener.gen_virtual_usual_reg();
-                regs.insert(mul as *const _ as Address, dst);
-                let inst = MulInst::new(dst.into(), lhs, rhs);
-                Ok(vec![Inst::Mul(inst)])
+                ssa2tac_binary_usual!(inst, regs, reg_gener, Mul, Mul, MulInst)
             }
-            middle::ir::instruction::InstType::FMul => todo!(),
+            middle::ir::instruction::InstType::FMul => {
+                ssa2tac_binary_float!(inst, regs, reg_gener, FMul, Mul, MulInst)
+            }
+            middle::ir::instruction::InstType::SDiv => {
+                ssa2tac_binary_usual!(inst, regs, reg_gener, SDiv, Div, DivInst)
+            }
+            middle::ir::instruction::InstType::SRem => {
+                ssa2tac_binary_usual!(inst, regs, reg_gener, SRem, Rem, RemInst)
+            }
+
+            // TODO
             middle::ir::instruction::InstType::UDiv => todo!(),
-            middle::ir::instruction::InstType::SDiv => todo!(),
-            middle::ir::instruction::InstType::FDiv => todo!(),
             middle::ir::instruction::InstType::URem => todo!(),
-            middle::ir::instruction::InstType::SRem => todo!(),
+            middle::ir::instruction::InstType::FDiv => todo!(),
             middle::ir::instruction::InstType::Shl => {
-                let shl = downcast_ref::<middle::ir::instruction::binary_inst::Shl>(
-                    inst.as_ref().as_ref(),
-                );
-                let lhs =
-                    Self::local_operand_from(shl.get_lhs(), regs).with_context(|| context!())?;
-                let rhs =
-                    Self::local_operand_from(shl.get_rhs(), regs).with_context(|| context!())?;
-                let dst = reg_gener.gen_virtual_usual_reg();
-                regs.insert(shl as *const _ as Address, dst);
-                let inst = SllInst::new(dst.into(), lhs, rhs);
-                Ok(vec![Inst::Sll(inst)])
+                ssa2tac_binary_usual!(inst, regs, reg_gener, Shl, Sll, SllInst)
             }
             middle::ir::instruction::InstType::LShr => {
-                let lshr = downcast_ref::<middle::ir::instruction::binary_inst::LShr>(
-                    inst.as_ref().as_ref(),
-                );
-                let lhs =
-                    Self::local_operand_from(lshr.get_lhs(), regs).with_context(|| context!())?;
-                let rhs =
-                    Self::local_operand_from(lshr.get_rhs(), regs).with_context(|| context!())?;
-                let dst = reg_gener.gen_virtual_usual_reg();
-                regs.insert(lshr as *const _ as Address, dst);
-                let inst = SrlInst::new(dst.into(), lhs, rhs);
-                Ok(vec![Inst::Srl(inst)])
+                ssa2tac_binary_usual!(inst, regs, reg_gener, LShr, Srl, SrlInst)
             }
             middle::ir::instruction::InstType::AShr => {
-                let ashr = downcast_ref::<middle::ir::instruction::binary_inst::AShr>(
-                    inst.as_ref().as_ref(),
-                );
-                let lhs =
-                    Self::local_operand_from(ashr.get_lhs(), regs).with_context(|| context!())?;
-                let rhs =
-                    Self::local_operand_from(ashr.get_rhs(), regs).with_context(|| context!())?;
-                let dst = reg_gener.gen_virtual_usual_reg();
-                regs.insert(ashr as *const _ as Address, dst);
-                let inst = SraInst::new(dst.into(), lhs, rhs);
-                Ok(vec![Inst::SRA(inst)])
+                ssa2tac_binary_usual!(inst, regs, reg_gener, AShr, SRA, SraInst)
             }
             middle::ir::instruction::InstType::And => {
-                let and = downcast_ref::<middle::ir::instruction::binary_inst::And>(
-                    inst.as_ref().as_ref(),
-                );
-                let lhs =
-                    Self::local_operand_from(and.get_lhs(), regs).with_context(|| context!())?;
-                let rhs =
-                    Self::local_operand_from(and.get_rhs(), regs).with_context(|| context!())?;
-                let dst = reg_gener.gen_virtual_usual_reg();
-                regs.insert(and as *const _ as Address, dst);
-                let inst = AndInst::new(dst.into(), lhs, rhs);
-                Ok(vec![Inst::And(inst)])
+                ssa2tac_binary_usual!(inst, regs, reg_gener, And, And, AndInst)
             }
             middle::ir::instruction::InstType::Or => {
-                let or = downcast_ref::<middle::ir::instruction::binary_inst::Or>(
-                    inst.as_ref().as_ref(),
-                );
-                let lhs =
-                    Self::local_operand_from(or.get_lhs(), regs).with_context(|| context!())?;
-                let rhs =
-                    Self::local_operand_from(or.get_rhs(), regs).with_context(|| context!())?;
-                let dst = reg_gener.gen_virtual_usual_reg();
-                regs.insert(or as *const _ as Address, dst);
-                let inst = OrInst::new(dst.into(), lhs, rhs);
-                Ok(vec![Inst::Or(inst)])
+                ssa2tac_binary_usual!(inst, regs, reg_gener, Or, Or, OrInst)
             }
             middle::ir::instruction::InstType::Xor => {
-                let xor = downcast_ref::<middle::ir::instruction::binary_inst::Xor>(
-                    inst.as_ref().as_ref(),
-                );
-                let lhs =
-                    Self::local_operand_from(xor.get_lhs(), regs).with_context(|| context!())?;
-                let rhs =
-                    Self::local_operand_from(xor.get_rhs(), regs).with_context(|| context!())?;
-                let dst = reg_gener.gen_virtual_usual_reg();
-                regs.insert(xor as *const _ as Address, dst);
-                let inst = XorInst::new(dst.into(), lhs, rhs);
-                Ok(vec![Inst::Xor(inst)])
+                ssa2tac_binary_usual!(inst, regs, reg_gener, Xor, Xor, XorInst)
             }
             middle::ir::instruction::InstType::Ret => {
                 let ret = downcast_ref::<middle::ir::instruction::terminator_inst::Ret>(
@@ -183,17 +92,49 @@ impl IRBuilder {
                 );
                 Self::build_ret_inst(ret, regs)
             }
-            middle::ir::instruction::InstType::Br => todo!(),
-            middle::ir::instruction::InstType::Load => todo!(),
+            middle::ir::instruction::InstType::Br => {
+                let br = downcast_ref::<middle::ir::instruction::terminator_inst::Br>(
+                    inst.as_ref().as_ref(),
+                );
+                Self::build_br_inst(br, regs, reg_gener)
+            }
+            middle::ir::instruction::InstType::Load => {
+                let load = downcast_ref::<middle::ir::instruction::memory_op_inst::Load>(
+                    inst.as_ref().as_ref(),
+                );
+                Self::build_load_inst(load, stack_slots, reg_gener, regs)
+            }
             middle::ir::instruction::InstType::GetElementPtr => todo!(),
             middle::ir::instruction::InstType::ZextTo => todo!(),
             middle::ir::instruction::InstType::SextTo => todo!(),
             middle::ir::instruction::InstType::ItoFp => todo!(),
             middle::ir::instruction::InstType::FpToI => todo!(),
-            middle::ir::instruction::InstType::ICmp => todo!(),
+            middle::ir::instruction::InstType::ICmp => {
+                let icmp = downcast_ref::<middle::ir::instruction::misc_inst::ICmp>(
+                    inst.as_ref().as_ref(),
+                );
+                match icmp.op {
+                    middle::ir::instruction::misc_inst::ICmpOp::Eq => todo!(),
+                    middle::ir::instruction::misc_inst::ICmpOp::Ne => todo!(),
+                    middle::ir::instruction::misc_inst::ICmpOp::Slt => todo!(),
+                    middle::ir::instruction::misc_inst::ICmpOp::Sle => todo!(),
+                    middle::ir::instruction::misc_inst::ICmpOp::Sgt => todo!(),
+                    middle::ir::instruction::misc_inst::ICmpOp::Sge => todo!(),
+                    middle::ir::instruction::misc_inst::ICmpOp::Ult => todo!(),
+                    middle::ir::instruction::misc_inst::ICmpOp::Ule => todo!(),
+                    middle::ir::instruction::misc_inst::ICmpOp::Ugt => todo!(),
+                    middle::ir::instruction::misc_inst::ICmpOp::Uge => todo!(),
+                }
+                todo!()
+            }
             middle::ir::instruction::InstType::FCmp => todo!(),
             middle::ir::instruction::InstType::Phi => todo!(),
-            middle::ir::instruction::InstType::Call => todo!(),
+            middle::ir::instruction::InstType::Call => {
+                let call = downcast_ref::<middle::ir::instruction::misc_inst::Call>(
+                    inst.as_ref().as_ref(),
+                );
+                Self::build_call_inst(call, stack_allocator, stack_slots, reg_gener, regs)
+            }
         }
     }
 
@@ -253,7 +194,6 @@ impl IRBuilder {
         Ok(ret)
     }
 
-    #[allow(unused)]
     pub fn build_load_inst(
         load: &middle::ir::instruction::memory_op_inst::Load,
         stack_slots: &mut HashMap<Address, StackSlot>,
@@ -493,7 +433,6 @@ impl IRBuilder {
         Ok(ret_insts)
     }
 
-    #[allow(unused)]
     pub fn build_call_inst(
         // call: &llvm_ir::instruction::Call,
         call: &middle::ir::instruction::misc_inst::Call,
@@ -502,37 +441,37 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
     ) -> Result<Vec<Inst>> {
-        let mut ret: Vec<Inst> = Vec::new();
+        let mut call_insts: Vec<Inst> = Vec::new();
 
-        let f_name = &call.func.name; // 要跳转的函数名
         let params = call.get_operand(); // 参数列表
 
-        // 调用惯例
-        let call_inst = CallInst::new(f_name.to_string().into()).into(); // call <label>
-        ret.push(call_inst);
+        // 函数是全局的，因此用的是名字
+        let call_inst = CallInst::new(call.func.name.to_string().into()).into(); // call <label>
+        call_insts.push(call_inst);
 
         let dest_name = call as *const _ as Address;
 
         let func = call.func;
 
+        // call 返回之后，将返回值放到一个虚拟寄存器中
         match func.return_type {
             middle::ir::ValueType::Void => {}
             middle::ir::ValueType::Int => {
                 let dst = reg_gener.gen_virtual_usual_reg(); // 分配一个虚拟寄存器
                 let mv = MvInst::new(dst.into(), REG_A0.into());
-                ret.push(mv.into()); // 插入 mv 指令
+                call_insts.push(mv.into()); // 插入 mv 指令
                 regs.insert(dest_name, dst); // 绑定中端的 id 和 虚拟寄存器
             }
             middle::ir::ValueType::Float => {
                 let dst = reg_gener.gen_virtual_float_reg();
                 let mv = MvInst::new(dst.into(), REG_FA0.into());
-                ret.push(mv.into());
+                call_insts.push(mv.into());
                 regs.insert(dest_name, dst);
             }
             middle::ir::ValueType::Bool => {
                 let dst = reg_gener.gen_virtual_usual_reg();
                 let mv = MvInst::new(dst.into(), REG_A0.into());
-                ret.push(mv.into());
+                call_insts.push(mv.into());
                 regs.insert(dest_name, dst);
             }
             _ => {
@@ -541,7 +480,7 @@ impl IRBuilder {
             }
         };
 
-        Ok(ret)
+        Ok(call_insts)
     }
 }
 
