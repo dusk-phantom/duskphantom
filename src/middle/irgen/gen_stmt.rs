@@ -191,12 +191,14 @@ impl<'a> FunctionKit<'a> {
                 }
 
                 // Go to return block
-                let br_inst = self.program.mem_pool.get_br(None);
-                exit.push_back(br_inst);
-                exit.set_true_bb(self.return_to);
+                if let Some(mut exit) = self.exit {
+                    let br_inst = self.program.mem_pool.get_br(None);
+                    exit.push_back(br_inst);
+                    exit.set_true_bb(self.return_to);
 
-                // Exit block can't be appended further
-                self.exit = None;
+                    // Exit block can't be appended further
+                    self.exit = None;
+                }
             }
             Stmt::Block(stmts) => {
                 // Add statements to current block

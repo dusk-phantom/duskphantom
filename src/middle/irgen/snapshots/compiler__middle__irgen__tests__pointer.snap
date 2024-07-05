@@ -4,27 +4,39 @@ expression: llvm_ir
 ---
 define i32 @main() {
 %entry:
-%alloca_1 = alloca [1 x i32]
-%getelementptr_2 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 0
-%getelementptr_3 = getelementptr i32, ptr %getelementptr_2, i32 0
-store i32 8, ptr %getelementptr_3
-%getelementptr_5 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 0
-%call_6 = call i32 @f(i32* %getelementptr_5)
-%getelementptr_7 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 0
-%call_8 = call void @putarray(i32 1, i32* %getelementptr_7)
-ret i32 0
+%alloca_2 = alloca i32
+%alloca_5 = alloca [1 x i32]
+%getelementptr_6 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
+%getelementptr_7 = getelementptr i32, ptr %getelementptr_6, i32 0
+store i32 8, ptr %getelementptr_7
+%getelementptr_9 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
+%call_10 = call i32 @f(i32* %getelementptr_9)
+%getelementptr_11 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
+%call_12 = call void @putarray(i32 1, i32* %getelementptr_11)
+store i32 0, ptr %alloca_2
+br label %exit
+
+%exit:
+%load_3 = load i32, ptr %alloca_2
+ret i32 %load_3
 
 
 }
 define i32 @f(i32* a) {
 %entry:
-%alloca_11 = alloca i32*
-store i32* %a, ptr %alloca_11
-%load_13 = load i32*, ptr %alloca_11
-store i32 1, ptr %load_13
-%load_15 = load i32*, ptr %alloca_11
-%load_16 = load i32, ptr %load_15
-ret i32 %load_16
+%alloca_17 = alloca i32
+%alloca_20 = alloca i32*
+store i32* %a, ptr %alloca_20
+%load_22 = load i32*, ptr %alloca_20
+store i32 1, ptr %load_22
+%load_24 = load i32*, ptr %alloca_20
+%load_25 = load i32, ptr %load_24
+store i32 %load_25, ptr %alloca_17
+br label %exit
+
+%exit:
+%load_18 = load i32, ptr %alloca_17
+ret i32 %load_18
 
 
 }

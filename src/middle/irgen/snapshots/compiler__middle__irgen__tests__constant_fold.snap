@@ -6,10 +6,16 @@ expression: llvm_ir
 @y = dso_local constant i32 16
 define i32 @main() {
 %entry:
-%load_1 = load i32, ptr @x
-%load_2 = load i32, ptr @y
-%Add_3 = add i32, %load_1, %load_2
-ret i32 %Add_3
+%alloca_2 = alloca i32
+%load_5 = load i32, ptr @x
+%load_6 = load i32, ptr @y
+%Add_7 = add i32, %load_5, %load_6
+store i32 %Add_7, ptr %alloca_2
+br label %exit
+
+%exit:
+%load_3 = load i32, ptr %alloca_2
+ret i32 %load_3
 
 
 }

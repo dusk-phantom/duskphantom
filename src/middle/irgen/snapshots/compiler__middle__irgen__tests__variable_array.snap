@@ -4,44 +4,50 @@ expression: llvm_ir
 ---
 define i32 @main() {
 %entry:
-%alloca_1 = alloca [2 x [2 x [2 x float]]]
-%getelementptr_2 = getelementptr [2 x [2 x [2 x float]]], ptr %alloca_1, i32 0, i32 0
-%getelementptr_3 = getelementptr [2 x [2 x float]], ptr %getelementptr_2, i32 0
-%getelementptr_4 = getelementptr [2 x [2 x float]], ptr %getelementptr_3, i32 0, i32 0
-%getelementptr_5 = getelementptr [2 x float], ptr %getelementptr_4, i32 0
-%getelementptr_6 = getelementptr [2 x float], ptr %getelementptr_5, i32 0, i32 0
-%getelementptr_7 = getelementptr float, ptr %getelementptr_6, i32 0
-%itofp_8 = sitofp i32 1 to float
-store float %itofp_8, ptr %getelementptr_7
-%getelementptr_10 = getelementptr float, ptr %getelementptr_6, i32 1
-%itofp_11 = sitofp i32 1 to float
-store float %itofp_11, ptr %getelementptr_10
-%getelementptr_13 = getelementptr [2 x float], ptr %getelementptr_4, i32 1
-%getelementptr_14 = getelementptr [2 x float], ptr %getelementptr_13, i32 0, i32 0
-%getelementptr_15 = getelementptr float, ptr %getelementptr_14, i32 0
-%itofp_16 = sitofp i32 4 to float
-store float %itofp_16, ptr %getelementptr_15
-%getelementptr_18 = getelementptr float, ptr %getelementptr_14, i32 1
-%itofp_19 = sitofp i32 5 to float
-store float %itofp_19, ptr %getelementptr_18
-%getelementptr_21 = getelementptr [2 x [2 x float]], ptr %getelementptr_2, i32 1
-%getelementptr_22 = getelementptr [2 x [2 x float]], ptr %getelementptr_21, i32 0, i32 0
-%getelementptr_23 = getelementptr [2 x float], ptr %getelementptr_22, i32 0
-%getelementptr_24 = getelementptr [2 x float], ptr %getelementptr_23, i32 0, i32 0
-%getelementptr_25 = getelementptr float, ptr %getelementptr_24, i32 0
-%itofp_26 = sitofp i32 1 to float
-store float %itofp_26, ptr %getelementptr_25
-%getelementptr_28 = getelementptr [2 x float], ptr %getelementptr_22, i32 1
-%getelementptr_29 = getelementptr [2 x float], ptr %getelementptr_28, i32 0, i32 0
-%getelementptr_30 = getelementptr float, ptr %getelementptr_29, i32 0
-%itofp_31 = sitofp i32 4 to float
-store float %itofp_31, ptr %getelementptr_30
-%getelementptr_33 = getelementptr [2 x [2 x [2 x float]]], ptr %alloca_1, i32 0, i32 1
-%getelementptr_34 = getelementptr [2 x [2 x float]], ptr %getelementptr_33, i32 0, i32 1
-%getelementptr_35 = getelementptr [2 x float], ptr %getelementptr_34, i32 0, i32 1
-%load_36 = load float, ptr %getelementptr_35
-%fptoi_37 = fptosi float %load_36 to i32
-ret i32 %fptoi_37
+%alloca_2 = alloca i32
+%alloca_5 = alloca [2 x [2 x [2 x float]]]
+%getelementptr_6 = getelementptr [2 x [2 x [2 x float]]], ptr %alloca_5, i32 0, i32 0
+%getelementptr_7 = getelementptr [2 x [2 x float]], ptr %getelementptr_6, i32 0
+%getelementptr_8 = getelementptr [2 x [2 x float]], ptr %getelementptr_7, i32 0, i32 0
+%getelementptr_9 = getelementptr [2 x float], ptr %getelementptr_8, i32 0
+%getelementptr_10 = getelementptr [2 x float], ptr %getelementptr_9, i32 0, i32 0
+%getelementptr_11 = getelementptr float, ptr %getelementptr_10, i32 0
+%itofp_12 = sitofp i32 1 to float
+store float %itofp_12, ptr %getelementptr_11
+%getelementptr_14 = getelementptr float, ptr %getelementptr_10, i32 1
+%itofp_15 = sitofp i32 1 to float
+store float %itofp_15, ptr %getelementptr_14
+%getelementptr_17 = getelementptr [2 x float], ptr %getelementptr_8, i32 1
+%getelementptr_18 = getelementptr [2 x float], ptr %getelementptr_17, i32 0, i32 0
+%getelementptr_19 = getelementptr float, ptr %getelementptr_18, i32 0
+%itofp_20 = sitofp i32 4 to float
+store float %itofp_20, ptr %getelementptr_19
+%getelementptr_22 = getelementptr float, ptr %getelementptr_18, i32 1
+%itofp_23 = sitofp i32 5 to float
+store float %itofp_23, ptr %getelementptr_22
+%getelementptr_25 = getelementptr [2 x [2 x float]], ptr %getelementptr_6, i32 1
+%getelementptr_26 = getelementptr [2 x [2 x float]], ptr %getelementptr_25, i32 0, i32 0
+%getelementptr_27 = getelementptr [2 x float], ptr %getelementptr_26, i32 0
+%getelementptr_28 = getelementptr [2 x float], ptr %getelementptr_27, i32 0, i32 0
+%getelementptr_29 = getelementptr float, ptr %getelementptr_28, i32 0
+%itofp_30 = sitofp i32 1 to float
+store float %itofp_30, ptr %getelementptr_29
+%getelementptr_32 = getelementptr [2 x float], ptr %getelementptr_26, i32 1
+%getelementptr_33 = getelementptr [2 x float], ptr %getelementptr_32, i32 0, i32 0
+%getelementptr_34 = getelementptr float, ptr %getelementptr_33, i32 0
+%itofp_35 = sitofp i32 4 to float
+store float %itofp_35, ptr %getelementptr_34
+%getelementptr_37 = getelementptr [2 x [2 x [2 x float]]], ptr %alloca_5, i32 0, i32 1
+%getelementptr_38 = getelementptr [2 x [2 x float]], ptr %getelementptr_37, i32 0, i32 1
+%getelementptr_39 = getelementptr [2 x float], ptr %getelementptr_38, i32 0, i32 1
+%load_40 = load float, ptr %getelementptr_39
+%fptoi_41 = fptosi float %load_40 to i32
+store i32 %fptoi_41, ptr %alloca_2
+br label %exit
+
+%exit:
+%load_3 = load i32, ptr %alloca_2
+ret i32 %load_3
 
 
 }

@@ -4,24 +4,30 @@ expression: llvm_ir
 ---
 define i32 @main() {
 %entry:
-%alloca_1 = alloca i1
-%icmp_2 = icmp slt i32 1, 2
-store i1 %icmp_2, ptr %alloca_1
-%alloca_4 = alloca i1
-%itofp_5 = sitofp i32 1 to float
-%fcmp_6 = fcmp ult float %itofp_5, 1.1
-store i1 %fcmp_6, ptr %alloca_4
-%load_10 = load i1, ptr %alloca_1
-br i1 %load_10, label %alt0, label %final1
+%alloca_2 = alloca i32
+%alloca_5 = alloca i1
+%icmp_6 = icmp slt i32 1, 2
+store i1 %icmp_6, ptr %alloca_5
+%alloca_8 = alloca i1
+%itofp_9 = sitofp i32 1 to float
+%fcmp_10 = fcmp ult float %itofp_9, 1.1
+store i1 %fcmp_10, ptr %alloca_8
+%load_14 = load i1, ptr %alloca_5
+br i1 %load_14, label %alt0, label %final1
 
 %alt0:
-%load_12 = load i1, ptr %alloca_4
+%load_16 = load i1, ptr %alloca_8
 br label %final1
 
 %final1:
-%phi_14 = phi i1 [false, %entry], [%load_12, %alt0]
-%zext_15 = zext i1 %phi_14 to i32
-ret i32 %zext_15
+%phi_18 = phi i1 [false, %entry], [%load_16, %alt0]
+%zext_19 = zext i1 %phi_18 to i32
+store i32 %zext_19, ptr %alloca_2
+br label %exit
+
+%exit:
+%load_3 = load i32, ptr %alloca_2
+ret i32 %load_3
 
 
 }

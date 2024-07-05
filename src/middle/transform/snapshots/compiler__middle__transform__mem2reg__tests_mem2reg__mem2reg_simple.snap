@@ -1,13 +1,34 @@
 ---
 source: src/middle/transform/mem2reg.rs
-expression: program.module.gen_llvm_ir()
+expression: "format!(\"BEFORE:\\n{}\\n\\nAFTER:\\n{}\", llvm_before, llvm_after)"
 ---
+BEFORE:
 define i32 @main() {
 %entry:
-%alloca_1 = alloca i32
-store i32 1, ptr %alloca_1
-%load_3 = load i32, ptr %alloca_1
+%alloca_2 = alloca i32
+%alloca_5 = alloca i32
+store i32 1, ptr %alloca_5
+%load_7 = load i32, ptr %alloca_5
+store i32 %load_7, ptr %alloca_2
+br label %exit
+
+%exit:
+%load_3 = load i32, ptr %alloca_2
 ret i32 %load_3
+
+
+}
+
+
+AFTER:
+define i32 @main() {
+%entry:
+%alloca_2 = alloca i32
+%alloca_5 = alloca i32
+br label %exit
+
+%exit:
+ret i32 1
 
 
 }
