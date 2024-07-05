@@ -196,15 +196,17 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
     ) -> Result<Block> {
-        let mut m_bb = Block::new(bb.name.clone());
+        // basic 的 label 注意一下
+        let label = bb.as_ref() as *const _ as Address;
+        let mut m_bb = Block::new(label.to_string());
         for inst in bb.iter() {
             let gen_insts =
                 Self::build_instruction(&inst, stack_allocator, stack_slots, reg_gener, regs)
                     .with_context(|| context!())?;
             m_bb.extend_insts(gen_insts);
         }
-        let gen_insts =
-            Self::build_term_inst(&bb.get_last_inst(), regs).with_context(|| context!())?;
+        let gen_insts = Self::build_term_inst(&bb.get_last_inst(), regs, reg_gener)
+            .with_context(|| context!())?;
         m_bb.extend_insts(gen_insts);
         Ok(m_bb)
     }
@@ -216,11 +218,8 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
     ) -> Result<Block> {
-        // let bb = f.basic_blocks.first().expect("func must have entry");
-        let bb = func.entry.with_context(|| context!())?;
         let mut insts: Vec<Inst> = Vec::new();
-
-        // 函数的形参
+        // 处理函数的形参
         for (i, param) in func.params.iter().enumerate() {
             if i <= 7 {
                 let reg: Reg = match &param.value_type {
@@ -269,19 +268,21 @@ impl IRBuilder {
                 };
                 regs.insert(param.as_ref() as *const _ as Address, reg);
             } else {
+                // 从栈中 ld 第8个参数
+
                 // TODO 如果参数的个数大于 7
-                // 但是目前栈还不能用
                 unimplemented!();
             }
         }
 
+        let bb = func.entry.with_context(|| context!())?;
         for inst in bb.iter() {
             let gen_insts =
                 Self::build_instruction(&inst, stack_allocator, stack_slots, reg_gener, regs)
                     .with_context(|| context!())?;
             insts.extend(gen_insts);
         }
-        insts.extend(Self::build_term_inst(&bb.get_last_inst(), regs)?);
+        insts.extend(Self::build_term_inst(&bb.get_last_inst(), regs, reg_gener)?);
         let mut entry = Block::new("entry".to_string());
         entry.extend_insts(insts);
         Ok(entry)

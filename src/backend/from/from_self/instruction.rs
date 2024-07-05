@@ -94,19 +94,7 @@ impl IRBuilder {
                 Ok(vec![Inst::Mul(inst)])
             }
             middle::ir::instruction::InstType::FMul => todo!(),
-            middle::ir::instruction::InstType::UDiv => {
-                todo!();
-                // let mul = downcast_ref::<middle::ir::instruction::binary_inst::Mul>(
-                //     inst.as_ref().as_ref(),
-                // );
-                // let lhs =
-                //     Self::local_operand_from(mul.get_lhs(), regs).with_context(|| context!())?;
-                // let rhs =
-                //     Self::local_operand_from(mul.get_rhs(), regs).with_context(|| context!())?;
-                // let dst = reg_gener.gen_virtual_usual_reg();
-                // let inst = MulInst::new(dst.into(), lhs, rhs);
-                // Ok(vec![Inst::Mul(inst)])
-            }
+            middle::ir::instruction::InstType::UDiv => todo!(),
             middle::ir::instruction::InstType::SDiv => todo!(),
             middle::ir::instruction::InstType::FDiv => todo!(),
             middle::ir::instruction::InstType::URem => todo!(),
@@ -278,7 +266,6 @@ impl IRBuilder {
         Ok(ret)
     }
 
-    /// TODO 包含最后的 ret 语句
     pub fn build_ret_inst(
         ret: &middle::ir::instruction::terminator_inst::Ret,
         regs: &mut HashMap<Address, Reg>,
@@ -372,9 +359,8 @@ impl IRBuilder {
     pub fn build_br_inst(
         br: &middle::ir::instruction::terminator_inst::Br,
         regs: &mut HashMap<Address, Reg>,
+        reg_gener: &mut RegGenerator,
     ) -> Result<Vec<Inst>> {
-        let mut br_insts: Vec<Inst> = Vec::new();
-
         let cur = br
             .get_parent_bb()
             .ok_or(anyhow!("iffalse get error",))
@@ -382,22 +368,91 @@ impl IRBuilder {
 
         let succs = cur.get_succ_bb();
 
+        let mut br_insts: Vec<Inst> = Vec::new();
         if br.is_cond_br() {
-            let cond = br.get_cond();
+            // 获取 cond 对应的寄存器
+            let reg: Reg = match br.get_cond() {
+                // 如果是常数，那么需要使用 li 将常数加载到寄存器中
+                middle::ir::Operand::Constant(con) => match con {
+                    middle::ir::Constant::Int(i) => {
+                        let imm: Operand = (*i as i64).into();
+                        let reg = reg_gener.gen_virtual_usual_reg();
+                        let li = AddInst::new(reg.into(), REG_ZERO.into(), imm);
+                        br_insts.push(li.into());
+                        reg
+                    }
+                    middle::ir::Constant::Bool(bo) => {
+                        let imm: Operand = (*bo as i64).into();
+                        let reg = reg_gener.gen_virtual_usual_reg();
+                        let li = AddInst::new(reg.into(), REG_ZERO.into(), imm);
+                        br_insts.push(li.into());
+                        reg
+                    }
+                    _ => {
+                        return Err(anyhow!("cond br with array or float is not allow"))
+                            .with_context(|| context!())
+                    }
+                },
+                middle::ir::Operand::Parameter(param) => match param.as_ref().value_type {
+                    middle::ir::ValueType::Int | middle::ir::ValueType::Bool => {
+                        let addr = param.as_ref() as *const _ as Address;
+                        let reg = regs.get(&addr).ok_or(anyhow!("").context(context!()))?;
+                        *reg
+                    }
+                    _ => {
+                        return Err(anyhow!(
+                            "cond br with array/float/pointer/void is not allow"
+                        ))
+                        .with_context(|| context!())
+                    }
+                },
+                middle::ir::Operand::Instruction(instr) => match instr.get_value_type() {
+                    middle::ir::ValueType::Int | middle::ir::ValueType::Bool => {
+                        let addr = instr.as_ref().as_ref() as *const dyn middle::ir::Instruction
+                            as *const () as Address;
+                        let reg = regs.get(&addr).ok_or(anyhow!("").context(context!()))?;
+                        *reg
+                    }
+                    _ => {
+                        return Err(anyhow!(
+                            "cond br with array/float/pointer/void is not allow"
+                        ))
+                        .with_context(|| context!())
+                    }
+                },
+                middle::ir::Operand::Global(_) => {
+                    return Err(anyhow!("cond br with global is not allow"))
+                        .with_context(|| context!())
+                }
+            };
+
             let iftrue = succs
-                .get(0)
+                .first()
                 .ok_or(anyhow!("iftrue get error",))
                 .with_context(|| context!())?;
-
             let iffalse = succs
                 .get(1)
                 .ok_or(anyhow!("iftrue get error",))
                 .with_context(|| context!())?;
+
+            br_insts.extend(vec![
+                Inst::Bne(BneInst::new(
+                    reg,
+                    REG_ZERO,
+                    (iffalse.as_ref() as *const _ as Address).to_string().into(),
+                )),
+                Inst::Jmp(JmpInst::new(
+                    (iftrue.as_ref() as *const _ as Address).to_string().into(),
+                )),
+            ]);
         } else {
             let succ = succs
-                .get(0)
+                .first()
                 .ok_or(anyhow!("iftrue get error",))
                 .with_context(|| context!())?;
+            br_insts.push(Inst::Jmp(JmpInst::new(
+                (succ.as_ref() as *const _ as Address).to_string().into(),
+            )))
         }
 
         Ok(br_insts)
@@ -407,6 +462,7 @@ impl IRBuilder {
     pub fn build_term_inst(
         term: &ObjPtr<Box<dyn middle::ir::Instruction>>,
         regs: &mut HashMap<Address, Reg>,
+        reg_gener: &mut RegGenerator,
     ) -> Result<Vec<Inst>> {
         let mut ret_insts: Vec<Inst> = Vec::new();
         // dbg!(term);
@@ -422,13 +478,15 @@ impl IRBuilder {
                 let br = downcast_ref::<middle::ir::instruction::terminator_inst::Br>(
                     term.as_ref().as_ref(),
                 );
-                todo!();
+                Self::build_br_inst(br, regs, reg_gener)?
             }
             _ => {
                 return Err(anyhow!("get_last_inst only to be ret or br"))
                     .with_context(|| context!())
             }
         };
+
+        // TODO 这里 return 还要记得 退栈
 
         ret_insts.extend(insts);
 
