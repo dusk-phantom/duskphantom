@@ -1,0 +1,36 @@
+---
+source: src/middle/irgen/mod.rs
+expression: llvm_ir
+---
+define i32 @main() {
+%entry:
+%alloca_1 = alloca i32
+%call_2 = call i32 @getint()
+store i32 %call_2, ptr %alloca_1
+%load_6 = load i32, ptr %alloca_1
+%icmp_7 = icmp sgt i32 %load_6, 1
+br i1 %icmp_7, label %alt0, label %final1
+
+%alt0:
+%load_9 = load i32, ptr %alloca_1
+%call_10 = call i32 @f(i32 %load_9)
+%icmp_11 = icmp ne i32 %call_10, 0
+br label %final1
+
+%final1:
+%phi_13 = phi i1 [false, %entry], [%icmp_11, %alt0]
+ret i32 0
+
+
+}
+define i32 @f(i32 x) {
+%entry:
+%alloca_16 = alloca i32
+store i32 %x, ptr %alloca_16
+%load_18 = load i32, ptr %alloca_16
+%call_19 = call void @putint(i32 %load_18)
+%load_20 = load i32, ptr %alloca_16
+ret i32 %load_20
+
+
+}

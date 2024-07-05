@@ -1,0 +1,55 @@
+---
+source: src/middle/transform/mem2reg.rs
+expression: program.module.gen_llvm_ir()
+---
+define i32 @main() {
+%entry:
+%alloca_1 = alloca i32
+store i32 0, ptr %alloca_1
+br label %cond0
+
+%cond0:
+%load_32 = load i32, ptr %alloca_1
+%icmp_33 = icmp slt i32 %load_32, 10
+br i1 %icmp_33, label %body1, label %final2
+
+%body1:
+%load_7 = load i32, ptr %alloca_1
+%Add_8 = add i32, %load_7, 2
+store i32 %Add_8, ptr %alloca_1
+br label %cond3
+
+%final2:
+%load_35 = load i32, ptr %alloca_1
+ret i32 %load_35
+
+%cond3:
+%load_15 = load i32, ptr %alloca_1
+%icmp_16 = icmp sgt i32 %load_15, 5
+br i1 %icmp_16, label %then4, label %alt5
+
+%then4:
+br label %cond7
+
+%alt5:
+br label %final6
+
+%cond7:
+%load_26 = load i32, ptr %alloca_1
+%icmp_27 = icmp slt i32 %load_26, 8
+br i1 %icmp_27, label %body8, label %final9
+
+%final6:
+br label %cond0
+
+%body8:
+%load_22 = load i32, ptr %alloca_1
+%Add_23 = add i32, %load_22, 1
+store i32 %Add_23, ptr %alloca_1
+br label %cond7
+
+%final9:
+br label %final6
+
+
+}

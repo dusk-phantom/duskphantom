@@ -1,0 +1,22 @@
+---
+source: src/middle/irgen/mod.rs
+expression: llvm_ir
+---
+define i32 @main() {
+%entry:
+%alloca_1 = alloca i32
+store i32 1, ptr %alloca_1
+%alloca_3 = alloca float
+store float 2, ptr %alloca_3
+%alloca_5 = alloca float
+%load_6 = load i32, ptr %alloca_1
+%itofp_7 = sitofp i32 %load_6 to float
+%load_8 = load float, ptr %alloca_3
+%FAdd_9 = fadd float, %itofp_7, %load_8
+store float %FAdd_9, ptr %alloca_5
+%load_11 = load float, ptr %alloca_5
+%fptoi_12 = fptosi float %load_11 to i32
+ret i32 %fptoi_12
+
+
+}

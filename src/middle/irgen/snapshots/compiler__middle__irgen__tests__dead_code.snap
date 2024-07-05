@@ -1,0 +1,20 @@
+---
+source: src/middle/irgen/mod.rs
+expression: llvm_ir
+---
+define i32 @main() {
+%entry:
+br label %cond0
+
+%cond0:
+%icmp_6 = icmp ne i32 1, 0
+br i1 %icmp_6, label %body1, label %final2
+
+%body1:
+br label %final2
+
+%final2:
+ret i32 0
+
+
+}

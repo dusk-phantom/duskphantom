@@ -1,0 +1,16 @@
+---
+source: src/middle/irgen/mod.rs
+expression: llvm_ir
+---
+@A = dso_local constant [3 x [2 x [2 x float]]] [[2 x [2 x float]] [[2 x float] [float 1, float 0], [2 x float] [float 0, float 0]], [2 x [2 x float]] [[2 x float] [float 1, float 4], [2 x float] [float 5, float 1]], [2 x [2 x float]] [[2 x float] [float 4, float 0], [2 x float] [float 0, float 0]]]
+define i32 @main() {
+%entry:
+%getelementptr_1 = getelementptr [3 x [2 x [2 x float]]], ptr @A, i32 0, i32 0
+%getelementptr_2 = getelementptr [2 x [2 x float]], ptr %getelementptr_1, i32 0, i32 0
+%getelementptr_3 = getelementptr [2 x float], ptr %getelementptr_2, i32 0, i32 0
+%load_4 = load float, ptr %getelementptr_3
+%fptoi_5 = fptosi float %load_4 to i32
+ret i32 %fptoi_5
+
+
+}
