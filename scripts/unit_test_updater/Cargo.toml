@@ -1,0 +1,8 @@
+[package]
+name = "unit_test_updater"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+fs = "0.0.5"
+winnow = "0.6.13"

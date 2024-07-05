@@ -184,16 +184,19 @@ impl<'a> FunctionKit<'a> {
                 self.exit = None;
             }
             Stmt::Return(expr) => {
-                // Add returned result to exit block
-                let return_value = match expr {
-                    Some(expr) => Some(self.gen_expr(expr)?.load(self.return_type.clone(), self)?),
-                    None => None,
-                };
-
-                // Add ret instruction to exit block
-                if let Some(mut exit) = self.exit {
-                    exit.push_back(self.program.mem_pool.get_ret(return_value));
+                // Assign return value source to destination if possible
+                if let (Some(expr), Some(return_dst)) = (expr, self.return_value.clone()) {
+                    let return_src = self.gen_expr(expr)?;
+                    return_dst.assign(self, return_src)?;
                 }
+
+                // Go to return block
+                let br_inst = self.program.mem_pool.get_br(None);
+                exit.push_back(br_inst);
+                exit.set_true_bb(self.return_to);
+
+                // Exit block can't be appended further
+                self.exit = None;
             }
             Stmt::Block(stmts) => {
                 // Add statements to current block
