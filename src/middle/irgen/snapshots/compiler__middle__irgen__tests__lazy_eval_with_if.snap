@@ -4,35 +4,41 @@ expression: llvm_ir
 ---
 define i32 @main() {
 %entry:
-%alloca_1 = alloca i32
-%call_2 = call i32 @getint()
-store i32 %call_2, ptr %alloca_1
+%alloca_2 = alloca i32
+%alloca_5 = alloca i32
+%call_6 = call i32 @getint()
+store i32 %call_6, ptr %alloca_5
 br label %cond0
 
 %cond0:
-%load_11 = load i32, ptr %alloca_1
-%icmp_12 = icmp sgt i32 %load_11, 1
-br i1 %icmp_12, label %alt4, label %final5
+%load_15 = load i32, ptr %alloca_5
+%icmp_16 = icmp sgt i32 %load_15, 1
+br i1 %icmp_16, label %alt4, label %final5
 
 %alt4:
-%load_14 = load i32, ptr %alloca_1
-%icmp_15 = icmp slt i32 %load_14, 3
+%load_18 = load i32, ptr %alloca_5
+%icmp_19 = icmp slt i32 %load_18, 3
 br label %final5
 
 %final5:
-%phi_17 = phi i1 [false, %cond0], [%icmp_15, %alt4]
-br i1 %phi_17, label %then1, label %alt2
+%phi_21 = phi i1 [false, %cond0], [%icmp_19, %alt4]
+br i1 %phi_21, label %then1, label %alt2
 
 %then1:
-%load_19 = load i32, ptr %alloca_1
-%call_20 = call void @putint(i32 %load_19)
+%load_23 = load i32, ptr %alloca_5
+%call_24 = call void @putint(i32 %load_23)
 br label %final3
 
 %alt2:
 br label %final3
 
 %final3:
-ret i32 0
+store i32 0, ptr %alloca_2
+br label %exit
+
+%exit:
+%load_3 = load i32, ptr %alloca_2
+ret i32 %load_3
 
 
 }

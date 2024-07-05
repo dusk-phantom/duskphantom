@@ -375,11 +375,15 @@ pub mod tests_mem2reg {
         // Check before optimization
         let parsed = parse(code).unwrap();
         let mut program = gen(&parsed).unwrap();
-        assert_snapshot!(program.module.gen_llvm_ir());
+        let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
         mem2reg(program.module.functions[0].entry.unwrap(), &mut program).unwrap();
-        assert_snapshot!(program.module.gen_llvm_ir());
+        let llvm_after = program.module.gen_llvm_ir();
+        assert_snapshot!(format!(
+            "BEFORE:\n{}\n\nAFTER:\n{}",
+            llvm_before, llvm_after
+        ));
     }
 
     #[test]
@@ -399,11 +403,15 @@ pub mod tests_mem2reg {
         // Check before optimization
         let parsed = parse(code).unwrap();
         let mut program = gen(&parsed).unwrap();
-        assert_snapshot!(program.module.gen_llvm_ir());
+        let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
         mem2reg(program.module.functions[0].entry.unwrap(), &mut program).unwrap();
-        assert_snapshot!(program.module.gen_llvm_ir());
+        let llvm_after = program.module.gen_llvm_ir();
+        assert_snapshot!(format!(
+            "BEFORE:\n{}\n\nAFTER:\n{}",
+            llvm_before, llvm_after
+        ));
     }
 
     #[test]
@@ -421,11 +429,15 @@ pub mod tests_mem2reg {
         // Check before optimization
         let parsed = parse(code).unwrap();
         let mut program = gen(&parsed).unwrap();
-        assert_snapshot!(program.module.gen_llvm_ir());
+        let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
         mem2reg(program.module.functions[0].entry.unwrap(), &mut program).unwrap();
-        assert_snapshot!(program.module.gen_llvm_ir());
+        let llvm_after = program.module.gen_llvm_ir();
+        assert_snapshot!(format!(
+            "BEFORE:\n{}\n\nAFTER:\n{}",
+            llvm_before, llvm_after
+        ));
     }
 
     #[test]
@@ -444,11 +456,15 @@ pub mod tests_mem2reg {
         // Check before optimization
         let parsed = parse(code).unwrap();
         let mut program = gen(&parsed).unwrap();
-        assert_snapshot!(program.module.gen_llvm_ir());
+        let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
         mem2reg(program.module.functions[0].entry.unwrap(), &mut program).unwrap();
-        assert_snapshot!(program.module.gen_llvm_ir());
+        let llvm_after = program.module.gen_llvm_ir();
+        assert_snapshot!(format!(
+            "BEFORE:\n{}\n\nAFTER:\n{}",
+            llvm_before, llvm_after
+        ));
     }
 
     #[test]
@@ -470,12 +486,16 @@ pub mod tests_mem2reg {
         // Check before optimization
         let parsed = parse(code).unwrap();
         let mut program = gen(&parsed).unwrap();
-        assert_snapshot!(program.module.gen_llvm_ir());
+        let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
         mem2reg(program.module.functions[0].entry.unwrap(), &mut program).unwrap();
         mem2reg(program.module.functions[1].entry.unwrap(), &mut program).unwrap();
-        assert_snapshot!(program.module.gen_llvm_ir());
+        let llvm_after = program.module.gen_llvm_ir();
+        assert_snapshot!(format!(
+            "BEFORE:\n{}\n\nAFTER:\n{}",
+            llvm_before, llvm_after
+        ));
     }
 
     #[test]

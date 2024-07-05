@@ -1,33 +1,70 @@
 ---
 source: src/middle/transform/mem2reg.rs
-expression: program.module.gen_llvm_ir()
+expression: "format!(\"BEFORE:\\n{}\\n\\nAFTER:\\n{}\", llvm_before, llvm_after)"
 ---
+BEFORE:
 define i32 @main() {
 %entry:
-%alloca_1 = alloca i32
-store i32 0, ptr %alloca_1
+%alloca_2 = alloca i32
+%alloca_5 = alloca i32
+store i32 0, ptr %alloca_5
 br label %cond0
 
 %cond0:
-%load_8 = load i32, ptr %alloca_1
-%icmp_9 = icmp slt i32 %load_8, 10
-br i1 %icmp_9, label %then1, label %alt2
+%load_12 = load i32, ptr %alloca_5
+%icmp_13 = icmp slt i32 %load_12, 10
+br i1 %icmp_13, label %then1, label %alt2
 
 %then1:
-%load_11 = load i32, ptr %alloca_1
-%Add_12 = add i32, %load_11, 1
-store i32 %Add_12, ptr %alloca_1
+%load_15 = load i32, ptr %alloca_5
+%Add_16 = add i32, %load_15, 1
+store i32 %Add_16, ptr %alloca_5
 br label %final3
 
 %alt2:
-%load_15 = load i32, ptr %alloca_1
-%Add_16 = add i32, %load_15, 9
-store i32 %Add_16, ptr %alloca_1
+%load_19 = load i32, ptr %alloca_5
+%Add_20 = add i32, %load_19, 9
+store i32 %Add_20, ptr %alloca_5
 br label %final3
 
 %final3:
-%load_19 = load i32, ptr %alloca_1
-ret i32 %load_19
+%load_23 = load i32, ptr %alloca_5
+store i32 %load_23, ptr %alloca_2
+br label %exit
+
+%exit:
+%load_3 = load i32, ptr %alloca_2
+ret i32 %load_3
+
+
+}
+
+
+AFTER:
+define i32 @main() {
+%entry:
+%alloca_2 = alloca i32
+%alloca_5 = alloca i32
+br label %cond0
+
+%cond0:
+%icmp_13 = icmp slt i32 0, 10
+br i1 %icmp_13, label %then1, label %alt2
+
+%then1:
+%Add_16 = add i32, 0, 1
+br label %final3
+
+%alt2:
+%Add_20 = add i32, 0, 9
+br label %final3
+
+%final3:
+%phi_26 = phi i32 [%Add_16, %then1], [%Add_20, %alt2]
+br label %exit
+
+%exit:
+ret i32 %phi_26
 
 
 }

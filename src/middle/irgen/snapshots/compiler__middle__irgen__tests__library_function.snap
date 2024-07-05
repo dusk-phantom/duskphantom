@@ -4,13 +4,19 @@ expression: llvm_ir
 ---
 define i32 @main() {
 %entry:
-%alloca_1 = alloca i32
-%call_2 = call i32 @getint()
-store i32 %call_2, ptr %alloca_1
-%load_4 = load i32, ptr %alloca_1
-%Add_5 = add i32, %load_4, 3
-%call_6 = call void @putint(i32 %Add_5)
-ret i32 0
+%alloca_2 = alloca i32
+%alloca_5 = alloca i32
+%call_6 = call i32 @getint()
+store i32 %call_6, ptr %alloca_5
+%load_8 = load i32, ptr %alloca_5
+%Add_9 = add i32, %load_8, 3
+%call_10 = call void @putint(i32 %Add_9)
+store i32 0, ptr %alloca_2
+br label %exit
+
+%exit:
+%load_3 = load i32, ptr %alloca_2
+ret i32 %load_3
 
 
 }

@@ -4,24 +4,30 @@ expression: llvm_ir
 ---
 define i32 @main() {
 %entry:
-%alloca_1 = alloca i32
-store i32 0, ptr %alloca_1
+%alloca_2 = alloca i32
+%alloca_5 = alloca i32
+store i32 0, ptr %alloca_5
 br label %body0
 
 %body0:
-%load_7 = load i32, ptr %alloca_1
-%Add_8 = add i32, %load_7, 1
-store i32 %Add_8, ptr %alloca_1
+%load_11 = load i32, ptr %alloca_5
+%Add_12 = add i32, %load_11, 1
+store i32 %Add_12, ptr %alloca_5
 br label %cond1
 
 %cond1:
-%load_11 = load i32, ptr %alloca_1
-%icmp_12 = icmp slt i32 %load_11, 10
-br i1 %icmp_12, label %body0, label %final2
+%load_15 = load i32, ptr %alloca_5
+%icmp_16 = icmp slt i32 %load_15, 10
+br i1 %icmp_16, label %body0, label %final2
 
 %final2:
-%load_14 = load i32, ptr %alloca_1
-ret i32 %load_14
+%load_18 = load i32, ptr %alloca_5
+store i32 %load_18, ptr %alloca_2
+br label %exit
+
+%exit:
+%load_3 = load i32, ptr %alloca_2
+ret i32 %load_3
 
 
 }

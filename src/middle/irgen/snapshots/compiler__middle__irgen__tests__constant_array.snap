@@ -5,12 +5,18 @@ expression: llvm_ir
 @A = dso_local constant [3 x [2 x [2 x float]]] [[2 x [2 x float]] [[2 x float] [float 1, float 0], [2 x float] [float 0, float 0]], [2 x [2 x float]] [[2 x float] [float 1, float 4], [2 x float] [float 5, float 1]], [2 x [2 x float]] [[2 x float] [float 4, float 0], [2 x float] [float 0, float 0]]]
 define i32 @main() {
 %entry:
-%getelementptr_1 = getelementptr [3 x [2 x [2 x float]]], ptr @A, i32 0, i32 0
-%getelementptr_2 = getelementptr [2 x [2 x float]], ptr %getelementptr_1, i32 0, i32 0
-%getelementptr_3 = getelementptr [2 x float], ptr %getelementptr_2, i32 0, i32 0
-%load_4 = load float, ptr %getelementptr_3
-%fptoi_5 = fptosi float %load_4 to i32
-ret i32 %fptoi_5
+%alloca_2 = alloca i32
+%getelementptr_5 = getelementptr [3 x [2 x [2 x float]]], ptr @A, i32 0, i32 0
+%getelementptr_6 = getelementptr [2 x [2 x float]], ptr %getelementptr_5, i32 0, i32 0
+%getelementptr_7 = getelementptr [2 x float], ptr %getelementptr_6, i32 0, i32 0
+%load_8 = load float, ptr %getelementptr_7
+%fptoi_9 = fptosi float %load_8 to i32
+store i32 %fptoi_9, ptr %alloca_2
+br label %exit
+
+%exit:
+%load_3 = load i32, ptr %alloca_2
+ret i32 %load_3
 
 
 }
