@@ -1,0 +1,5 @@
+/target
+.vscode
+config.yaml
+.idea
+data

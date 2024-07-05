@@ -13,6 +13,8 @@ pub struct FunctionKit<'a> {
     pub exit: Option<BBPtr>,
     pub break_to: Option<BBPtr>,
     pub continue_to: Option<BBPtr>,
+    pub return_to: BBPtr,
+    pub return_value: Option<Value>,
     pub return_type: ValueType,
     pub counter: &'a mut usize,
 }
@@ -33,6 +35,8 @@ impl<'a> FunctionKit<'a> {
             exit: Some(exit),
             break_to,
             continue_to,
+            return_to: self.return_to,
+            return_value: self.return_value.clone(),
             return_type: self.return_type.clone(),
             counter: self.counter,
         }

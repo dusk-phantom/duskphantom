@@ -1,5 +1,6 @@
 use crate::errors::MiddleError;
 use crate::frontend::Decl;
+use crate::middle::ir::ValueType;
 use crate::middle::irgen::function_kit::FunctionKit;
 use crate::middle::irgen::program_kit::ProgramKit;
 use crate::middle::irgen::value::Value;
@@ -19,6 +20,26 @@ impl<'a> ProgramKit<'a> {
                 // Create basic block
                 let entry_name = "entry".to_string();
                 let mut entry = self.program.mem_pool.new_basicblock(entry_name);
+                let exit_name = "exit".to_string();
+                let mut exit = self.program.mem_pool.new_basicblock(exit_name);
+
+                // Handle value to return
+                let mut ret_value = None;
+                if let ValueType::Void = fty {
+                    let ret_inst = self.program.mem_pool.get_ret(None);
+                    exit.push_back(ret_inst);
+                } else {
+                    let ret_alloc = self.program.mem_pool.get_alloca(fty.clone(), 1);
+                    entry.push_back(ret_alloc);
+                    let ret_load = self
+                        .program
+                        .mem_pool
+                        .get_load(fty.clone(), ret_alloc.into());
+                    exit.push_back(ret_load);
+                    let ret_inst = self.program.mem_pool.get_ret(Some(ret_load.into()));
+                    exit.push_back(ret_inst);
+                    ret_value = Some(Value::ReadWrite(ret_alloc.into()));
+                }
 
                 // Fill parameters
                 for param in fun_ptr.params.iter() {
@@ -48,12 +69,14 @@ impl<'a> ProgramKit<'a> {
                     exit: Some(entry),
                     break_to: None,
                     continue_to: None,
+                    return_to: exit,
+                    return_value: ret_value,
                     return_type: fty,
                     counter: &mut counter,
                 };
                 kit.gen_stmt(stmt)?;
                 fun_ptr.entry = Some(entry);
-                fun_ptr.exit = kit.exit;
+                fun_ptr.exit = Some(exit);
                 Ok(())
             }
             _ => Ok(()),
