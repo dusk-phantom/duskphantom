@@ -1,0 +1,13 @@
+---
+source: src/middle/irgen/mod.rs
+expression: llvm_ir
+---
+@PI = dso_local constant float 3.1415925
+define i32 @main() {
+%entry:
+%load_1 = load float, ptr @PI
+%fptoi_2 = fptosi float %load_1 to i32
+ret i32 %fptoi_2
+
+
+}

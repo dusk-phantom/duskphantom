@@ -1,0 +1,30 @@
+---
+source: src/middle/irgen/mod.rs
+expression: llvm_ir
+---
+define i32 @main() {
+%entry:
+%alloca_1 = alloca [1 x i32]
+%getelementptr_2 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 0
+%getelementptr_3 = getelementptr i32, ptr %getelementptr_2, i32 0
+store i32 8, ptr %getelementptr_3
+%getelementptr_5 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 0
+%call_6 = call i32 @f(i32* %getelementptr_5)
+%getelementptr_7 = getelementptr [1 x i32], ptr %alloca_1, i32 0, i32 0
+%call_8 = call void @putarray(i32 1, i32* %getelementptr_7)
+ret i32 0
+
+
+}
+define i32 @f(i32* a) {
+%entry:
+%alloca_11 = alloca i32*
+store i32* %a, ptr %alloca_11
+%load_13 = load i32*, ptr %alloca_11
+store i32 1, ptr %load_13
+%load_15 = load i32*, ptr %alloca_11
+%load_16 = load i32, ptr %load_15
+ret i32 %load_16
+
+
+}

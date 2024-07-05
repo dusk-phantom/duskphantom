@@ -1,0 +1,13 @@
+---
+source: src/middle/transform/mem2reg.rs
+expression: program.module.gen_llvm_ir()
+---
+define i32 @main() {
+%entry:
+%alloca_1 = alloca i32
+store i32 1, ptr %alloca_1
+%load_3 = load i32, ptr %alloca_1
+ret i32 %load_3
+
+
+}

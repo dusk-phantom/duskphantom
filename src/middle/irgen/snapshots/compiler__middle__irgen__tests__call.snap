@@ -1,0 +1,22 @@
+---
+source: src/middle/irgen/mod.rs
+expression: llvm_ir
+---
+define i32 @main() {
+%entry:
+%fptoi_1 = fptosi float 1.7 to i32
+%call_2 = call i32 @f(i32 %fptoi_1)
+ret i32 %call_2
+
+
+}
+define i32 @f(i32 x) {
+%entry:
+%alloca_5 = alloca i32
+store i32 %x, ptr %alloca_5
+%load_7 = load i32, ptr %alloca_5
+%Add_8 = add i32, %load_7, 1
+ret i32 %Add_8
+
+
+}

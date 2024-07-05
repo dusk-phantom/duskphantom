@@ -1,0 +1,15 @@
+---
+source: src/middle/irgen/mod.rs
+expression: llvm_ir
+---
+define i32 @main() {
+%entry:
+%icmp_1 = icmp sgt i32 3, 1
+%icmp_2 = icmp sgt i32 4, 2
+%zext_3 = zext i1 %icmp_1 to i32
+%zext_4 = zext i1 %icmp_2 to i32
+%Add_5 = add i32, %zext_3, %zext_4
+ret i32 %Add_5
+
+
+}

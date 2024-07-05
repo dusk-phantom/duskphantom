@@ -1,0 +1,16 @@
+---
+source: src/middle/irgen/mod.rs
+expression: llvm_ir
+---
+define i32 @main() {
+%entry:
+%alloca_1 = alloca i32
+%call_2 = call i32 @getint()
+store i32 %call_2, ptr %alloca_1
+%load_4 = load i32, ptr %alloca_1
+%Add_5 = add i32, %load_4, 3
+%call_6 = call void @putint(i32 %Add_5)
+ret i32 0
+
+
+}
