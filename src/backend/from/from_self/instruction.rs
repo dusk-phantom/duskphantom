@@ -125,7 +125,6 @@ impl IRBuilder {
                     middle::ir::instruction::misc_inst::ICmpOp::Ugt => todo!(),
                     middle::ir::instruction::misc_inst::ICmpOp::Uge => todo!(),
                 }
-                todo!()
             }
             middle::ir::instruction::InstType::FCmp => todo!(),
             middle::ir::instruction::InstType::Phi => todo!(),
@@ -194,6 +193,7 @@ impl IRBuilder {
         Ok(ret)
     }
 
+    #[allow(unused)]
     pub fn build_load_inst(
         load: &middle::ir::instruction::memory_op_inst::Load,
         stack_slots: &mut HashMap<Address, StackSlot>,
@@ -433,6 +433,7 @@ impl IRBuilder {
         Ok(ret_insts)
     }
 
+    #[allow(unused)]
     pub fn build_call_inst(
         // call: &llvm_ir::instruction::Call,
         call: &middle::ir::instruction::misc_inst::Call,
