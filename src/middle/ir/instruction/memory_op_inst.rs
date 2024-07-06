@@ -122,7 +122,7 @@ impl IRBuilder {
 
         // Generate the instruction from calculated type
         let mut inst = self.new_instruction(Box::new(GetElementPtr {
-            element_type: element_type.clone(),
+            element_type,
             manager: InstManager::new(ValueType::Pointer(Box::new(return_type))),
         }));
         unsafe {
@@ -165,6 +165,14 @@ impl Instruction for Alloca {
             }
         )
     }
+
+    unsafe fn copy_self(&self) -> Box<dyn Instruction> {
+        Box::new(Alloca {
+            value_type: self.value_type.clone(),
+            num_elements: self.num_elements,
+            manager: InstManager::new(self.get_value_type()),
+        })
+    }
 }
 
 pub struct Load {
@@ -206,6 +214,14 @@ impl Instruction for Load {
             self.get_value_type(),
             self.get_operand()[0]
         )
+    }
+
+    unsafe fn copy_self(&self) -> Box<dyn Instruction> {
+        let mut inst = Box::new(Load {
+            manager: InstManager::new(self.get_value_type()),
+        });
+        inst.get_manager_mut().add_operand(self.get_ptr().clone());
+        inst
     }
 }
 
@@ -267,6 +283,15 @@ impl Instruction for Store {
             self.get_operand()[0],
             self.get_operand()[1]
         )
+    }
+
+    unsafe fn copy_self(&self) -> Box<dyn Instruction> {
+        let mut inst = Box::new(Store {
+            manager: InstManager::new(ValueType::Void),
+        });
+        inst.get_manager_mut().add_operand(self.get_value().clone());
+        inst.get_manager_mut().add_operand(self.get_ptr().clone());
+        inst
     }
 }
 
@@ -335,6 +360,18 @@ impl Instruction for GetElementPtr {
             }
         }
         s
+    }
+
+    unsafe fn copy_self(&self) -> Box<dyn Instruction> {
+        let mut inst = Box::new(GetElementPtr {
+            element_type: self.element_type.clone(),
+            manager: InstManager::new(self.get_value_type()),
+        });
+        inst.get_manager_mut().add_operand(self.get_ptr().clone());
+        for i in self.get_index() {
+            inst.get_manager_mut().add_operand(i.clone());
+        }
+        inst
     }
 }
 

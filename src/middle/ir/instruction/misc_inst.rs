@@ -66,6 +66,7 @@ impl IRBuilder {
     }
 }
 
+#[derive(Clone, Copy)]
 pub enum ICmpOp {
     Eq,
     Ne,
@@ -144,8 +145,20 @@ impl Instruction for ICmp {
             &self.get_operand()[1]
         )
     }
+
+    unsafe fn copy_self(&self) -> Box<dyn Instruction> {
+        let mut inst = Box::new(ICmp {
+            op: self.op,
+            comp_type: self.comp_type.clone(),
+            manager: InstManager::new(ValueType::Bool),
+        });
+        inst.get_manager_mut().add_operand(self.get_lhs().clone());
+        inst.get_manager_mut().add_operand(self.get_rhs().clone());
+        inst
+    }
 }
 
+#[derive(Clone, Copy)]
 pub enum FCmpOp {
     Oeq,
     Ogt,
@@ -236,6 +249,14 @@ impl Instruction for FCmp {
             &self.get_operand()[1]
         )
     }
+
+    unsafe fn copy_self(&self) -> Box<dyn Instruction> {
+        Box::new(FCmp {
+            op: self.op,
+            comp_type: self.comp_type.clone(),
+            manager: InstManager::new(ValueType::Bool),
+        })
+    }
 }
 
 pub struct Phi {
@@ -279,6 +300,17 @@ impl Instruction for Phi {
         res.truncate(res.len() - 2);
         res
     }
+
+    unsafe fn copy_self(&self) -> Box<dyn Instruction> {
+        let mut inst = Box::new(Phi {
+            incoming_values: self.incoming_values.clone(),
+            manager: InstManager::new(self.get_value_type().clone()),
+        });
+        for (val, _) in &self.incoming_values {
+            inst.get_manager_mut().add_operand(val.clone());
+        }
+        inst
+    }
 }
 
 pub struct Call {
@@ -310,5 +342,16 @@ impl Instruction for Call {
         }
         res.push(')');
         res
+    }
+
+    unsafe fn copy_self(&self) -> Box<dyn Instruction> {
+        let mut inst = Box::new(Call {
+            func: self.func,
+            manager: InstManager::new(self.get_value_type()),
+        });
+        for arg in self.get_operand() {
+            inst.get_manager_mut().add_operand(arg.clone());
+        }
+        inst
     }
 }
