@@ -128,6 +128,16 @@ macro_rules! impl_binary_inst {
 
         impl Instruction for $type {
             gen_common_code!($type, $type);
+            unsafe fn copy_self(&self) -> Box<dyn Instruction> {
+                let mut inst = Box::new($type {
+                    manager: InstManager::new($value_type),
+                });
+                unsafe {
+                    inst.get_manager_mut().add_operand(self.get_lhs().clone());
+                    inst.get_manager_mut().add_operand(self.get_rhs().clone());
+                }
+                inst
+            }
             #[inline]
             fn gen_llvm_ir(&self) -> String {
                 format!(

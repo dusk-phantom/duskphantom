@@ -43,6 +43,16 @@ impl IRBuilder {
         ))
     }
 
+    /// Copy a global variable
+    pub fn copy_global_variable(&mut self, new_name: String, global: GlobalPtr) -> GlobalPtr {
+        self.gvar_pool.alloc(GlobalVariable::new(
+            new_name,
+            global.value_type.clone(),
+            global.variable_or_constant,
+            global.initializer.clone(),
+        ))
+    }
+
     /// Allocate a space for func, return a pointer to this space.
     pub fn new_function(&mut self, name: String, return_type: ValueType) -> FunPtr {
         let func = Function {
@@ -80,12 +90,22 @@ impl IRBuilder {
         let id = self.new_inst_id();
         unsafe {
             inst.get_manager_mut().set_id(id);
-            // FIXME: not sure if this inst's clone can be replaced by inst, need to check
-            #[allow(clippy::clone_on_copy)]
             let ic = inst.clone();
             inst.get_manager_mut().set_self_ptr(ic);
         }
         inst
+    }
+
+    /// Copy a instruction
+    pub fn copy_instruction(&mut self, inst: &dyn Instruction) -> InstPtr {
+        unsafe {
+            let mut inst = self.inst_pool.alloc(inst.copy_self());
+            let id = self.new_inst_id();
+            inst.get_manager_mut().set_id(id);
+            let ic = inst.clone();
+            inst.get_manager_mut().set_self_ptr(ic);
+            inst
+        }
     }
 
     /// Allocate a space for parameter, return a pointer to this space.

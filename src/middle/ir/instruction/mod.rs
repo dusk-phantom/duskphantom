@@ -72,6 +72,10 @@ pub trait Instruction: Display {
     /// Don't call this method, use downcast_mut instead.
     unsafe fn as_any_mut(&mut self) -> &mut dyn Any;
 
+    /// # Safety
+    /// Do not call this function directly
+    unsafe fn copy_self(&self) -> Box<dyn Instruction>;
+
     /// Returns the type of current instruction.
     fn get_type(&self) -> InstType;
 

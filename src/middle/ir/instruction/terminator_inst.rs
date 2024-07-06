@@ -77,6 +77,17 @@ impl Instruction for Ret {
             format!("ret {} {}", self.get_value_type(), self.get_return_value())
         }
     }
+
+    unsafe fn copy_self(&self) -> Box<dyn Instruction> {
+        let mut inst = Box::new(Ret {
+            manager: InstManager::new(self.get_value_type()),
+        });
+        if !self.is_void() {
+            inst.get_manager_mut()
+                .add_operand(self.get_return_value().clone());
+        }
+        inst
+    }
 }
 
 impl Instruction for Br {
@@ -95,5 +106,15 @@ impl Instruction for Br {
         } else {
             format!("br label %{}", next_bb[0].name)
         }
+    }
+
+    unsafe fn copy_self(&self) -> Box<dyn Instruction> {
+        let mut inst = Box::new(Br {
+            manager: InstManager::new(self.get_value_type()),
+        });
+        if self.is_cond_br() {
+            inst.get_manager_mut().add_operand(self.get_cond().clone());
+        }
+        inst
     }
 }
