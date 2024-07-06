@@ -114,10 +114,39 @@ impl IRBuilder {
                     inst.as_ref().as_ref(),
                 );
                 match icmp.op {
-                    middle::ir::instruction::misc_inst::ICmpOp::Eq => todo!(),
-                    middle::ir::instruction::misc_inst::ICmpOp::Ne => todo!(),
-                    middle::ir::instruction::misc_inst::ICmpOp::Slt => todo!(),
-                    middle::ir::instruction::misc_inst::ICmpOp::Sle => todo!(),
+                    middle::ir::instruction::misc_inst::ICmpOp::Eq => {
+                        // 我觉得可以去掉
+                        let lhs = Self::local_operand_from(icmp.get_lhs(), regs)
+                            .with_context(|| context!())?;
+                        let rhs = Self::local_operand_from(icmp.get_rhs(), regs)
+                            .with_context(|| context!())?;
+                        let dst1 = reg_gener.gen_virtual_usual_reg();
+                        let sub = SubInst::new(dst1.into(), lhs, rhs); // dst = lhs - rhs
+                        let dst2 = reg_gener.gen_virtual_usual_reg();
+                        let neg = NegInst::new(dst2.into(), dst1.into());
+                        Ok(vec![Inst::Sub(sub), Inst::Neg(neg)])
+                    }
+                    middle::ir::instruction::misc_inst::ICmpOp::Ne => {
+                        let lhs = Self::local_operand_from(icmp.get_lhs(), regs)
+                            .with_context(|| context!())?;
+                        let rhs = Self::local_operand_from(icmp.get_rhs(), regs)
+                            .with_context(|| context!())?;
+                        let dst1 = reg_gener.gen_virtual_usual_reg();
+                        let sub = SubInst::new(dst1.into(), lhs, rhs); // dst = lhs - rhs
+                        Ok(vec![Inst::Sub(sub)])
+                    }
+                    middle::ir::instruction::misc_inst::ICmpOp::Slt => {
+                        let lhs = Self::local_operand_from(icmp.get_lhs(), regs)
+                            .with_context(|| context!())?;
+                        let rhs = Self::local_operand_from(icmp.get_rhs(), regs)
+                            .with_context(|| context!())?;
+                        let dst = reg_gener.gen_virtual_usual_reg();
+                        let slt = SltInst::new(dst.into(), lhs, rhs); // dst = lhs - rhs
+                        Ok(vec![Inst::Slt(slt)])
+                    }
+                    middle::ir::instruction::misc_inst::ICmpOp::Sle => {
+                        todo!()
+                    }
                     middle::ir::instruction::misc_inst::ICmpOp::Sgt => todo!(),
                     middle::ir::instruction::misc_inst::ICmpOp::Sge => todo!(),
                     middle::ir::instruction::misc_inst::ICmpOp::Ult => todo!(),
