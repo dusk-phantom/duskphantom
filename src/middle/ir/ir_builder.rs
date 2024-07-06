@@ -90,7 +90,7 @@ impl IRBuilder {
         let id = self.new_inst_id();
         unsafe {
             inst.get_manager_mut().set_id(id);
-            let ic = inst.clone();
+            let ic = inst;
             inst.get_manager_mut().set_self_ptr(ic);
         }
         inst
@@ -102,7 +102,7 @@ impl IRBuilder {
             let mut inst = self.inst_pool.alloc(inst.copy_self());
             let id = self.new_inst_id();
             inst.get_manager_mut().set_id(id);
-            let ic = inst.clone();
+            let ic = inst;
             inst.get_manager_mut().set_self_ptr(ic);
             inst
         }
