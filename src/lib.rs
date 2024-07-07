@@ -135,7 +135,8 @@ pub fn compile_self_llc(
 ) -> Result<(), CompilerError> {
     use std::fs;
 
-    let mut program = frontend::parse(sy_path)?;
+    let content = std::fs::read_to_string(sy_path).map_err(CompilerError::IOError)?;
+    let mut program = frontend::parse(content)?;
     if opt_flag {
         frontend::optimize(&mut program);
     }
