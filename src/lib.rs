@@ -1,3 +1,4 @@
+use anyhow::Context;
 use backend::checker::CheckValidInst;
 use errors::CompilerError;
 
@@ -22,6 +23,7 @@ pub fn compile(
     output_path: &str,
     opt_flag: bool,
     asm_flag: bool,
+    ll_path: Option<String>,
 ) -> Result<(), CompilerError> {
     let content = std::fs::read_to_string(sy_path).map_err(CompilerError::IOError)?;
     let mut program = frontend::parse(&content)?;
@@ -31,6 +33,9 @@ pub fn compile(
     let mut program = middle::gen(&program)?;
     if opt_flag {
         middle::optimize(&mut program);
+    }
+    if let Some(ll_path) = ll_path {
+        std::fs::write(ll_path, program.module.gen_llvm_ir()).with_context(|| context!())?;
     }
     let mut program = backend::gen(&program)?;
     if opt_flag {

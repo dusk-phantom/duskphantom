@@ -15,6 +15,9 @@ pub enum CompilerError {
     // 后端错误
     #[error("backend error, cause: {0}")]
     BackendError(#[from] BackendError),
+    // from anyhow
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
 }
 
 // 前端错误
