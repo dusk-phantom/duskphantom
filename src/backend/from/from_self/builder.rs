@@ -233,14 +233,6 @@ impl IRBuilder {
                     middle::ir::ValueType::Array(_, _) => {
                         return Err(anyhow!("array should be pointer {}", param))
                     }
-                    middle::ir::ValueType::Int => {
-                        let reg = reg_gener.gen_virtual_usual_reg();
-                        insts.push(Inst::Mv(MvInst::new(
-                            reg.into(),
-                            Reg::new(REG_A0.id() + i as u32, true).into(),
-                        )));
-                        reg
-                    }
                     middle::ir::ValueType::Float => {
                         let reg = reg_gener.gen_virtual_float_reg();
                         insts.push(Inst::Mv(MvInst::new(
@@ -249,15 +241,9 @@ impl IRBuilder {
                         )));
                         reg
                     }
-                    middle::ir::ValueType::Bool => {
-                        let reg = reg_gener.gen_virtual_usual_reg();
-                        insts.push(Inst::Mv(MvInst::new(
-                            reg.into(),
-                            Reg::new(REG_A0.id() + i as u32, true).into(),
-                        )));
-                        reg
-                    }
-                    middle::ir::ValueType::Pointer(_typ) => {
+                    middle::ir::ValueType::Pointer(_)
+                    | middle::ir::ValueType::Bool
+                    | middle::ir::ValueType::Int => {
                         let reg = reg_gener.gen_virtual_usual_reg();
                         insts.push(Inst::Mv(MvInst::new(
                             reg.into(),
