@@ -122,6 +122,7 @@ impl IRBuilder {
     ) -> Result<Block> {
         let bb = f.basic_blocks.first().expect("func must have entry");
         let mut insts = Vec::new();
+        let mut extern_arg_start = 0;
         for (i, param) in f.parameters.iter().enumerate() {
             if i <= 7 {
                 let reg = if IRBuilder::is_ty_int(&param.ty) {
@@ -133,7 +134,16 @@ impl IRBuilder {
                 };
                 regs.insert(param.name.clone(), reg);
             } else {
-                unimplemented!();
+                let ret = if IRBuilder::is_ty_int(&param.ty) {
+                    Reg::new(REG_A0.id() + i as u32, true)
+                } else if IRBuilder::is_ty_float(&param.ty) {
+                    Reg::new(REG_FA0.id() + i as u32, true)
+                } else {
+                    unimplemented!();
+                };
+                let sd_inst = SdInst::new(ret, extern_arg_start.into(), REG_S0);
+                insts.push(sd_inst.into());
+                extern_arg_start += 4;
             }
         }
         for inst in &bb.instrs {
