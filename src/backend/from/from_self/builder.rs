@@ -201,6 +201,7 @@ impl IRBuilder {
         regs: &mut HashMap<Address, Reg>,
     ) -> Result<Block> {
         let mut insts: Vec<Inst> = Vec::new();
+        let mut extern_arg_start = 0;
         // 处理函数的形参
         for (i, param) in func.params.iter().enumerate() {
             if i <= 7 {
@@ -236,10 +237,25 @@ impl IRBuilder {
                 };
                 regs.insert(param.as_ref() as *const _ as Address, reg);
             } else {
-                // 从栈中 ld 第8个参数
-
-                // TODO 如果参数的个数大于 7
-                unimplemented!();
+                let reg: Reg = match &param.value_type {
+                    // 返回生成的 虚拟寄存器
+                    middle::ir::ValueType::Void => {
+                        return Err(anyhow!(
+                            "it is impossible to receive void-type parameter: {}",
+                            param
+                        ))
+                    }
+                    middle::ir::ValueType::Array(_, _) => {
+                        return Err(anyhow!("array should be pointer {}", param))
+                    }
+                    middle::ir::ValueType::Bool
+                    | middle::ir::ValueType::Int
+                    | middle::ir::ValueType::Pointer(_) => reg_gener.gen_virtual_usual_reg(),
+                    middle::ir::ValueType::Float => reg_gener.gen_virtual_float_reg(),
+                };
+                let ld_inst = LdInst::new(reg, extern_arg_start.into(), REG_S0);
+                insts.push(ld_inst.into());
+                extern_arg_start += 4;
             }
         }
 
