@@ -141,8 +141,8 @@ impl IRBuilder {
                 } else {
                     unimplemented!();
                 };
-                let sd_inst = SdInst::new(ret, extern_arg_start.into(), REG_S0);
-                insts.push(sd_inst.into());
+                let ld_inst = LdInst::new(ret, extern_arg_start.into(), REG_S0);
+                insts.push(ld_inst.into());
                 extern_arg_start += 4;
             }
         }
