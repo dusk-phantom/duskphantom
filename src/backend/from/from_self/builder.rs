@@ -64,13 +64,13 @@ impl IRBuilder {
                 middle::ir::Constant::Array(arr) => {
                     match arr.first().with_context(|| context!())? {
                         // 不可能出现: arr 是混合的
-                        middle::ir::Constant::Int(_) => {
+                        middle::ir::Constant::Bool(_) | middle::ir::Constant::Int(_) => {
                             let mut init = Vec::new();
                             for (index, con) in arr.iter().enumerate() {
                                 if let middle::ir::Constant::Int(value) = con {
                                     init.push((index, *value as u32)); // FIXME 这里 i32 和 u32 注意
                                 } else {
-                                    return Err(anyhow!("arr can't be mixed with int and others"))
+                                    return Err(anyhow!("arr can't be mixed with other-type"))
                                         .with_context(|| context!());
                                 }
                             }
@@ -95,24 +95,6 @@ impl IRBuilder {
                                 }
                             }
                             let arr_var = Var::FloatArr(ArrVar::<f32> {
-                                name: name.to_string(),
-                                capacity: arr.len(),
-                                init,
-                                is_const: false,
-                            });
-                            global_vars.push(arr_var);
-                        }
-                        middle::ir::Constant::Bool(_) => {
-                            let mut init = Vec::new();
-                            for (index, con) in arr.iter().enumerate() {
-                                if let middle::ir::Constant::Bool(value) = con {
-                                    init.push((index, *value as i32 as u32)); // FIXME 这里注意一下
-                                } else {
-                                    return Err(anyhow!("arr can't be mixed with bool and others"))
-                                        .with_context(|| context!());
-                                }
-                            }
-                            let arr_var = Var::IntArr(ArrVar::<u32> {
                                 name: name.to_string(),
                                 capacity: arr.len(),
                                 init,
