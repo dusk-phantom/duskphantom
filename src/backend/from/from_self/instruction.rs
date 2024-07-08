@@ -401,11 +401,11 @@ impl IRBuilder {
                 .with_context(|| context!())?;
             let iffalse = succs
                 .get(1)
-                .ok_or(anyhow!("iftrue get error",))
+                .ok_or(anyhow!("iffalse get error",))
                 .with_context(|| context!())?;
 
             br_insts.extend(vec![
-                Inst::Bne(BneInst::new(
+                Inst::Beq(BeqInst::new(
                     reg,
                     REG_ZERO,
                     (iffalse.as_ref() as *const _ as Address).to_string().into(),
