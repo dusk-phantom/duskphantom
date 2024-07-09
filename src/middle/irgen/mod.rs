@@ -54,7 +54,7 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         assert_snapshot!(llvm_ir, @r###"
         define i32 @main() {
-        %entry:
+        entry:
         %alloca_2 = alloca i32
         %alloca_5 = alloca i32
         store i32 1, ptr %alloca_5
@@ -69,7 +69,7 @@ mod tests {
         store i32 %load_14, ptr %alloca_2
         br label %exit
 
-        %exit:
+        exit:
         %load_3 = load i32, ptr %alloca_2
         ret i32 %load_3
 
@@ -97,7 +97,7 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         assert_snapshot!(llvm_ir, @r###"
         define i32 @main() {
-        %entry:
+        entry:
         %alloca_2 = alloca i32
         %alloca_5 = alloca i32
         store i32 1, ptr %alloca_5
@@ -105,26 +105,26 @@ mod tests {
         store i32 2, ptr %alloca_7
         br label %cond0
 
-        %cond0:
+        cond0:
         %load_14 = load i32, ptr %alloca_5
         %load_15 = load i32, ptr %alloca_7
         %icmp_16 = icmp slt i32 %load_14, %load_15
         br i1 %icmp_16, label %then1, label %alt2
 
-        %then1:
+        then1:
         store i32 3, ptr %alloca_5
         br label %final3
 
-        %alt2:
+        alt2:
         store i32 4, ptr %alloca_5
         br label %final3
 
-        %final3:
+        final3:
         %load_22 = load i32, ptr %alloca_5
         store i32 %load_22, ptr %alloca_2
         br label %exit
 
-        %exit:
+        exit:
         %load_3 = load i32, ptr %alloca_2
         ret i32 %load_3
 
@@ -149,29 +149,29 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         assert_snapshot!(llvm_ir, @r###"
         define i32 @main() {
-        %entry:
+        entry:
         %alloca_2 = alloca i32
         %alloca_5 = alloca i32
         store i32 0, ptr %alloca_5
         br label %cond0
 
-        %cond0:
+        cond0:
         %load_15 = load i32, ptr %alloca_5
         %icmp_16 = icmp slt i32 %load_15, 10
         br i1 %icmp_16, label %body1, label %final2
 
-        %body1:
+        body1:
         %load_11 = load i32, ptr %alloca_5
         %Add_12 = add i32, %load_11, 1
         store i32 %Add_12, ptr %alloca_5
         br label %cond0
 
-        %final2:
+        final2:
         %load_18 = load i32, ptr %alloca_5
         store i32 %load_18, ptr %alloca_2
         br label %exit
 
-        %exit:
+        exit:
         %load_3 = load i32, ptr %alloca_2
         ret i32 %load_3
 
@@ -196,29 +196,29 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         assert_snapshot!(llvm_ir, @r###"
         define i32 @main() {
-        %entry:
+        entry:
         %alloca_2 = alloca i32
         %alloca_5 = alloca i32
         store i32 0, ptr %alloca_5
         br label %body0
 
-        %body0:
+        body0:
         %load_11 = load i32, ptr %alloca_5
         %Add_12 = add i32, %load_11, 1
         store i32 %Add_12, ptr %alloca_5
         br label %cond1
 
-        %cond1:
+        cond1:
         %load_15 = load i32, ptr %alloca_5
         %icmp_16 = icmp slt i32 %load_15, 10
         br i1 %icmp_16, label %body0, label %final2
 
-        %final2:
+        final2:
         %load_18 = load i32, ptr %alloca_5
         store i32 %load_18, ptr %alloca_2
         br label %exit
 
-        %exit:
+        exit:
         %load_3 = load i32, ptr %alloca_2
         ret i32 %load_3
 
@@ -244,29 +244,29 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         assert_snapshot!(llvm_ir, @r###"
         define i32 @main() {
-        %entry:
+        entry:
         %alloca_2 = alloca i32
         %alloca_5 = alloca i32
         store i32 0, ptr %alloca_5
         br label %cond0
 
-        %cond0:
+        cond0:
         %load_15 = load i32, ptr %alloca_5
         %icmp_16 = icmp slt i32 %load_15, 10
         br i1 %icmp_16, label %body1, label %final2
 
-        %body1:
+        body1:
         %load_11 = load i32, ptr %alloca_5
         %Add_12 = add i32, %load_11, 1
         store i32 %Add_12, ptr %alloca_5
         br label %final2
 
-        %final2:
+        final2:
         %load_18 = load i32, ptr %alloca_5
         store i32 %load_18, ptr %alloca_2
         br label %exit
 
-        %exit:
+        exit:
         %load_3 = load i32, ptr %alloca_2
         ret i32 %load_3
 
@@ -292,29 +292,29 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         assert_snapshot!(llvm_ir, @r###"
         define i32 @main() {
-        %entry:
+        entry:
         %alloca_2 = alloca i32
         %alloca_5 = alloca i32
         store i32 0, ptr %alloca_5
         br label %cond0
 
-        %cond0:
+        cond0:
         %load_15 = load i32, ptr %alloca_5
         %icmp_16 = icmp slt i32 %load_15, 10
         br i1 %icmp_16, label %body1, label %final2
 
-        %body1:
+        body1:
         %load_11 = load i32, ptr %alloca_5
         %Add_12 = add i32, %load_11, 1
         store i32 %Add_12, ptr %alloca_5
         br label %cond0
 
-        %final2:
+        final2:
         %load_18 = load i32, ptr %alloca_5
         store i32 %load_18, ptr %alloca_2
         br label %exit
 
-        %exit:
+        exit:
         %load_3 = load i32, ptr %alloca_2
         ret i32 %load_3
 
@@ -344,41 +344,41 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         assert_snapshot!(llvm_ir, @r###"
         define i32 @main() {
-        %entry:
+        entry:
         %alloca_2 = alloca i32
         %alloca_5 = alloca i32
         store i32 0, ptr %alloca_5
         br label %cond0
 
-        %cond0:
+        cond0:
         %load_25 = load i32, ptr %alloca_5
         %icmp_26 = icmp slt i32 %load_25, 10
         br i1 %icmp_26, label %body1, label %final2
 
-        %body1:
+        body1:
         %load_11 = load i32, ptr %alloca_5
         %Add_12 = add i32, %load_11, 1
         store i32 %Add_12, ptr %alloca_5
         br label %cond3
 
-        %final2:
+        final2:
         %load_28 = load i32, ptr %alloca_5
         store i32 %load_28, ptr %alloca_2
         br label %exit
 
-        %cond3:
+        cond3:
         %load_19 = load i32, ptr %alloca_5
         %icmp_20 = icmp eq i32 %load_19, 5
         br i1 %icmp_20, label %then4, label %alt5
 
-        %exit:
+        exit:
         %load_3 = load i32, ptr %alloca_2
         ret i32 %load_3
 
-        %then4:
+        then4:
         br label %final2
 
-        %alt5:
+        alt5:
         br label %cond0
 
 
@@ -405,44 +405,44 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         assert_snapshot!(llvm_ir, @r###"
         define i32 @main() {
-        %entry:
+        entry:
         %alloca_2 = alloca i32
         %alloca_5 = alloca i32
         store i32 0, ptr %alloca_5
         br label %cond0
 
-        %cond0:
+        cond0:
         %load_25 = load i32, ptr %alloca_5
         %icmp_26 = icmp slt i32 %load_25, 10
         br i1 %icmp_26, label %body1, label %final2
 
-        %body1:
+        body1:
         %load_11 = load i32, ptr %alloca_5
         %Add_12 = add i32, %load_11, 1
         store i32 %Add_12, ptr %alloca_5
         br label %cond3
 
-        %final2:
+        final2:
         %load_28 = load i32, ptr %alloca_5
         store i32 %load_28, ptr %alloca_2
         br label %exit
 
-        %cond3:
+        cond3:
         %load_19 = load i32, ptr %alloca_5
         %icmp_20 = icmp eq i32 %load_19, 5
         br i1 %icmp_20, label %then4, label %alt5
 
-        %exit:
+        exit:
         %load_3 = load i32, ptr %alloca_2
         ret i32 %load_3
 
-        %then4:
+        then4:
         br label %final2
 
-        %alt5:
+        alt5:
         br label %final6
 
-        %final6:
+        final6:
         br label %cond0
 
 
@@ -473,22 +473,22 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         assert_snapshot!(llvm_ir, @r###"
         define i32 @main() {
-        %entry:
+        entry:
         %alloca_2 = alloca i32
         br label %cond0
 
-        %cond0:
+        cond0:
         %icmp_10 = icmp ne i32 1, 0
         br i1 %icmp_10, label %body1, label %final2
 
-        %body1:
+        body1:
         br label %final2
 
-        %final2:
+        final2:
         store i32 0, ptr %alloca_2
         br label %exit
 
-        %exit:
+        exit:
         %load_3 = load i32, ptr %alloca_2
         ret i32 %load_3
 
@@ -514,7 +514,7 @@ mod tests {
         @x = dso_local global i32 4
         @y = dso_local global i32 8
         define i32 @main() {
-        %entry:
+        entry:
         %alloca_2 = alloca i32
         %load_5 = load i32, ptr @x
         %load_6 = load i32, ptr @y
@@ -524,7 +524,7 @@ mod tests {
         store i32 %load_9, ptr %alloca_2
         br label %exit
 
-        %exit:
+        exit:
         %load_3 = load i32, ptr %alloca_2
         ret i32 %load_3
 
@@ -548,7 +548,7 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         assert_snapshot!(llvm_ir, @r###"
         define i32 @main() {
-        %entry:
+        entry:
         %alloca_2 = alloca i32
         %alloca_5 = alloca i32
         store i32 1, ptr %alloca_5
@@ -565,7 +565,7 @@ mod tests {
         store i32 %fptoi_16, ptr %alloca_2
         br label %exit
 
-        %exit:
+        exit:
         %load_3 = load i32, ptr %alloca_2
         ret i32 %load_3
 
@@ -586,7 +586,7 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         assert_snapshot!(llvm_ir, @r###"
         define i32 @main() {
-        %entry:
+        entry:
         %alloca_2 = alloca i32
         %icmp_5 = icmp sgt i32 3, 1
         %icmp_6 = icmp sgt i32 4, 2
@@ -596,7 +596,7 @@ mod tests {
         store i32 %Add_9, ptr %alloca_2
         br label %exit
 
-        %exit:
+        exit:
         %load_3 = load i32, ptr %alloca_2
         ret i32 %load_3
 
@@ -617,7 +617,7 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         assert_snapshot!(llvm_ir, @r###"
         define i32 @main(i32 arg) {
-        %entry:
+        entry:
         %alloca_2 = alloca i32
         %alloca_5 = alloca i32
         store i32 %arg, ptr %alloca_5
@@ -625,7 +625,7 @@ mod tests {
         store i32 %load_7, ptr %alloca_2
         br label %exit
 
-        %exit:
+        exit:
         %load_3 = load i32, ptr %alloca_2
         ret i32 %load_3
 
@@ -650,21 +650,21 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         assert_snapshot!(llvm_ir, @r###"
         define i32 @main() {
-        %entry:
+        entry:
         %alloca_2 = alloca i32
         %fptoi_5 = fptosi float 1.7 to i32
         %call_6 = call i32 @f(i32 %fptoi_5)
         store i32 %call_6, ptr %alloca_2
         br label %exit
 
-        %exit:
+        exit:
         %load_3 = load i32, ptr %alloca_2
         ret i32 %load_3
 
 
         }
         define i32 @f(i32 x) {
-        %entry:
+        entry:
         %alloca_11 = alloca i32
         %alloca_14 = alloca i32
         store i32 %x, ptr %alloca_14
@@ -673,7 +673,7 @@ mod tests {
         store i32 %Add_17, ptr %alloca_11
         br label %exit
 
-        %exit:
+        exit:
         %load_12 = load i32, ptr %alloca_11
         ret i32 %load_12
 
@@ -698,21 +698,21 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         assert_snapshot!(llvm_ir, @r###"
         define i32 @main() {
-        %entry:
+        entry:
         %alloca_2 = alloca i32
         %call_5 = call i32 @f(i32 1)
         %call_6 = call i32 @f(i32 %call_5)
         store i32 %call_6, ptr %alloca_2
         br label %exit
 
-        %exit:
+        exit:
         %load_3 = load i32, ptr %alloca_2
         ret i32 %load_3
 
 
         }
         define i32 @f(i32 x) {
-        %entry:
+        entry:
         %alloca_11 = alloca i32
         %alloca_14 = alloca i32
         store i32 %x, ptr %alloca_14
@@ -721,7 +721,7 @@ mod tests {
         store i32 %Add_17, ptr %alloca_11
         br label %exit
 
-        %exit:
+        exit:
         %load_12 = load i32, ptr %alloca_11
         ret i32 %load_12
 
@@ -745,14 +745,14 @@ mod tests {
         assert_snapshot!(llvm_ir, @r###"
         @PI = dso_local constant float 3.1415925
         define i32 @main() {
-        %entry:
+        entry:
         %alloca_2 = alloca i32
         %load_5 = load float, ptr @PI
         %fptoi_6 = fptosi float %load_5 to i32
         store i32 %fptoi_6, ptr %alloca_2
         br label %exit
 
-        %exit:
+        exit:
         %load_3 = load i32, ptr %alloca_2
         ret i32 %load_3
 
@@ -776,7 +776,7 @@ mod tests {
         assert_snapshot!(llvm_ir, @r###"
         @A = dso_local constant [3 x [2 x [2 x float]]] [[2 x [2 x float]] [[2 x float] [float 1, float 0], [2 x float] [float 0, float 0]], [2 x [2 x float]] [[2 x float] [float 1, float 4], [2 x float] [float 5, float 1]], [2 x [2 x float]] [[2 x float] [float 4, float 0], [2 x float] [float 0, float 0]]]
         define i32 @main() {
-        %entry:
+        entry:
         %alloca_2 = alloca i32
         %getelementptr_5 = getelementptr [3 x [2 x [2 x float]]], ptr @A, i32 0, i32 0
         %getelementptr_6 = getelementptr [2 x [2 x float]], ptr %getelementptr_5, i32 0, i32 0
@@ -786,7 +786,7 @@ mod tests {
         store i32 %fptoi_9, ptr %alloca_2
         br label %exit
 
-        %exit:
+        exit:
         %load_3 = load i32, ptr %alloca_2
         ret i32 %load_3
 
@@ -808,7 +808,7 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         assert_snapshot!(llvm_ir, @r###"
         define i32 @main() {
-        %entry:
+        entry:
         %alloca_2 = alloca i32
         %alloca_5 = alloca [2 x [2 x [2 x float]]]
         %getelementptr_6 = getelementptr [2 x [2 x [2 x float]]], ptr %alloca_5, i32 0, i32 0
@@ -850,7 +850,7 @@ mod tests {
         store i32 %fptoi_41, ptr %alloca_2
         br label %exit
 
-        %exit:
+        exit:
         %load_3 = load i32, ptr %alloca_2
         ret i32 %load_3
 
@@ -873,7 +873,7 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         assert_snapshot!(llvm_ir, @r###"
         define i32 @main() {
-        %entry:
+        entry:
         %alloca_2 = alloca i32
         %alloca_5 = alloca [1 x i32]
         %getelementptr_6 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
@@ -888,7 +888,7 @@ mod tests {
         store i32 %load_14, ptr %alloca_2
         br label %exit
 
-        %exit:
+        exit:
         %load_3 = load i32, ptr %alloca_2
         ret i32 %load_3
 
@@ -917,7 +917,7 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         assert_snapshot!(llvm_ir, @r###"
         define i32 @main() {
-        %entry:
+        entry:
         %alloca_2 = alloca i32
         %alloca_5 = alloca [1 x i32]
         %getelementptr_6 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
@@ -930,14 +930,14 @@ mod tests {
         store i32 0, ptr %alloca_2
         br label %exit
 
-        %exit:
+        exit:
         %load_3 = load i32, ptr %alloca_2
         ret i32 %load_3
 
 
         }
         define i32 @f(i32* a) {
-        %entry:
+        entry:
         %alloca_17 = alloca i32
         %alloca_20 = alloca i32*
         store i32* %a, ptr %alloca_20
@@ -948,7 +948,7 @@ mod tests {
         store i32 %load_25, ptr %alloca_17
         br label %exit
 
-        %exit:
+        exit:
         %load_18 = load i32, ptr %alloca_17
         ret i32 %load_18
 
@@ -978,7 +978,7 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         assert_snapshot!(llvm_ir, @r###"
         define i32 @main() {
-        %entry:
+        entry:
         %alloca_2 = alloca i32
         %alloca_5 = alloca float
         store float 5.4, ptr %alloca_5
@@ -988,39 +988,39 @@ mod tests {
         store i32 0, ptr %alloca_9
         br label %cond0
 
-        %cond0:
+        cond0:
         %load_16 = load float, ptr %alloca_5
         %fcmp_17 = fcmp une float %load_16, 0
         br i1 %fcmp_17, label %then1, label %alt2
 
-        %then1:
+        then1:
         store i32 1, ptr %alloca_9
         br label %final3
 
-        %alt2:
+        alt2:
         br label %final3
 
-        %final3:
+        final3:
         br label %cond4
 
-        %cond4:
+        cond4:
         %load_27 = load i32, ptr %alloca_7
         %icmp_28 = icmp ne i32 %load_27, 0
         br i1 %icmp_28, label %then5, label %alt6
 
-        %then5:
+        then5:
         store i32 2, ptr %alloca_9
         br label %final7
 
-        %alt6:
+        alt6:
         br label %final7
 
-        %final7:
+        final7:
         %load_33 = load i32, ptr %alloca_9
         store i32 %load_33, ptr %alloca_2
         br label %exit
 
-        %exit:
+        exit:
         %load_3 = load i32, ptr %alloca_2
         ret i32 %load_3
 
@@ -1042,7 +1042,7 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         assert_snapshot!(llvm_ir, @r###"
         define i32 @main() {
-        %entry:
+        entry:
         %alloca_2 = alloca i32
         %alloca_5 = alloca i32
         store i32 1, ptr %alloca_5
@@ -1054,7 +1054,7 @@ mod tests {
         store i32 %zext_11, ptr %alloca_2
         br label %exit
 
-        %exit:
+        exit:
         %load_3 = load i32, ptr %alloca_2
         ret i32 %load_3
 
@@ -1077,7 +1077,7 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         assert_snapshot!(llvm_ir, @r###"
         define i32 @main() {
-        %entry:
+        entry:
         %alloca_2 = alloca i32
         %alloca_5 = alloca i1
         %icmp_6 = icmp slt i32 1, 2
@@ -1089,17 +1089,17 @@ mod tests {
         %load_14 = load i1, ptr %alloca_5
         br i1 %load_14, label %alt0, label %final1
 
-        %alt0:
+        alt0:
         %load_16 = load i1, ptr %alloca_8
         br label %final1
 
-        %final1:
-        %phi_18 = phi i1 [false, %entry], [%load_16, %alt0]
+        final1:
+        %phi_18 = phi i1 [false, entry], [%load_16, alt0]
         %zext_19 = zext i1 %phi_18 to i32
         store i32 %zext_19, ptr %alloca_2
         br label %exit
 
-        %exit:
+        exit:
         %load_3 = load i32, ptr %alloca_2
         ret i32 %load_3
 
@@ -1124,7 +1124,7 @@ mod tests {
         @x = dso_local constant i32 4
         @y = dso_local constant i32 16
         define i32 @main() {
-        %entry:
+        entry:
         %alloca_2 = alloca i32
         %load_5 = load i32, ptr @x
         %load_6 = load i32, ptr @y
@@ -1132,7 +1132,7 @@ mod tests {
         store i32 %Add_7, ptr %alloca_2
         br label %exit
 
-        %exit:
+        exit:
         %load_3 = load i32, ptr %alloca_2
         ret i32 %load_3
 
@@ -1155,7 +1155,7 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         assert_snapshot!(llvm_ir, @r###"
         define i32 @main() {
-        %entry:
+        entry:
         %alloca_2 = alloca i32
         %alloca_5 = alloca i32
         %call_6 = call i32 @getint()
@@ -1166,7 +1166,7 @@ mod tests {
         store i32 0, ptr %alloca_2
         br label %exit
 
-        %exit:
+        exit:
         %load_3 = load i32, ptr %alloca_2
         ret i32 %load_3
 
@@ -1194,7 +1194,7 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         assert_snapshot!(llvm_ir, @r###"
         define i32 @main() {
-        %entry:
+        entry:
         %alloca_2 = alloca i32
         %alloca_5 = alloca i32
         %call_6 = call i32 @getint()
@@ -1203,25 +1203,25 @@ mod tests {
         %icmp_11 = icmp sgt i32 %load_10, 1
         br i1 %icmp_11, label %alt0, label %final1
 
-        %alt0:
+        alt0:
         %load_13 = load i32, ptr %alloca_5
         %call_14 = call i32 @f(i32 %load_13)
         %icmp_15 = icmp ne i32 %call_14, 0
         br label %final1
 
-        %final1:
-        %phi_17 = phi i1 [false, %entry], [%icmp_15, %alt0]
+        final1:
+        %phi_17 = phi i1 [false, entry], [%icmp_15, alt0]
         store i32 0, ptr %alloca_2
         br label %exit
 
-        %exit:
+        exit:
         %load_3 = load i32, ptr %alloca_2
         ret i32 %load_3
 
 
         }
         define i32 @f(i32 x) {
-        %entry:
+        entry:
         %alloca_22 = alloca i32
         %alloca_25 = alloca i32
         store i32 %x, ptr %alloca_25
@@ -1231,7 +1231,7 @@ mod tests {
         store i32 %load_29, ptr %alloca_22
         br label %exit
 
-        %exit:
+        exit:
         %load_23 = load i32, ptr %alloca_22
         ret i32 %load_23
 
@@ -1256,40 +1256,40 @@ mod tests {
         let llvm_ir = result.module.gen_llvm_ir();
         assert_snapshot!(llvm_ir, @r###"
         define i32 @main() {
-        %entry:
+        entry:
         %alloca_2 = alloca i32
         %alloca_5 = alloca i32
         %call_6 = call i32 @getint()
         store i32 %call_6, ptr %alloca_5
         br label %cond0
 
-        %cond0:
+        cond0:
         %load_15 = load i32, ptr %alloca_5
         %icmp_16 = icmp sgt i32 %load_15, 1
         br i1 %icmp_16, label %alt4, label %final5
 
-        %alt4:
+        alt4:
         %load_18 = load i32, ptr %alloca_5
         %icmp_19 = icmp slt i32 %load_18, 3
         br label %final5
 
-        %final5:
-        %phi_21 = phi i1 [false, %cond0], [%icmp_19, %alt4]
+        final5:
+        %phi_21 = phi i1 [false, cond0], [%icmp_19, alt4]
         br i1 %phi_21, label %then1, label %alt2
 
-        %then1:
+        then1:
         %load_23 = load i32, ptr %alloca_5
         %call_24 = call void @putint(i32 %load_23)
         br label %final3
 
-        %alt2:
+        alt2:
         br label %final3
 
-        %final3:
+        final3:
         store i32 0, ptr %alloca_2
         br label %exit
 
-        %exit:
+        exit:
         %load_3 = load i32, ptr %alloca_2
         ret i32 %load_3
 
@@ -1313,7 +1313,7 @@ mod tests {
         assert_snapshot!(llvm_ir, @r###"
         @format0 = dso_local constant [7 x i32] [i32 120, i32 32, i32 61, i32 32, i32 37, i32 100, i32 0]
         define i32 @main() {
-        %entry:
+        entry:
         %alloca_2 = alloca i32
         %alloca_5 = alloca i32
         %call_6 = call i32 @getint()
@@ -1324,7 +1324,7 @@ mod tests {
         store i32 0, ptr %alloca_2
         br label %exit
 
-        %exit:
+        exit:
         %load_3 = load i32, ptr %alloca_2
         ret i32 %load_3
 
