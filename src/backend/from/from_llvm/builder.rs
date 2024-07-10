@@ -120,39 +120,56 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
     ) -> Result<Block> {
-        let bb = f.basic_blocks.first().expect("func must have entry");
+        let bb = f
+            .basic_blocks
+            .first()
+            .ok_or(anyhow!("no basic block"))
+            .with_context(|| context!())?;
         let mut insts = Vec::new();
         let mut extern_arg_start = 0;
-        for (i, param) in f.parameters.iter().enumerate() {
-            if i <= 7 {
-                let reg = if IRBuilder::is_ty_int(&param.ty) {
-                    Reg::new(REG_A0.id() + i as u32, true)
-                } else if IRBuilder::is_ty_float(&param.ty) {
-                    Reg::new(REG_FA0.id() + i as u32, true)
-                } else {
-                    unimplemented!();
-                };
-                regs.insert(param.name.clone(), reg);
+
+        let mut process_params = |is_usual: bool| {
+            let filter_f = if is_usual {
+                IRBuilder::is_ty_int
             } else {
-                let ret = if IRBuilder::is_ty_int(&param.ty) {
-                    Reg::new(REG_A0.id() + i as u32, true)
-                } else if IRBuilder::is_ty_float(&param.ty) {
-                    Reg::new(REG_FA0.id() + i as u32, true)
+                IRBuilder::is_ty_float
+            };
+            let params = f
+                .parameters
+                .iter()
+                .filter(|p| filter_f(&p.ty))
+                .peekable()
+                .enumerate();
+            for (i, param) in params {
+                let v_reg = reg_gener.gen_virtual_reg(is_usual);
+                regs.insert(param.name.clone(), v_reg);
+                if i <= 7 {
+                    let a_reg = if is_usual {
+                        Reg::new(REG_A0.id() + i as u32, true)
+                    } else {
+                        Reg::new(REG_FA0.id() + i as u32, false)
+                    };
+                    let mv_inst = MvInst::new(v_reg.into(), a_reg.into());
+                    insts.push(mv_inst.into());
                 } else {
-                    unimplemented!();
-                };
-                let ld_inst = LdInst::new(ret, extern_arg_start.into(), REG_S0);
-                insts.push(ld_inst.into());
-                extern_arg_start += 4;
+                    let ld_inst = LdInst::new(v_reg, extern_arg_start.into(), REG_S0);
+                    insts.push(ld_inst.into());
+                    extern_arg_start += 8;
+                }
             }
-        }
+        };
+        process_params(true);
+        process_params(false);
+
         for inst in &bb.instrs {
             let gen_insts =
                 Self::build_instruction(inst, stack_allocator, stack_slots, reg_gener, regs)
                     .with_context(|| context!())?;
             insts.extend(gen_insts);
         }
+
         insts.extend(Self::build_term_inst(&bb.term, regs)?);
+
         let mut entry = Block::new("entry".to_string());
         entry.extend_insts(insts);
         Ok(entry)

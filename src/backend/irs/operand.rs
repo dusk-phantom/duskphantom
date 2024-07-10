@@ -220,6 +220,13 @@ impl RegGenerator {
     pub fn new() -> Self {
         Self::default()
     }
+    pub fn gen_virtual_reg(&mut self, is_usual: bool) -> Reg {
+        if is_usual {
+            self.gen_virtual_usual_reg()
+        } else {
+            self.gen_virtual_float_reg()
+        }
+    }
     pub fn gen_virtual_usual_reg(&mut self) -> Reg {
         let id = self.usual_counter.get_id().unwrap();
         Reg::new(id as u32, true)
