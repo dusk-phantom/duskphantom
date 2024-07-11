@@ -127,39 +127,35 @@ impl IRBuilder {
             .with_context(|| context!())?;
         let mut insts = Vec::new();
         let mut extern_arg_start = 0;
-
-        let mut process_params = |is_usual: bool| {
-            let filter_f = if is_usual {
-                IRBuilder::is_ty_int
+        let mut float_idx = 0;
+        let mut usual_idx = 0;
+        for param in f.parameters.iter() {
+            let is_usual = if Self::is_ty_int(&param.ty) {
+                true
             } else {
-                IRBuilder::is_ty_float
+                assert!(Self::is_ty_float(&param.ty));
+                false
             };
-            let params = f
-                .parameters
-                .iter()
-                .filter(|p| filter_f(&p.ty))
-                .peekable()
-                .enumerate();
-            for (i, param) in params {
-                let v_reg = reg_gener.gen_virtual_reg(is_usual);
-                regs.insert(param.name.clone(), v_reg);
-                if i <= 7 {
-                    let a_reg = if is_usual {
-                        Reg::new(REG_A0.id() + i as u32, true)
-                    } else {
-                        Reg::new(REG_FA0.id() + i as u32, false)
-                    };
-                    let mv_inst = MvInst::new(v_reg.into(), a_reg.into());
-                    insts.push(mv_inst.into());
-                } else {
-                    let ld_inst = LdInst::new(v_reg, extern_arg_start.into(), REG_S0);
-                    insts.push(ld_inst.into());
-                    extern_arg_start += 8;
-                }
+            let v_reg = reg_gener.gen_virtual_reg(is_usual);
+            regs.insert(param.name.clone(), v_reg);
+            if is_usual && usual_idx <= 7 {
+                let a_reg = Reg::new(REG_A0.id() + usual_idx, is_usual);
+                let mv = MvInst::new(v_reg.into(), a_reg.into());
+                insts.push(mv.into());
+                usual_idx += 1;
             }
-        };
-        process_params(true);
-        process_params(false);
+            if !is_usual && float_idx <= 7 {
+                let a_reg = Reg::new(REG_FA0.id() + float_idx, is_usual);
+                let mv = MvInst::new(v_reg.into(), a_reg.into());
+                insts.push(mv.into());
+                float_idx += 1;
+            }
+            if (is_usual && usual_idx > 7) || (!is_usual && float_idx > 7) {
+                let ld_inst = LdInst::new(v_reg, extern_arg_start.into(), REG_S0);
+                insts.push(ld_inst.into());
+                extern_arg_start += 8;
+            }
+        }
 
         for inst in &bb.instrs {
             let gen_insts =
