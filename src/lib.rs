@@ -186,14 +186,14 @@ pub fn asm2bin(asm: String) -> String {
         let tmp_bin_path = tmp_bin_file.path();
         let tmp_asm_path = tmp_asm_file.path();
         std::fs::write(tmp_asm_path, asm).expect("msg: write asm failed");
-        let mut cmd = std::process::Command::new("lcc");
+        let mut cmd = std::process::Command::new("llc");
         cmd.arg("-o")
             .arg(tmp_bin_path)
             .arg(tmp_asm_path)
             .arg("-Wl,-Ttext=0x80000000");
-        let output = cmd.output().expect("msg: exec lcc failed");
+        let output = cmd.output().expect("msg: exec llc failed");
         if !output.status.success() {
-            panic!("msg: exec lcc failed");
+            panic!("msg: exec llc failed");
         }
         let bin = std::fs::read(tmp_bin_path).expect("msg: read bin failed");
         let mut bin_str = String::new();
