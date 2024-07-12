@@ -143,6 +143,27 @@ impl IRBuilder {
             *m_f.stack_allocator_mut() = Some(stack_allocator);
             funcs.push(m_f);
         }
+
+        // 看一个函数，他里面的所有的调用
+        let name_func: HashMap<String, u32> = funcs
+            .iter()
+            .map(|f| (f.name().to_string(), f.caller_regs_stack()))
+            .collect();
+
+        for f in &mut funcs {
+            let mut max_callee_regs_stack = 0;
+            for bb in f.iter_bbs() {
+                for inst in bb.insts() {
+                    if let Inst::Call(c) = inst {
+                        let callee_regs_stack = *name_func.get(c.func_name().as_str()).unwrap();
+                        max_callee_regs_stack =
+                            std::cmp::max(max_callee_regs_stack, callee_regs_stack);
+                    }
+                }
+            }
+            *f.max_callee_regs_stack_mut() = Some(max_callee_regs_stack);
+        }
+
         Ok(funcs)
     }
 
