@@ -122,7 +122,7 @@ impl IRBuilder {
             let mut regs: HashMap<Address, Reg> = HashMap::new();
             let mut stack_allocator = StackAllocator::new();
             let mut stack_slots: HashMap<Address, StackSlot> = HashMap::new();
-            let entry = Self::build_entry(
+            let (entry, caller_reg_stack) = Self::build_entry(
                 fu,
                 &mut stack_allocator,
                 &mut stack_slots,
@@ -130,7 +130,7 @@ impl IRBuilder {
                 &mut regs,
             )?;
             let mut m_f = Func::new(fu.name.to_string(), args, entry);
-
+            *m_f.caller_regs_stack_mut() = Some(caller_reg_stack.try_into()?);
             for bb in Self::build_other_bbs(
                 fu,
                 &mut stack_allocator,
@@ -140,14 +140,7 @@ impl IRBuilder {
             )? {
                 m_f.push_bb(bb);
             }
-            // count stack size,
-            // let stack_size = stack_allocator.allocated();
-            // // align to 16
-            // let stack_size = if stack_size % 16 == 0 {
-            //     stack_size
-            // } else {
-            //     stack_size - stack_size % 16 + 16
-            // };
+            *m_f.stack_allocator_mut() = Some(stack_allocator);
             funcs.push(m_f);
         }
         Ok(funcs)
@@ -199,63 +192,54 @@ impl IRBuilder {
         stack_slots: &mut HashMap<Address, StackSlot>,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
-    ) -> Result<Block> {
+    ) -> Result<(Block, usize)> {
         let mut insts: Vec<Inst> = Vec::new();
-        let mut extern_arg_start = 0;
+
+        let mut caller_regs_stack = 0;
+        let mut float_idx = 0;
+        let mut usual_idx = 0;
+
         // 处理函数的形参
-        for (i, param) in func.params.iter().enumerate() {
-            if i <= 7 {
-                let reg: Reg = match &param.value_type {
-                    // 返回生成的 虚拟寄存器
-                    middle::ir::ValueType::Void => {
-                        return Err(anyhow!(
-                            "it is impossible to receive void-type parameter: {}",
-                            param
-                        ))
-                    }
-                    middle::ir::ValueType::Array(_, _) => {
-                        return Err(anyhow!("array should be pointer {}", param))
-                    }
-                    middle::ir::ValueType::Float => {
-                        let reg = reg_gener.gen_virtual_float_reg();
-                        insts.push(Inst::Mv(MvInst::new(
-                            reg.into(),
-                            Reg::new(REG_FA0.id() + i as u32, true).into(),
-                        )));
-                        reg
-                    }
-                    middle::ir::ValueType::Pointer(_)
-                    | middle::ir::ValueType::Bool
-                    | middle::ir::ValueType::Int => {
-                        let reg = reg_gener.gen_virtual_usual_reg();
-                        insts.push(Inst::Mv(MvInst::new(
-                            reg.into(),
-                            Reg::new(REG_A0.id() + i as u32, true).into(),
-                        )));
-                        reg
-                    }
-                };
-                regs.insert(param.as_ref() as *const _ as Address, reg);
-            } else {
-                let reg: Reg = match &param.value_type {
-                    // 返回生成的 虚拟寄存器
-                    middle::ir::ValueType::Void => {
-                        return Err(anyhow!(
-                            "it is impossible to receive void-type parameter: {}",
-                            param
-                        ))
-                    }
-                    middle::ir::ValueType::Array(_, _) => {
-                        return Err(anyhow!("array should be pointer {}", param))
-                    }
-                    middle::ir::ValueType::Bool
-                    | middle::ir::ValueType::Int
-                    | middle::ir::ValueType::Pointer(_) => reg_gener.gen_virtual_usual_reg(),
-                    middle::ir::ValueType::Float => reg_gener.gen_virtual_float_reg(),
-                };
-                let ld_inst = LdInst::new(reg, extern_arg_start.into(), REG_S0);
+        for param in func.params.iter() {
+            let is_usual: bool = match &param.value_type {
+                // 返回生成的 虚拟寄存器
+                middle::ir::ValueType::Void => {
+                    return Err(anyhow!(
+                        "it is impossible to receive void-type parameter: {}",
+                        param
+                    ))
+                }
+                middle::ir::ValueType::Array(_, _) => {
+                    return Err(anyhow!("array should be pointer {}", param))
+                }
+                middle::ir::ValueType::Float => false,
+                middle::ir::ValueType::Pointer(_)
+                | middle::ir::ValueType::Bool
+                | middle::ir::ValueType::Int => true,
+            };
+
+            let v_reg = reg_gener.gen_virtual_reg(is_usual);
+            regs.insert(param.as_ref() as *const _ as Address, v_reg); // 直接就先绑定了寄存器
+
+            if is_usual && usual_idx <= 7 {
+                let a_reg = Reg::new(REG_A0.id() + usual_idx, is_usual);
+                let mv = MvInst::new(v_reg.into(), a_reg.into());
+                insts.push(mv.into());
+                usual_idx += 1;
+            }
+            if !is_usual && float_idx <= 7 {
+                let a_reg = Reg::new(REG_FA0.id() + float_idx, is_usual);
+                let mv = MvInst::new(v_reg.into(), a_reg.into());
+                insts.push(mv.into()); // TODO 但是 mv 指令可能有点问题, mv 是伪指令, 能不能 mv float, float ?
+                float_idx += 1;
+            }
+
+            //  参数多了的情况
+
+            if (is_usual && usual_idx > 7) || (!is_usual && float_idx > 7) {
+                let ld_inst = LdInst::new(v_reg, caller_regs_stack.into(), REG_S0);
                 insts.push(ld_inst.into());
-                extern_arg_start += 4;
+                caller_regs_stack += 8;
             }
         }
 
@@ -267,8 +251,10 @@ impl IRBuilder {
             insts.extend(gen_insts);
         }
         insts.extend(Self::build_term_inst(&bb.get_last_inst(), regs, reg_gener)?);
+
         let mut entry = Block::new("entry".to_string());
         entry.extend_insts(insts);
-        Ok(entry)
+        let caller_regs_stack = usize::try_from(caller_regs_stack)?;
+        Ok((entry, caller_regs_stack))
     }
 }
