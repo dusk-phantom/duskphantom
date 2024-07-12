@@ -114,6 +114,7 @@ impl Deref for Label {
         &self.0
     }
 }
+
 impl Deref for Reg {
     type Target = u32;
     fn deref(&self) -> &Self::Target {
@@ -347,47 +348,54 @@ impl Reg {
     }
 }
 impl Imm {
+    #[inline]
     pub fn gen_asm(&self) -> String {
         format!("{}", self.0)
     }
 }
 impl Fmm {
+    #[inline]
     pub fn gen_asm(&self) -> String {
         format!("{}", self.0)
     }
 }
 impl Label {
+    #[inline]
     pub fn gen_asm(&self) -> String {
         self.0.clone()
     }
 }
 
 impl Operand {
+    #[inline]
     pub fn reg(&self) -> Option<Reg> {
         match self {
             Self::Reg(reg) => Some(*reg),
             _ => None,
         }
     }
+    #[inline]
     pub fn imm(&self) -> Option<Imm> {
         match self {
             Self::Imm(imm) => Some(imm.clone()),
             _ => None,
         }
     }
+    #[inline]
     pub fn fmm(&self) -> Option<Fmm> {
         match self {
             Self::Fmm(fmm) => Some(fmm.clone()),
             _ => None,
         }
     }
+    #[inline]
     pub fn label(&self) -> Option<Label> {
         match self {
             Self::Label(label) => Some(label.clone()),
             _ => None,
         }
     }
-
+    #[inline]
     pub fn gen_asm(&self) -> String {
         match self {
             Self::Reg(reg) => reg.gen_asm(),
@@ -457,6 +465,23 @@ impl TryInto<Label> for Operand {
     }
 }
 
+impl<'a> TryInto<&'a Label> for &'a Operand {
+    type Error = BackendError;
+    fn try_into(self) -> Result<&'a Label, Self::Error> {
+        match self {
+            Operand::Label(label) => Ok(label),
+            _ => Err(BackendError::InternalConsistencyError(
+                "Operand is not a Label".to_string(),
+            )),
+        }
+    }
+}
+impl<'a> TryInto<&'a str> for &'a Label {
+    type Error = BackendError;
+    fn try_into(self) -> Result<&'a str, Self::Error> {
+        Ok(self.0.as_str())
+    }
+}
 impl From<&Reg> for Operand {
     fn from(value: &Reg) -> Self {
         Operand::Reg(*value)

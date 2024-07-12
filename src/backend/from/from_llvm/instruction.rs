@@ -219,6 +219,13 @@ impl IRBuilder {
             }
         };
         let mut ret: Vec<Inst> = Vec::new();
+
+        // FIXME: process arguments
+        // unimplemented!("process arguments");
+        for arg in &call.arguments {
+            todo!();
+        }
+
         let call_inst = CallInst::new(f_name.to_string().into()).into();
         ret.push(call_inst);
 
@@ -230,31 +237,25 @@ impl IRBuilder {
                     result_type,
                     param_types,
                     is_var_arg,
-                } => match result_type.as_ref() {
-                    llvm_ir::Type::FPType(_) => {
-                        let dst = reg_gener.gen_virtual_float_reg();
-                        let mv = MvInst::new(dst.into(), REG_FA0.into());
-                        ret.push(mv.into());
-                        dst
-                    }
-                    llvm_ir::Type::IntegerType { bits } => {
-                        let dst = reg_gener.gen_virtual_usual_reg();
-                        let mv = MvInst::new(dst.into(), REG_A0.into());
-                        ret.push(mv.into());
-                        dst
-                    }
-                    _ => {
+                } => {
+                    let (is_usual, ret_reg) = if Self::is_ty_float(result_type.as_ref()) {
+                        (false, REG_FA0)
+                    } else if Self::is_ty_int(result_type.as_ref()) {
+                        (true, REG_A0)
+                    } else {
                         unimplemented!();
-                    }
-                },
+                    };
+                    let dst_reg = reg_gener.gen_virtual_reg(is_usual);
+                    let mv = MvInst::new(dst_reg.into(), ret_reg.into());
+                    ret.push(mv.into());
+                    dst_reg
+                }
                 _ => {
                     unimplemented!("function type");
                 }
             };
             regs.insert(dest.clone(), dst_reg);
         }
-        // FIXME: process arguments
-        // unimplemented!("process arguments");
 
         Ok(ret)
     }
