@@ -16,7 +16,17 @@
         ];
       in {
         devShell = pkgs.mkShell {
-          buildInputs = with pkgs; [ clang llvm_16 rustup glib gcc libxml2 ];
+          buildInputs = with pkgs; [
+            llvmPackages_16.bintools
+            llvmPackages_16.libllvm
+            llvmPackages_16.llvm
+            llvmPackages_16.stdenv
+            clang
+            rustup
+            glib
+            gcc
+            libxml2
+          ];
           LD_LIBRARY_PATH = libPath;
           RUSTC_VERSION = overrides.toolchain.channel;
 
@@ -25,8 +35,7 @@
             export PATH=$PATH:''${RUSTUP_HOME:-~/.rustup}/toolchains/$RUSTC_VERSION-x86_64-unknown-linux-gnu/bin/
           '';
 
-          LIBCLANG_PATH =
-            pkgs.lib.makeLibraryPath [ pkgs.llvmPackages_latest.libclang.lib ];
+          # LIBCLANG_PATH = pkgs.lib.makeLibraryPath [ pkgs.llvmPackages_latest.libclang.lib ];
 
         };
       });
