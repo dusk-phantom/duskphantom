@@ -5,7 +5,6 @@ use super::*;
 pub fn phisicalize(program: &mut Program) -> Result<(), BackendError> {
     for module in program.modules.iter_mut() {
         for func in module.funcs.iter_mut() {
-            let mut stack_size = 0;
             // count stack size: 统计栈大小,首先遍历每个块每条指令,统计中函数调用的最大栈大小
             let stack_size = func
                 .stack_allocator()

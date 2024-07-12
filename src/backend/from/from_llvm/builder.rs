@@ -88,7 +88,7 @@ impl IRBuilder {
             let mut regs: HashMap<Name, Reg> = HashMap::new();
             let mut stack_allocator = StackAllocator::new();
             let mut stack_slots: HashMap<Name, StackSlot> = HashMap::new();
-            let entry = Self::build_entry(
+            let (entry, caller_reg_stack) = Self::build_entry(
                 f,
                 &mut stack_allocator,
                 &mut stack_slots,
@@ -96,7 +96,7 @@ impl IRBuilder {
                 &mut regs,
             )?;
             let mut m_f = Func::new(f.name.to_string(), args, entry);
-
+            *m_f.caller_regs_stack_mut() = Some(caller_reg_stack.try_into()?);
             for bb in Self::build_other_bbs(
                 f,
                 &mut stack_allocator,
@@ -110,6 +110,25 @@ impl IRBuilder {
             *m_f.stack_allocator_mut() = Some(stack_allocator);
             funcs.push(m_f);
         }
+        // count max_callee_regs_stack
+        let name_func: HashMap<String, u32> = funcs
+            .iter()
+            .map(|f| (f.name().to_string(), f.caller_regs_stack()))
+            .collect();
+        for f in &mut funcs {
+            let mut max_callee_regs_stack = 0;
+            for bb in f.iter_bbs() {
+                for inst in bb.insts() {
+                    if let Inst::Call(c) = inst {
+                        let callee_regs_stack = *name_func.get(c.func_name().as_str()).unwrap();
+                        max_callee_regs_stack =
+                            std::cmp::max(max_callee_regs_stack, callee_regs_stack);
+                    }
+                }
+            }
+            *f.max_callee_regs_stack_mut() = Some(max_callee_regs_stack);
+        }
+
         Ok(funcs)
     }
 
@@ -119,14 +138,14 @@ impl IRBuilder {
         stack_slots: &mut HashMap<Name, StackSlot>,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
-    ) -> Result<Block> {
+    ) -> Result<(Block, usize)> {
         let bb = f
             .basic_blocks
             .first()
             .ok_or(anyhow!("no basic block"))
             .with_context(|| context!())?;
         let mut insts = Vec::new();
-        let mut extern_arg_start = 0;
+        let mut caller_regs_stack = 0;
         let mut float_idx = 0;
         let mut usual_idx = 0;
         for param in f.parameters.iter() {
@@ -151,9 +170,9 @@ impl IRBuilder {
                 float_idx += 1;
             }
             if (is_usual && usual_idx > 7) || (!is_usual && float_idx > 7) {
-                let ld_inst = LdInst::new(v_reg, extern_arg_start.into(), REG_S0);
+                let ld_inst = LdInst::new(v_reg, caller_regs_stack.into(), REG_S0);
                 insts.push(ld_inst.into());
-                extern_arg_start += 8;
+                caller_regs_stack += 8;
             }
         }
 
@@ -168,7 +187,8 @@ impl IRBuilder {
 
         let mut entry = Block::new("entry".to_string());
         entry.extend_insts(insts);
-        Ok(entry)
+        let caller_regs_stack = usize::try_from(caller_regs_stack)?;
+        Ok((entry, caller_regs_stack))
     }
     fn build_other_bbs(
         f: &llvm_ir::Function,

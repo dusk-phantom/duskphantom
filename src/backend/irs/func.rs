@@ -1,3 +1,5 @@
+use std::usize;
+
 use super::*;
 use super::{block::Block, gen_asm::GenTool};
 use crate::config::CONFIG;
@@ -8,6 +10,10 @@ use rayon::prelude::*;
 pub struct Func {
     name: String,
     args: Vec<String>,
+    /// the size of stack where extra args are stored
+    caller_regs_stack: Option<u32>,
+    /// the max size of stack where callee's args are stored
+    max_callee_regs_stack: Option<u32>,
     // stack_allocator,
     stack_allocator: Option<StackAllocator>,
     // entry block
@@ -44,11 +50,26 @@ impl Func {
         Func {
             name,
             args,
+            caller_regs_stack: None,
+            max_callee_regs_stack: None,
             stack_allocator: None,
             other_bbs: Vec::new(),
             entry,
         }
     }
+    pub fn caller_regs_stack(&self) -> u32 {
+        self.caller_regs_stack.unwrap_or(0)
+    }
+    pub fn caller_regs_stack_mut(&mut self) -> &mut Option<u32> {
+        &mut self.caller_regs_stack
+    }
+    pub fn max_callee_regs_stack(&self) -> u32 {
+        self.max_callee_regs_stack.unwrap_or(0)
+    }
+    pub fn max_callee_regs_stack_mut(&mut self) -> &mut Option<u32> {
+        &mut self.max_callee_regs_stack
+    }
+
     pub fn stack_allocator(&self) -> Option<&StackAllocator> {
         self.stack_allocator.as_ref()
     }
