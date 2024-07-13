@@ -155,7 +155,7 @@ impl BasicBlock {
 
     pub fn gen_llvm_ir(&self) -> String {
         let mut ir = String::new();
-        ir += &format!("{}:\n", self);
+        ir += &format!("{}:\n", self.name);
         for inst in self.iter() {
             ir += &inst.gen_llvm_ir();
             ir += "\n";
@@ -166,7 +166,7 @@ impl BasicBlock {
 
 impl Display for BasicBlock {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.name)
+        write!(f, "%{}", self.name)
     }
 }
 

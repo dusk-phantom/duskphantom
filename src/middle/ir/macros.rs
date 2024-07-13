@@ -141,7 +141,7 @@ macro_rules! impl_binary_inst {
             #[inline]
             fn gen_llvm_ir(&self) -> String {
                 format!(
-                    "{} = {} {}, {}, {}",
+                    "{} = {} {} {}, {}",
                     self,
                     self.get_type(),
                     $operand_type,

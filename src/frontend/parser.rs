@@ -138,7 +138,7 @@ pub fn line_comment(input: &mut &str) -> PResult<()> {
 
 /// Parser of blank beginning with block comment.
 pub fn block_comment(input: &mut &str) -> PResult<()> {
-    ("/*", take_until(0.., "*/"), blank)
+    ("/*", cut_err(take_until(0.., "*/")), "*/", blank)
         .value(())
         .parse_next(input)
 }

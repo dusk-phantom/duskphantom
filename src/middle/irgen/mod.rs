@@ -63,7 +63,7 @@ mod tests {
         %alloca_9 = alloca i32
         %load_10 = load i32, ptr %alloca_5
         %load_11 = load i32, ptr %alloca_7
-        %Add_12 = add i32, %load_10, %load_11
+        %Add_12 = add i32 %load_10, %load_11
         store i32 %Add_12, ptr %alloca_9
         %load_14 = load i32, ptr %alloca_9
         store i32 %load_14, ptr %alloca_2
@@ -162,7 +162,7 @@ mod tests {
 
         body1:
         %load_11 = load i32, ptr %alloca_5
-        %Add_12 = add i32, %load_11, 1
+        %Add_12 = add i32 %load_11, 1
         store i32 %Add_12, ptr %alloca_5
         br label %cond0
 
@@ -204,7 +204,7 @@ mod tests {
 
         body0:
         %load_11 = load i32, ptr %alloca_5
-        %Add_12 = add i32, %load_11, 1
+        %Add_12 = add i32 %load_11, 1
         store i32 %Add_12, ptr %alloca_5
         br label %cond1
 
@@ -257,7 +257,7 @@ mod tests {
 
         body1:
         %load_11 = load i32, ptr %alloca_5
-        %Add_12 = add i32, %load_11, 1
+        %Add_12 = add i32 %load_11, 1
         store i32 %Add_12, ptr %alloca_5
         br label %final2
 
@@ -305,7 +305,7 @@ mod tests {
 
         body1:
         %load_11 = load i32, ptr %alloca_5
-        %Add_12 = add i32, %load_11, 1
+        %Add_12 = add i32 %load_11, 1
         store i32 %Add_12, ptr %alloca_5
         br label %cond0
 
@@ -357,7 +357,7 @@ mod tests {
 
         body1:
         %load_11 = load i32, ptr %alloca_5
-        %Add_12 = add i32, %load_11, 1
+        %Add_12 = add i32 %load_11, 1
         store i32 %Add_12, ptr %alloca_5
         br label %cond3
 
@@ -418,7 +418,7 @@ mod tests {
 
         body1:
         %load_11 = load i32, ptr %alloca_5
-        %Add_12 = add i32, %load_11, 1
+        %Add_12 = add i32 %load_11, 1
         store i32 %Add_12, ptr %alloca_5
         br label %cond3
 
@@ -518,7 +518,7 @@ mod tests {
         %alloca_2 = alloca i32
         %load_5 = load i32, ptr @x
         %load_6 = load i32, ptr @y
-        %Add_7 = add i32, %load_5, %load_6
+        %Add_7 = add i32 %load_5, %load_6
         store i32 %Add_7, ptr @x
         %load_9 = load i32, ptr @x
         store i32 %load_9, ptr %alloca_2
@@ -558,7 +558,7 @@ mod tests {
         %load_10 = load i32, ptr %alloca_5
         %itofp_11 = sitofp i32 %load_10 to float
         %load_12 = load float, ptr %alloca_7
-        %FAdd_13 = fadd float, %itofp_11, %load_12
+        %FAdd_13 = fadd float %itofp_11, %load_12
         store float %FAdd_13, ptr %alloca_9
         %load_15 = load float, ptr %alloca_9
         %fptoi_16 = fptosi float %load_15 to i32
@@ -592,7 +592,7 @@ mod tests {
         %icmp_6 = icmp sgt i32 4, 2
         %zext_7 = zext i1 %icmp_5 to i32
         %zext_8 = zext i1 %icmp_6 to i32
-        %Add_9 = add i32, %zext_7, %zext_8
+        %Add_9 = add i32 %zext_7, %zext_8
         store i32 %Add_9, ptr %alloca_2
         br label %exit
 
@@ -616,7 +616,7 @@ mod tests {
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
         assert_snapshot!(llvm_ir, @r###"
-        define i32 @main(i32 arg) {
+        define i32 @main(i32 %arg) {
         entry:
         %alloca_2 = alloca i32
         %alloca_5 = alloca i32
@@ -663,19 +663,78 @@ mod tests {
 
 
         }
-        define i32 @f(i32 x) {
+        define i32 @f(i32 %x) {
         entry:
         %alloca_11 = alloca i32
         %alloca_14 = alloca i32
         store i32 %x, ptr %alloca_14
         %load_16 = load i32, ptr %alloca_14
-        %Add_17 = add i32, %load_16, 1
+        %Add_17 = add i32 %load_16, 1
         store i32 %Add_17, ptr %alloca_11
         br label %exit
 
         exit:
         %load_12 = load i32, ptr %alloca_11
         ret i32 %load_12
+
+
+        }
+        "###);
+    }
+
+    #[test]
+    fn test_call_2() {
+        let code = r#"
+            int a;
+            int func(int p){
+                p = p - 1;
+                return p;
+            }
+            int main(){
+                int b;
+                a = 10;
+                b = func(a);
+                return b;
+            }
+        "#;
+        let program = parse(code).unwrap();
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_snapshot!(llvm_ir, @r###"
+        @a = dso_local global i32 0
+        define i32 @func(i32 %p) {
+        entry:
+        %alloca_2 = alloca i32
+        %alloca_5 = alloca i32
+        store i32 %p, ptr %alloca_5
+        %load_7 = load i32, ptr %alloca_5
+        %Sub_8 = sub i32 %load_7, 1
+        store i32 %Sub_8, ptr %alloca_5
+        %load_10 = load i32, ptr %alloca_5
+        store i32 %load_10, ptr %alloca_2
+        br label %exit
+
+        exit:
+        %load_3 = load i32, ptr %alloca_2
+        ret i32 %load_3
+
+
+        }
+        define i32 @main() {
+        entry:
+        %alloca_15 = alloca i32
+        %alloca_18 = alloca i32
+        store i32 10, ptr @a
+        %load_20 = load i32, ptr @a
+        %call_21 = call i32 @func(i32 %load_20)
+        store i32 %call_21, ptr %alloca_18
+        %load_23 = load i32, ptr %alloca_18
+        store i32 %load_23, ptr %alloca_15
+        br label %exit
+
+        exit:
+        %load_16 = load i32, ptr %alloca_15
+        ret i32 %load_16
 
 
         }
@@ -711,13 +770,13 @@ mod tests {
 
 
         }
-        define i32 @f(i32 x) {
+        define i32 @f(i32 %x) {
         entry:
         %alloca_11 = alloca i32
         %alloca_14 = alloca i32
         store i32 %x, ptr %alloca_14
         %load_16 = load i32, ptr %alloca_14
-        %Add_17 = add i32, %load_16, 1
+        %Add_17 = add i32 %load_16, 1
         store i32 %Add_17, ptr %alloca_11
         br label %exit
 
@@ -750,6 +809,38 @@ mod tests {
         %load_5 = load float, ptr @PI
         %fptoi_6 = fptosi float %load_5 to i32
         store i32 %fptoi_6, ptr %alloca_2
+        br label %exit
+
+        exit:
+        %load_3 = load i32, ptr %alloca_2
+        ret i32 %load_3
+
+
+        }
+        "###);
+    }
+
+    #[test]
+    fn test_two_constant() {
+        let code = r#"
+            //test const gloal var define
+            const int a = 10, b = 5;
+            
+            int main(){
+                return b;
+            }
+        "#;
+        let program = parse(code).unwrap();
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_snapshot!(llvm_ir, @r###"
+        @a = dso_local constant i32 10
+        @b = dso_local constant i32 5
+        define i32 @main() {
+        entry:
+        %alloca_2 = alloca i32
+        %load_5 = load i32, ptr @b
+        store i32 %load_5, ptr %alloca_2
         br label %exit
 
         exit:
@@ -811,7 +902,7 @@ mod tests {
         assert_snapshot!(llvm_ir, @r###"
         @A = dso_local constant i32 1
         @B = dso_local constant [1 x i32] [i32 1]
-        define i32 @f([1 x [1 x i32]]* x) {
+        define i32 @f([1 x [1 x i32]]* %x) {
         entry:
         %alloca_2 = alloca i32
         %alloca_5 = alloca [1 x [1 x i32]]*
@@ -973,7 +1064,7 @@ mod tests {
 
 
         }
-        define i32 @f(i32* a) {
+        define i32 @f(i32* %a) {
         entry:
         %alloca_17 = alloca i32
         %alloca_20 = alloca i32*
@@ -1084,9 +1175,9 @@ mod tests {
         %alloca_5 = alloca i32
         store i32 1, ptr %alloca_5
         %load_7 = load i32, ptr %alloca_5
-        %Sub_8 = sub i32, 0, %load_7
+        %Sub_8 = sub i32 0, %load_7
         %icmp_9 = icmp ne i32 %Sub_8, 0
-        %Xor_10 = xor i1, %icmp_9, true
+        %Xor_10 = xor i1 %icmp_9, true
         %zext_11 = zext i1 %Xor_10 to i32
         store i32 %zext_11, ptr %alloca_2
         br label %exit
@@ -1131,7 +1222,7 @@ mod tests {
         br label %final1
 
         final1:
-        %phi_18 = phi i1 [false, entry], [%load_16, alt0]
+        %phi_18 = phi i1 [false, %entry], [%load_16, %alt0]
         %zext_19 = zext i1 %phi_18 to i32
         store i32 %zext_19, ptr %alloca_2
         br label %exit
@@ -1165,7 +1256,7 @@ mod tests {
         %alloca_2 = alloca i32
         %load_5 = load i32, ptr @x
         %load_6 = load i32, ptr @y
-        %Add_7 = add i32, %load_5, %load_6
+        %Add_7 = add i32 %load_5, %load_6
         store i32 %Add_7, ptr %alloca_2
         br label %exit
 
@@ -1198,7 +1289,7 @@ mod tests {
         %call_6 = call i32 @getint()
         store i32 %call_6, ptr %alloca_5
         %load_8 = load i32, ptr %alloca_5
-        %Add_9 = add i32, %load_8, 3
+        %Add_9 = add i32 %load_8, 3
         %call_10 = call void @putint(i32 %Add_9)
         store i32 0, ptr %alloca_2
         br label %exit
@@ -1247,7 +1338,7 @@ mod tests {
         br label %final1
 
         final1:
-        %phi_17 = phi i1 [false, entry], [%icmp_15, alt0]
+        %phi_17 = phi i1 [false, %entry], [%icmp_15, %alt0]
         store i32 0, ptr %alloca_2
         br label %exit
 
@@ -1257,7 +1348,7 @@ mod tests {
 
 
         }
-        define i32 @f(i32 x) {
+        define i32 @f(i32 %x) {
         entry:
         %alloca_22 = alloca i32
         %alloca_25 = alloca i32
@@ -1311,7 +1402,7 @@ mod tests {
         br label %final5
 
         final5:
-        %phi_21 = phi i1 [false, cond0], [%icmp_19, alt4]
+        %phi_21 = phi i1 [false, %cond0], [%icmp_19, %alt4]
         br i1 %phi_21, label %then1, label %alt2
 
         then1:
