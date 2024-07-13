@@ -96,8 +96,7 @@ impl RegDefs for LaInst {
         vec![self.dst()]
     }
 }
-impl RegUses for CallInst {}
-impl RegDefs for CallInst {}
+
 impl RegUses for JmpInst {}
 impl RegDefs for JmpInst {}
 impl RegUses for LdInst {
