@@ -1,5 +1,4 @@
 use super::*;
-use anyhow::Ok;
 use builder::IRBuilder;
 use llvm_ir::{Constant, Name};
 use std::collections::HashMap;
@@ -220,10 +219,67 @@ impl IRBuilder {
         };
         let mut ret: Vec<Inst> = Vec::new();
 
-        // FIXME: process arguments
-        // unimplemented!("process arguments");
-        for arg in &call.arguments {
-            todo!();
+        let mut i_arg: u32 = 0;
+        let mut f_arg: u32 = 0;
+        let mut extra_arg_stack: i64 = 0;
+        for (arg, _) in &call.arguments {
+            if let Ok(r) = Self::local_var_from(arg, regs) {
+                let r: Reg = r.try_into()?;
+                let is_usual = r.is_usual();
+                if r.is_usual() && i_arg < 8 {
+                    let reg = Reg::new(REG_A0.id() + i_arg, true);
+                    let mv = MvInst::new(reg.into(), r.into());
+                    ret.push(mv.into());
+                    i_arg += 1;
+                } else if (!r.is_usual()) && f_arg < 8 {
+                    let reg = Reg::new(REG_FA0.id() + f_arg, false);
+                    let mv = MvInst::new(reg.into(), r.into());
+                    ret.push(mv.into());
+                    f_arg += 1;
+                } else {
+                    // extra arguments,store to stack extra_arg_stack(sp)
+                    let sd = SdInst::new(r, extra_arg_stack.into(), REG_SP);
+                    extra_arg_stack += 8;
+                    ret.push(sd.into());
+                }
+            } else if let Ok(v) = Self::const_from(arg) {
+                if let Some(imm) = v.imm() {
+                    if i_arg < 8 {
+                        let reg = Reg::new(REG_A0.id() + i_arg, true);
+                        let li = LiInst::new(reg.into(), imm.into());
+                        ret.push(li.into());
+                        i_arg += 1;
+                    } else {
+                        let reg = reg_gener.gen_virtual_usual_reg();
+                        let li = LiInst::new(reg.into(), imm.into());
+                        ret.push(li.into());
+                        let sd = SdInst::new(reg, extra_arg_stack.into(), REG_SP);
+                        extra_arg_stack += 8;
+                        ret.push(sd.into());
+                    }
+                } else if let Some(fmm) = v.fmm() {
+                    // FIXME: fmm to reg should use other method
+                    if f_arg < 8 {
+                        let reg = Reg::new(REG_FA0.id() + f_arg, false);
+                        let li = LiInst::new(reg.into(), fmm.into());
+                        ret.push(li.into());
+                        f_arg += 1;
+                    } else {
+                        let reg = reg_gener.gen_virtual_float_reg();
+                        let li = LiInst::new(reg.into(), fmm.into());
+                        ret.push(li.into());
+                        let sd = SdInst::new(reg, extra_arg_stack.into(), REG_SP);
+                        extra_arg_stack += 8;
+                        ret.push(sd.into());
+                    };
+                } else {
+                    dbg!(v);
+                    unimplemented!();
+                }
+            } else {
+                dbg!(arg);
+                unimplemented!();
+            }
         }
 
         let call_inst = CallInst::new(f_name.to_string().into()).into();
