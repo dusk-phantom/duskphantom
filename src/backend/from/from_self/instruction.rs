@@ -173,7 +173,7 @@ impl IRBuilder {
         stack_slots: &mut HashMap<Address, StackSlot>,
     ) -> Result<Vec<Inst>> {
         let ty = alloca.value_type.clone();
-        let bits: u32 = match ty {
+        let bytes: u32 = match ty {
             middle::ir::ValueType::Int => 4,
             middle::ir::ValueType::Void => {
                 return Err(anyhow!("it can't alloca void")).with_context(|| context!())
@@ -184,8 +184,11 @@ impl IRBuilder {
             middle::ir::ValueType::Pointer(_) => todo!(), // 4B
                                                           // _ => todo!(),             // TODO 如果是其他大小的指令
         };
-        let ss = stack_allocator.alloc(bits);
-        stack_slots.insert(alloca as *const _ as Address, ss);
+        let ss = stack_allocator.alloc(bytes);
+        stack_slots.insert(
+            alloca as *const _ as Address, /* alloca 的目的寄存器, 里面存放有栈上变量的地址 */
+            ss,                            /* 栈上分配的地址 */
+        ); /* 将 栈上地址 与 目的寄存器 关联起来 */
         Ok(vec![])
     }
 
