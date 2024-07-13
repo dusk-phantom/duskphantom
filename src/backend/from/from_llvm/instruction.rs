@@ -87,7 +87,7 @@ impl IRBuilder {
         let name = alloca.dest.clone();
         let ty = alloca.allocated_type.clone();
         let num_byte = match ty.as_ref() {
-            llvm_ir::Type::IntegerType { bits } => Self::count_num_byte(*bits)?,
+            llvm_ir::Type::IntegerType { bits: _ } => 8,
             _ => todo!(),
         };
         let ss = stack_allocator.alloc(num_byte);
