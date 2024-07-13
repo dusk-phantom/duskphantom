@@ -119,6 +119,7 @@ impl IRBuilder {
             let mut max_callee_regs_stack = 0;
             for bb in f.iter_bbs() {
                 for inst in bb.insts() {
+                    // 找到所有的 call 指令, 然后找到他的参数占用多少栈空间, 然后找到最大的那个, 然后设置 max_callee_regs_stack_mut
                     if let Inst::Call(c) = inst {
                         // NOTICE: if callee_regs_stack is None, it means the function is not defined in the current module, so we can't get the callee_regs_stack
                         // so we just guess the callee_regs_stack is 0 now.

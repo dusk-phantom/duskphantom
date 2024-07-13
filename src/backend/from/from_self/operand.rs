@@ -42,6 +42,8 @@ impl IRBuilder {
         })
     }
 
+    /// 找到指令的 output 对应的 reg, 查表 !
+    /// 在这里好像看不出来是 int 还是 float
     pub fn local_var_from(
         instr: &ObjPtr<Box<dyn Instruction>>,
         regs: &HashMap<Address, Reg>,
@@ -82,7 +84,9 @@ impl IRBuilder {
         Ok((*reg).into())
     }
 
-    /// 要不是 instruction 的输出, 要不是 constant
+    /// 要不是 instruction 的输出, 要不是 constant 要不是 parameter
+    /// 这个只是将 instruction 和 constant 包装成 Operand
+    /// 里面不会出现 asm 的输出
     pub fn local_operand_from(
         operand: &middle::ir::Operand,
         regs: &HashMap<Address, Reg>,
