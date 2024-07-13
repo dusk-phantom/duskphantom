@@ -138,6 +138,7 @@ pub fn compile_self_llc(
     output_path: &str,
     opt_flag: bool,
     asm_flag: bool,
+    ll_path: Option<String>,
 ) -> Result<(), CompilerError> {
     use std::fs;
 
@@ -149,6 +150,9 @@ pub fn compile_self_llc(
     let mut program = middle::gen(&program)?;
     if opt_flag {
         middle::optimize(&mut program);
+    }
+    if let Some(ll_path) = ll_path {
+        std::fs::write(ll_path, program.module.gen_llvm_ir()).with_context(|| context!())?;
     }
     // 中端接clang
     let llvm_ir = format!(
