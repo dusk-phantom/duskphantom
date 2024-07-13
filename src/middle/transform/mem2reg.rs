@@ -458,13 +458,13 @@ pub mod tests_mem2reg {
 
         then1:
         %load_15 = load i32, ptr %alloca_5
-        %Add_16 = add i32, %load_15, 1
+        %Add_16 = add i32 %load_15, 1
         store i32 %Add_16, ptr %alloca_5
         br label %final3
 
         alt2:
         %load_19 = load i32, ptr %alloca_5
-        %Add_20 = add i32, %load_19, 9
+        %Add_20 = add i32 %load_19, 9
         store i32 %Add_20, ptr %alloca_5
         br label %final3
 
@@ -493,15 +493,15 @@ pub mod tests_mem2reg {
         br i1 %icmp_13, label %then1, label %alt2
 
         then1:
-        %Add_16 = add i32, 0, 1
+        %Add_16 = add i32 0, 1
         br label %final3
 
         alt2:
-        %Add_20 = add i32, 0, 9
+        %Add_20 = add i32 0, 9
         br label %final3
 
         final3:
-        %phi_26 = phi i32 [%Add_16, then1], [%Add_20, alt2]
+        %phi_26 = phi i32 [%Add_16, %then1], [%Add_20, %alt2]
         br label %exit
 
         exit:
@@ -551,7 +551,7 @@ pub mod tests_mem2reg {
 
         body1:
         %load_11 = load i32, ptr %alloca_5
-        %Add_12 = add i32, %load_11, 1
+        %Add_12 = add i32 %load_11, 1
         store i32 %Add_12, ptr %alloca_5
         br label %cond0
 
@@ -576,12 +576,12 @@ pub mod tests_mem2reg {
         br label %cond0
 
         cond0:
-        %phi_21 = phi i32 [0, entry], [%Add_12, body1]
+        %phi_21 = phi i32 [0, %entry], [%Add_12, %body1]
         %icmp_16 = icmp slt i32 %phi_21, 10
         br i1 %icmp_16, label %body1, label %final2
 
         body1:
-        %Add_12 = add i32, %phi_21, 1
+        %Add_12 = add i32 %phi_21, 1
         br label %cond0
 
         final2:
@@ -635,7 +635,7 @@ pub mod tests_mem2reg {
 
         body1:
         %load_11 = load i32, ptr %alloca_5
-        %Add_12 = add i32, %load_11, 2
+        %Add_12 = add i32 %load_11, 2
         store i32 %Add_12, ptr %alloca_5
         br label %cond3
 
@@ -669,7 +669,7 @@ pub mod tests_mem2reg {
 
         body8:
         %load_26 = load i32, ptr %alloca_5
-        %Add_27 = add i32, %load_26, 1
+        %Add_27 = add i32 %load_26, 1
         store i32 %Add_27, ptr %alloca_5
         br label %cond7
 
@@ -688,12 +688,12 @@ pub mod tests_mem2reg {
         br label %cond0
 
         cond0:
-        %phi_42 = phi i32 [0, entry], [%phi_43, final6]
+        %phi_42 = phi i32 [0, %entry], [%phi_43, %final6]
         %icmp_37 = icmp slt i32 %phi_42, 10
         br i1 %icmp_37, label %body1, label %final2
 
         body1:
-        %Add_12 = add i32, %phi_42, 2
+        %Add_12 = add i32 %phi_42, 2
         br label %cond3
 
         final2:
@@ -713,7 +713,7 @@ pub mod tests_mem2reg {
         br label %final6
 
         cond7:
-        %phi_43 = phi i32 [%Add_12, then4], [%Add_27, body8]
+        %phi_43 = phi i32 [%Add_12, %then4], [%Add_27, %body8]
         %icmp_31 = icmp slt i32 %phi_43, 8
         br i1 %icmp_31, label %body8, label %final9
 
@@ -721,7 +721,7 @@ pub mod tests_mem2reg {
         br label %cond0
 
         body8:
-        %Add_27 = add i32, %phi_43, 1
+        %Add_27 = add i32 %phi_43, 1
         br label %cond7
 
         final9:
@@ -782,7 +782,7 @@ pub mod tests_mem2reg {
 
 
         }
-        define i32 @f(i32* a) {
+        define i32 @f(i32* %a) {
         entry:
         %alloca_17 = alloca i32
         %alloca_20 = alloca i32*
@@ -821,7 +821,7 @@ pub mod tests_mem2reg {
 
 
         }
-        define i32 @f(i32* a) {
+        define i32 @f(i32* %a) {
         entry:
         %alloca_17 = alloca i32
         %alloca_20 = alloca i32*

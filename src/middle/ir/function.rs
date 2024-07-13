@@ -93,7 +93,7 @@ pub struct Parameter {
 
 impl Display for Parameter {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {}", self.value_type, self.name)
+        write!(f, "{} %{}", self.value_type, self.name)
     }
 }
 

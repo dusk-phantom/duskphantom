@@ -79,6 +79,12 @@ impl<'a> ProgramKit<'a> {
                 self.program.module.functions.push(fun_ptr);
                 Ok(())
             }
+            Decl::Stack(ls) => {
+                for l in ls.iter() {
+                    self.gen_global_decl(l)?;
+                }
+                Ok(())
+            }
             _ => Err(anyhow!("invalid declaration")).with_context(|| context!()),
         }
     }
