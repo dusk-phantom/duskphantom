@@ -11,6 +11,7 @@ pub fn phisicalize(program: &mut Program) -> Result<(), BackendError> {
                 .ok_or(anyhow!("virtual stack allocator not found"))
                 .with_context(|| context!())?
                 .allocated();
+            dbg!(func.name());
             dbg!(stack_size);
             // alloc reg: 调用寄存器分配算法,获得分配结果,其中包括寄存器溢出需要的空间
 

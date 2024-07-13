@@ -120,7 +120,11 @@ impl IRBuilder {
             for bb in f.iter_bbs() {
                 for inst in bb.insts() {
                     if let Inst::Call(c) = inst {
-                        let callee_regs_stack = *name_func.get(c.func_name().as_str()).unwrap();
+                        // NOTICE: if callee_regs_stack is None, it means the function is not defined in the current module, so we can't get the callee_regs_stack
+                        // so we just guess the callee_regs_stack is 0 now.
+                        // FIXME: we should check the function is defined in the current module or not,and if not, we should report an warning.
+                        let callee_regs_stack =
+                            *name_func.get(c.func_name().as_str()).unwrap_or(&0);
                         max_callee_regs_stack =
                             std::cmp::max(max_callee_regs_stack, callee_regs_stack);
                     }
