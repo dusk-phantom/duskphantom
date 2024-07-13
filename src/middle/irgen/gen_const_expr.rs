@@ -7,7 +7,7 @@ use anyhow::{anyhow, Context, Result};
 
 impl<'a> ProgramKit<'a> {
     /// Generate constant expression
-    pub fn gen_const_expr(&mut self, expr: &Expr) -> Result<Constant> {
+    pub fn gen_const_expr(&self, expr: &Expr) -> Result<Constant> {
         match expr {
             Expr::Var(x) => {
                 // Ensure variable is defined
@@ -30,7 +30,20 @@ impl<'a> ProgramKit<'a> {
                     .collect::<anyhow::Result<_, _>>()?,
             )),
             Expr::Map(_) => Err(anyhow!("map is not implemented yet")).with_context(|| context!()),
-            Expr::Index(_, _) => Err(anyhow!("index not implemented")).with_context(|| context!()),
+            Expr::Index(arr, idx) => {
+                let arr_const = self.gen_const_expr(arr)?;
+                let idx_const = self.gen_const_expr(idx)?;
+                let Constant::Array(arr) = arr_const else {
+                    return Err(anyhow!("indexing non-array")).with_context(|| context!());
+                };
+                let Constant::Int(idx) = idx_const else {
+                    return Err(anyhow!("indexing with non-integer")).with_context(|| context!());
+                };
+                if idx < 0 || idx as usize >= arr.len() {
+                    return Err(anyhow!("index out of bounds")).with_context(|| context!());
+                }
+                Ok(arr[idx as usize].clone())
+            }
             Expr::Field(_, _) => Err(anyhow!("field not implemented")).with_context(|| context!()),
             Expr::Select(_, _) => Err(anyhow!("select not supported")).with_context(|| context!()),
             Expr::Int32(x) => Ok(Constant::Int(*x)),

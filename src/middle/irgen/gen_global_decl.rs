@@ -8,7 +8,6 @@ use crate::middle::irgen::value::Value;
 use anyhow::{anyhow, Context};
 
 use super::constant::{collapse_array, type_to_const};
-use super::value_type::translate_type;
 
 impl<'a> ProgramKit<'a> {
     /// Generate a global declaration into the program
@@ -17,7 +16,7 @@ impl<'a> ProgramKit<'a> {
         match decl {
             Decl::Var(ty, name, val) | Decl::Const(ty, name, val) => {
                 // Get variable type
-                let value_type = translate_type(ty);
+                let value_type = self.translate_type(ty)?;
 
                 // Get if value is global variable or constant
                 let is_global_variable: bool = match decl {
@@ -58,17 +57,18 @@ impl<'a> ProgramKit<'a> {
             }
             Decl::Func(Type::Function(return_ty, params), id, _) => {
                 // Get function type
-                let fty = translate_type(return_ty);
+                let fty = self.translate_type(return_ty)?;
 
                 // Create function
                 let mut fun_ptr = self.program.mem_pool.new_function(id.clone(), fty.clone());
 
                 // Generate parameters
                 for param in params.iter() {
-                    let param = self.program.mem_pool.new_parameter(
-                        param.id.clone().unwrap_or("_".to_string()),
-                        translate_type(&param.ty),
-                    );
+                    let value_type = self.translate_type(&param.ty)?;
+                    let param = self
+                        .program
+                        .mem_pool
+                        .new_parameter(param.id.clone().unwrap_or("_".to_string()), value_type);
                     fun_ptr.params.push(param);
                 }
 

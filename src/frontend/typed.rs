@@ -29,8 +29,8 @@ pub enum Type {
 
     /// Array of given type.
     /// Example:
-    /// `int x[4]` is `Array(Int32, 4)`
-    Array(Box<Type>, usize),
+    /// `int x[4]` is `Array(Int32, Int32(4))`
+    Array(Box<Type>, Box<Expr>),
 
     /// Function to given type.
     /// Example:
@@ -84,7 +84,7 @@ pub enum LVal {
 
     /// Array indexing.
     /// Example: `x[8]`
-    Index(Box<LVal>, usize),
+    Index(Box<LVal>, Box<Expr>),
 
     /// A function call.
     /// Example: `f(x, y)`
@@ -103,10 +103,10 @@ pub fn lval(input: &mut &str) -> PResult<LVal> {
         empty.value(LVal::Nothing),
     ));
     let access_tail = alt((
-        bracket(opt(pad(usize))).map(|x| {
+        bracket(opt(pad(expr))).map(|x| {
             // Empty bracket is pointer, non-empty bracket is index.
             BoxF::new(move |acc| match x {
-                Some(ix) => LVal::Index(acc, ix),
+                Some(ix) => LVal::Index(acc, ix.into()),
                 None => LVal::Pointer(acc),
             })
         }),
@@ -279,7 +279,10 @@ pub mod tests_typed {
         match single_type.parse(code) {
             Ok(result) => assert_eq!(
                 result,
-                Type::Pointer(Box::new(Type::Array(Box::new(Type::Int32), 4)))
+                Type::Pointer(Box::new(Type::Array(
+                    Box::new(Type::Int32),
+                    Box::new(Expr::Int32(4))
+                )))
             ),
             Err(err) => panic!("failed to parse {}: {}", code, err),
         }

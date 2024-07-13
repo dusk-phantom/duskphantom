@@ -6,7 +6,7 @@ use anyhow::{anyhow, Context};
 
 impl<'a> ProgramKit<'a> {
     /// Generate a unary expression
-    pub fn gen_const_unary(&mut self, op: &UnaryOp, expr: &Expr) -> anyhow::Result<Constant> {
+    pub fn gen_const_unary(&self, op: &UnaryOp, expr: &Expr) -> anyhow::Result<Constant> {
         // Generate constant
         let val = self.gen_const_expr(expr)?;
 
