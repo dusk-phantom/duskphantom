@@ -1,4 +1,8 @@
-
+int f(int a0,int a1){return 0;}
+extern int geti();
+extern int f1();
 int main(){
-    return 0;
+    f1();
+    int a=geti();
+    return f(a,1);
 }

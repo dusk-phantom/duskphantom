@@ -1,17 +1,41 @@
 use super::*;
 
 #[derive(Debug, Clone)]
-pub struct CallInst(Label);
+pub struct CallInst {
+    dst: Label,
+    uses: Vec<Reg>,
+    def: Option<Reg>,
+}
 impl CallInst {
     pub fn new(dst: Label) -> Self {
-        Self(dst)
+        Self {
+            dst,
+            uses: vec![],
+            def: None,
+        }
     }
     pub fn func_name(&self) -> &Label {
-        &self.0
+        &self.dst
     }
     pub fn gen_asm(&self) -> String {
         let dst = self.func_name().gen_asm();
         format!("call {}", dst)
+    }
+    pub fn add_uses(&mut self, uses: &[Reg]) {
+        self.uses.extend(uses.iter());
+    }
+    pub fn add_def(&mut self, def: Reg) {
+        self.def = Some(def);
+    }
+}
+impl RegUses for CallInst {
+    fn uses(&self) -> Vec<&Reg> {
+        self.uses.iter().collect()
+    }
+}
+impl RegDefs for CallInst {
+    fn defs(&self) -> Vec<&Reg> {
+        self.def.iter().collect()
     }
 }
 

@@ -222,17 +222,20 @@ impl IRBuilder {
         let mut i_arg: u32 = 0;
         let mut f_arg: u32 = 0;
         let mut extra_arg_stack: i64 = 0;
+        let mut phisic_arg_regs: Vec<Reg> = Vec::new();
         for (arg, _) in &call.arguments {
             if let Ok(r) = Self::local_var_from(arg, regs) {
                 let r: Reg = r.try_into()?;
                 let is_usual = r.is_usual();
                 if r.is_usual() && i_arg < 8 {
                     let reg = Reg::new(REG_A0.id() + i_arg, true);
+                    phisic_arg_regs.push(reg);
                     let mv = MvInst::new(reg.into(), r.into());
                     ret.push(mv.into());
                     i_arg += 1;
                 } else if (!r.is_usual()) && f_arg < 8 {
                     let reg = Reg::new(REG_FA0.id() + f_arg, false);
+                    phisic_arg_regs.push(reg);
                     let mv = MvInst::new(reg.into(), r.into());
                     ret.push(mv.into());
                     f_arg += 1;
@@ -246,6 +249,7 @@ impl IRBuilder {
                 if let Some(imm) = v.imm() {
                     if i_arg < 8 {
                         let reg = Reg::new(REG_A0.id() + i_arg, true);
+                        phisic_arg_regs.push(reg);
                         let li = LiInst::new(reg.into(), imm.into());
                         ret.push(li.into());
                         i_arg += 1;
@@ -261,6 +265,7 @@ impl IRBuilder {
                     // FIXME: fmm to reg should use other method
                     if f_arg < 8 {
                         let reg = Reg::new(REG_FA0.id() + f_arg, false);
+                        phisic_arg_regs.push(reg);
                         let li = LiInst::new(reg.into(), fmm.into());
                         ret.push(li.into());
                         f_arg += 1;
@@ -282,10 +287,12 @@ impl IRBuilder {
             }
         }
 
-        let call_inst = CallInst::new(f_name.to_string().into()).into();
-        ret.push(call_inst);
+        let mut call_inst = CallInst::new(f_name.to_string().into());
+        call_inst.add_uses(&phisic_arg_regs); // set reg uses for call_inst
 
+        // 根据是否有返回值来 决定是否需要修改call_inst的defs列表
         if let Some(dest) = &call.dest {
+            // with return value, add ret_reg to defs of call_inst
             // dbg!(dest);
             let func_ty = &call.function_ty;
             let dst_reg: Reg = match func_ty.as_ref() {
@@ -301,6 +308,8 @@ impl IRBuilder {
                     } else {
                         unimplemented!();
                     };
+                    call_inst.add_def(ret_reg);
+                    ret.push(call_inst.into());
                     let dst_reg = reg_gener.gen_virtual_reg(is_usual);
                     let mv = MvInst::new(dst_reg.into(), ret_reg.into());
                     ret.push(mv.into());
@@ -311,6 +320,9 @@ impl IRBuilder {
                 }
             };
             regs.insert(dest.clone(), dst_reg);
+        } else {
+            // if without dest value,means this call inst won't def any ret_reg
+            ret.push(call_inst.into());
         }
 
         Ok(ret)

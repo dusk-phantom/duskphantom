@@ -476,8 +476,7 @@ impl IRBuilder {
         let params = call.get_operand(); // 参数列表
 
         // 函数是全局的，因此用的是名字
-        let call_inst = CallInst::new(call.func.name.to_string().into()).into(); // call <label>
-        call_insts.push(call_inst);
+        let mut call_inst: CallInst = CallInst::new(call.func.name.to_string().into()); // call <label>
 
         let dest_name = call as *const _ as Address;
 
@@ -485,24 +484,28 @@ impl IRBuilder {
 
         // call 返回之后，将返回值放到一个虚拟寄存器中
         match func.return_type {
-            middle::ir::ValueType::Void => {}
-            middle::ir::ValueType::Int => {
-                let dst = reg_gener.gen_virtual_usual_reg(); // 分配一个虚拟寄存器
-                let mv = MvInst::new(dst.into(), REG_A0.into());
-                call_insts.push(mv.into()); // 插入 mv 指令
+            middle::ir::ValueType::Void => {
+                call_insts.push(call_inst.into());
+            }
+            middle::ir::ValueType::Int
+            | middle::ir::ValueType::Float
+            | middle::ir::ValueType::Bool => {
+                let is_usual = func.return_type == middle::ir::ValueType::Int
+                    || func.return_type == middle::ir::ValueType::Bool;
+                let dst = if is_usual {
+                    reg_gener.gen_virtual_usual_reg()
+                } else {
+                    reg_gener.gen_virtual_float_reg()
+                }; // 分配一个虚拟寄存器
+                let ret_reg = if is_usual { REG_A0 } else { REG_FA0 };
+                let mv = MvInst::new(dst.into(), ret_reg.into());
                 regs.insert(dest_name, dst); // 绑定中端的 id 和 虚拟寄存器
-            }
-            middle::ir::ValueType::Float => {
-                let dst = reg_gener.gen_virtual_float_reg();
-                let mv = MvInst::new(dst.into(), REG_FA0.into());
+
+                // 有返回值的情况下,传递返回值的ret_reg寄存器被认为被这条call指令
+                // 定义了,需要加入到该指令的defs列表中
+                call_inst.add_def(ret_reg);
+                call_insts.push(call_inst.into());
                 call_insts.push(mv.into());
-                regs.insert(dest_name, dst);
-            }
-            middle::ir::ValueType::Bool => {
-                let dst = reg_gener.gen_virtual_usual_reg();
-                let mv = MvInst::new(dst.into(), REG_A0.into());
-                call_insts.push(mv.into());
-                regs.insert(dest_name, dst);
             }
             _ => {
                 return Err(anyhow!("sysy only return: void | float | int".to_string()))
