@@ -6,7 +6,6 @@ use crate::middle::irgen::function_kit::FunctionKit;
 use anyhow::{anyhow, Context};
 
 use super::value::{alloc, collapse_array, Value};
-use super::value_type::translate_type;
 
 impl<'a> FunctionKit<'a> {
     /// Generate a declaration as a statement into the program
@@ -14,7 +13,7 @@ impl<'a> FunctionKit<'a> {
         match decl {
             Decl::Var(raw_ty, id, op) => {
                 // Allocate space for variable, add to environment
-                let ty = translate_type(raw_ty);
+                let ty = self.gen_program_kit().translate_type(raw_ty)?;
                 let lhs = alloc(ty.clone(), self);
                 self.env.insert(id.clone(), lhs.clone());
 

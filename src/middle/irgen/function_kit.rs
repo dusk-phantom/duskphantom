@@ -48,8 +48,8 @@ impl<'a> FunctionKit<'a> {
     /// If environment is needed when inserting constants, the function needs changes.
     pub fn gen_program_kit(&mut self) -> ProgramKit {
         ProgramKit {
-            env: HashMap::new(),
-            fun_env: HashMap::new(),
+            env: &mut self.env,
+            fun_env: &mut self.fun_env,
             program: self.program,
         }
     }

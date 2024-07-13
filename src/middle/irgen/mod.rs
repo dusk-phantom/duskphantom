@@ -25,8 +25,8 @@ pub fn gen(program: &frontend::Program) -> Result<middle::Program> {
     let mut result = middle::Program::new();
     ProgramKit {
         program: &mut result,
-        env: HashMap::new(),
-        fun_env: HashMap::new(),
+        env: &mut HashMap::new(),
+        fun_env: &mut HashMap::new(),
     }
     .gen(program)?;
     Ok(result)
@@ -784,6 +784,43 @@ mod tests {
         %load_8 = load float, ptr %getelementptr_7
         %fptoi_9 = fptosi float %load_8 to i32
         store i32 %fptoi_9, ptr %alloca_2
+        br label %exit
+
+        exit:
+        %load_3 = load i32, ptr %alloca_2
+        ret i32 %load_3
+
+
+        }
+        "###);
+    }
+
+    #[test]
+    fn test_constant_fold_array() {
+        let code = r#"
+            const int A = 1;
+            const int B[A] = {1};
+
+            int f(int x[][A][B[A-1]]) {
+                return x[0][0][0];
+            }
+        "#;
+        let program = parse(code).unwrap();
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_snapshot!(llvm_ir, @r###"
+        @A = dso_local constant i32 1
+        @B = dso_local constant [1 x i32] [i32 1]
+        define i32 @f([1 x [1 x i32]]* x) {
+        entry:
+        %alloca_2 = alloca i32
+        %alloca_5 = alloca [1 x [1 x i32]]*
+        store [1 x [1 x i32]]* %x, ptr %alloca_5
+        %load_7 = load [1 x [1 x i32]]*, ptr %alloca_5
+        %getelementptr_8 = getelementptr [1 x [1 x i32]], ptr %load_7, i32 0, i32 0
+        %getelementptr_9 = getelementptr [1 x i32], ptr %getelementptr_8, i32 0, i32 0
+        %load_10 = load i32, ptr %getelementptr_9
+        store i32 %load_10, ptr %alloca_2
         br label %exit
 
         exit:

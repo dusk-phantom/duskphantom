@@ -7,7 +7,7 @@ use anyhow::{anyhow, Context};
 impl<'a> ProgramKit<'a> {
     /// Generate a binary expression
     pub fn gen_const_binary(
-        &mut self,
+        &self,
         op: &BinaryOp,
         lhs: &Expr,
         rhs: &Expr,

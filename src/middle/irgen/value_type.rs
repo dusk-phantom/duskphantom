@@ -1,4 +1,3 @@
-use crate::frontend::Type;
 use crate::middle::ir::ValueType;
 
 /// Convenient methods for value type
@@ -41,23 +40,5 @@ impl ValueType {
         } else {
             ValueType::Void
         }
-    }
-}
-
-/// Translate a frontend type to IR value type
-pub fn translate_type(ty: &Type) -> ValueType {
-    match ty {
-        Type::Void => ValueType::Void,
-        Type::Int32 => ValueType::Int,
-        Type::Float32 => ValueType::Float,
-        Type::String => todo!(),
-        Type::Char => todo!(),
-        Type::Boolean => ValueType::Bool,
-        Type::Pointer(ty) => ValueType::Pointer(Box::new(translate_type(ty))),
-        Type::Array(ty, n) => ValueType::Array(Box::new(translate_type(ty)), *n),
-        Type::Function(_, _) => todo!(),
-        Type::Enum(_) => todo!(),
-        Type::Union(_) => todo!(),
-        Type::Struct(_) => todo!(),
     }
 }
