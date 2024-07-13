@@ -64,7 +64,7 @@ impl IRBuilder {
                 ssa2tac_binary_usual!(inst, regs, reg_gener, SRem, Rem, RemInst)
             }
 
-            // TODO
+            // TODO 目前还没有 udiv 和 urem
             middle::ir::instruction::InstType::UDiv => todo!(),
             middle::ir::instruction::InstType::URem => todo!(),
             middle::ir::instruction::InstType::FDiv => todo!(),
@@ -272,7 +272,9 @@ impl IRBuilder {
                 middle::ir::Operand::Instruction(instr) => {
                     let addr = instr.as_ref().as_ref() as *const dyn middle::ir::Instruction
                         as *const () as Address;
-                    let reg = regs.get(&addr).ok_or(anyhow!("").context(context!()))?; // 获取返回值对应的虚拟寄存器
+                    let reg = regs
+                        .get(&addr)
+                        .ok_or(anyhow!("could not get {} from map", &addr).context(context!()))?; // 获取返回值对应的虚拟寄存器
                     let mv_inst = match instr.get_value_type() {
                         middle::ir::ValueType::Int => MvInst::new(REG_A0.into(), (*reg).into()),
                         middle::ir::ValueType::Float => MvInst::new(REG_FA0.into(), (*reg).into()),
@@ -465,7 +467,6 @@ impl IRBuilder {
         Ok(ret_insts)
     }
 
-    #[allow(unused)]
     pub fn build_call_inst(
         // call: &llvm_ir::instruction::Call,
         call: &middle::ir::instruction::misc_inst::Call,
@@ -474,9 +475,75 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
     ) -> Result<Vec<Inst>> {
-        let mut call_insts: Vec<Inst> = Vec::new();
+        let mut call_insts: Vec<Inst> = Vec::new(); // build_call_inst 的返回值
 
-        let params = call.get_operand(); // 参数列表
+        /* ---------- 参数 ---------- */
+
+        let mut i_arg_num: u32 = 0;
+        let mut f_arg_num: u32 = 0;
+        let mut extra_arg_stack: i64 = 0;
+
+        let arguments = call.get_operand(); // 参数列表, 这个可以类比成 llvm_ir::call::arguments
+        for arg in arguments {
+            let ope = Self::local_operand_from(arg, regs).context(context!())?;
+            match ope {
+                Operand::Reg(r) => {
+                    if r.is_usual() && i_arg_num < 8 {
+                        let reg = Reg::new(REG_A0.id() + i_arg_num, true);
+                        let mv = MvInst::new(reg.into(), ope);
+                        call_insts.push(mv.into());
+                        i_arg_num += 1;
+                    } else if (!r.is_usual()) && f_arg_num < 8 {
+                        let reg = Reg::new(REG_FA0.id() + f_arg_num, false);
+                        let mv = MvInst::new(reg.into(), ope);
+                        call_insts.push(mv.into());
+                        f_arg_num += 1;
+                    } else {
+                        let sd = SdInst::new(r, extra_arg_stack.into(), REG_SP);
+                        extra_arg_stack += 8;
+                        call_insts.push(sd.into());
+                    }
+                }
+                Operand::Imm(imm) => {
+                    if i_arg_num < 8 {
+                        let reg = Reg::new(REG_A0.id() + i_arg_num, true);
+                        let li = LiInst::new(reg.into(), imm.into());
+                        call_insts.push(li.into());
+                        i_arg_num += 1;
+                    } else {
+                        let reg = Reg::new(REG_A0.id() + i_arg_num, true);
+                        let li = LiInst::new(reg.into(), imm.into());
+                        call_insts.push(li.into());
+                        let sd = SdInst::new(reg, extra_arg_stack.into(), REG_SP);
+                        extra_arg_stack += 8;
+                        call_insts.push(sd.into());
+                    }
+                }
+                Operand::Fmm(fmm) => {
+                    if f_arg_num < 8 {
+                        // TODO 不一定是 li, 这里可能有问题, 可能是 flw/fld 之类的
+                        let reg = Reg::new(REG_FA0.id() + f_arg_num, false);
+                        let li = LiInst::new(reg.into(), fmm.into());
+                        call_insts.push(li.into());
+                        f_arg_num += 1;
+                    } else {
+                        let reg = Reg::new(REG_FA0.id() + f_arg_num, false);
+                        let li = LiInst::new(reg.into(), fmm.into());
+                        call_insts.push(li.into());
+                        let sd = SdInst::new(reg, extra_arg_stack.into(), REG_SP);
+                        extra_arg_stack += 8;
+                        call_insts.push(sd.into());
+                    }
+                }
+                Operand::StackSlot(_) => todo!(), // TODO 这个有待商榷
+                Operand::Label(_) => {
+                    return Err(anyhow!("argument can't be a label".to_string()))
+                        .with_context(|| context!())
+                }
+            }
+        }
+
+        /* ---------- call 指令本身 ---------- */
 
         // 函数是全局的，因此用的是名字
         let mut call_inst: CallInst = CallInst::new(call.func.name.to_string().into()); // call <label>
@@ -484,6 +551,8 @@ impl IRBuilder {
         let dest_name = call as *const _ as Address;
 
         let func = call.func;
+
+        /* ---------- 返回值 ---------- */
 
         // call 返回之后，将返回值放到一个虚拟寄存器中
         match func.return_type {
