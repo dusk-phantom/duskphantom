@@ -187,11 +187,11 @@ impl IRBuilder {
             insts.extend(gen_insts);
         }
 
-        insts.extend(Self::build_term_inst(&bb.term, regs)?);
+        insts.extend(Self::build_term_inst(&bb.term, regs)?); // bb.instrs 是不包含 bb.term 的
 
         let mut entry = Block::new("entry".to_string());
         entry.extend_insts(insts);
-        let caller_regs_stack = usize::try_from(caller_regs_stack)?;
+        let caller_regs_stack = usize::try_from(caller_regs_stack)?; // 这是将 i64 转换为 usize
         Ok((entry, caller_regs_stack))
     }
     fn build_other_bbs(
