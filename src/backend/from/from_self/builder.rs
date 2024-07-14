@@ -264,7 +264,7 @@ impl IRBuilder {
             }
         }
 
-        let bb = func.entry.with_context(|| context!())?; // func 的其他 blocks 是不是不包含 entry ?
+        let bb = func.entry.with_context(|| context!())?; // FIXME func 的其他 blocks 是不是不包含 entry ?
         for inst in bb.iter() {
             let gen_insts =
                 Self::build_instruction(&inst, stack_allocator, stack_slots, reg_gener, regs)
