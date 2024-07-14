@@ -226,7 +226,6 @@ impl IRBuilder {
         for (arg, _) in &call.arguments {
             if let Ok(r) = Self::local_var_from(arg, regs) {
                 let r: Reg = r.try_into()?;
-                let is_usual = r.is_usual();
                 if r.is_usual() && i_arg < 8 {
                     let reg = Reg::new(REG_A0.id() + i_arg, true);
                     phisic_arg_regs.push(reg);
