@@ -467,6 +467,7 @@ impl IRBuilder {
         Ok(ret_insts)
     }
 
+    #[allow(unused)]
     pub fn build_call_inst(
         // call: &llvm_ir::instruction::Call,
         call: &middle::ir::instruction::misc_inst::Call,
