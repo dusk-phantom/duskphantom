@@ -6,10 +6,11 @@ use crate::config::CONFIG;
 use rayon::prelude::*;
 
 #[allow(unused)]
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Func {
     name: String,
     args: Vec<String>,
+    ret: Option<Reg>,
     /// the size of stack where extra args are stored
     caller_regs_stack: Option<u32>,
     /// the max size of stack where callee's args are stored
@@ -46,10 +47,12 @@ impl Func {
 }
 
 impl Func {
+    /// create a new function, default return type is void
     pub fn new(name: String, args: Vec<String>, entry: Block) -> Func {
         Func {
             name,
             args,
+            ret: None,
             caller_regs_stack: None,
             max_callee_regs_stack: None,
             stack_allocator: None,
@@ -57,6 +60,14 @@ impl Func {
             entry,
         }
     }
+
+    pub fn ret(&self) -> Option<&Reg> {
+        self.ret.as_ref()
+    }
+    pub fn ret_mut(&mut self) -> &mut Option<Reg> {
+        &mut self.ret
+    }
+
     pub fn caller_regs_stack(&self) -> u32 {
         self.caller_regs_stack.unwrap_or(0)
     }
@@ -117,6 +128,8 @@ impl<'a> Iterator for BBIter<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::backend::{Block, Func};
+
     #[test]
     fn test_iter_bb_order() {
         use super::*;
@@ -135,5 +148,14 @@ mod tests {
         assert_eq!(iter.next().unwrap().label(), "bb4");
         assert_eq!(iter.next().unwrap().label(), "bb3");
         assert!(iter.next().is_none());
+    }
+
+    #[test]
+    fn test_func_new() {
+        let func = Func::new("main".to_string(), vec![], Block::new("entry".to_string()));
+        assert_eq!(func.name(), "main");
+        assert_eq!(func.args.len(), 0);
+        assert_eq!(func.entry().label(), "entry");
+        assert_eq!(func.ret(), None); // default return type is void
     }
 }

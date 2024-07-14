@@ -171,12 +171,13 @@ impl IRBuilder {
                     match op {
                         llvm_ir::Operand::LocalOperand { name, ty } => {
                             let reg = regs.get(name).ok_or(anyhow!("").context(context!()))?;
-                            let mv_inst = match ty.as_ref() {
-                                llvm_ir::Type::IntegerType { bits: _ } => {
-                                    MvInst::new(REG_A0.into(), reg.into())
-                                }
-                                llvm_ir::Type::FPType(_) => MvInst::new(REG_FA0.into(), reg.into()),
-                                _ => unimplemented!(),
+                            let ret_ty = ty.as_ref();
+                            let mv_inst = if Self::is_ty_int(ret_ty) {
+                                MvInst::new(REG_A0.into(), reg.into())
+                            } else if Self::is_ty_float(ret_ty) {
+                                MvInst::new(REG_FA0.into(), reg.into())
+                            } else {
+                                unimplemented!();
                             };
                             ret_insts.push(mv_inst.into());
                             ret_insts.push(Inst::Ret);
@@ -188,13 +189,16 @@ impl IRBuilder {
                                 ret_insts.push(addi.into());
                                 ret_insts.push(Inst::Ret);
                             }
-                            Constant::Float(_) => todo!(),
+                            Constant::Float(_) => {
+                                // FIXME: float constant load
+                                unimplemented!();
+                            }
                             _ => todo!(),
                         },
                         llvm_ir::Operand::MetadataOperand => todo!(),
                     }
                 } else {
-                    unimplemented!();
+                    ret_insts.push(Inst::Ret);
                 }
             }
             _ => todo!(),

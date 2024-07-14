@@ -14,9 +14,7 @@ impl IRBuilder {
     #[allow(unused)]
     pub fn gen_from_clang(program: &clang_frontend::Program) -> Result<Program> {
         let llvm_module = &program.llvm;
-        // dbg!(&llvm.types);
         let global_vars = Self::build_global_var(&llvm_module.global_vars)?;
-        // dbg!(&global_vars);
         let funcs = Self::build_funcs(&llvm_module.functions)?;
 
         let mdl = module::Module {
@@ -79,6 +77,9 @@ impl IRBuilder {
         Ok(global_vars)
     }
 
+    /**
+     * build funcs
+     */
     pub fn build_funcs(llvm_funcs: &[llvm_ir::Function]) -> Result<Vec<Func>> {
         let mut funcs = Vec::new();
         for f in llvm_funcs {
@@ -96,6 +97,17 @@ impl IRBuilder {
                 &mut regs,
             )?;
             let mut m_f = Func::new(f.name.to_string(), args, entry);
+            let ret_ty = f.return_type.as_ref();
+            if Self::is_ty_float(ret_ty) {
+                m_f.ret_mut().replace(REG_FA0);
+            } else if Self::is_ty_int(ret_ty) {
+                m_f.ret_mut().replace(REG_A0);
+            } else if Self::is_ty_void(ret_ty) {
+                // do nothing
+            } else {
+                unimplemented!("return type is not int or float");
+            }
+
             *m_f.caller_regs_stack_mut() = Some(caller_reg_stack.try_into()?);
             for bb in Self::build_other_bbs(
                 f,
@@ -110,6 +122,7 @@ impl IRBuilder {
             *m_f.stack_allocator_mut() = Some(stack_allocator);
             funcs.push(m_f);
         }
+
         // count max_callee_regs_stack
         let name_func: HashMap<String, u32> = funcs
             .iter()

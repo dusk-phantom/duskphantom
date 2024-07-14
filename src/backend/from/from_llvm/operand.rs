@@ -12,6 +12,9 @@ impl IRBuilder {
     pub fn is_ty_float(ty: &llvm_ir::Type) -> bool {
         matches!(ty, llvm_ir::Type::FPType(_))
     }
+    pub fn is_ty_void(ty: &llvm_ir::Type) -> bool {
+        matches!(ty, llvm_ir::Type::VoidType)
+    }
 
     pub fn address_from(
         operand: &llvm_ir::Operand,
