@@ -174,12 +174,12 @@ impl IRBuilder {
     ) -> Result<Vec<Inst>> {
         let ty = alloca.value_type.clone();
         let bytes: u32 = match ty {
-            middle::ir::ValueType::Int => 4,
+            middle::ir::ValueType::Int => 8,
             middle::ir::ValueType::Void => {
                 return Err(anyhow!("it can't alloca void")).with_context(|| context!())
             }
-            middle::ir::ValueType::Float => 4,
-            middle::ir::ValueType::Bool => 4,
+            middle::ir::ValueType::Float => 8,
+            middle::ir::ValueType::Bool => 8,
             middle::ir::ValueType::Array(_, _) => todo!(),
             middle::ir::ValueType::Pointer(_) => todo!(), // 4B
                                                           // _ => todo!(),             // TODO 如果是其他大小的指令
@@ -483,7 +483,7 @@ impl IRBuilder {
         let mut i_arg_num: u32 = 0;
         let mut f_arg_num: u32 = 0;
         let mut extra_arg_stack: i64 = 0;
-
+        let mut phisic_arg_regs: Vec<Reg> = Vec::new();
         let arguments = call.get_operand(); // 参数列表, 这个可以类比成 llvm_ir::call::arguments
         for arg in arguments {
             let ope = Self::local_operand_from(arg, regs).context(context!())?;
@@ -491,11 +491,13 @@ impl IRBuilder {
                 Operand::Reg(r) => {
                     if r.is_usual() && i_arg_num < 8 {
                         let reg = Reg::new(REG_A0.id() + i_arg_num, true);
+                        phisic_arg_regs.push(reg);
                         let mv = MvInst::new(reg.into(), ope);
                         call_insts.push(mv.into());
                         i_arg_num += 1;
                     } else if (!r.is_usual()) && f_arg_num < 8 {
                         let reg = Reg::new(REG_FA0.id() + f_arg_num, false);
+                        phisic_arg_regs.push(reg);
                         let mv = MvInst::new(reg.into(), ope);
                         call_insts.push(mv.into());
                         f_arg_num += 1;
@@ -509,6 +511,7 @@ impl IRBuilder {
                     if i_arg_num < 8 {
                         let reg = Reg::new(REG_A0.id() + i_arg_num, true);
                         let li = LiInst::new(reg.into(), imm.into());
+                        phisic_arg_regs.push(reg);
                         call_insts.push(li.into());
                         i_arg_num += 1;
                     } else {
@@ -525,6 +528,7 @@ impl IRBuilder {
                         // TODO 不一定是 li, 这里可能有问题, 可能是 flw/fld 之类的
                         let reg = Reg::new(REG_FA0.id() + f_arg_num, false);
                         let li = LiInst::new(reg.into(), fmm.into());
+                        phisic_arg_regs.push(reg);
                         call_insts.push(li.into());
                         f_arg_num += 1;
                     } else {
