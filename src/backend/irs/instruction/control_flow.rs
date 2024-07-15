@@ -40,7 +40,6 @@ impl RegDefs for CallInst {
 }
 
 impl_unary_inst!(JmpInst, "j");
-// impl_unary_inst!(CallInst, "call");
 impl_unary_inst!(TailInst, "tail");
 
 impl_branch_inst!(BeqInst, "beq");
@@ -49,3 +48,24 @@ impl_branch_inst!(BltInst, "blt");
 impl_branch_inst!(BleInst, "ble");
 impl_branch_inst!(BgtInst, "bgt");
 impl_branch_inst!(BgeInst, "bge");
+
+pub trait ToBB {
+    fn to_bb(&self) -> Result<&str>;
+}
+
+impl ToBB for JmpInst {
+    fn to_bb(&self) -> Result<&str> {
+        match &self.0 {
+            Operand::Label(s) => Ok(s.as_str()),
+            _ => Err(anyhow!("JmpInst: to_bb: not a label")),
+        }
+    }
+}
+impl ToBB for TailInst {
+    fn to_bb(&self) -> Result<&str> {
+        match &self.0 {
+            Operand::Label(s) => Ok(s.as_str()),
+            _ => Err(anyhow!("TailInst: to_bb: not a label")),
+        }
+    }
+}

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::usize;
 
 use super::*;
@@ -114,6 +115,96 @@ impl Func {
             other_bbs,
             idx: 0,
         }
+    }
+}
+/// impl Some functionality for reg alloc
+impl Func {
+    /// compute the in and out set of each basic block
+    /// return a tuple of two hashmaps, the first one is in set, the second one is out set
+    pub fn in_out_bbs(f: &Func) -> Result<(InBBs, OutBBs)> {
+        let mut outs: HashMap<String, Vec<String>> = HashMap::new();
+        for bb in f.iter_bbs() {
+            let mut rev_iter = bb.insts().iter().rev();
+            let mut to_bbs: Vec<String> = vec![];
+            if let Some(last_inst) = rev_iter.next() {
+                match last_inst {
+                    Inst::Ret { .. } => {}
+                    Inst::Jmp(jmp) => {
+                        to_bbs.push(jmp.to_bb()?.to_string());
+                        if let Some(last2) = rev_iter.next() {
+                            match last2 {
+                                Inst::Beq(beq) => {
+                                    to_bbs.push(beq.label().to_string());
+                                }
+                                _ => {
+                                    unreachable!(
+                                        "The second last instruction of a basic block should be a branch instruction"
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    _ => {
+                        unreachable!("The last instruction of a basic block should be a return or jump instruction");
+                    }
+                }
+            }
+            outs.insert(bb.label().to_string(), to_bbs);
+        }
+        let mut ins: HashMap<String, Vec<String>> = HashMap::new();
+        for bb in f.iter_bbs() {
+            let to_bbs = outs.get(bb.label()).unwrap();
+            for to_bb in to_bbs {
+                if let Some(ins_to_bb) = ins.get_mut(to_bb) {
+                    ins_to_bb.push(bb.label().to_string());
+                } else {
+                    ins.insert(to_bb.to_string(), vec![bb.label().to_string()]);
+                }
+            }
+            if !ins.contains_key(bb.label()) {
+                ins.insert(bb.label().to_string(), vec![]);
+            }
+        }
+        let bbs: HashMap<String, &Block> = f
+            .iter_bbs()
+            .map(|bb| (bb.label().to_string(), bb))
+            .collect();
+        let ins = InBBs {
+            bbs: bbs.clone(),
+            ins,
+        };
+        let outs = OutBBs { bbs, outs };
+
+        Ok((ins, outs))
+    }
+}
+
+pub struct InBBs<'a> {
+    bbs: HashMap<String, &'a Block>,
+    ins: HashMap<String, Vec<String>>,
+}
+pub struct OutBBs<'a> {
+    bbs: HashMap<String, &'a Block>,
+    outs: HashMap<String, Vec<String>>,
+}
+impl<'a> InBBs<'a> {
+    pub fn ins(&'a self, bb: &Block) -> Vec<&'a Block> {
+        self.ins
+            .get(bb.label())
+            .unwrap()
+            .iter()
+            .map(|label| self.bbs[label])
+            .collect()
+    }
+}
+impl<'a> OutBBs<'a> {
+    pub fn outs(&'a self, bb: &Block) -> Vec<&'a Block> {
+        self.outs
+            .get(bb.label())
+            .unwrap()
+            .iter()
+            .map(|label| self.bbs[label])
+            .collect()
     }
 }
 
