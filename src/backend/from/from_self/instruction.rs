@@ -10,7 +10,6 @@ use super::*;
 
 use anyhow::{Context, Result};
 
-use anyhow::Ok;
 use builder::IRBuilder;
 use std::collections::HashMap;
 use var::FloatVar;
@@ -206,7 +205,8 @@ impl IRBuilder {
             middle::ir::ValueType::Bool => 8,
             middle::ir::ValueType::Array(_, _) => todo!(),
             middle::ir::ValueType::Pointer(_) => todo!(), // 4B
-                                                          // _ => todo!(),             // TODO 如果是其他大小的指令
+                                                          // _ => todo!(),
+                                                          // TODO 如果是其他大小的指令
         };
         let ss = stack_allocator.alloc(bytes);
         stack_slots.insert(
@@ -224,10 +224,10 @@ impl IRBuilder {
         regs: &HashMap<Address, Reg>,
     ) -> Result<Vec<Inst>> {
         // 这个 address
-        // 有三种来源: 1. 全局变量 2. alloca 3. get_element_ptr
+        // 有三种来源: 1. 全局变量 2. alloca 3. get_element_ptr // TODO 目前只有 stack
         let address: &&middle::ir::Operand = &store.get_ptr();
         // address 这个地址是 stack 上的地址
-        let address = Self::address_from(address, stack_slots).with_context(|| context!())?;
+        let address = Self::stack_slot_from(address, stack_slots).with_context(|| context!())?;
         let val = &store.get_value();
         let val = Self::local_operand_from(val, regs).with_context(|| context!())?;
         let mut ret: Vec<Inst> = Vec::new();
@@ -254,11 +254,36 @@ impl IRBuilder {
         load: &middle::ir::instruction::memory_op_inst::Load,
         stack_slots: &mut HashMap<Address, StackSlot>,
         reg_gener: &mut RegGenerator,
-        regs: &HashMap<Address, Reg>,
+        regs: &mut HashMap<Address, Reg>,
     ) -> Result<Vec<Inst>> {
         // dbg!(load);
         let mut ret: Vec<Inst> = Vec::new();
-        todo!();
+        if regs.contains_key(&(load as *const _ as Address)) {
+            unimplemented!() // 已经 load 过一次了
+        }
+        let dst_reg = match load.get_value_type() {
+            middle::ir::ValueType::Int => reg_gener.gen_virtual_usual_reg(),
+            middle::ir::ValueType::Float => reg_gener.gen_virtual_float_reg(),
+            middle::ir::ValueType::Bool => reg_gener.gen_virtual_usual_reg(),
+            _ => {
+                /* void, array, pointer */
+                return Err(anyhow!("load instruction with array/pointer/void"))
+                    .with_context(|| context!());
+            }
+        };
+        regs.insert(load as *const _ as Address, dst_reg);
+        if let Ok(slot) = Self::stack_slot_from(load.get_ptr(), stack_slots) {
+            let ld = LoadInst::new(dst_reg, slot.try_into()?);
+            ret.push(ld.into());
+        } else if let Ok(label) = Self::global_name_from(load.get_ptr()) {
+            let addr = reg_gener.gen_virtual_usual_reg();
+            let la = LaInst::new(addr, label.to_string().into());
+            ret.push(la.into());
+            let lw = LwInst::new(dst_reg, 0.into(), addr);
+            ret.push(lw.into());
+        } else {
+            return Err(anyhow!("load instruction with other address")).with_context(|| context!());
+        }
         Ok(ret)
     }
 
