@@ -213,7 +213,7 @@ impl IRBuilder {
             insts.extend(gen_insts);
         }
 
-        insts.extend(Self::build_term_inst(&bb.term, reg_gener, regs, fmms)?); // bb.instrs 是不包含 bb.term 的
+        insts.extend(Self::build_term_inst(&bb.term, reg_gener, regs, fmms)?);
 
         let mut entry = Block::new("entry".to_string());
         entry.extend_insts(insts);
