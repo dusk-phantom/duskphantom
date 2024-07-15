@@ -106,6 +106,11 @@ macro_rules! impl_branch_inst {
                 vec![self.lhs(), self.rhs()]
             }
         }
+        impl ToBB for $ty_name {
+            fn to_bb(&self) -> Result<&str> {
+                Ok(&self.2.as_str())
+            }
+        }
     };
 }
 
