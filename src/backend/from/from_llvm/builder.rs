@@ -5,7 +5,7 @@ use anyhow::{Context, Result};
 
 use llvm_ir::{Constant, Name};
 use std::collections::HashMap;
-use var::Var;
+use var::{FloatVar, Var};
 
 pub struct IRBuilder;
 
@@ -13,9 +13,15 @@ impl IRBuilder {
     #[cfg(feature = "clang_enabled")]
     #[allow(unused)]
     pub fn gen_from_clang(program: &clang_frontend::Program) -> Result<Program> {
+        use var::FloatVar;
+
         let llvm_module = &program.llvm;
-        let global_vars = Self::build_global_var(&llvm_module.global_vars)?;
-        let funcs = Self::build_funcs(&llvm_module.functions)?;
+        let mut global_vars = Self::build_global_var(&llvm_module.global_vars)?;
+        let mut fmms: HashMap<Fmm, FloatVar> = HashMap::new();
+        let funcs = Self::build_funcs(&llvm_module.functions, &mut fmms)?;
+        for (_, float_var) in fmms {
+            global_vars.push(float_var.into());
+        }
 
         let mdl = module::Module {
             name: "main".to_string(),
@@ -80,7 +86,10 @@ impl IRBuilder {
     /**
      * build funcs
      */
-    pub fn build_funcs(llvm_funcs: &[llvm_ir::Function]) -> Result<Vec<Func>> {
+    pub fn build_funcs(
+        llvm_funcs: &[llvm_ir::Function],
+        fmms: &mut HashMap<Fmm, FloatVar>,
+    ) -> Result<Vec<Func>> {
         let mut funcs = Vec::new();
         for f in llvm_funcs {
             // dbg!(&f);
@@ -95,6 +104,7 @@ impl IRBuilder {
                 &mut stack_slots,
                 &mut reg_gener,
                 &mut regs,
+                fmms,
             )?;
             let mut m_f = Func::new(f.name.to_string(), args, entry);
             let ret_ty = f.return_type.as_ref();
@@ -115,6 +125,7 @@ impl IRBuilder {
                 &mut stack_slots,
                 &mut reg_gener,
                 &mut regs,
+                fmms,
             )? {
                 m_f.push_bb(bb);
             }
@@ -156,6 +167,7 @@ impl IRBuilder {
         stack_slots: &mut HashMap<Name, StackSlot>,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
+        fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<(Block, usize)> {
         let bb = f
             .basic_blocks
@@ -201,7 +213,7 @@ impl IRBuilder {
             insts.extend(gen_insts);
         }
 
-        insts.extend(Self::build_term_inst(&bb.term, regs)?); // bb.instrs 是不包含 bb.term 的
+        insts.extend(Self::build_term_inst(&bb.term, reg_gener, regs, fmms)?); // bb.instrs 是不包含 bb.term 的
 
         let mut entry = Block::new("entry".to_string());
         entry.extend_insts(insts);
@@ -214,10 +226,11 @@ impl IRBuilder {
         stack_slots: &mut HashMap<Name, StackSlot>,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
+        fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<Vec<Block>> {
         let mut ret: Vec<Block> = Vec::new();
         for bb in &f.basic_blocks[1..] {
-            let m_bb = Self::build_bb(bb, stack_allocator, stack_slots, reg_gener, regs)?;
+            let m_bb = Self::build_bb(bb, stack_allocator, stack_slots, reg_gener, regs, fmms)?;
             ret.push(m_bb);
         }
         Ok(ret)
@@ -229,6 +242,7 @@ impl IRBuilder {
         stack_slots: &mut HashMap<Name, StackSlot>,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
+        fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<Block> {
         let mut m_bb = Block::new(
             bb.name
@@ -243,7 +257,8 @@ impl IRBuilder {
                     .with_context(|| context!())?;
             m_bb.extend_insts(gen_insts);
         }
-        let gen_insts = Self::build_term_inst(&bb.term, regs).with_context(|| context!())?;
+        let gen_insts =
+            Self::build_term_inst(&bb.term, reg_gener, regs, fmms).with_context(|| context!())?;
         m_bb.extend_insts(gen_insts);
         Ok(m_bb)
     }

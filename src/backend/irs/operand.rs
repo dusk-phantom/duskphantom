@@ -1,4 +1,5 @@
 use crate::utils::paral_counter::ParalCounter;
+use std::hash::Hash;
 use std::ops::Deref;
 
 use super::{BackendError, StackSlot};
@@ -27,10 +28,47 @@ impl Reg {
         self.is_usual
     }
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Imm(i64);
 #[derive(Clone, Debug)]
 pub struct Fmm(f64);
+
+impl TryInto<f32> for Fmm {
+    type Error = BackendError;
+    fn try_into(self) -> Result<f32, Self::Error> {
+        if f64::is_nan(self.0) {
+            Ok(f32::NAN)
+        } else if self.0 < f32::MAX as f64 && self.0 > f32::MIN as f64 {
+            Ok(self.0 as f32)
+        } else {
+            Err(BackendError::InternalConsistencyError(
+                "Fmm is not a valid f32".to_string(),
+            ))
+        }
+    }
+}
+
+impl PartialEq for Fmm {
+    fn eq(&self, other: &Self) -> bool {
+        if f64::is_nan(self.0) && f64::is_nan(other.0) {
+            true
+        } else {
+            self.0 == other.0
+        }
+    }
+}
+impl Eq for Fmm {}
+impl Hash for Fmm {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        if f64::is_nan(self.0) {
+            // NOTICE: f64::NAN.to_bits() is not always the same value in different platforms
+            f64::NAN.to_bits().hash(state);
+        } else {
+            self.0.to_bits().hash(state);
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Label(String);
 
@@ -43,6 +81,20 @@ impl From<i64> for Imm {
 impl From<f64> for Fmm {
     fn from(val: f64) -> Self {
         Self(val)
+    }
+}
+impl From<&f32> for Fmm {
+    fn from(value: &f32) -> Self {
+        if f32::is_nan(*value) {
+            Self(f64::NAN)
+        } else {
+            Self(*value as f64)
+        }
+    }
+}
+impl From<&f64> for Fmm {
+    fn from(value: &f64) -> Self {
+        Self(*value)
     }
 }
 impl From<String> for Label {
@@ -646,5 +698,14 @@ pub mod tests {
         assert_eq!(REG_FT9.gen_asm(), "ft9");
         assert_eq!(REG_FT10.gen_asm(), "ft10");
         assert_eq!(REG_FT11.gen_asm(), "ft11");
+    }
+
+    #[test]
+    fn test_f64_as_f32() {
+        // FIXME
+        let f1: f32 = f32::MIN;
+        let f2: f64 = f1 as f64;
+        let f3 = f2 as f32;
+        assert!(f1 == f3);
     }
 }
