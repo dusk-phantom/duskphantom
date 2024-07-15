@@ -130,6 +130,18 @@ impl IRBuilder {
                 &mut regs,
             )?;
             let mut m_f = Func::new(fu.name.to_string(), args, entry);
+            match &fu.return_type {
+                middle::ir::ValueType::Void => { /* do nothing */ }
+                middle::ir::ValueType::Int
+                | middle::ir::ValueType::Bool
+                | middle::ir::ValueType::Pointer(_) /* 返回指针是 UB */ => {
+                    m_f.ret_mut().replace(REG_A0);
+                }
+                middle::ir::ValueType::Float => {
+                    m_f.ret_mut().replace(REG_FA0);
+                }
+                middle::ir::ValueType::Array(_, _) => todo!(),
+            }
             *m_f.caller_regs_stack_mut() = Some(caller_reg_stack.try_into()?);
             for bb in Self::build_other_bbs(
                 fu,
