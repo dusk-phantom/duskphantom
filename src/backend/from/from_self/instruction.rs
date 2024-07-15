@@ -49,7 +49,6 @@ impl IRBuilder {
                 todo!()
             }
             middle::ir::instruction::InstType::Sub => {
-                // ssa2tac_binary_usual!(inst, regs, reg_gener, Sub, Sub, SubInst)
                 ssa2tac_binary_usual!(SubInst, Sub, inst, regs, reg_gener)
             }
             // 通过类型转换，可以做到: FAdd 的输入一定是 Float 类型的寄存器
@@ -58,7 +57,6 @@ impl IRBuilder {
                 todo!()
             }
             middle::ir::instruction::InstType::Mul => {
-                // ssa2tac_binary_usual!(inst, regs, reg_gener, Mul, Mul, MulInst)
                 ssa2tac_binary_usual!(MulInst, Mul, inst, regs, reg_gener)
             }
             middle::ir::instruction::InstType::FMul => {
@@ -66,11 +64,9 @@ impl IRBuilder {
                 todo!()
             }
             middle::ir::instruction::InstType::SDiv => {
-                // ssa2tac_binary_usual!(inst, regs, reg_gener, SDiv, Div, DivInst)
                 ssa2tac_binary_usual!(DivInst, SDiv, inst, regs, reg_gener)
             }
             middle::ir::instruction::InstType::SRem => {
-                // ssa2tac_binary_usual!(inst, regs, reg_gener, SRem, Rem, RemInst)
                 ssa2tac_binary_usual!(RemInst, SRem, inst, regs, reg_gener)
             }
 
@@ -79,7 +75,6 @@ impl IRBuilder {
             middle::ir::instruction::InstType::URem => todo!(),
             middle::ir::instruction::InstType::FDiv => todo!(),
             middle::ir::instruction::InstType::Shl => {
-                // ssa2tac_binary_usual!(inst, regs, reg_gener, Shl, Sll, SllInst)
                 ssa2tac_binary_usual!(SllInst, Shl, inst, regs, reg_gener)
             }
             middle::ir::instruction::InstType::LShr => {
@@ -92,15 +87,12 @@ impl IRBuilder {
                 todo!()
             }
             middle::ir::instruction::InstType::And => {
-                // ssa2tac_binary_usual!(inst, regs, reg_gener, And, And, AndInst)
                 ssa2tac_binary_usual!(AndInst, And, inst, regs, reg_gener)
             }
             middle::ir::instruction::InstType::Or => {
-                // ssa2tac_binary_usual!(inst, regs, reg_gener, Or, Or, OrInst)
                 ssa2tac_binary_usual!(OrInst, Or, inst, regs, reg_gener)
             }
             middle::ir::instruction::InstType::Xor => {
-                // ssa2tac_binary_usual!(XorInst, )
                 ssa2tac_binary_usual!(XorInst, Xor, inst, regs, reg_gener)
             }
             middle::ir::instruction::InstType::Ret => {
