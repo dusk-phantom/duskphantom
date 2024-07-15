@@ -13,9 +13,15 @@ impl IRBuilder {
     pub fn gen_from_self(program: &middle::Program) -> Result<Program> {
         let self_module = &program.module;
         // dbg!(&llvm.types);
-        let global_vars = Self::build_global_var(&self_module.global_variables)?;
+        let mut global_vars = Self::build_global_var(&self_module.global_variables)?;
+        let mut fmms: HashMap<Fmm, FloatVar> = HashMap::new();
+
         // dbg!(&global_vars);
-        let funcs = Self::build_funcs(&self_module.functions)?;
+        let funcs = Self::build_funcs(&self_module.functions, &mut fmms)?;
+
+        for (_, float_var) in fmms {
+            global_vars.push(float_var.into());
+        }
 
         let mdl = module::Module {
             name: "main".to_string(),
@@ -113,7 +119,10 @@ impl IRBuilder {
         Ok(global_vars)
     }
 
-    pub fn build_funcs(self_funcs: &Vec<middle::ir::FunPtr>) -> Result<Vec<Func>> {
+    pub fn build_funcs(
+        self_funcs: &Vec<middle::ir::FunPtr>,
+        fmms: &mut HashMap<Fmm, FloatVar>,
+    ) -> Result<Vec<Func>> {
         let mut funcs = Vec::new();
         for fu in self_funcs {
             // dbg!(&f);
@@ -128,8 +137,10 @@ impl IRBuilder {
                 &mut stack_slots,
                 &mut reg_gener,
                 &mut regs,
+                fmms,
             )?;
             let mut m_f = Func::new(fu.name.to_string(), args, entry);
+            // 设置 def-use
             match &fu.return_type {
                 middle::ir::ValueType::Void => { /* do nothing */ }
                 middle::ir::ValueType::Int
@@ -149,6 +160,7 @@ impl IRBuilder {
                 &mut stack_slots,
                 &mut reg_gener,
                 &mut regs,
+                fmms,
             )? {
                 m_f.push_bb(bb);
             }
@@ -185,6 +197,7 @@ impl IRBuilder {
         stack_slots: &mut HashMap<Address, StackSlot>,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
+        fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<Vec<Block>> {
         // let mut blocks: Vec<Block> = Vec::new();
         // for ptr_bb in f.dfs_iter() {
@@ -193,7 +206,9 @@ impl IRBuilder {
         // }
         // Ok(blocks)
         func.dfs_iter()
-            .map(|ptr_bb| Self::build_bb(&ptr_bb, stack_allocator, stack_slots, reg_gener, regs))
+            .map(|ptr_bb| {
+                Self::build_bb(&ptr_bb, stack_allocator, stack_slots, reg_gener, regs, fmms)
+            })
             .collect()
     }
 
@@ -203,17 +218,18 @@ impl IRBuilder {
         stack_slots: &mut HashMap<Address, StackSlot>,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
+        fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<Block> {
         // basic 的 label 注意一下
         let label = bb.as_ref() as *const _ as Address;
         let mut m_bb = Block::new(label.to_string());
         for inst in bb.iter() {
             let gen_insts =
-                Self::build_instruction(&inst, stack_allocator, stack_slots, reg_gener, regs)
+                Self::build_instruction(&inst, stack_allocator, stack_slots, reg_gener, regs, fmms)
                     .with_context(|| context!())?;
             m_bb.extend_insts(gen_insts);
         }
-        let gen_insts = Self::build_term_inst(&bb.get_last_inst(), regs, reg_gener)
+        let gen_insts = Self::build_term_inst(&bb.get_last_inst(), regs, reg_gener, fmms)
             .with_context(|| context!())?;
         m_bb.extend_insts(gen_insts);
         Ok(m_bb)
@@ -225,6 +241,7 @@ impl IRBuilder {
         stack_slots: &mut HashMap<Address, StackSlot>,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
+        fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<(Block, usize)> {
         let mut insts: Vec<Inst> = Vec::new();
 
@@ -279,11 +296,16 @@ impl IRBuilder {
         let bb = func.entry.with_context(|| context!())?; // FIXME func 的其他 blocks 是不是不包含 entry ?
         for inst in bb.iter() {
             let gen_insts =
-                Self::build_instruction(&inst, stack_allocator, stack_slots, reg_gener, regs)
+                Self::build_instruction(&inst, stack_allocator, stack_slots, reg_gener, regs, fmms)
                     .with_context(|| context!())?;
             insts.extend(gen_insts);
         }
-        insts.extend(Self::build_term_inst(&bb.get_last_inst(), regs, reg_gener)?);
+        insts.extend(Self::build_term_inst(
+            &bb.get_last_inst(),
+            regs,
+            reg_gener,
+            fmms,
+        )?);
 
         let mut entry = Block::new("entry".to_string());
         entry.extend_insts(insts);

@@ -13,6 +13,7 @@ use anyhow::{Context, Result};
 use anyhow::Ok;
 use builder::IRBuilder;
 use std::collections::HashMap;
+use var::FloatVar;
 
 impl IRBuilder {
     pub fn build_instruction(
@@ -21,6 +22,7 @@ impl IRBuilder {
         stack_slots: &mut HashMap<Address, StackSlot>,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
+        fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<Vec<Inst>> {
         match inst.get_type() {
             middle::ir::instruction::InstType::Head => {
@@ -42,6 +44,7 @@ impl IRBuilder {
                 ssa2tac_binary_usual!(inst, regs, reg_gener, Add, Add, AddInst)
             }
             middle::ir::instruction::InstType::FAdd => {
+                // TODO 浮点型指令, 立即数处理
                 ssa2tac_binary_float!(inst, regs, reg_gener, FAdd, Add, AddInst)
             }
             middle::ir::instruction::InstType::Sub => {
@@ -90,7 +93,7 @@ impl IRBuilder {
                 let ret = downcast_ref::<middle::ir::instruction::terminator_inst::Ret>(
                     inst.as_ref().as_ref(),
                 );
-                Self::build_ret_inst(ret, regs)
+                Self::build_ret_inst(ret, reg_gener, regs, fmms)
             }
             middle::ir::instruction::InstType::Br => {
                 let br = downcast_ref::<middle::ir::instruction::terminator_inst::Br>(
@@ -240,7 +243,9 @@ impl IRBuilder {
 
     pub fn build_ret_inst(
         ret: &middle::ir::instruction::terminator_inst::Ret,
+        reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
+        fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<Vec<Inst>> {
         let mut ret_insts: Vec<Inst> = Vec::new();
 
@@ -259,12 +264,28 @@ impl IRBuilder {
                         let li = AddInst::new(REG_A0.into(), REG_ZERO.into(), imm);
                         ret_insts.push(li.into());
                     }
-                    middle::ir::Constant::Float(_f) => {
-                        // FIXME 浮点数的返回值需要字面量池
-                        todo!();
-                        // let fmm = (*f as f64).into();
-                        // let li = AddInst::new(REG_FA0.into(), REG_ZERO.into(), fmm);
-                        // ret_insts.push(li.into());
+                    middle::ir::Constant::Float(f) => {
+                        let fmm: Fmm = f.into();
+                        let n = if let Some(f_var) = fmms.get(&fmm) {
+                            f_var.name.clone() // 这个 name 是我们自己加进去的
+                        } else {
+                            let name = format!("_fc_{:x}", fmm.to_bits());
+                            fmms.insert(
+                                fmm.clone(),
+                                FloatVar {
+                                    name: name.clone(),
+                                    init: Some(fmm.try_into()?),
+                                    is_const: true,
+                                },
+                            );
+                            name
+                        };
+                        let addr = reg_gener.gen_virtual_float_reg();
+                        let la = LaInst::new(addr, n.into());
+                        ret_insts.push(la.into());
+                        // 不过这里没有 double
+                        let loadf = LwInst::new(REG_FA0, 0.into(), addr);
+                        ret_insts.push(loadf.into());
                     }
                     middle::ir::Constant::Array(_) => {
                         return Err(anyhow!("return array is not allow:{}", op))
@@ -439,6 +460,7 @@ impl IRBuilder {
         term: &ObjPtr<Box<dyn middle::ir::Instruction>>,
         regs: &mut HashMap<Address, Reg>,
         reg_gener: &mut RegGenerator,
+        fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<Vec<Inst>> {
         let mut ret_insts: Vec<Inst> = Vec::new();
         // dbg!(term);
@@ -448,7 +470,7 @@ impl IRBuilder {
                 let ret = downcast_ref::<middle::ir::instruction::terminator_inst::Ret>(
                     term.as_ref().as_ref(),
                 );
-                Self::build_ret_inst(ret, regs)?
+                Self::build_ret_inst(ret, reg_gener, regs, fmms)?
             }
             middle::ir::instruction::InstType::Br => {
                 let br = downcast_ref::<middle::ir::instruction::terminator_inst::Br>(
