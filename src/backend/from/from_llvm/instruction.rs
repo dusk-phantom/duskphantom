@@ -1,3 +1,5 @@
+use crate::llvm2tac_binary_usual;
+
 use super::*;
 use builder::IRBuilder;
 use llvm_ir::{Constant, Name};
@@ -12,11 +14,11 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
-        // dbg!(&inst);
+        dbg!(&inst);
         match inst {
-            llvm_ir::Instruction::Add(_) => todo!(),
-            llvm_ir::Instruction::Sub(_) => todo!(),
-            llvm_ir::Instruction::Mul(_) => todo!(),
+            llvm_ir::Instruction::Add(add) => llvm2tac_binary_usual!(AddInst, add, reg_gener, regs),
+            llvm_ir::Instruction::Sub(sub) => llvm2tac_binary_usual!(SubInst, sub, reg_gener, regs),
+            llvm_ir::Instruction::Mul(mul) => llvm2tac_binary_usual!(MulInst, mul, reg_gener, regs),
             llvm_ir::Instruction::UDiv(_) => todo!(),
             llvm_ir::Instruction::SDiv(_) => todo!(),
             llvm_ir::Instruction::URem(_) => todo!(),
