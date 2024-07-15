@@ -27,7 +27,7 @@ impl IRBuilder {
         matches!(ty, llvm_ir::Type::VoidType)
     }
 
-    pub fn address_from(
+    pub fn stack_slot_from(
         operand: &llvm_ir::Operand,
         stack_slots: &HashMap<Name, StackSlot>,
     ) -> Result<Operand> {
@@ -37,8 +37,10 @@ impl IRBuilder {
                 .ok_or(anyhow!("stack slot not found {}", name))
                 .with_context(|| context!())?
                 .into(),
-            llvm_ir::Operand::ConstantOperand(_) => todo!(),
-            llvm_ir::Operand::MetadataOperand => todo!(),
+            _ => {
+                return Err(anyhow!("operand is not local var:{}", operand))
+                    .with_context(|| context!());
+            }
         })
     }
     pub fn local_var_from(
@@ -99,19 +101,19 @@ impl IRBuilder {
         }
     }
 
-    #[allow(unused)]
     #[inline]
-    pub fn global_name_from(operand: &llvm_ir::Operand) -> Result<Name> {
-        match operand {
+    pub fn global_name_from(operand: &llvm_ir::Operand) -> Result<String> {
+        let n = match operand {
             llvm_ir::Operand::LocalOperand { name: _, ty: _ } => {
-                Err(anyhow!("local operand".to_string())).with_context(|| context!())
+                return Err(anyhow!("local operand".to_string())).with_context(|| context!())
             }
             llvm_ir::Operand::ConstantOperand(c) => match c.as_ref() {
-                Constant::GlobalReference { name, ty: _ } => Ok(name.clone()),
+                Constant::GlobalReference { name, ty: _ } => name.clone(),
                 _ => todo!(),
             },
             llvm_ir::Operand::MetadataOperand => todo!(),
-        }
+        };
+        Self::name_without_prefix(&n)
     }
 
     #[inline]
@@ -126,10 +128,14 @@ impl IRBuilder {
             },
             llvm_ir::Operand::MetadataOperand => todo!(),
         }?;
-        let f_name = name.to_string();
-        let f_name = &f_name
-            .strip_prefix('%')
-            .ok_or(anyhow!("").context(context!()))?;
-        Ok(f_name.to_string())
+        Self::name_without_prefix(&name)
+    }
+
+    #[inline]
+    pub fn name_without_prefix(name: &llvm_ir::Name) -> Result<String> {
+        let name = name.to_string();
+        name.strip_prefix('%')
+            .ok_or(anyhow!("").context(context!()))
+            .map(|s| s.to_string())
     }
 }

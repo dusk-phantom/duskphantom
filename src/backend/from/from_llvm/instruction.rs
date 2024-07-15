@@ -14,7 +14,7 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
-        dbg!(&inst);
+        // dbg!(&inst);
         match inst {
             llvm_ir::Instruction::Add(add) => llvm2tac_binary_usual!(AddInst, add, reg_gener, regs),
             llvm_ir::Instruction::Sub(sub) => llvm2tac_binary_usual!(SubInst, sub, reg_gener, regs),
@@ -157,7 +157,7 @@ impl IRBuilder {
         // dbg!(store);
         let address = &store.address;
         let val = &store.value;
-        let address = Self::address_from(address, stack_slots).with_context(|| context!())?;
+        let address = Self::stack_slot_from(address, stack_slots).with_context(|| context!())?;
         // dbg!(address.gen_asm());
         let val: Operand = Self::value_from(val, regs).with_context(|| context!())?;
         // dbg!(&val);
@@ -206,9 +206,19 @@ impl IRBuilder {
             unimplemented!();
         };
         regs.insert(load.dest.clone(), dst_reg);
-        let address = Self::address_from(&load.address, stack_slots).with_context(|| context!())?;
-        let ld = LoadInst::new(dst_reg, address.try_into()?);
-        ret.push(ld.into());
+        if let Ok(stack_slot) = Self::stack_slot_from(&load.address, stack_slots) {
+            let ld = LoadInst::new(dst_reg, stack_slot.try_into()?);
+            ret.push(ld.into());
+        } else if let Ok(var) = Self::global_name_from(&load.address) {
+            let addr = reg_gener.gen_virtual_usual_reg();
+            let la = LaInst::new(addr, var.into());
+            ret.push(la.into());
+            let lw = LwInst::new(dst_reg, 0.into(), addr);
+            ret.push(lw.into());
+        } else {
+            return Err(anyhow!("load instruction with other address".to_string()))
+                .with_context(|| context!());
+        }
         Ok(ret)
     }
 
