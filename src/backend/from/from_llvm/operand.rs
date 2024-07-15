@@ -59,6 +59,13 @@ impl IRBuilder {
             }
         })
     }
+    pub fn label_name_from(name: &llvm_ir::Name) -> Result<String> {
+        let name = name.to_string();
+        let name = &name
+            .strip_prefix('%')
+            .ok_or(anyhow!("").context(context!()))?;
+        Ok(name.to_string())
+    }
 
     pub fn const_from(operand: &llvm_ir::Operand) -> Result<Operand> {
         Ok(match operand {

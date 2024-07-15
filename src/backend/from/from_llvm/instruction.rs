@@ -64,7 +64,7 @@ impl IRBuilder {
             llvm_ir::Instruction::IntToPtr(_) => todo!(),
             llvm_ir::Instruction::BitCast(_) => todo!(),
             llvm_ir::Instruction::AddrSpaceCast(_) => todo!(),
-            llvm_ir::Instruction::ICmp(_) => todo!(),
+            llvm_ir::Instruction::ICmp(icmp) => Self::build_icmp_inst(icmp, reg_gener, regs),
             llvm_ir::Instruction::FCmp(_) => todo!(),
             llvm_ir::Instruction::Phi(_) => todo!(),
             llvm_ir::Instruction::Select(_) => todo!(),
@@ -77,6 +77,54 @@ impl IRBuilder {
             llvm_ir::Instruction::CatchPad(_) => todo!(),
             llvm_ir::Instruction::CleanupPad(_) => todo!(),
         }
+    }
+    fn build_icmp_inst(
+        icmp: &llvm_ir::instruction::ICmp,
+        reg_gener: &mut RegGenerator,
+        regs: &mut HashMap<Name, Reg>,
+    ) -> Result<Vec<Inst>> {
+        let mut ret: Vec<Inst> = Vec::new();
+        match icmp.predicate {
+            llvm_ir::IntPredicate::EQ => todo!(),
+            llvm_ir::IntPredicate::NE => {
+                let op0 = &Self::value_from(&icmp.operand0, regs)?;
+                let op1 = &Self::value_from(&icmp.operand1, regs)?;
+                let dest = icmp.dest.clone();
+                if let (Operand::Imm(imm0), Operand::Imm(imm1)) = (op0, op1) {
+                    let imm = if imm0 == imm1 { 0 } else { 1 };
+                    let dst = reg_gener.gen_virtual_usual_reg();
+                    let li = LiInst::new(dst.into(), imm.into());
+                    ret.push(li.into());
+                } else if let (Operand::Reg(reg0), Operand::Reg(reg1)) = (op0, op1) {
+                    let dst = reg_gener.gen_virtual_usual_reg();
+                    let sub = SubInst::new(dst.into(), reg0.into(), reg1.into());
+                    let flag = reg_gener.gen_virtual_usual_reg();
+                    let seqz = SeqzInst::new(flag.into(), dst.into());
+                    ret.push(sub.into());
+                    ret.push(seqz.into());
+                    regs.insert(dest, flag);
+                } else if let (Operand::Reg(reg), Operand::Imm(imm)) = (op0, op1) {
+                    let dst = reg_gener.gen_virtual_usual_reg();
+                    let sub = SubInst::new(dst.into(), reg.into(), imm.into());
+                    let flag = reg_gener.gen_virtual_usual_reg();
+                    let seqz = SeqzInst::new(flag.into(), dst.into());
+                    ret.push(sub.into());
+                    ret.push(seqz.into());
+                    regs.insert(dest, flag);
+                } else {
+                    unimplemented!();
+                }
+            }
+            llvm_ir::IntPredicate::UGT => todo!(),
+            llvm_ir::IntPredicate::UGE => todo!(),
+            llvm_ir::IntPredicate::ULT => todo!(),
+            llvm_ir::IntPredicate::ULE => todo!(),
+            llvm_ir::IntPredicate::SGT => todo!(),
+            llvm_ir::IntPredicate::SGE => todo!(),
+            llvm_ir::IntPredicate::SLT => todo!(),
+            llvm_ir::IntPredicate::SLE => todo!(),
+        }
+        Ok(ret)
     }
 
     /// alloca instruction only instruct allocating memory on stack,not generate one-one instruction
@@ -228,11 +276,28 @@ impl IRBuilder {
                         llvm_ir::Operand::MetadataOperand => todo!(),
                     }
                 }
+                ret_insts.push(Inst::Ret);
             }
-            _ => todo!(),
+            llvm_ir::Terminator::CondBr(cond_br) => {
+                let cond = Self::local_var_from(&cond_br.condition, regs)?;
+                let true_label = Self::label_name_from(&cond_br.true_dest)?;
+                let false_label = Self::label_name_from(&cond_br.false_dest)?;
+                let beq = BeqInst::new(cond.try_into()?, REG_ZERO, false_label.into());
+                let j = JmpInst::new(true_label.into());
+                ret_insts.push(beq.into());
+                ret_insts.push(j.into());
+            }
+            llvm_ir::Terminator::Br(br) => {
+                let bb_label = Self::label_name_from(&br.dest)?;
+                let j = JmpInst::new(bb_label.into());
+                ret_insts.push(j.into());
+            }
+            _ => {
+                dbg!(term);
+                unimplemented!();
+            }
         }
 
-        ret_insts.push(Inst::Ret);
         Ok(ret_insts)
     }
 

@@ -117,6 +117,11 @@ impl From<Imm> for Operand {
         Self::Imm(val)
     }
 }
+impl From<&Imm> for Operand {
+    fn from(val: &Imm) -> Self {
+        Self::Imm(val.clone())
+    }
+}
 impl From<Fmm> for Operand {
     fn from(val: Fmm) -> Self {
         Self::Fmm(val)

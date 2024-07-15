@@ -44,6 +44,7 @@ pub mod riscv {
                 Inst::Xor(inst) => inst.check_valid(),
                 Inst::Tail(inst) => inst.check_valid(),
                 Inst::Li(inst) => inst.check_valid(),
+                Inst::Seqz(inst) => inst.check_valid(),
             }
         }
     }
@@ -97,6 +98,11 @@ pub mod riscv {
     impl CheckValidInst for LiInst {
         fn check_valid(&self) -> bool {
             matches!(self.dst(), Operand::Reg(_)) && matches!(self.src(), Operand::Imm(_))
+        }
+    }
+    impl CheckValidInst for SeqzInst {
+        fn check_valid(&self) -> bool {
+            matches!(self.dst(), Operand::Reg(_)) && matches!(self.src(), Operand::Reg(_))
         }
     }
 }
