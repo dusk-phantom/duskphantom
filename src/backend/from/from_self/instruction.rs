@@ -159,10 +159,9 @@ impl IRBuilder {
                 if let (Operand::Reg(reg0), Operand::Reg(reg1)) = (&op0, &op1) {
                     let dst = reg_gener.gen_virtual_usual_reg();
                     let sub = SubInst::new(dst.into(), reg0.into(), reg1.into());
+                    ret.push(sub.into());
                     let flag = reg_gener.gen_virtual_usual_reg();
                     let seqz = SeqzInst::new(flag.into(), dst.into());
-                    // FIXME 有问题
-                    ret.push(sub.into());
                     ret.push(seqz.into());
                     regs.insert(dest, flag);
                 } else if let (Operand::Reg(reg), Operand::Imm(imm))
@@ -170,9 +169,9 @@ impl IRBuilder {
                 {
                     let dst = reg_gener.gen_virtual_usual_reg();
                     let sub = SubInst::new(dst.into(), reg.into(), imm.into());
+                    ret.push(sub.into());
                     let flag = reg_gener.gen_virtual_usual_reg();
                     let seqz = SeqzInst::new(flag.into(), dst.into());
-                    ret.push(sub.into());
                     ret.push(seqz.into());
                     regs.insert(dest, flag);
                 } else {
