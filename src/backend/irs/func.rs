@@ -93,6 +93,17 @@ impl Func {
     pub fn extend_bbs(&mut self, bbs: Vec<Block>) {
         self.other_bbs.extend(bbs);
     }
+    /// check if there is a call instruction in the function
+    pub fn is_caller(f: &Func) -> bool {
+        for bb in f.iter_bbs() {
+            for inst in bb.insts() {
+                if let Inst::Call { .. } = inst {
+                    return true;
+                }
+            }
+        }
+        false
+    }
 
     // iter bbs in a special order,in which entry is the first one,
     // and other bbs in order of label's dictionary order
