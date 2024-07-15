@@ -94,10 +94,12 @@ impl IRBuilder {
                 let dest = icmp.dest.clone();
                 if let (Operand::Imm(imm0), Operand::Imm(imm1)) = (op0, op1) {
                     let imm = if imm0 == imm1 { 0 } else { 1 };
-                    let dst = reg_gener.gen_virtual_usual_reg();
-                    let li = LiInst::new(dst.into(), imm.into());
+                    let flag = reg_gener.gen_virtual_usual_reg();
+                    let li = LiInst::new(flag.into(), imm.into());
+                    regs.insert(dest, flag);
                     ret.push(li.into());
                 } else if let (Operand::Reg(reg0), Operand::Reg(reg1)) = (op0, op1) {
+                    assert!(reg0.is_usual() == reg1.is_usual());
                     let dst = reg_gener.gen_virtual_usual_reg();
                     let sub = SubInst::new(dst.into(), reg0.into(), reg1.into());
                     let flag = reg_gener.gen_virtual_usual_reg();
