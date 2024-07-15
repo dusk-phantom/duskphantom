@@ -47,6 +47,7 @@ impl RegUses for Inst {
             Inst::Ret => vec![],
             Inst::Tail(_) => vec![],
             Inst::Li(inst) => inst.uses(),
+            Inst::Seqz(inst) => inst.uses(),
         }
     }
 }
@@ -85,6 +86,7 @@ impl RegDefs for Inst {
             Inst::Tail(_) => vec![],
             Inst::Slt(inst) => inst.defs(),
             Inst::Li(inst) => inst.defs(),
+            Inst::Seqz(inst) => inst.defs(),
         }
     }
 }
@@ -137,3 +139,17 @@ impl RegDefs for LoadInst {}
 impl RegUses for LoadInst {}
 impl RegDefs for StoreInst {}
 impl RegUses for StoreInst {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_seqz() {
+        let mut reg_gener = RegGenerator::new();
+        let dst = reg_gener.gen_virtual_usual_reg();
+        let src = reg_gener.gen_virtual_usual_reg();
+        let seqz = SeqzInst::new(dst.into(), src.into());
+        assert_eq!(seqz.uses(), vec![&src]);
+        assert_eq!(seqz.defs(), vec![&dst]);
+    }
+}

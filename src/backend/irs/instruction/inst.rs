@@ -53,9 +53,10 @@ pub enum Inst {
     Or(OrInst),
     Xor(XorInst),
     Neg(NegInst),
+    Slt(SltInst),
 
     // comparison operation
-    Slt(SltInst),
+    Seqz(SeqzInst),
 
     // data transfer operation
     Mv(MvInst),
@@ -145,6 +146,7 @@ impl Inst {
             Inst::Or(inst) => inst.gen_asm(),
             Inst::Xor(inst) => inst.gen_asm(),
             Inst::Tail(inst) => inst.gen_asm(),
+            Inst::Seqz(inst) => inst.gen_asm(),
         }
     }
 }
@@ -171,6 +173,9 @@ impl_inst_convert!(SllInst, Sll);
 impl_inst_convert!(SrlInst, Srl);
 impl_inst_convert!(SltInst, Slt);
 
+// for comparison
+impl_inst_convert!(SeqzInst, Seqz);
+
 // inst for data transfer
 impl_inst_convert!(MvInst, Mv);
 impl_inst_convert!(LaInst, La);
@@ -186,3 +191,9 @@ impl_inst_convert!(StoreInst, Store);
 impl_inst_convert!(JmpInst, Jmp);
 impl_inst_convert!(CallInst, Call);
 impl_inst_convert!(TailInst, Tail);
+impl_inst_convert!(BeqInst, Beq);
+impl_inst_convert!(BneInst, Bne);
+impl_inst_convert!(BltInst, Blt);
+impl_inst_convert!(BleInst, Ble);
+impl_inst_convert!(BgtInst, Bgt);
+impl_inst_convert!(BgeInst, Bge);
