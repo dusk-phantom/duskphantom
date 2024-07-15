@@ -189,7 +189,11 @@ macro_rules! impl_mem_inst {
                 let dst = self.dst().gen_asm();
                 let offset = self.offset().gen_asm();
                 let base = self.base().gen_asm();
-                format!("{} {},{}({})", $inst_name, dst, offset, base)
+                if self.dst().is_usual() {
+                    format!("{} {},{}({})", $inst_name, dst, offset, base)
+                } else {
+                    format!("f{} {},{}({})", $inst_name, dst, offset, base)
+                }
             }
         }
     };

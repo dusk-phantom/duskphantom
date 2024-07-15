@@ -5,6 +5,17 @@ use builder::IRBuilder;
 
 use llvm_ir::{Constant, Name};
 
+impl TryFrom<&llvm_ir::constant::Float> for Fmm {
+    type Error = anyhow::Error;
+    fn try_from(value: &llvm_ir::constant::Float) -> std::result::Result<Self, Self::Error> {
+        match value {
+            llvm_ir::constant::Float::Single(f) => Ok(f.into()),
+            llvm_ir::constant::Float::Double(f) => Ok(f.into()),
+            _ => Err(anyhow!("float type not supported").context(context!())),
+        }
+    }
+}
+
 impl IRBuilder {
     pub fn is_ty_int(ty: &llvm_ir::Type) -> bool {
         matches!(ty, llvm_ir::Type::IntegerType { bits: _ })

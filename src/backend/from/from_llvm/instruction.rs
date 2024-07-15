@@ -2,6 +2,7 @@ use super::*;
 use builder::IRBuilder;
 use llvm_ir::{Constant, Name};
 use std::collections::HashMap;
+use var::FloatVar;
 
 impl IRBuilder {
     pub fn build_instruction(
@@ -159,9 +160,15 @@ impl IRBuilder {
         Ok(ret)
     }
 
+    pub fn build_ret_imm(imm: u64) -> Imm {
+        let ret_v = ((imm as i64) % 256 + 256) % 256;
+        ret_v.into()
+    }
     pub fn build_term_inst(
         term: &llvm_ir::Terminator,
+        reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
+        fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<Vec<Inst>> {
         let mut ret_insts: Vec<Inst> = Vec::new();
         // dbg!(term);
@@ -180,29 +187,52 @@ impl IRBuilder {
                                 unimplemented!();
                             };
                             ret_insts.push(mv_inst.into());
-                            ret_insts.push(Inst::Ret);
                         }
                         llvm_ir::Operand::ConstantOperand(c) => match c.as_ref() {
                             Constant::Int { bits: _, value } => {
-                                let imm = (*value as i64).into();
-                                let addi = AddInst::new(REG_A0.into(), REG_ZERO.into(), imm);
+                                let imm = Self::build_ret_imm(*value);
+                                let addi = AddInst::new(REG_A0.into(), REG_ZERO.into(), imm.into());
                                 ret_insts.push(addi.into());
-                                ret_insts.push(Inst::Ret);
                             }
-                            Constant::Float(_) => {
-                                // FIXME: float constant load
-                                unimplemented!();
+                            Constant::Float(f) => {
+                                let fmm: Fmm = f.try_into()?;
+                                let n = if let Some(f_var) = fmms.get(&fmm) {
+                                    f_var.name.clone()
+                                } else {
+                                    let name = format!("_fc_{:X}", fmm.to_bits());
+                                    fmms.insert(
+                                        fmm.clone(),
+                                        FloatVar {
+                                            name: name.clone(),
+                                            init: Some(fmm.try_into()?),
+                                            is_const: true,
+                                        },
+                                    );
+                                    name
+                                };
+                                let addr = reg_gener.gen_virtual_usual_reg();
+                                let la = LaInst::new(addr, n.into());
+                                ret_insts.push(la.into());
+                                let loadf: Inst =
+                                    if matches!(f, llvm_ir::constant::Float::Single(_)) {
+                                        LwInst::new(REG_FA0, 0.into(), addr).into()
+                                    } else if matches!(f, llvm_ir::constant::Float::Double(_)) {
+                                        LdInst::new(REG_FA0, 0.into(), addr).into()
+                                    } else {
+                                        unimplemented!();
+                                    };
+                                ret_insts.push(loadf);
                             }
                             _ => todo!(),
                         },
                         llvm_ir::Operand::MetadataOperand => todo!(),
                     }
-                } else {
-                    ret_insts.push(Inst::Ret);
                 }
             }
             _ => todo!(),
         }
+
+        ret_insts.push(Inst::Ret);
         Ok(ret_insts)
     }
 
@@ -329,5 +359,26 @@ impl IRBuilder {
         }
 
         Ok(ret)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_count_ret_imm() {
+        fn inner_test(imm: i64, expect: Imm) {
+            let imm = imm as u64;
+            let ret = IRBuilder::build_ret_imm(imm);
+            assert_eq!(ret, expect);
+        }
+        inner_test(0, 0.into());
+        inner_test(1, 1.into());
+        inner_test(255, 255.into());
+        inner_test(256, 0.into());
+        inner_test(257, 1.into());
+        inner_test(-1, 255.into());
+        inner_test(-250, 6.into());
+        inner_test(-257, 255.into());
     }
 }
