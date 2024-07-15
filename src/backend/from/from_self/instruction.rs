@@ -259,10 +259,12 @@ impl IRBuilder {
                         let li = AddInst::new(REG_A0.into(), REG_ZERO.into(), imm);
                         ret_insts.push(li.into());
                     }
-                    middle::ir::Constant::Float(f) => {
-                        let fmm = (*f as f64).into();
-                        let li = AddInst::new(REG_FA0.into(), REG_ZERO.into(), fmm);
-                        ret_insts.push(li.into());
+                    middle::ir::Constant::Float(_f) => {
+                        // FIXME 浮点数的返回值需要字面量池
+                        todo!();
+                        // let fmm = (*f as f64).into();
+                        // let li = AddInst::new(REG_FA0.into(), REG_ZERO.into(), fmm);
+                        // ret_insts.push(li.into());
                     }
                     middle::ir::Constant::Array(_) => {
                         return Err(anyhow!("return array is not allow:{}", op))
