@@ -1,5 +1,7 @@
 mod builder;
 mod instruction;
+#[macro_use]
+mod macros;
 mod operand;
 
 pub use super::irs::*;
