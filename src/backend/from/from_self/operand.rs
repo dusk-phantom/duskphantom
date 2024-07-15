@@ -21,16 +21,11 @@ impl IRBuilder {
         matches!(ty, middle::ir::ValueType::Float)
     }
 
-    pub fn address_from(
+    pub fn stack_slot_from(
         operand: &middle::ir::Operand,
         stack_slots: &HashMap<Address, StackSlot>,
     ) -> Result<Operand> {
         Ok(match operand {
-            middle::ir::Operand::Constant(_) => todo!(),
-            // TODO store 中的 dst 可能是 全局变量
-            middle::ir::Operand::Global(_) => todo!(),
-            middle::ir::Operand::Parameter(_) => todo!(),
-            // 来源于 get_element_ptr 或者是 alloca
             middle::ir::Operand::Instruction(instr) => stack_slots
                 .get(&(instr.as_ref().as_ref() as *const dyn Instruction as *const () as Address))
                 .ok_or(anyhow!(
@@ -39,6 +34,12 @@ impl IRBuilder {
                 ))
                 .with_context(|| context!())?
                 .into(), // 这个 into 将 stackslot -> operand
+            _ => {
+                /* Constant, Global */
+                /* Parameter 只有 void, int, float 三种类型 */
+                return Err(anyhow!("operand is not local var:{}", operand))
+                    .with_context(|| context!());
+            }
         })
     }
 
@@ -103,23 +104,22 @@ impl IRBuilder {
         }
     }
 
-    #[allow(unused)]
     #[inline]
-    pub fn global_name_from(operand: &middle::ir::Operand) -> Result<Address> {
-        unimplemented!();
+    pub fn global_name_from(operand: &middle::ir::Operand) -> Result<String> {
+        // TODO
         match operand {
+            middle::ir::Operand::Parameter(_) => unimplemented!(), /* 参数只有 float/int/void */
             middle::ir::Operand::Constant(con) => match con {
                 middle::ir::Constant::Int(_) => todo!(),
-                middle::ir::Constant::Float(_) => todo!(),
-                middle::ir::Constant::Bool(_) => todo!(),
                 middle::ir::Constant::Array(_) => todo!(),
-                _ => todo!(),
+                middle::ir::Constant::Float(_) | middle::ir::Constant::Bool(_) => {
+                    Err(anyhow!("could not".to_string())).with_context(|| context!())
+                }
             },
-            middle::ir::Operand::Instruction(instr) => {
-                Err(anyhow!("local operand".to_string())).with_context(|| context!())
+            middle::ir::Operand::Instruction(_instr) => {
+                todo!()
             }
             middle::ir::Operand::Global(_) => todo!(),
-            middle::ir::Operand::Parameter(_) => todo!(),
         }
     }
 }
