@@ -53,10 +53,27 @@ impl IRBuilder {
                     match op {
                         Operand::Reg(reg) => Ok(reg),
                         Operand::Fmm(fmm) => {
-                            let reg = reg_gener.gen_virtual_float_reg(); // 立即数
-                            let li = LiInst::new(reg.into(), fmm.into());
-                            ret.push(li.into());
-                            Ok(reg)
+                            let n = if let Some(f_var) = fmms.get(&fmm) {
+                                f_var.name.clone()
+                            } else {
+                                let name = format!("_fc_{:x}", fmm.to_bits());
+                                fmms.insert(
+                                    fmm.clone(),
+                                    FloatVar {
+                                        name: name.clone(),
+                                        init: Some(fmm.try_into()?),
+                                        is_const: true,
+                                    },
+                                );
+                                name
+                            };
+                            let addr = reg_gener.gen_virtual_usual_reg(); // 地址
+                            let la = LaInst::new(addr, n.into());
+                            ret.push(la.into());
+                            let dst = reg_gener.gen_virtual_float_reg(); // fmm
+                            let loadf = LwInst::new(dst, 0.into(), addr);
+                            ret.push(loadf.into());
+                            Ok(dst)
                         }
                         _ => Err(anyhow!("operand type not supported")).with_context(|| context!()),
                     }
@@ -352,7 +369,7 @@ impl IRBuilder {
                             );
                             name
                         };
-                        let addr = reg_gener.gen_virtual_float_reg();
+                        let addr = reg_gener.gen_virtual_usual_reg();
                         let la = LaInst::new(addr, n.into());
                         ret_insts.push(la.into());
                         // 不过这里没有 double
