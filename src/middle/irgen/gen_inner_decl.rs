@@ -1,16 +1,51 @@
 use std::collections::VecDeque;
 
-use crate::context;
 use crate::frontend::Decl;
 use crate::middle::irgen::function_kit::FunctionKit;
+use crate::{context, middle::ir::Constant};
 use anyhow::{anyhow, Context};
 
-use super::value::{alloc, collapse_array, Value};
+use super::value::{alloc, Value};
+use super::{constant, value};
 
 impl<'a> FunctionKit<'a> {
     /// Generate a declaration as a statement into the program
     pub fn gen_inner_decl(&mut self, decl: &Decl) -> anyhow::Result<()> {
         match decl {
+            Decl::Const(raw_ty, id, op) => {
+                // Make sure constant has an initializer
+                let Some(expr) = op else {
+                    return Err(anyhow!("const declaration must have an initializer"))
+                        .with_context(|| context!());
+                };
+
+                // Translate type
+                let ty = self.gen_program_kit().translate_type(raw_ty)?;
+
+                // Generate constant value
+                let val = self.gen_program_kit().gen_const_expr(expr)?;
+
+                // If constant is an array, collapse it and store into global variable
+                let val = match val {
+                    Constant::Array(arr) => {
+                        let arr = constant::collapse_array(&mut VecDeque::from(arr), &ty)?;
+                        let name = self.unique_name(id);
+                        let gvar = self.program.mem_pool.new_global_variable(
+                            name,
+                            arr.get_type(),
+                            false,
+                            arr,
+                        );
+                        self.program.module.global_variables.push(gvar);
+                        Value::ReadWrite(gvar.into())
+                    }
+                    _ => Value::ReadOnly(val.into()),
+                };
+
+                // Add value to environment
+                self.env.insert(id.clone(), val);
+                Ok(())
+            }
             Decl::Var(raw_ty, id, op) => {
                 // Allocate space for variable, add to environment
                 let ty = self.gen_program_kit().translate_type(raw_ty)?;
@@ -24,7 +59,7 @@ impl<'a> FunctionKit<'a> {
 
                     // Collapse if `rhs` is array
                     if let Value::Array(arr) = rhs {
-                        rhs = collapse_array(&mut VecDeque::from(arr), &ty)?;
+                        rhs = value::collapse_array(&mut VecDeque::from(arr), &ty)?;
                     }
 
                     // Assign operand to value

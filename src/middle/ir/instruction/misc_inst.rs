@@ -327,12 +327,13 @@ impl Display for Call {
 impl Instruction for Call {
     gen_common_code!(Call, Call);
     fn gen_llvm_ir(&self) -> String {
-        let mut res = format!(
-            "{} = call {} @{}(",
-            self,
-            self.get_value_type(),
-            &self.func.name
-        );
+        let value_type = self.get_value_type();
+        let prefix = if value_type == ValueType::Void {
+            String::new()
+        } else {
+            format!("{} = ", self)
+        };
+        let mut res = format!("{}call {} @{}(", prefix, value_type, &self.func.name);
         let operands = self.get_operand();
         for op in operands {
             res.push_str(&format!("{} {}, ", op.get_type(), op));
