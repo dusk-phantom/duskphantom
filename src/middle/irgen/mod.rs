@@ -924,6 +924,38 @@ mod tests {
     }
 
     #[test]
+    fn test_inner_constant_array() {
+        let code = r#"
+            int main() {
+                const int a[2] = {1};
+                putint(a[1]);
+                return 0;
+            }
+        "#;
+        let program = parse(code).unwrap();
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_snapshot!(llvm_ir, @r###"
+        @a0 = dso_local constant [2 x i32] [i32 1, i32 0]
+        define i32 @main() {
+        entry:
+        %alloca_2 = alloca i32
+        %getelementptr_5 = getelementptr [2 x i32], ptr @a0, i32 0, i32 1
+        %load_6 = load i32, ptr %getelementptr_5
+        call void @putint(i32 %load_6)
+        store i32 0, ptr %alloca_2
+        br label %exit
+
+        exit:
+        %load_3 = load i32, ptr %alloca_2
+        ret i32 %load_3
+
+
+        }
+        "###);
+    }
+
+    #[test]
     fn test_variable_array() {
         let code = r#"
             int main() {
@@ -1054,7 +1086,7 @@ mod tests {
         %getelementptr_9 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
         %call_10 = call i32 @f(i32* %getelementptr_9)
         %getelementptr_11 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
-        %call_12 = call void @putarray(i32 1, i32* %getelementptr_11)
+        call void @putarray(i32 1, i32* %getelementptr_11)
         store i32 0, ptr %alloca_2
         br label %exit
 
@@ -1290,7 +1322,7 @@ mod tests {
         store i32 %call_6, ptr %alloca_5
         %load_8 = load i32, ptr %alloca_5
         %Add_9 = add i32 %load_8, 3
-        %call_10 = call void @putint(i32 %Add_9)
+        call void @putint(i32 %Add_9)
         store i32 0, ptr %alloca_2
         br label %exit
 
@@ -1354,7 +1386,7 @@ mod tests {
         %alloca_25 = alloca i32
         store i32 %x, ptr %alloca_25
         %load_27 = load i32, ptr %alloca_25
-        %call_28 = call void @putint(i32 %load_27)
+        call void @putint(i32 %load_27)
         %load_29 = load i32, ptr %alloca_25
         store i32 %load_29, ptr %alloca_22
         br label %exit
@@ -1407,7 +1439,7 @@ mod tests {
 
         then1:
         %load_23 = load i32, ptr %alloca_5
-        %call_24 = call void @putint(i32 %load_23)
+        call void @putint(i32 %load_23)
         br label %final3
 
         alt2:
@@ -1448,7 +1480,7 @@ mod tests {
         store i32 %call_6, ptr %alloca_5
         %getelementptr_8 = getelementptr [7 x i32], ptr @format0, i32 0, i32 0
         %load_9 = load i32, ptr %alloca_5
-        %call_10 = call void @putf(i32* %getelementptr_8, i32 %load_9)
+        call void @putf(i32* %getelementptr_8, i32 %load_9)
         store i32 0, ptr %alloca_2
         br label %exit
 

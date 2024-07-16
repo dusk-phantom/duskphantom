@@ -772,7 +772,7 @@ pub mod tests_mem2reg {
         %getelementptr_9 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
         %call_10 = call i32 @f(i32* %getelementptr_9)
         %getelementptr_11 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
-        %call_12 = call void @putarray(i32 1, i32* %getelementptr_11)
+        call void @putarray(i32 1, i32* %getelementptr_11)
         store i32 0, ptr %alloca_2
         br label %exit
 
@@ -813,7 +813,7 @@ pub mod tests_mem2reg {
         %getelementptr_9 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
         %call_10 = call i32 @f(i32* %getelementptr_9)
         %getelementptr_11 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
-        %call_12 = call void @putarray(i32 1, i32* %getelementptr_11)
+        call void @putarray(i32 1, i32* %getelementptr_11)
         br label %exit
 
         exit:
