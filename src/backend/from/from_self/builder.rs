@@ -269,7 +269,7 @@ impl IRBuilder {
             };
 
             let v_reg = reg_gener.gen_virtual_reg(is_usual);
-            regs.insert(param.as_ref() as *const _ as Address, v_reg); // 直接就先绑定了寄存器
+            regs.insert(param.as_ref() as *const _ as Address, v_reg); // 参数绑定寄存器
 
             if is_usual && usual_idx <= 7 {
                 let a_reg = Reg::new(REG_A0.id() + usual_idx, is_usual);
