@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::usize;
 
 use super::*;
@@ -116,6 +116,25 @@ impl Func {
             idx: 0,
         }
     }
+    // get exit bbs, which are the bbs that end with ret or tail call
+    pub fn exit_bbs(&self) -> Vec<&Block> {
+        let mut ret = vec![];
+        for bb in self.iter_bbs() {
+            let insts = bb.insts();
+            if let Some(last_inst) = insts.last() {
+                match last_inst {
+                    Inst::Ret { .. } => {
+                        ret.push(bb);
+                    }
+                    Inst::Tail { .. } => {
+                        ret.push(bb);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        ret
+    }
 }
 /// impl Some functionality for reg alloc
 impl Func {
@@ -191,6 +210,127 @@ impl Func {
 
         Ok((ins, outs))
     }
+
+    /// compute the live in and live out set of regs of each basic block
+    pub fn reg_lives<'a>(f: &'a Func, ins: &InBBs<'a>, outs: &OutBBs<'a>) -> Result<RegLives> {
+        let mut live_ins: HashMap<String, HashSet<Reg>> = HashMap::new();
+        let mut live_outs: HashMap<String, HashSet<Reg>> = HashMap::new();
+
+        // consider the exit block
+        if let Some(ret) = f.ret() {
+            for bb in f.exit_bbs() {
+                let mut live_out: HashSet<Reg> = HashSet::new();
+                live_out.insert(*ret);
+                live_outs.insert(bb.label().to_string(), live_out);
+            }
+        }
+        let bb_iter = f.iter_bbs();
+
+        // consider live_use
+        for bb in bb_iter.clone() {
+            let mut live_in: HashSet<Reg> = HashSet::new();
+            let mut defed_regs: HashSet<Reg> = HashSet::new();
+            for inst in bb.insts().iter().rev() {
+                for reg in inst.uses() {
+                    if !defed_regs.contains(reg) {
+                        live_in.insert(*reg);
+                    }
+                }
+                defed_regs.extend(inst.defs());
+            }
+            live_ins.insert(bb.label().to_string(), live_in);
+        }
+
+        // loop to compute live_in and live_out
+        // FIXME: 使用位图实现的寄存器记录表来加速运算过程，以及节省内存
+        let mut changed = true;
+        while changed {
+            changed = false;
+            for bb in bb_iter.clone() {
+                let mut new_live_in = live_ins.get(bb.label()).cloned().unwrap_or(HashSet::new());
+                for in_bb in ins.ins(bb) {
+                    if let Some(out) = live_outs.get(in_bb.label()) {
+                        new_live_in.extend(out.iter().cloned());
+                    }
+                }
+                let mut new_live_out = live_outs.get(bb.label()).cloned().unwrap_or(HashSet::new());
+                for out_bb in outs.outs(bb) {
+                    if let Some(in_) = live_ins.get(out_bb.label()) {
+                        new_live_out.extend(in_.iter().cloned());
+                    }
+                }
+                if !live_ins.contains_key(bb.label()) || new_live_in != live_ins[bb.label()] {
+                    live_ins.insert(bb.label().to_string(), new_live_in);
+                    changed = true;
+                }
+                if !live_outs.contains_key(bb.label()) || new_live_out != live_outs[bb.label()] {
+                    live_outs.insert(bb.label().to_string(), new_live_out);
+                    changed = true;
+                }
+            }
+        }
+
+        Ok(RegLives {
+            live_ins,
+            live_outs,
+        })
+    }
+
+    /// compute the reg interference graph of a function
+    pub fn reg_interfere_graph(f: &Func) -> Result<HashMap<Reg, HashSet<Reg>>> {
+        let mut graph: HashMap<Reg, HashSet<Reg>> = HashMap::new();
+
+        // for each physical register, add it to the graph
+        let p_regs = Reg::physical_regs();
+        for p_reg in p_regs {
+            graph.insert(p_reg, HashSet::new());
+            for other_p_reg in p_regs {
+                if p_reg != other_p_reg {
+                    graph.get_mut(&p_reg).unwrap().insert(other_p_reg);
+                }
+            }
+        }
+
+        // for each basic block, collect interference between regs
+        let (ins, outs) = Func::in_out_bbs(f)?;
+        let reg_lives = Func::reg_lives(f, &ins, &outs)?;
+        // FIXME: 使用位图实现的寄存器记录表来加速运算过程，以及节省内存
+        for bb in f.iter_bbs() {
+            let mut alive_regs: HashSet<Reg> = reg_lives.live_outs(bb).clone();
+            for r in alive_regs.iter() {
+                if !graph.contains_key(r) {
+                    graph.insert(*r, HashSet::new());
+                }
+            }
+            for inst in bb.insts().iter().rev() {
+                let defs = inst.defs();
+                for reg in defs.clone() {
+                    if !graph.contains_key(&reg) {
+                        graph.insert(*reg, HashSet::new());
+                    }
+                    alive_regs.remove(reg);
+                    for alive_reg in alive_regs.iter() {
+                        graph.get_mut(reg).expect("").insert(*alive_reg);
+                        graph.get_mut(alive_reg).expect("").insert(*reg);
+                    }
+                    alive_regs.insert(*reg);
+                }
+                alive_regs.retain(|r| !defs.contains(&r));
+                for reg in inst.uses() {
+                    if !graph.contains_key(reg) {
+                        graph.insert(*reg, HashSet::new());
+                    }
+                    alive_regs.insert(*reg);
+                    for alive_reg in alive_regs.iter() {
+                        graph.get_mut(reg).expect("").insert(*alive_reg);
+                        graph.get_mut(alive_reg).expect("").insert(*reg);
+                    }
+                }
+            }
+        }
+
+        Ok(graph)
+    }
 }
 
 #[derive(Debug)]
@@ -224,6 +364,20 @@ impl<'a> OutBBs<'a> {
     }
 }
 
+pub struct RegLives {
+    live_ins: HashMap<String, HashSet<Reg>>,
+    live_outs: HashMap<String, HashSet<Reg>>,
+}
+impl RegLives {
+    pub fn live_ins(&self, bb: &Block) -> &HashSet<Reg> {
+        self.live_ins.get(bb.label()).unwrap()
+    }
+    pub fn live_outs(&self, bb: &Block) -> &HashSet<Reg> {
+        self.live_outs.get(bb.label()).unwrap()
+    }
+}
+
+#[derive(Clone)]
 pub struct BBIter<'a> {
     entry: &'a Block,
     other_bbs: Vec<&'a Block>,
