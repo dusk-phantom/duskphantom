@@ -305,7 +305,7 @@ impl Func {
             for inst in bb.insts().iter().rev() {
                 let defs = inst.defs();
                 for reg in defs.clone() {
-                    if !graph.contains_key(&reg) {
+                    if !graph.contains_key(reg) {
                         graph.insert(*reg, HashSet::new());
                     }
                     alive_regs.remove(reg);
