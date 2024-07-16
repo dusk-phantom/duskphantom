@@ -19,16 +19,25 @@ impl IRBuilder {
             llvm_ir::Instruction::Add(add) => llvm2tac_binary_usual!(AddInst, add, reg_gener, regs),
             llvm_ir::Instruction::Sub(sub) => llvm2tac_binary_usual!(SubInst, sub, reg_gener, regs),
             llvm_ir::Instruction::Mul(mul) => llvm2tac_binary_usual!(MulInst, mul, reg_gener, regs),
+            llvm_ir::Instruction::And(and) => llvm2tac_binary_usual!(AndInst, and, reg_gener, regs),
+            llvm_ir::Instruction::Or(or) => llvm2tac_binary_usual!(OrInst, or, reg_gener, regs),
+            llvm_ir::Instruction::Xor(xor) => llvm2tac_binary_usual!(XorInst, xor, reg_gener, regs),
+            llvm_ir::Instruction::SRem(srem) => {
+                llvm2tac_binary_usual!(RemInst, srem, reg_gener, regs)
+            }
+            // process logical shift right
+            llvm_ir::Instruction::LShr(lshr) => {
+                llvm2tac_binary_usual!(SrlInst, lshr, reg_gener, regs)
+            }
+            // process logical shift left
+            llvm_ir::Instruction::Shl(shl) => llvm2tac_binary_usual!(SllInst, shl, reg_gener, regs),
+            // process arithmetic shift right
+            llvm_ir::Instruction::AShr(ashr) => {
+                llvm2tac_binary_usual!(SraInst, ashr, reg_gener, regs)
+            }
             llvm_ir::Instruction::UDiv(_) => todo!(),
             llvm_ir::Instruction::SDiv(_) => todo!(),
             llvm_ir::Instruction::URem(_) => todo!(),
-            llvm_ir::Instruction::SRem(_) => todo!(),
-            llvm_ir::Instruction::And(_) => todo!(),
-            llvm_ir::Instruction::Or(_) => todo!(),
-            llvm_ir::Instruction::Xor(_) => todo!(),
-            llvm_ir::Instruction::Shl(_) => todo!(),
-            llvm_ir::Instruction::LShr(_) => todo!(),
-            llvm_ir::Instruction::AShr(_) => todo!(),
             llvm_ir::Instruction::FAdd(_) => todo!(),
             llvm_ir::Instruction::FSub(_) => todo!(),
             llvm_ir::Instruction::FMul(_) => todo!(),

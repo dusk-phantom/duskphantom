@@ -172,6 +172,7 @@ impl_inst_convert!(XorInst, Xor);
 impl_inst_convert!(SllInst, Sll);
 impl_inst_convert!(SrlInst, Srl);
 impl_inst_convert!(SltInst, Slt);
+impl_inst_convert!(SraInst, SRA);
 
 // for comparison
 impl_inst_convert!(SeqzInst, Seqz);
