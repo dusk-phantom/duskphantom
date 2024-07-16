@@ -272,14 +272,18 @@ impl IRBuilder {
             }
         };
         regs.insert(load as *const _ as Address, dst_reg);
+        // 两种情况: 1. 从栈上获取(之前 alloca 过一次), 2. 从非栈上获取(paramete-pointer, global)
         if let Ok(slot) = Self::stack_slot_from(load.get_ptr(), stack_slots) {
             let ld = LoadInst::new(dst_reg, slot.try_into()?);
             ret.push(ld.into());
-        } else if let Ok(label) = Self::global_name_from(load.get_ptr()) {
+        } else if let Ok(label) = Self::global_from(load.get_ptr()) {
             let addr = reg_gener.gen_virtual_usual_reg();
-            let la = LaInst::new(addr, label.to_string().into());
+            let la = LaInst::new(addr, label.into());
             ret.push(la.into());
             let lw = LwInst::new(dst_reg, 0.into(), addr);
+            ret.push(lw.into());
+        } else if let Ok(base /* 基地址 */) = Self::pointer_from(load.get_ptr(), regs) {
+            let lw = LwInst::new(dst_reg, 0.into(), base);
             ret.push(lw.into());
         } else {
             return Err(anyhow!("load instruction with other address")).with_context(|| context!());
