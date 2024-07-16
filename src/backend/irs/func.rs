@@ -136,11 +136,25 @@ impl Func {
                                 Inst::Beq(beq) => {
                                     to_bbs.push(beq.label().to_string());
                                 }
-                                _ => {
-                                    unreachable!(
-                                        "The second last instruction of a basic block should be a branch instruction"
-                                    );
+                                Inst::Bge(bge) => {
+                                    to_bbs.push(bge.label().to_string());
                                 }
+                                Inst::Bgt(bgt) => {
+                                    to_bbs.push(bgt.label().to_string());
+                                }
+                                Inst::Ble(ble) => {
+                                    to_bbs.push(ble.label().to_string());
+                                }
+                                Inst::Blt(blt) => {
+                                    to_bbs.push(blt.label().to_string());
+                                }
+                                Inst::Bne(bne) => {
+                                    to_bbs.push(bne.label().to_string());
+                                }
+                                Inst::Jmp(_) => {
+                                    unreachable!("The last two instructions of a basic block should not be both jump instructions");
+                                }
+                                _ => {}
                             }
                         }
                     }
@@ -179,10 +193,12 @@ impl Func {
     }
 }
 
+#[derive(Debug)]
 pub struct InBBs<'a> {
     bbs: HashMap<String, &'a Block>,
     ins: HashMap<String, Vec<String>>,
 }
+#[derive(Debug)]
 pub struct OutBBs<'a> {
     bbs: HashMap<String, &'a Block>,
     outs: HashMap<String, Vec<String>>,

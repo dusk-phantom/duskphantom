@@ -13,6 +13,7 @@ pub fn phisicalize(program: &mut Program) -> Result<(), BackendError> {
                 .allocated();
             dbg!(func.name());
             dbg!(stack_size);
+            dbg!(Func::in_out_bbs(func));
             // alloc reg: 调用寄存器分配算法,获得分配结果,其中包括寄存器溢出需要的空间
 
             // count caller save: 计算保存caller save需要的栈空间 max(caller_save(call[i])),这一步应该在寄存器分配之后进行
