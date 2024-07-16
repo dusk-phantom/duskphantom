@@ -45,7 +45,29 @@ impl IRBuilder {
             middle::ir::instruction::InstType::FAdd => {
                 // TODO 浮点型指令, 立即数处理
                 // ssa2tac_binary_float!(inst, regs, reg_gener, FAdd, Add, AddInst)
-                todo!()
+                let mut ret = Vec::new();
+                let fadd = downcast_ref::<middle::ir::instruction::binary_inst::FAdd>(
+                    inst.as_ref().as_ref(),
+                );
+                let mut get_reg = |op: Operand| -> Result<Reg> {
+                    match op {
+                        Operand::Reg(reg) => Ok(reg),
+                        Operand::Fmm(fmm) => {
+                            let reg = reg_gener.gen_virtual_float_reg(); // 立即数
+                            let li = LiInst::new(reg.into(), fmm.into());
+                            ret.push(li.into());
+                            Ok(reg)
+                        }
+                        _ => Err(anyhow!("operand type not supported")).with_context(|| context!()),
+                    }
+                };
+                let op0 = get_reg(Self::local_operand_from(fadd.get_lhs(), regs)?)?;
+                let op1 = get_reg(Self::local_operand_from(fadd.get_rhs(), regs)?)?;
+                let dst0 = reg_gener.gen_virtual_float_reg();
+                let add_inst = AddInst::new(dst0.into(), op0.into(), op1.into());
+                regs.insert(fadd as *const _ as Address, dst0);
+                ret.push(add_inst.into());
+                Ok(ret)
             }
             middle::ir::instruction::InstType::Sub => {
                 ssa2tac_binary_usual!(SubInst, Sub, inst, regs, reg_gener)
