@@ -60,7 +60,7 @@ pub enum Expr {
 
     /// Application of binary operator.
     /// Example: `a + b`
-    Binary(BinaryOp, Box<Expr>, Box<Expr>),
+    Binary(Box<Expr>, Vec<(BinaryOp, Expr)>),
 
     /// Application of conditional operator.
     /// Example: `cond ? a : b`
@@ -146,6 +146,8 @@ pub fn expr(input: &mut &str) -> PResult<Expr> {
 // Unit tests
 #[cfg(test)]
 pub mod tests_expr {
+    use insta::assert_debug_snapshot;
+
     use super::*;
 
     #[test]
@@ -179,13 +181,9 @@ pub mod tests_expr {
     fn test_plus() {
         let code = "1+1";
         match expr.parse(code) {
-            Ok(result) => assert_eq!(
+            Ok(result) => assert_debug_snapshot!(
                 result,
-                Expr::Binary(
-                    BinaryOp::Add,
-                    Box::new(Expr::Int32(1)),
-                    Box::new(Expr::Int32(1))
-                )
+                @"",
             ),
             Err(err) => panic!("failed to parse {}: {}", code, err),
         }
@@ -195,13 +193,9 @@ pub mod tests_expr {
     fn test_space() {
         let code = "1  +  1";
         match expr.parse(code) {
-            Ok(result) => assert_eq!(
+            Ok(result) => assert_debug_snapshot!(
                 result,
-                Expr::Binary(
-                    BinaryOp::Add,
-                    Box::new(Expr::Int32(1)),
-                    Box::new(Expr::Int32(1))
-                )
+                @"",
             ),
             Err(err) => panic!("failed to parse {}: {}", code, err),
         }
@@ -211,21 +205,9 @@ pub mod tests_expr {
     fn test_precedence() {
         let code = "1 + 1 * 2 - 3";
         match expr.parse(code) {
-            Ok(result) => assert_eq!(
+            Ok(result) => assert_debug_snapshot!(
                 result,
-                Expr::Binary(
-                    BinaryOp::Sub,
-                    Box::new(Expr::Binary(
-                        BinaryOp::Add,
-                        Box::new(Expr::Int32(1)),
-                        Box::new(Expr::Binary(
-                            BinaryOp::Mul,
-                            Box::new(Expr::Int32(1)),
-                            Box::new(Expr::Int32(2))
-                        ))
-                    )),
-                    Box::new(Expr::Int32(3)),
-                )
+                @"",
             ),
             Err(err) => panic!("failed to parse {}: {}", code, err),
         }

@@ -60,7 +60,7 @@ impl<'a> ProgramKit<'a> {
             Expr::Bool(_) => Err(anyhow!("bool not implemented")).with_context(|| context!()),
             Expr::Call(_, _) => Err(anyhow!("call not implemented")).with_context(|| context!()),
             Expr::Unary(op, expr) => self.gen_const_unary(op, expr),
-            Expr::Binary(op, lhs, rhs) => self.gen_const_binary(op, lhs, rhs),
+            Expr::Binary(head, tail) => self.gen_const_binary(head, tail),
             Expr::Conditional(_, _, _) => {
                 Err(anyhow!("conditional not implemented")).with_context(|| context!())
             }
