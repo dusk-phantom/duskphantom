@@ -58,6 +58,10 @@ impl IRBuilder {
             llvm_ir::Instruction::Store(store) => {
                 Self::build_store_inst(store, stack_slots, reg_gener, regs)
             }
+            llvm_ir::Instruction::SIToFP(si2f) => {
+                dbg!(si2f);
+                unimplemented!();
+            }
             llvm_ir::Instruction::Fence(_) => todo!(),
             llvm_ir::Instruction::CmpXchg(_) => todo!(),
             llvm_ir::Instruction::AtomicRMW(_) => todo!(),
@@ -70,7 +74,6 @@ impl IRBuilder {
             llvm_ir::Instruction::FPToUI(_) => todo!(),
             llvm_ir::Instruction::FPToSI(_) => todo!(),
             llvm_ir::Instruction::UIToFP(_) => todo!(),
-            llvm_ir::Instruction::SIToFP(_) => todo!(),
             llvm_ir::Instruction::PtrToInt(_) => todo!(),
             llvm_ir::Instruction::IntToPtr(_) => todo!(),
             llvm_ir::Instruction::BitCast(_) => todo!(),
@@ -150,6 +153,15 @@ impl IRBuilder {
         let ty = alloca.allocated_type.clone();
         let num_byte = match ty.as_ref() {
             llvm_ir::Type::IntegerType { bits: _ } => 8,
+            llvm_ir::Type::FPType(fp) => match fp {
+                llvm_ir::types::FPType::Half => todo!(),
+                llvm_ir::types::FPType::BFloat => todo!(),
+                llvm_ir::types::FPType::Single => 8,
+                llvm_ir::types::FPType::Double => 8,
+                llvm_ir::types::FPType::FP128 => todo!(),
+                llvm_ir::types::FPType::X86_FP80 => todo!(),
+                llvm_ir::types::FPType::PPC_FP128 => todo!(),
+            },
             _ => todo!(),
         };
         let ss = stack_allocator.alloc(num_byte);

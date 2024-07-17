@@ -68,6 +68,11 @@ pub enum Inst {
     La(LaInst),
     Load(LoadInst),
     Store(StoreInst),
+
+    // conversion operation
+    I2fInst(I2fInst),
+    F2iInst(F2iInst),
+
     // control flow operation
     Jmp(JmpInst),
 
@@ -147,6 +152,8 @@ impl Inst {
             Inst::Xor(inst) => inst.gen_asm(),
             Inst::Tail(inst) => inst.gen_asm(),
             Inst::Seqz(inst) => inst.gen_asm(),
+            Inst::I2fInst(i2f) => i2f.gen_asm(),
+            Inst::F2iInst(f2i) => f2i.gen_asm(),
         }
     }
 }

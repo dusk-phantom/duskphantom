@@ -160,6 +160,50 @@ macro_rules! impl_two_op_inst {
             }
         }
     };
+    ($ty_name:ident,$inst_name:expr,$inst_suffix:expr) => {
+        #[derive(Clone, Debug)]
+        pub struct $ty_name(Operand, Operand);
+        impl $ty_name {
+            pub fn new(dst: Operand, src: Operand) -> Self {
+                Self(dst, src)
+            }
+            pub fn dst(&self) -> &Operand {
+                &self.0
+            }
+            pub fn src(&self) -> &Operand {
+                &self.1
+            }
+            pub fn dst_mut(&mut self) -> &mut Operand {
+                &mut self.0
+            }
+            pub fn src_mut(&mut self) -> &mut Operand {
+                &mut self.1
+            }
+            pub fn gen_asm(&self) -> String {
+                let dst = self.dst().gen_asm();
+                let src = self.src().gen_asm();
+                format!("{} {},{},{}", $inst_name, dst, src, $inst_suffix)
+            }
+        }
+        impl RegDefs for $ty_name {
+            fn defs(&self) -> Vec<&Reg> {
+                if let Operand::Reg(reg) = self.dst() {
+                    vec![reg]
+                } else {
+                    vec![]
+                }
+            }
+        }
+        impl RegUses for $ty_name {
+            fn uses(&self) -> Vec<&Reg> {
+                if let Operand::Reg(reg) = self.src() {
+                    vec![reg]
+                } else {
+                    vec![]
+                }
+            }
+        }
+    };
 }
 
 #[macro_export]
