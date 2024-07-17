@@ -48,6 +48,8 @@ impl RegUses for Inst {
             Inst::Tail(_) => vec![],
             Inst::Li(inst) => inst.uses(),
             Inst::Seqz(inst) => inst.uses(),
+            Inst::I2fInst(i2f) => i2f.uses(),
+            Inst::F2iInst(f2i) => f2i.uses(),
         }
     }
 }
@@ -87,6 +89,8 @@ impl RegDefs for Inst {
             Inst::Slt(inst) => inst.defs(),
             Inst::Li(inst) => inst.defs(),
             Inst::Seqz(inst) => inst.defs(),
+            Inst::I2fInst(i2f) => i2f.defs(),
+            Inst::F2iInst(f2i) => f2i.defs(),
         }
     }
 }
