@@ -26,6 +26,16 @@ impl IRBuilder {
     pub fn is_ty_void(ty: &llvm_ir::Type) -> bool {
         matches!(ty, llvm_ir::Type::VoidType)
     }
+    pub fn new_var(ty: &llvm_ir::Type, reg_gener: &mut RegGenerator) -> Result<Reg> {
+        let dst_reg = if Self::is_ty_int(ty) {
+            reg_gener.gen_virtual_usual_reg()
+        } else if Self::is_ty_float(ty) {
+            reg_gener.gen_virtual_float_reg()
+        } else {
+            unimplemented!();
+        };
+        Ok(dst_reg)
+    }
 
     pub fn stack_slot_from(
         operand: &llvm_ir::Operand,

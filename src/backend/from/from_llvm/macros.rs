@@ -1,5 +1,5 @@
 #[macro_export]
-macro_rules! llvm2tac_binary_usual {
+macro_rules! llvm2tac_three_op_usual {
     ($tac_inst_ty:ident,$inst:ident, $reg_gener:ident,$regs:ident) => {{
         let op0 = &Self::value_from(&$inst.operand0, $regs)?;
         let op1 = &Self::value_from(&$inst.operand1, $regs)?;

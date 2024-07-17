@@ -1,4 +1,4 @@
-use crate::llvm2tac_binary_usual;
+use crate::llvm2tac_three_op_usual;
 
 use super::*;
 use builder::IRBuilder;
@@ -16,24 +16,36 @@ impl IRBuilder {
     ) -> Result<Vec<Inst>> {
         // dbg!(&inst);
         match inst {
-            llvm_ir::Instruction::Add(add) => llvm2tac_binary_usual!(AddInst, add, reg_gener, regs),
-            llvm_ir::Instruction::Sub(sub) => llvm2tac_binary_usual!(SubInst, sub, reg_gener, regs),
-            llvm_ir::Instruction::Mul(mul) => llvm2tac_binary_usual!(MulInst, mul, reg_gener, regs),
-            llvm_ir::Instruction::And(and) => llvm2tac_binary_usual!(AndInst, and, reg_gener, regs),
-            llvm_ir::Instruction::Or(or) => llvm2tac_binary_usual!(OrInst, or, reg_gener, regs),
-            llvm_ir::Instruction::Xor(xor) => llvm2tac_binary_usual!(XorInst, xor, reg_gener, regs),
+            llvm_ir::Instruction::Add(add) => {
+                llvm2tac_three_op_usual!(AddInst, add, reg_gener, regs)
+            }
+            llvm_ir::Instruction::Sub(sub) => {
+                llvm2tac_three_op_usual!(SubInst, sub, reg_gener, regs)
+            }
+            llvm_ir::Instruction::Mul(mul) => {
+                llvm2tac_three_op_usual!(MulInst, mul, reg_gener, regs)
+            }
+            llvm_ir::Instruction::And(and) => {
+                llvm2tac_three_op_usual!(AndInst, and, reg_gener, regs)
+            }
+            llvm_ir::Instruction::Or(or) => llvm2tac_three_op_usual!(OrInst, or, reg_gener, regs),
+            llvm_ir::Instruction::Xor(xor) => {
+                llvm2tac_three_op_usual!(XorInst, xor, reg_gener, regs)
+            }
             llvm_ir::Instruction::SRem(srem) => {
-                llvm2tac_binary_usual!(RemInst, srem, reg_gener, regs)
+                llvm2tac_three_op_usual!(RemInst, srem, reg_gener, regs)
             }
             // process logical shift right
             llvm_ir::Instruction::LShr(lshr) => {
-                llvm2tac_binary_usual!(SrlInst, lshr, reg_gener, regs)
+                llvm2tac_three_op_usual!(SrlInst, lshr, reg_gener, regs)
             }
             // process logical shift left
-            llvm_ir::Instruction::Shl(shl) => llvm2tac_binary_usual!(SllInst, shl, reg_gener, regs),
+            llvm_ir::Instruction::Shl(shl) => {
+                llvm2tac_three_op_usual!(SllInst, shl, reg_gener, regs)
+            }
             // process arithmetic shift right
             llvm_ir::Instruction::AShr(ashr) => {
-                llvm2tac_binary_usual!(SraInst, ashr, reg_gener, regs)
+                llvm2tac_three_op_usual!(SraInst, ashr, reg_gener, regs)
             }
             llvm_ir::Instruction::UDiv(_) => todo!(),
             llvm_ir::Instruction::SDiv(_) => todo!(),
@@ -58,10 +70,7 @@ impl IRBuilder {
             llvm_ir::Instruction::Store(store) => {
                 Self::build_store_inst(store, stack_slots, reg_gener, regs)
             }
-            llvm_ir::Instruction::SIToFP(si2f) => {
-                dbg!(si2f);
-                unimplemented!();
-            }
+            llvm_ir::Instruction::SIToFP(si2f) => Self::build_si2f_inst(si2f, reg_gener, regs),
             llvm_ir::Instruction::Fence(_) => todo!(),
             llvm_ir::Instruction::CmpXchg(_) => todo!(),
             llvm_ir::Instruction::AtomicRMW(_) => todo!(),
@@ -143,6 +152,22 @@ impl IRBuilder {
         Ok(ret)
     }
 
+    fn build_si2f_inst(
+        si2f: &llvm_ir::instruction::SIToFP,
+        reg_gener: &mut RegGenerator,
+        regs: &mut HashMap<Name, Reg>,
+    ) -> Result<Vec<Inst>> {
+        let op = Self::local_var_from(&si2f.operand, regs)?;
+        let dst = Self::new_var(&si2f.to_type, reg_gener)?;
+        regs.insert(si2f.dest.clone(), dst);
+        let inst: Inst = if dst.is_usual() {
+            F2iInst::new(dst.into(), op).into()
+        } else {
+            I2fInst::new(dst.into(), op).into()
+        };
+        Ok(vec![inst])
+    }
+
     /// alloca instruction only instruct allocating memory on stack,not generate one-one instruction
     fn build_alloca_inst(
         alloca: &llvm_ir::instruction::Alloca,
@@ -207,7 +232,6 @@ impl IRBuilder {
         Ok(ret)
     }
 
-    #[allow(unused)]
     pub fn build_load_inst(
         load: &llvm_ir::instruction::Load,
         stack_slots: &mut HashMap<Name, StackSlot>,
@@ -219,13 +243,7 @@ impl IRBuilder {
         if regs.contains_key(&load.dest) {
             unimplemented!();
         }
-        let dst_reg = if Self::is_ty_int(&load.loaded_ty) {
-            reg_gener.gen_virtual_usual_reg()
-        } else if Self::is_ty_float(&load.loaded_ty) {
-            reg_gener.gen_virtual_float_reg()
-        } else {
-            unimplemented!();
-        };
+        let dst_reg = Self::new_var(&load.loaded_ty, reg_gener)?;
         regs.insert(load.dest.clone(), dst_reg);
         if let Ok(stack_slot) = Self::stack_slot_from(&load.address, stack_slots) {
             let ld = LoadInst::new(dst_reg, stack_slot.try_into()?);
