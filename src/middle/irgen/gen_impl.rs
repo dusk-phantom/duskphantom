@@ -75,6 +75,14 @@ impl<'a> ProgramKit<'a> {
 
                 // Generate statements
                 kit.gen_stmt(stmt)?;
+
+                // If kit still has exit, it did not return, so redirect it to return
+                if let Some(mut kit_exit) = kit.exit {
+                    kit_exit.push_back(kit.program.mem_pool.get_br(None));
+                    kit_exit.set_true_bb(exit);
+                }
+
+                // Set function entry and exit
                 fun_ptr.entry = Some(entry);
                 fun_ptr.exit = Some(exit);
                 Ok(())
