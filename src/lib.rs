@@ -76,10 +76,11 @@ pub fn compile_clang(
 
     let mut program = clang_frontend::Program::parse(src_file);
     if opt_flag {
-        clang_frontend::optimize(&mut program);
+        clang_frontend::optimize(&mut program)?;
     }
     if let Some(ll_path) = ll_path {
-        std::fs::write(ll_path, program.gen_ll()).map_err(CompilerError::IOError)?;
+        std::fs::write(ll_path, program.gen_ll().with_context(|| context!())?)
+            .map_err(CompilerError::IOError)?;
     }
     let mut program = backend::gen_from_clang(&program)
         .map_err(|e| BackendError::GenFromLlvmError(format!("{e:?}")))?;
@@ -118,10 +119,11 @@ pub fn compile_clang_llc(
 ) -> Result<(), CompilerError> {
     let mut program = clang_frontend::Program::parse(src_file);
     if opt_flag {
-        clang_frontend::optimize(&mut program);
+        clang_frontend::optimize(&mut program)?;
     }
     if let Some(ll_path) = ll_path {
-        std::fs::write(ll_path, program.gen_ll()).map_err(CompilerError::IOError)?;
+        std::fs::write(ll_path, program.gen_ll().with_context(|| context!())?)
+            .map_err(CompilerError::IOError)?;
     }
     let mut program = clang_backend::gen_from_clang(&program)?;
     if opt_flag {
