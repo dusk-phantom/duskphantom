@@ -54,7 +54,7 @@ impl<'a> FunctionKit<'a> {
                 // Add statements and br to then branch
                 // Retain break_to and continue_to
                 let then_exit = self
-                    .gen_function_kit(then_entry, self.break_to, self.continue_to)
+                    .gen_function_kit(Some(then_entry), self.break_to, self.continue_to)
                     .gen_stmt(then)?
                     .exit;
                 if let Some(mut then_exit) = then_exit {
@@ -64,7 +64,7 @@ impl<'a> FunctionKit<'a> {
 
                 // Add statements and br to alt branch
                 let alt_exit = self
-                    .gen_function_kit(alt_entry, self.break_to, self.continue_to)
+                    .gen_function_kit(Some(alt_entry), self.break_to, self.continue_to)
                     .gen_stmt(alt)?
                     .exit;
                 if let Some(mut alt_exit) = alt_exit {
@@ -90,7 +90,7 @@ impl<'a> FunctionKit<'a> {
 
                 // Add statements and br to body block
                 let body_exit = self
-                    .gen_function_kit(body_entry, Some(final_entry), Some(cond_entry))
+                    .gen_function_kit(Some(body_entry), Some(final_entry), Some(cond_entry))
                     .gen_stmt(body)?
                     .exit;
                 if let Some(mut body_exit) = body_exit {
@@ -125,7 +125,7 @@ impl<'a> FunctionKit<'a> {
 
                 // Add statements and br to body block
                 let body_exit = self
-                    .gen_function_kit(body_entry, Some(final_entry), Some(cond_entry))
+                    .gen_function_kit(Some(body_entry), Some(final_entry), Some(cond_entry))
                     .gen_stmt(body)?
                     .exit;
                 if let Some(mut body_exit) = body_exit {
@@ -201,12 +201,20 @@ impl<'a> FunctionKit<'a> {
                 }
             }
             Stmt::Block(stmts) => {
+                // A block is an encapsulated scope, create a new FunctionKit for it
+                let mut kit = self.gen_function_kit(self.exit, self.break_to, self.continue_to);
+
                 // Add statements to current block
                 for stmt in stmts.iter() {
-                    if self.exit.is_some() {
-                        self.gen_stmt(stmt)?;
+                    if kit.exit.is_some() {
+                        kit.gen_stmt(stmt)?;
                     }
                 }
+
+                // Rewire exit
+                let exit = kit.exit;
+                drop(kit);
+                self.exit = exit;
             }
         }
         Ok(self)

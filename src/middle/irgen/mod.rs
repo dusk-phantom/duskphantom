@@ -1,7 +1,8 @@
+use std::collections::HashMap;
+
 use crate::{frontend, middle};
 use anyhow::Result;
 use program_kit::ProgramKit;
-use std::collections::HashMap;
 
 mod constant;
 mod function_kit;
@@ -25,8 +26,8 @@ pub fn gen(program: &frontend::Program) -> Result<middle::Program> {
     let mut result = middle::Program::new();
     ProgramKit {
         program: &mut result,
-        env: &mut HashMap::new(),
-        fun_env: &mut HashMap::new(),
+        env: &mut vec![HashMap::new()],
+        fun_env: &mut vec![HashMap::new()],
     }
     .gen(program)?;
     Ok(result)
@@ -1481,6 +1482,62 @@ mod tests {
         %getelementptr_8 = getelementptr [7 x i32], ptr @format0, i32 0, i32 0
         %load_9 = load i32, ptr %alloca_5
         call void @putf(i32* %getelementptr_8, i32 %load_9)
+        store i32 0, ptr %alloca_2
+        br label %exit
+
+        exit:
+        %load_3 = load i32, ptr %alloca_2
+        ret i32 %load_3
+
+
+        }
+        "###);
+    }
+
+    #[test]
+    fn test_hidden_var() {
+        let code = r#"
+            int b = 5;
+            int c[4] = {6, 7, 8, 9};
+
+            int main()
+            {
+                {
+                    int c[2][8] = {};
+                }
+                if (c[2]) {
+                    putch(10);
+                }
+                return 0;
+            }
+        "#;
+        let program = parse(code).unwrap();
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_snapshot!(llvm_ir, @r###"
+        @b = dso_local global i32 5
+        @c = dso_local global [4 x i32] [i32 6, i32 7, i32 8, i32 9]
+        define i32 @main() {
+        entry:
+        %alloca_2 = alloca i32
+        %alloca_5 = alloca [2 x [8 x i32]]
+        %getelementptr_6 = getelementptr [2 x [8 x i32]], ptr %alloca_5, i32 0, i32 0
+        br label %cond0
+
+        cond0:
+        %getelementptr_12 = getelementptr [4 x i32], ptr @c, i32 0, i32 2
+        %load_13 = load i32, ptr %getelementptr_12
+        %icmp_14 = icmp ne i32 %load_13, 0
+        br i1 %icmp_14, label %then1, label %alt2
+
+        then1:
+        call void @putch(i32 10)
+        br label %final3
+
+        alt2:
+        br label %final3
+
+        final3:
         store i32 0, ptr %alloca_2
         br label %exit
 

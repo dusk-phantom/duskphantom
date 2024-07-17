@@ -11,7 +11,7 @@ impl<'a> ProgramKit<'a> {
         match expr {
             Expr::Var(x) => {
                 // Ensure variable is defined
-                let Some(val) = self.env.get(x) else {
+                let Some(val) = self.get_env(x) else {
                     return Err(anyhow!("variable not defined")).with_context(|| context!());
                 };
 

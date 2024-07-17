@@ -151,7 +151,11 @@ pub fn compile_self_llc(
         middle::optimize(&mut program);
     }
     // 中端接clang
-    let llvm_ir = program.module.gen_llvm_ir();
+    let llvm_ir = format!(
+        "{}\n{}",
+        include_str!("../lib/sylib.ll"),
+        program.module.gen_llvm_ir()
+    );
     let mut builder = tempfile::Builder::new();
     let tmp_cfile = builder.suffix(".c").tempfile().unwrap();
     let tmp_llvm_file = builder.suffix(".ll").tempfile().unwrap();

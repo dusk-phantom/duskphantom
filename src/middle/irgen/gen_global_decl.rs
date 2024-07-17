@@ -48,8 +48,7 @@ impl<'a> ProgramKit<'a> {
                 );
 
                 // Add global variable (pointer) to environment
-                self.env
-                    .insert(name.clone(), Value::ReadWrite(global_val.into()));
+                self.insert_env(name.clone(), Value::ReadWrite(global_val.into()));
 
                 // Add global variable to program
                 self.program.module.global_variables.push(global_val);
@@ -73,7 +72,7 @@ impl<'a> ProgramKit<'a> {
                 }
 
                 // Add function to environment
-                self.fun_env.insert(id.clone(), fun_ptr);
+                self.insert_fun_env(id.clone(), fun_ptr);
 
                 // Add function to program
                 self.program.module.functions.push(fun_ptr);

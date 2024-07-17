@@ -10,7 +10,7 @@ impl<'a> ProgramKit<'a> {
                 .program
                 .mem_pool
                 .new_function(name.to_string(), return_ty);
-            self.fun_env.insert(name.to_string(), fun_ptr);
+            self.insert_fun_env(name.to_string(), fun_ptr);
 
             // Insert parameters
             for (i, ty) in param_ty.iter().enumerate() {
