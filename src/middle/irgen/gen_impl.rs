@@ -1,9 +1,9 @@
-use crate::errors::MiddleError;
 use crate::frontend::Decl;
 use crate::middle::ir::ValueType;
 use crate::middle::irgen::function_kit::FunctionKit;
 use crate::middle::irgen::program_kit::ProgramKit;
 use crate::middle::irgen::value::Value;
+use crate::{errors::MiddleError, middle::ir::InstPtr};
 
 use super::function_kit::{FunctionContext, FunctionRouting};
 
@@ -40,24 +40,6 @@ impl<'a> ProgramKit<'a> {
                     ret_value = Some(Value::ReadWrite(ret_alloc.into()));
                 }
 
-                // Fill parameters
-                for param in fun_ptr.params.iter() {
-                    // Add parameter to entry
-                    let alloc = self
-                        .program
-                        .mem_pool
-                        .get_alloca(param.value_type.clone(), 1);
-                    let store = self
-                        .program
-                        .mem_pool
-                        .get_store((*param).into(), alloc.into());
-                    entry.push_back(alloc);
-                    entry.push_back(store);
-
-                    // Add parameter to env
-                    self.insert_env(param.name.clone(), Value::ReadWrite(alloc.into()));
-                }
-
                 // Build function
                 let mut counter: usize = 0;
                 let mut kit = FunctionKit::new(
@@ -76,6 +58,22 @@ impl<'a> ProgramKit<'a> {
                         return_type: fty,
                     },
                 );
+
+                // Fill parameters
+                for param in fun_ptr.params.iter() {
+                    // Add parameter to entry
+                    let value_type = param.value_type.clone();
+                    let value = (*param).into();
+                    let alloc: InstPtr = kit.program.mem_pool.get_alloca(value_type, 1);
+                    let store: InstPtr = kit.program.mem_pool.get_store(value, alloc.into());
+                    entry.push_back(alloc);
+                    entry.push_back(store);
+
+                    // Add parameter to function env
+                    kit.insert_env(param.name.clone(), Value::ReadWrite(alloc.into()));
+                }
+
+                // Generate statements
                 kit.gen_stmt(stmt)?;
                 fun_ptr.entry = Some(entry);
                 fun_ptr.exit = Some(exit);
