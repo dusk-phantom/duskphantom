@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use super::*;
 
 // turn virtual backend module to phisic backend module
@@ -6,30 +8,36 @@ pub fn phisicalize(program: &mut Program) -> Result<(), BackendError> {
     for module in program.modules.iter_mut() {
         for func in module.funcs.iter_mut() {
             // count stack size: 统计栈大小,首先遍历每个块每条指令,统计中函数调用的最大栈大小
-            let stack_size = func
-                .stack_allocator()
-                .ok_or(anyhow!("virtual stack allocator not found"))
-                .with_context(|| context!())?
-                .allocated();
-            dbg!(func.name());
-            dbg!(stack_size);
-            dbg!(Func::in_out_bbs(func));
-            dbg!(Func::reg_interfere_graph(func));
-            // alloc reg: 调用寄存器分配算法,获得分配结果,其中包括寄存器溢出需要的空间
+            let mut stack_allocator = func
+                .stack_allocator_mut()
+                .take()
+                .expect("msg: stack allocator not found");
+            // 该情况下仅仅使用临时寄存器参与运算
+            let i_regs = [REG_T0, REG_T1, REG_T2];
+            let f_regs = [REG_FT0, REG_FT1, REG_FT2];
+            // 对于遇到的每个寄存器,为其分配栈上空间
+            let mut v_ss: HashMap<Reg, StackSlot> = HashMap::new();
+            for v_r in func.v_regs() {
+                v_ss.insert(v_r, stack_allocator.alloc(8));
+            }
+            // 对于每个块,遍历每个指令,涉及到栈的指令,将其替换为栈上的指令
+            for bb in func.iter_bbs_mut() {
+                let mut new_insts: Vec<Inst> = Vec::new();
+                for inst in bb.insts() {
+                    todo!();
+                }
+                *bb.insts_mut() = new_insts;
+            }
 
-            // count caller save: 计算保存caller save需要的栈空间 max(caller_save(call[i])),这一步应该在寄存器分配之后进行
+            // TODO: 为函数开头和结尾插入callee-save regs的保存和恢复
 
-            // count callee save: 计算保存callee save需要的栈空间,这一步应该在寄存器分配之后进行
+            // TODO: 为call指令前后插入caller-save regs的保存和恢复
 
-            // count return value: 计算返回值需要的栈空间,返回值的栈空间以栈底作为起点 (略,因为只返回int或者float)
+            // TODO: 计算此时的栈空间,16字节对齐
 
-            // process_long_address: 检测是否有长地址访问,如果有,则使用保留寄存器处理长地址访问问题
+            // TODO: 为函数开头和结尾插入栈的开辟和关闭,ra寄存器的保存和恢复,s0寄存器的保存和恢复
 
-            // apply reg alloc: 实施寄存器分配结果,插入spill 指令,使用t0-t3三个寄存器处理寄存器溢出问题
-
-            // apply caller save: 插入保存caller save的指令
-
-            // apply callee save: 插入保存callee save的指令
+            // TODO: 替换所有使用的内存操作伪指令 为 实际的内存操作指令,比如load a0,[0-8] 修改为ld a0,0(sp)
         }
     }
     Ok(())

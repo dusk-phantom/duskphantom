@@ -49,10 +49,14 @@ macro_rules! impl_three_op_inst {
         impl RegUses for $ty_name {
             fn uses(&self) -> Vec<&Reg> {
                 let mut regs = vec![];
-                if let Operand::Reg(reg) = self.lhs() {
-                    regs.push(reg);
-                }
-                if let Operand::Reg(reg) = self.rhs() {
+                if let Operand::Reg(r1) = self.lhs() {
+                    regs.push(r1);
+                    if let Operand::Reg(r2) = self.rhs() {
+                        if r2 != r1 {
+                            regs.push(r2);
+                        }
+                    }
+                } else if let Operand::Reg(reg) = self.rhs() {
                     regs.push(reg);
                 }
                 regs
@@ -70,25 +74,31 @@ macro_rules! impl_branch_inst {
             pub fn new(dst: Reg, lhs: Reg, rhs: Label) -> Self {
                 Self(dst, lhs, rhs)
             }
+            #[inline]
             pub fn lhs(&self) -> &Reg {
                 &self.0
             }
+            #[inline]
             pub fn rhs(&self) -> &Reg {
-                &self.0
+                &self.1
             }
+            #[inline]
             pub fn lhs_mut(&mut self) -> &mut Reg {
-                &mut self.1
+                &mut self.0
             }
+            #[inline]
             pub fn rhs_mut(&mut self) -> &mut Reg {
                 &mut self.1
             }
+            #[inline]
             pub fn label(&self) -> &Label {
                 &self.2
             }
+            #[inline]
             pub fn label_mut(&mut self) -> &mut Label {
                 &mut self.2
             }
-
+            #[inline]
             pub fn gen_asm(&self) -> String {
                 let lhs = self.lhs().gen_asm();
                 let rhs = self.rhs().gen_asm();
@@ -103,7 +113,12 @@ macro_rules! impl_branch_inst {
         }
         impl RegUses for $ty_name {
             fn uses(&self) -> Vec<&Reg> {
-                vec![self.lhs(), self.rhs()]
+                let (l, r) = (self.lhs(), self.rhs());
+                if l == r {
+                    vec![l]
+                } else {
+                    vec![l, r]
+                }
             }
         }
         impl ToBB for $ty_name {

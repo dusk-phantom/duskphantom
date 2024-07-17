@@ -156,4 +156,14 @@ mod tests {
         assert_eq!(seqz.uses(), vec![&src]);
         assert_eq!(seqz.defs(), vec![&dst]);
     }
+    #[test]
+    fn test_repeat() {
+        let mul = MulInst::new(REG_A0.into(), REG_A0.into(), REG_A0.into());
+        assert_eq!(mul.uses(), vec![&REG_A0]);
+        assert_eq!(mul.defs(), vec![&REG_A0]);
+        let beq = BeqInst::new(REG_A0, REG_A0, "a".into());
+        assert_eq!(beq.uses(), vec![&REG_A0]);
+        let beq2 = BeqInst::new(REG_A0, REG_A1, "a".into());
+        assert_eq!(beq2.uses(), vec![&REG_A0, &REG_A1]);
+    }
 }
