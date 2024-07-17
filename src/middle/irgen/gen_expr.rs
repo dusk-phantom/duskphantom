@@ -87,7 +87,7 @@ impl<'a> FunctionKit<'a> {
                 Ok(Value::ReadOnly(inst.into()))
             }
             Expr::Unary(op, expr) => self.gen_unary(op, expr),
-            Expr::Binary(op, lhs, rhs) => self.gen_binary(op, lhs, rhs),
+            Expr::Binary(head, tail) => self.gen_binary(head, tail),
             Expr::Conditional(_, _, _) => {
                 Err(anyhow!("conditional not supported")).with_context(|| context!())
             }
