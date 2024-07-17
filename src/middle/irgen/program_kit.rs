@@ -8,8 +8,8 @@ use std::collections::HashMap;
 
 /// Kit for translating a program to middle IR
 pub struct ProgramKit<'a> {
-    pub env: &'a mut HashMap<String, Value>,
-    pub fun_env: &'a mut HashMap<String, FunPtr>,
+    pub env: &'a mut Vec<HashMap<String, Value>>,
+    pub fun_env: &'a mut Vec<HashMap<String, FunPtr>>,
     pub program: &'a mut middle::Program,
 }
 
@@ -24,6 +24,36 @@ impl<'a> ProgramKit<'a> {
             self.gen_impl(decl)?;
         }
         Ok(())
+    }
+
+    /// Get from environment
+    pub fn get_env(&self, name: &str) -> Option<Value> {
+        for frame in self.env.iter().rev() {
+            if let Some(val) = frame.get(name) {
+                return Some(val.clone());
+            }
+        }
+        None
+    }
+
+    /// Insert to environment
+    pub fn insert_env(&mut self, name: String, value: Value) {
+        self.env.last_mut().unwrap().insert(name, value);
+    }
+
+    /// Get from func environment
+    pub fn get_fun_env(&self, name: &str) -> Option<FunPtr> {
+        for frame in self.fun_env.iter().rev() {
+            if let Some(val) = frame.get(name) {
+                return Some(*val);
+            }
+        }
+        None
+    }
+
+    /// Insert to func environment
+    pub fn insert_fun_env(&mut self, name: String, value: FunPtr) {
+        self.fun_env.last_mut().unwrap().insert(name, value);
     }
 
     /// Translate a frontend type to IR value type

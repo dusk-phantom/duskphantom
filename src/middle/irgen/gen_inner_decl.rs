@@ -43,14 +43,14 @@ impl<'a> FunctionKit<'a> {
                 };
 
                 // Add value to environment
-                self.env.insert(id.clone(), val);
+                self.insert_env(id.clone(), val);
                 Ok(())
             }
             Decl::Var(raw_ty, id, op) => {
                 // Allocate space for variable, add to environment
                 let ty = self.gen_program_kit().translate_type(raw_ty)?;
                 let lhs = alloc(ty.clone(), self);
-                self.env.insert(id.clone(), lhs.clone());
+                self.insert_env(id.clone(), lhs.clone());
 
                 // Assign to the variable if it is defined
                 if let Some(expr) = op {

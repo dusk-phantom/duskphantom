@@ -5,16 +5,15 @@ use crate::middle::irgen::function_kit::FunctionKit;
 use crate::middle::irgen::program_kit::ProgramKit;
 use crate::middle::irgen::value::Value;
 
+use super::function_kit::{FunctionContext, FunctionRouting};
+
 impl<'a> ProgramKit<'a> {
     /// Generate an implementation into the program
     pub fn gen_impl(&mut self, decl: &Decl) -> anyhow::Result<()> {
         match decl {
             Decl::Func(_, id, Some(stmt)) => {
-                // Clone function env before mutating it
-                let cloned_fun_env = self.fun_env.clone();
-
                 // Get function and its type
-                let fun_ptr = self.fun_env.get_mut(id).ok_or(MiddleError::GenError)?;
+                let mut fun_ptr = self.get_fun_env(id).ok_or(MiddleError::GenError)?;
                 let fty = fun_ptr.return_type.clone();
 
                 // Create basic block
@@ -56,24 +55,27 @@ impl<'a> ProgramKit<'a> {
                     entry.push_back(store);
 
                     // Add parameter to env
-                    self.env
-                        .insert(param.name.clone(), Value::ReadWrite(alloc.into()));
+                    self.insert_env(param.name.clone(), Value::ReadWrite(alloc.into()));
                 }
 
                 // Build function
                 let mut counter: usize = 0;
-                let mut kit = FunctionKit {
-                    program: self.program,
-                    env: self.env.clone(),
-                    fun_env: cloned_fun_env,
-                    exit: Some(entry),
-                    break_to: None,
-                    continue_to: None,
-                    return_to: exit,
-                    return_value: ret_value,
-                    return_type: fty,
-                    counter: &mut counter,
-                };
+                let mut kit = FunctionKit::new(
+                    FunctionContext {
+                        env: self.env,
+                        fun_env: self.fun_env,
+                        program: self.program,
+                        counter: &mut counter,
+                    },
+                    FunctionRouting {
+                        exit: Some(entry),
+                        break_to: None,
+                        continue_to: None,
+                        return_to: exit,
+                        return_value: ret_value,
+                        return_type: fty,
+                    },
+                );
                 kit.gen_stmt(stmt)?;
                 fun_ptr.entry = Some(entry);
                 fun_ptr.exit = Some(exit);
