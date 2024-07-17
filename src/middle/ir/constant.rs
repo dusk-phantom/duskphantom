@@ -12,7 +12,15 @@ impl std::fmt::Display for Constant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Constant::Int(i) => write!(f, "{}", i),
-            Constant::Float(fl) => write!(f, "{}", fl),
+            Constant::Float(fl) => {
+                // write float in hexidemal form (IEEE-754) like 0x1234567800000000
+                let bytes = (*fl as f64).to_le_bytes();
+                write!(f, "0x")?;
+                for byte in bytes.iter().rev() {
+                    write!(f, "{:02x}", byte)?;
+                }
+                Ok(())
+            }
             Constant::Bool(b) => write!(f, "{}", b),
             Constant::Array(arr) => {
                 write!(f, "[")?;
