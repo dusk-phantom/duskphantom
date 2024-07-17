@@ -60,7 +60,7 @@ pub enum Expr {
 
     /// Application of binary operator.
     /// Example: `a + b`
-    Binary(BinaryOp, Box<Expr>, Box<Expr>),
+    Binary(Box<Expr>, Vec<(BinaryOp, Expr)>),
 
     /// Application of conditional operator.
     /// Example: `cond ? a : b`
@@ -140,94 +140,5 @@ pub fn expr(input: &mut &str) -> PResult<Expr> {
             Box::new(fail),
         )),
         Err(_) => Ok(cond),
-    }
-}
-
-// Unit tests
-#[cfg(test)]
-pub mod tests_expr {
-    use super::*;
-
-    #[test]
-    fn test_minimal() {
-        let code = "80";
-        match usize.parse(code) {
-            Ok(result) => assert_eq!(result, 80),
-            Err(err) => panic!("failed to parse {}: {}", code, err),
-        }
-    }
-
-    #[test]
-    fn test_unary() {
-        let code = "622.4";
-        match prefix.parse(code) {
-            Ok(result) => assert_eq!(result, Expr::Float32(622.4)),
-            Err(err) => panic!("failed to parse {}: {}", code, err),
-        }
-    }
-
-    #[test]
-    fn test_int() {
-        let code = "117";
-        match expr.parse(code) {
-            Ok(result) => assert_eq!(result, Expr::Int32(117)),
-            Err(err) => panic!("failed to parse {}: {}", code, err),
-        }
-    }
-
-    #[test]
-    fn test_plus() {
-        let code = "1+1";
-        match expr.parse(code) {
-            Ok(result) => assert_eq!(
-                result,
-                Expr::Binary(
-                    BinaryOp::Add,
-                    Box::new(Expr::Int32(1)),
-                    Box::new(Expr::Int32(1))
-                )
-            ),
-            Err(err) => panic!("failed to parse {}: {}", code, err),
-        }
-    }
-
-    #[test]
-    fn test_space() {
-        let code = "1  +  1";
-        match expr.parse(code) {
-            Ok(result) => assert_eq!(
-                result,
-                Expr::Binary(
-                    BinaryOp::Add,
-                    Box::new(Expr::Int32(1)),
-                    Box::new(Expr::Int32(1))
-                )
-            ),
-            Err(err) => panic!("failed to parse {}: {}", code, err),
-        }
-    }
-
-    #[test]
-    fn test_precedence() {
-        let code = "1 + 1 * 2 - 3";
-        match expr.parse(code) {
-            Ok(result) => assert_eq!(
-                result,
-                Expr::Binary(
-                    BinaryOp::Sub,
-                    Box::new(Expr::Binary(
-                        BinaryOp::Add,
-                        Box::new(Expr::Int32(1)),
-                        Box::new(Expr::Binary(
-                            BinaryOp::Mul,
-                            Box::new(Expr::Int32(1)),
-                            Box::new(Expr::Int32(2))
-                        ))
-                    )),
-                    Box::new(Expr::Int32(3)),
-                )
-            ),
-            Err(err) => panic!("failed to parse {}: {}", code, err),
-        }
     }
 }

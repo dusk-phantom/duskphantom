@@ -16,7 +16,7 @@ impl<'a> FunctionKit<'a> {
         match expr {
             Expr::Var(x) => {
                 // Ensure variable is defined
-                let Some(operand) = self.env.get(x) else {
+                let Some(operand) = self.get_env(x) else {
                     return Err(anyhow!("variable not defined")).with_context(|| context!());
                 };
 
@@ -49,10 +49,9 @@ impl<'a> FunctionKit<'a> {
                 let Expr::Var(func_name) = *func.clone() else {
                     return Err(anyhow!("function is not variable")).with_context(|| context!());
                 };
-                let Some(func_ref) = self.fun_env.get(&func_name) else {
+                let Some(func_ptr) = self.get_fun_env(&func_name) else {
                     return Err(anyhow!("function not defined")).with_context(|| context!());
                 };
-                let func_ptr = *func_ref;
 
                 // Generate arguments
                 let mut operands = Vec::new();
@@ -88,7 +87,7 @@ impl<'a> FunctionKit<'a> {
                 Ok(Value::ReadOnly(inst.into()))
             }
             Expr::Unary(op, expr) => self.gen_unary(op, expr),
-            Expr::Binary(op, lhs, rhs) => self.gen_binary(op, lhs, rhs),
+            Expr::Binary(head, tail) => self.gen_binary(head, tail),
             Expr::Conditional(_, _, _) => {
                 Err(anyhow!("conditional not supported")).with_context(|| context!())
             }
