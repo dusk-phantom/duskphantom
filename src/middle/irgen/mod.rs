@@ -1,7 +1,8 @@
+use std::collections::HashMap;
+
 use crate::{frontend, middle};
 use anyhow::Result;
 use program_kit::ProgramKit;
-use std::collections::HashMap;
 
 mod constant;
 mod function_kit;
@@ -25,8 +26,8 @@ pub fn gen(program: &frontend::Program) -> Result<middle::Program> {
     let mut result = middle::Program::new();
     ProgramKit {
         program: &mut result,
-        env: &mut HashMap::new(),
-        fun_env: &mut HashMap::new(),
+        env: &mut vec![HashMap::new()],
+        fun_env: &mut vec![HashMap::new()],
     }
     .gen(program)?;
     Ok(result)
@@ -553,7 +554,7 @@ mod tests {
         %alloca_5 = alloca i32
         store i32 1, ptr %alloca_5
         %alloca_7 = alloca float
-        store float 2, ptr %alloca_7
+        store float 0x4000000000000000, ptr %alloca_7
         %alloca_9 = alloca float
         %load_10 = load i32, ptr %alloca_5
         %itofp_11 = sitofp i32 %load_10 to float
@@ -652,7 +653,7 @@ mod tests {
         define i32 @main() {
         entry:
         %alloca_2 = alloca i32
-        %fptoi_5 = fptosi float 1.7 to i32
+        %fptoi_5 = fptosi float 0x3ffb333340000000 to i32
         %call_6 = call i32 @f(i32 %fptoi_5)
         store i32 %call_6, ptr %alloca_2
         br label %exit
@@ -792,7 +793,7 @@ mod tests {
     #[test]
     fn test_constant() {
         let code = r#"
-            const float PI = 3.1415926;
+            const float PI = 03.141592653589793;
 
             int main() {
                 return PI;
@@ -802,7 +803,7 @@ mod tests {
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
         assert_snapshot!(llvm_ir, @r###"
-        @PI = dso_local constant float 3.1415925
+        @PI = dso_local constant float 0x400921fb60000000
         define i32 @main() {
         entry:
         %alloca_2 = alloca i32
@@ -865,7 +866,7 @@ mod tests {
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
         assert_snapshot!(llvm_ir, @r###"
-        @A = dso_local constant [3 x [2 x [2 x float]]] [[2 x [2 x float]] [[2 x float] [float 1, float 0], [2 x float] [float 0, float 0]], [2 x [2 x float]] [[2 x float] [float 1, float 4], [2 x float] [float 5, float 1]], [2 x [2 x float]] [[2 x float] [float 4, float 0], [2 x float] [float 0, float 0]]]
+        @A = dso_local constant [3 x [2 x [2 x float]]] [[2 x [2 x float]] [[2 x float] [float 0x3ff0000000000000, float 0x0000000000000000], [2 x float] [float 0x0000000000000000, float 0x0000000000000000]], [2 x [2 x float]] [[2 x float] [float 0x3ff0000000000000, float 0x4010000000000000], [2 x float] [float 0x4014000000000000, float 0x3ff0000000000000]], [2 x [2 x float]] [[2 x float] [float 0x4010000000000000, float 0x0000000000000000], [2 x float] [float 0x0000000000000000, float 0x0000000000000000]]]
         define i32 @main() {
         entry:
         %alloca_2 = alloca i32
@@ -1141,7 +1142,7 @@ mod tests {
         entry:
         %alloca_2 = alloca i32
         %alloca_5 = alloca float
-        store float 5.4, ptr %alloca_5
+        store float 0x40159999a0000000, ptr %alloca_5
         %alloca_7 = alloca i32
         store i32 8, ptr %alloca_7
         %alloca_9 = alloca i32
@@ -1150,7 +1151,7 @@ mod tests {
 
         cond0:
         %load_16 = load float, ptr %alloca_5
-        %fcmp_17 = fcmp une float %load_16, 0
+        %fcmp_17 = fcmp une float %load_16, 0x0000000000000000
         br i1 %fcmp_17, label %then1, label %alt2
 
         then1:
@@ -1244,7 +1245,7 @@ mod tests {
         store i1 %icmp_6, ptr %alloca_5
         %alloca_8 = alloca i1
         %itofp_9 = sitofp i32 1 to float
-        %fcmp_10 = fcmp ult float %itofp_9, 1.1
+        %fcmp_10 = fcmp ult float %itofp_9, 0x3ff19999a0000000
         store i1 %fcmp_10, ptr %alloca_8
         %load_14 = load i1, ptr %alloca_5
         br i1 %load_14, label %alt0, label %final1
@@ -1359,9 +1360,9 @@ mod tests {
         %alloca_5 = alloca i32
         %call_6 = call i32 @getint()
         store i32 %call_6, ptr %alloca_5
-        %load_10 = load i32, ptr %alloca_5
-        %icmp_11 = icmp sgt i32 %load_10, 1
-        br i1 %icmp_11, label %alt0, label %final1
+        %load_8 = load i32, ptr %alloca_5
+        %icmp_9 = icmp sgt i32 %load_8, 1
+        br i1 %icmp_9, label %alt0, label %final1
 
         alt0:
         %load_13 = load i32, ptr %alloca_5
@@ -1424,9 +1425,9 @@ mod tests {
         br label %cond0
 
         cond0:
-        %load_15 = load i32, ptr %alloca_5
-        %icmp_16 = icmp sgt i32 %load_15, 1
-        br i1 %icmp_16, label %alt4, label %final5
+        %load_13 = load i32, ptr %alloca_5
+        %icmp_14 = icmp sgt i32 %load_13, 1
+        br i1 %icmp_14, label %alt4, label %final5
 
         alt4:
         %load_18 = load i32, ptr %alloca_5
@@ -1491,5 +1492,214 @@ mod tests {
 
         }
         "###);
+    }
+
+    #[test]
+    fn test_block_scope() {
+        let code = r#"
+            int b = 5;
+            int c[4] = {6, 7, 8, 9};
+
+            int main()
+            {
+                {
+                    int c[2][8] = {};
+                }
+                if (c[2]) {
+                    putch(10);
+                }
+                return 0;
+            }
+        "#;
+        let program = parse(code).unwrap();
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_snapshot!(llvm_ir, @r###"
+        @b = dso_local global i32 5
+        @c = dso_local global [4 x i32] [i32 6, i32 7, i32 8, i32 9]
+        define i32 @main() {
+        entry:
+        %alloca_2 = alloca i32
+        %alloca_5 = alloca [2 x [8 x i32]]
+        %getelementptr_6 = getelementptr [2 x [8 x i32]], ptr %alloca_5, i32 0, i32 0
+        br label %cond0
+
+        cond0:
+        %getelementptr_12 = getelementptr [4 x i32], ptr @c, i32 0, i32 2
+        %load_13 = load i32, ptr %getelementptr_12
+        %icmp_14 = icmp ne i32 %load_13, 0
+        br i1 %icmp_14, label %then1, label %alt2
+
+        then1:
+        call void @putch(i32 10)
+        br label %final3
+
+        alt2:
+        br label %final3
+
+        final3:
+        store i32 0, ptr %alloca_2
+        br label %exit
+
+        exit:
+        %load_3 = load i32, ptr %alloca_2
+        ret i32 %load_3
+
+
+        }
+        "###);
+    }
+
+    #[test]
+    fn test_function_scope() {
+        let code = r#"
+            int n;
+            int select_sort(int A[], int n)
+            {
+                return 0;
+            }
+            int main(){
+                n = 10;
+                return 0;
+            }
+        "#;
+        let program = parse(code).unwrap();
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_snapshot!(llvm_ir, @r###"
+        @n = dso_local global i32 0
+        define i32 @select_sort(i32* %A, i32 %n) {
+        entry:
+        %alloca_2 = alloca i32
+        %alloca_5 = alloca i32*
+        store i32* %A, ptr %alloca_5
+        %alloca_7 = alloca i32
+        store i32 %n, ptr %alloca_7
+        store i32 0, ptr %alloca_2
+        br label %exit
+
+        exit:
+        %load_3 = load i32, ptr %alloca_2
+        ret i32 %load_3
+
+
+        }
+        define i32 @main() {
+        entry:
+        %alloca_13 = alloca i32
+        store i32 10, ptr @n
+        store i32 0, ptr %alloca_13
+        br label %exit
+
+        exit:
+        %load_14 = load i32, ptr %alloca_13
+        ret i32 %load_14
+
+
+        }
+        "###);
+    }
+
+    #[test]
+    fn test_void() {
+        let code = r#"
+            void f() {}
+            
+            int main() {
+                f();
+                return 0;
+            }
+        "#;
+        let program = parse(code).unwrap();
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_snapshot!(llvm_ir, @r###"
+        define void @f() {
+        entry:
+        br label %exit
+
+        exit:
+        ret void
+
+
+        }
+        define i32 @main() {
+        entry:
+        %alloca_6 = alloca i32
+        call void @f()
+        store i32 0, ptr %alloca_6
+        br label %exit
+
+        exit:
+        %load_7 = load i32, ptr %alloca_6
+        ret i32 %load_7
+
+
+        }
+        "###);
+    }
+
+    #[test]
+    fn test_stack_overflow() {
+        let code = r#"
+int main() {
+    int a = 5;
+	int ans =
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 
+a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + a + 6 ;
+	return ans;
+}
+        "#;
+        let program = parse(code).unwrap();
+        let result = gen(&program).unwrap();
+        let _llvm_ir = result.module.gen_llvm_ir();
     }
 }

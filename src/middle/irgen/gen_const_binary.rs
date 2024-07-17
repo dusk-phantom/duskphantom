@@ -8,38 +8,49 @@ impl<'a> ProgramKit<'a> {
     /// Generate a binary expression
     pub fn gen_const_binary(
         &self,
-        op: &BinaryOp,
-        lhs: &Expr,
-        rhs: &Expr,
+        head: &Expr,
+        tail: &[(BinaryOp, Expr)],
     ) -> anyhow::Result<Constant> {
-        // Generate constants
-        let lv = self.gen_const_expr(lhs)?;
-        let rv = self.gen_const_expr(rhs)?;
+        let mut head = self.gen_const_expr(head)?;
 
-        // Apply operation
-        match op {
-            BinaryOp::Add => Ok(lv + rv),
-            BinaryOp::Sub => Ok(lv - rv),
-            BinaryOp::Mul => Ok(lv * rv),
-            BinaryOp::Div => Ok(lv / rv),
-            BinaryOp::Mod => Ok(lv % rv),
-            BinaryOp::Shr => Err(anyhow!("shr is not implemented yet")).with_context(|| context!()),
-            BinaryOp::Shl => Err(anyhow!("shl is not implemented yet")).with_context(|| context!()),
-            BinaryOp::BitAnd => Err(anyhow!("bitand not implemented")).with_context(|| context!()),
-            BinaryOp::BitOr => Err(anyhow!("bitor not implemented")).with_context(|| context!()),
-            BinaryOp::BitXor => Err(anyhow!("bitxor not implemented")).with_context(|| context!()),
-            BinaryOp::Gt => Ok(Constant::Bool(lv > rv)),
-            BinaryOp::Lt => Ok(Constant::Bool(lv < rv)),
-            BinaryOp::Ge => Ok(Constant::Bool(lv >= rv)),
-            BinaryOp::Le => Ok(Constant::Bool(lv <= rv)),
-            BinaryOp::Eq => Ok(Constant::Bool(lv == rv)),
-            BinaryOp::Ne => Ok(Constant::Bool(lv != rv)),
-            BinaryOp::And => Ok(Constant::Bool(
-                Into::<bool>::into(lv) && Into::<bool>::into(rv),
-            )),
-            BinaryOp::Or => Ok(Constant::Bool(
-                Into::<bool>::into(lv) || Into::<bool>::into(rv),
-            )),
+        // Iterate through the tail
+        for (op, expr) in tail {
+            let expr = self.gen_const_expr(expr)?;
+            head = match op {
+                BinaryOp::Add => head + expr,
+                BinaryOp::Sub => head - expr,
+                BinaryOp::Mul => head * expr,
+                BinaryOp::Div => head / expr,
+                BinaryOp::Mod => head % expr,
+                BinaryOp::Shr => {
+                    return Err(anyhow!("shr is not implemented yet")).with_context(|| context!());
+                }
+                BinaryOp::Shl => {
+                    return Err(anyhow!("shl is not implemented yet")).with_context(|| context!());
+                }
+                BinaryOp::BitAnd => {
+                    return Err(anyhow!("bitand not implemented")).with_context(|| context!());
+                }
+                BinaryOp::BitOr => {
+                    return Err(anyhow!("bitor not implemented")).with_context(|| context!());
+                }
+                BinaryOp::BitXor => {
+                    return Err(anyhow!("bitxor not implemented")).with_context(|| context!());
+                }
+                BinaryOp::Gt => Constant::Bool(head > expr),
+                BinaryOp::Lt => Constant::Bool(head < expr),
+                BinaryOp::Ge => Constant::Bool(head >= expr),
+                BinaryOp::Le => Constant::Bool(head <= expr),
+                BinaryOp::Eq => Constant::Bool(head == expr),
+                BinaryOp::Ne => Constant::Bool(head != expr),
+                BinaryOp::And => {
+                    Constant::Bool(Into::<bool>::into(head) && Into::<bool>::into(expr))
+                }
+                BinaryOp::Or => {
+                    Constant::Bool(Into::<bool>::into(head) || Into::<bool>::into(expr))
+                }
+            };
         }
+        Ok(head)
     }
 }
