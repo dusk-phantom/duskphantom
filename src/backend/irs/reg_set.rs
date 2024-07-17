@@ -74,15 +74,15 @@ impl RegSet {
     }
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.float.count_ones() == 0 && self.usual.count_ones() == 0
+        self.float.not_any() && self.usual.not_any()
     }
     #[inline]
     pub fn is_empty_usual(&self) -> bool {
-        self.usual.count_ones() == 0
+        self.usual.not_any()
     }
     #[inline]
     pub fn is_empty_float(&self) -> bool {
-        self.float.count_ones() == 0
+        self.float.not_any()
     }
 
     #[inline]
