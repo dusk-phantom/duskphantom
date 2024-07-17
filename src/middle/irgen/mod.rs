@@ -1495,7 +1495,7 @@ mod tests {
     }
 
     #[test]
-    fn test_hidden_var() {
+    fn test_block_scope() {
         let code = r#"
             int b = 5;
             int c[4] = {6, 7, 8, 9};
@@ -1547,6 +1547,114 @@ mod tests {
 
 
         }
+        "###);
+    }
+
+    #[test]
+    fn test_function_scope() {
+        let code = r#"
+            int n;
+            int select_sort(int A[], int n)
+            {
+                return 0;
+            }
+            int main(){
+                n = 10;
+                return 0;
+            }
+        "#;
+        let program = parse(code).unwrap();
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_snapshot!(llvm_ir, @r###"
+        @n = dso_local global i32 0
+        define i32 @select_sort(i32* %A, i32 %n) {
+        entry:
+        %alloca_2 = alloca i32
+        %alloca_5 = alloca i32*
+        store i32* %A, ptr %alloca_5
+        %alloca_7 = alloca i32
+        store i32 %n, ptr %alloca_7
+        store i32 0, ptr %alloca_2
+        br label %exit
+
+        exit:
+        %load_3 = load i32, ptr %alloca_2
+        ret i32 %load_3
+
+
+        }
+        define i32 @main() {
+        entry:
+        %alloca_13 = alloca i32
+        store i32 10, ptr @n
+        store i32 0, ptr %alloca_13
+        br label %exit
+
+        exit:
+        %load_14 = load i32, ptr %alloca_13
+        ret i32 %load_14
+
+
+        }
+        "###);
+    }
+
+    #[test]
+    fn test_xxx() {
+        let code = r#"
+            int buf[2][100];
+
+            // sort [l, r)
+            void merge_sort(int l, int r)
+            {
+                if (l + 1 >= r)
+                    return;
+            
+                int mid = (l + r) / 2;
+                merge_sort(l, mid);
+                merge_sort(mid, r);
+            
+                int i = l, j = mid, k = l;
+                while (i < mid && j < r) {
+                    if (buf[0][i] < buf[0][j]) {
+                        buf[1][k] = buf[0][i];
+                        i = i + 1;
+                    } else {
+                        buf[1][k] = buf[0][j];
+                        j = j + 1;
+                    }
+                    k = k + 1;
+                }
+                while (i < mid) {
+                    buf[1][k] = buf[0][i];
+                    i = i + 1;
+                    k = k + 1;
+                }
+                while (j < r) {
+                    buf[1][k] = buf[0][j];
+                    j = j + 1;
+                    k = k + 1;
+                }
+            
+                while (l < r) {
+                    buf[0][l] = buf[1][l];
+                    l = l + 1;
+                }
+            }
+            
+            int main()
+            {
+                int n = getarray(buf[0]);
+                merge_sort(0, n);
+                putarray(n, buf[0]);
+                return 0;
+            }
+        "#;
+        let program = parse(code).unwrap();
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_snapshot!(llvm_ir, @r###"
         "###);
     }
 }
