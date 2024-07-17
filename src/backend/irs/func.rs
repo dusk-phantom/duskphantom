@@ -28,9 +28,11 @@ impl Func {
     pub fn name(&self) -> &str {
         self.name.as_str()
     }
+
     pub fn entry(&self) -> &Block {
         &self.entry
     }
+
     pub fn gen_asm(&self) -> String {
         let thread_pool = rayon::ThreadPoolBuilder::new()
             .num_threads(CONFIG.num_parallel_for_block_gen_asm)
@@ -106,8 +108,19 @@ impl Func {
         false
     }
 
-    // iter bbs in a special order,in which entry is the first one,
-    // and other bbs in order of label's dictionary order
+    /// get all virtual regs in the function
+    pub fn v_regs(&self) -> HashSet<Reg> {
+        let mut regs = HashSet::new();
+        for bb in self.iter_bbs() {
+            for inst in bb.insts() {
+                regs.extend(inst.uses().iter().cloned());
+                regs.extend(inst.defs().iter().cloned());
+            }
+        }
+        regs
+    }
+
+    // iter bbs in a special order,in which entry is the first one
     pub fn iter_bbs(&self) -> BBIter {
         let other_bbs: Vec<&Block> = self.other_bbs.iter().collect();
         BBIter {
@@ -116,6 +129,14 @@ impl Func {
             idx: 0,
         }
     }
+
+    /// iter bbs in a special order mutably, in which entry is the first one,
+    pub fn iter_bbs_mut(&mut self) -> impl Iterator<Item = &mut Block> {
+        let mut bbs = vec![&mut self.entry];
+        bbs.extend(self.other_bbs.iter_mut());
+        bbs.into_iter()
+    }
+
     // get exit bbs, which are the bbs that end with ret or tail call
     pub fn exit_bbs(&self) -> Vec<&Block> {
         let mut ret = vec![];

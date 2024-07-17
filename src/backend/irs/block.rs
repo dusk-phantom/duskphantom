@@ -56,4 +56,7 @@ impl Block {
     pub fn insts(&self) -> &Vec<Inst> {
         &self.insts
     }
+    pub fn insts_mut(&mut self) -> &mut Vec<Inst> {
+        &mut self.insts
+    }
 }

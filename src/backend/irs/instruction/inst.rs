@@ -159,6 +159,25 @@ impl Inst {
 }
 
 //*********************************************************************************
+// impl RegReplace for Inst
+// replace the use and def register of the instruction
+// which is used in the register allocation phase
+//*********************************************************************************
+pub trait RegReplace {
+    fn replace_use(&mut self, from: Reg, to: Reg) -> Result<()>;
+    fn replace_def(&mut self, from: Reg, to: Reg) -> Result<()>;
+}
+impl RegReplace for Inst {
+    fn replace_use(&mut self, from: Reg, to: Reg) -> Result<()> {
+        todo!()
+    }
+
+    fn replace_def(&mut self, from: Reg, to: Reg) -> Result<()> {
+        todo!()
+    }
+}
+
+//*********************************************************************************
 // impl From<T> for Inst
 // and impl TryFrom<Inst> for T
 // T is the specific instruction type
