@@ -70,8 +70,8 @@ pub enum Inst {
     Store(StoreInst),
 
     // conversion operation
-    I2fInst(I2fInst),
-    F2iInst(F2iInst),
+    I2f(I2fInst),
+    F2i(F2iInst),
 
     // control flow operation
     Jmp(JmpInst),
@@ -152,8 +152,8 @@ impl Inst {
             Inst::Xor(inst) => inst.gen_asm(),
             Inst::Tail(inst) => inst.gen_asm(),
             Inst::Seqz(inst) => inst.gen_asm(),
-            Inst::I2fInst(i2f) => i2f.gen_asm(),
-            Inst::F2iInst(f2i) => f2i.gen_asm(),
+            Inst::I2f(i2f) => i2f.gen_asm(),
+            Inst::F2i(f2i) => f2i.gen_asm(),
         }
     }
 }
@@ -194,6 +194,10 @@ impl_inst_convert!(SwInst, Sw);
 impl_inst_convert!(LiInst, Li);
 impl_inst_convert!(LoadInst, Load);
 impl_inst_convert!(StoreInst, Store);
+
+// inst for conversion
+impl_inst_convert!(I2fInst, I2f);
+impl_inst_convert!(F2iInst, F2i);
 
 // inst for control flow
 impl_inst_convert!(JmpInst, Jmp);

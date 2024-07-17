@@ -36,8 +36,8 @@ pub mod riscv {
                 Inst::Bgt(inst) => inst.check_valid(),
                 Inst::Ble(inst) => inst.check_valid(),
 
-                Inst::F2iInst(inst) => inst.check_valid(),
-                Inst::I2fInst(inst) => inst.check_valid(),
+                Inst::F2i(inst) => inst.check_valid(),
+                Inst::I2f(inst) => inst.check_valid(),
 
                 Inst::Call(inst) => inst.check_valid(),
                 Inst::SRA(inst) => inst.check_valid(),
