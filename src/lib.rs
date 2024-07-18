@@ -37,7 +37,7 @@ pub fn compile(
     if let Some(ll_path) = ll_path {
         std::fs::write(ll_path, program.module.gen_llvm_ir()).with_context(|| context!())?;
     }
-    let mut program = backend::gen(&program)?;
+    let mut program = backend::gen_from_self(&program)?;
     if opt_flag {
         backend::optimize(&mut program);
     } else {
