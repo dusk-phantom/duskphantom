@@ -196,9 +196,10 @@ fn handle_callee_save(func: &mut Func) -> Result<()> {
     let exit_bbs = func.exit_bbs_mut();
     let mut load_back = reg_ss.iter().map(|(r, ss)| LoadInst::new(*r, *ss));
     for bb in exit_bbs {
-        load_back
-            .clone()
-            .for_each(|i| bb.insts_mut().push(i.into()));
+        load_back.clone().for_each(|i| {
+            let n = bb.insts().len();
+            bb.insts_mut().insert(n - 1, i.into());
+        });
     }
 
     Ok(())
@@ -216,8 +217,9 @@ fn handle_ra(func: &mut Func) -> Result<()> {
 
     // insert load back ra
     func.exit_bbs_mut().for_each(|bb| {
-        let ld_ra = LdInst::new(REG_RA, 0.into(), REG_S0);
-        bb.insts_mut().push(ld_ra.into());
+        let ld_ra = LdInst::new(REG_RA, (-8).into(), REG_S0);
+        let n = bb.insts().len();
+        bb.insts_mut().insert(n - 1, ld_ra.into());
     });
     Ok(())
 }
@@ -251,8 +253,9 @@ fn handle_stack(func: &mut Func) -> Result<()> {
     let close_stack: Inst = AddInst::new(REG_SP.into(), REG_SP.into(), stack_size.into()).into();
     let restore_s0: Inst = LdInst::new(REG_S0, (-16).into(), REG_S0).into();
     func.exit_bbs_mut().for_each(|bb| {
-        bb.insts_mut().push(close_stack.clone());
-        bb.insts_mut().push(restore_s0.clone());
+        let n = bb.insts().len();
+        bb.insts_mut().insert(n - 1, close_stack.clone());
+        bb.insts_mut().insert(n, restore_s0.clone());
     });
 
     Ok(())
