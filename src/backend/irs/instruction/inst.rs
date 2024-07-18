@@ -164,16 +164,94 @@ impl Inst {
 // which is used in the register allocation phase
 //*********************************************************************************
 pub trait RegReplace {
-    fn replace_use(&mut self, from: Reg, to: Reg) -> Result<()>;
-    fn replace_def(&mut self, from: Reg, to: Reg) -> Result<()>;
+    #[allow(unused_variables)]
+    fn replace_use(&mut self, from: Reg, to: Reg) -> Result<()> {
+        Ok(())
+    }
+    #[allow(unused_variables)]
+    fn replace_def(&mut self, from: Reg, to: Reg) -> Result<()> {
+        Ok(())
+    }
 }
 impl RegReplace for Inst {
     fn replace_use(&mut self, from: Reg, to: Reg) -> Result<()> {
-        todo!()
+        match self {
+            Inst::Add(inst) => inst.replace_use(from, to),
+            Inst::Sub(inst) => inst.replace_use(from, to),
+            Inst::Mul(inst) => inst.replace_use(from, to),
+            Inst::Rem(inst) => inst.replace_use(from, to),
+            Inst::Div(inst) => inst.replace_use(from, to),
+            Inst::Sll(inst) => inst.replace_use(from, to),
+            Inst::Srl(inst) => inst.replace_use(from, to),
+            Inst::Neg(inst) => inst.replace_use(from, to),
+            Inst::Slt(inst) => inst.replace_use(from, to),
+            Inst::Mv(inst) => inst.replace_use(from, to),
+            Inst::Ld(inst) => inst.replace_use(from, to),
+            Inst::Sd(inst) => inst.replace_use(from, to),
+            Inst::Lw(inst) => inst.replace_use(from, to),
+            Inst::Sw(inst) => inst.replace_use(from, to),
+            Inst::Load(inst) => inst.replace_use(from, to),
+            Inst::Store(inst) => inst.replace_use(from, to),
+            Inst::La(inst) => inst.replace_use(from, to),
+            Inst::Li(inst) => inst.replace_use(from, to),
+            Inst::I2f(i2f) => i2f.replace_use(from, to),
+            Inst::F2i(f2i) => f2i.replace_use(from, to),
+            Inst::Jmp(inst) => inst.replace_use(from, to),
+            Inst::Beq(inst) => inst.replace_use(from, to),
+            Inst::Bne(inst) => inst.replace_use(from, to),
+            Inst::Bge(inst) => inst.replace_use(from, to),
+            Inst::Blt(inst) => inst.replace_use(from, to),
+            Inst::Bgt(inst) => inst.replace_use(from, to),
+            Inst::Ble(inst) => inst.replace_use(from, to),
+            Inst::Call(inst) => inst.replace_use(from, to),
+            Inst::SRA(inst) => inst.replace_use(from, to),
+            Inst::Ret => Ok(()),
+            Inst::And(inst) => inst.replace_use(from, to),
+            Inst::Or(inst) => inst.replace_use(from, to),
+            Inst::Xor(inst) => inst.replace_use(from, to),
+            Inst::Tail(inst) => inst.replace_use(from, to),
+            Inst::Seqz(inst) => inst.replace_use(from, to),
+        }
     }
 
     fn replace_def(&mut self, from: Reg, to: Reg) -> Result<()> {
-        todo!()
+        match self {
+            Inst::Add(inst) => inst.replace_def(from, to),
+            Inst::Sub(inst) => inst.replace_def(from, to),
+            Inst::Mul(inst) => inst.replace_def(from, to),
+            Inst::Rem(inst) => inst.replace_def(from, to),
+            Inst::Div(inst) => inst.replace_def(from, to),
+            Inst::Sll(inst) => inst.replace_def(from, to),
+            Inst::Srl(inst) => inst.replace_def(from, to),
+            Inst::Neg(inst) => inst.replace_def(from, to),
+            Inst::Slt(inst) => inst.replace_def(from, to),
+            Inst::Mv(inst) => inst.replace_def(from, to),
+            Inst::Ld(inst) => inst.replace_def(from, to),
+            Inst::Sd(inst) => inst.replace_def(from, to),
+            Inst::Lw(inst) => inst.replace_def(from, to),
+            Inst::Sw(inst) => inst.replace_def(from, to),
+            Inst::Load(inst) => inst.replace_def(from, to),
+            Inst::Store(inst) => inst.replace_def(from, to),
+            Inst::La(inst) => inst.replace_def(from, to),
+            Inst::Li(inst) => inst.replace_def(from, to),
+            Inst::I2f(i2f) => i2f.replace_def(from, to),
+            Inst::F2i(f2i) => f2i.replace_def(from, to),
+            Inst::Jmp(inst) => inst.replace_def(from, to),
+            Inst::Beq(inst) => inst.replace_def(from, to),
+            Inst::Bne(inst) => inst.replace_def(from, to),
+            Inst::Bge(inst) => inst.replace_def(from, to),
+            Inst::Blt(inst) => inst.replace_def(from, to),
+            Inst::Bgt(inst) => inst.replace_def(from, to),
+            Inst::Ble(inst) => inst.replace_def(from, to),
+            Inst::Call(inst) => inst.replace_def(from, to),
+            Inst::SRA(inst) => inst.replace_def(from, to),
+            Inst::Ret => Ok(()),
+            Inst::And(inst) => inst.replace_def(from, to),
+            Inst::Or(inst) => inst.replace_def(from, to),
+            Inst::Xor(inst) => inst.replace_def(from, to),
+            Inst::Tail(inst) => inst.replace_def(from, to),
+            Inst::Seqz(inst) => inst.replace_def(from, to),
+        }
     }
 }
 

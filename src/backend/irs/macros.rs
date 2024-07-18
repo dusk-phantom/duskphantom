@@ -62,6 +62,29 @@ macro_rules! impl_three_op_inst {
                 regs
             }
         }
+        impl RegReplace for $ty_name {
+            fn replace_use(&mut self, from: Reg, to: Reg) -> Result<()> {
+                if let Operand::Reg(r1) = self.lhs_mut() {
+                    if *r1 == from {
+                        *r1 = to;
+                    }
+                }
+                if let Operand::Reg(r2) = self.rhs_mut() {
+                    if *r2 == from {
+                        *r2 = to;
+                    }
+                }
+                Ok(())
+            }
+            fn replace_def(&mut self, from: Reg, to: Reg) -> Result<()> {
+                if let Operand::Reg(r) = self.dst_mut() {
+                    if *r == from {
+                        *r = to;
+                    }
+                }
+                Ok(())
+            }
+        }
     };
 }
 
@@ -121,6 +144,19 @@ macro_rules! impl_branch_inst {
                 }
             }
         }
+
+        impl RegReplace for $ty_name {
+            fn replace_use(&mut self, from: Reg, to: Reg) -> Result<()> {
+                if *self.lhs_mut() == from {
+                    *self.lhs_mut() = to;
+                }
+                if *self.rhs_mut() == from {
+                    *self.rhs_mut() = to;
+                }
+                Ok(())
+            }
+        }
+
         impl ToBB for $ty_name {
             fn to_bb(&self) -> Result<&str> {
                 Ok(&self.2.as_str())
@@ -174,6 +210,24 @@ macro_rules! impl_two_op_inst {
                 }
             }
         }
+        impl RegReplace for $ty_name {
+            fn replace_use(&mut self, from: Reg, to: Reg) -> Result<()> {
+                if let Operand::Reg(reg) = self.src_mut() {
+                    if *reg == from {
+                        *reg = to;
+                    }
+                }
+                Ok(())
+            }
+            fn replace_def(&mut self, from: Reg, to: Reg) -> Result<()> {
+                if let Operand::Reg(reg) = self.dst_mut() {
+                    if *reg == from {
+                        *reg = to;
+                    }
+                }
+                Ok(())
+            }
+        }
     };
     ($ty_name:ident,$inst_name:expr,$inst_suffix:expr) => {
         #[derive(Clone, Debug)]
@@ -216,6 +270,24 @@ macro_rules! impl_two_op_inst {
                 } else {
                     vec![]
                 }
+            }
+        }
+        impl RegReplace for $ty_name {
+            fn replace_use(&mut self, from: Reg, to: Reg) -> Result<()> {
+                if let Operand::Reg(reg) = self.src_mut() {
+                    if *reg == from {
+                        *reg = to;
+                    }
+                }
+                Ok(())
+            }
+            fn replace_def(&mut self, from: Reg, to: Reg) -> Result<()> {
+                if let Operand::Reg(reg) = self.dst_mut() {
+                    if *reg == from {
+                        *reg = to;
+                    }
+                }
+                Ok(())
             }
         }
     };
@@ -281,6 +353,24 @@ macro_rules! impl_unary_inst {
             pub fn gen_asm(&self) -> String {
                 let dst = self.dst().gen_asm();
                 format!("{} {}", $inst_name, dst)
+            }
+        }
+        impl RegReplace for $ty_name {
+            fn replace_def(&mut self, from: Reg, to: Reg) -> Result<()> {
+                if let Operand::Reg(reg) = self.dst_mut() {
+                    if *reg == from {
+                        *reg = to;
+                    }
+                }
+                Ok(())
+            }
+            fn replace_use(&mut self, from: Reg, to: Reg) -> Result<()> {
+                if let Operand::Reg(reg) = self.dst_mut() {
+                    if *reg == from {
+                        *reg = to;
+                    }
+                }
+                Ok(())
             }
         }
     };

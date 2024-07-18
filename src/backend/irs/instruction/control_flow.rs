@@ -69,3 +69,5 @@ impl ToBB for TailInst {
         }
     }
 }
+
+impl RegReplace for CallInst {}

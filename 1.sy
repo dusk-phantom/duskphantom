@@ -1,7 +1,5 @@
-
+extern int getint();
 int main(){
-    int c=3;
-    float d=c;
-    int e=d;
-    return 0;
+    int a=getint();
+    return a*a;
 }
