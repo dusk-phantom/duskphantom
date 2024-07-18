@@ -9,10 +9,10 @@ pub fn phisicalize(program: &mut Program) -> Result<(), BackendError> {
         for func in module.funcs.iter_mut() {
             phisicalize_reg(func)?;
 
-            // TODO: 为函数开头和结尾插入callee-save regs的保存和恢复
+            // 为函数开头和结尾插入callee-save regs的保存和恢复
             handle_callee_save(func)?;
 
-            // TODO: 为call指令前后插入caller-save regs的保存和恢复
+            // 为call指令前后插入caller-save regs的保存和恢复
             handle_caller_save(func)?;
 
             // entry和exit插入ra寄存器的保存和恢复
