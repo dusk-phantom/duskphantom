@@ -75,7 +75,7 @@ fn phisicalize_reg(func: &mut Func) -> Result<()> {
                 tmp_used.insert(replace);
                 new_inst.replace_use(*u, replace)?;
                 // dbg!("replace use:", u.gen_asm(), replace.gen_asm());
-                new_insts.push(LoadInst::new(replace, *ss).into());
+                new_insts.push(LoadInst::new(replace, *ss).with_8byte().into());
             }
 
             // 处理使用临时寄存器替换虚拟寄存器之后要把值store回栈中
@@ -94,7 +94,7 @@ fn phisicalize_reg(func: &mut Func) -> Result<()> {
                 };
                 tmp_used.insert(replace);
                 new_inst.replace_def(*d, replace)?;
-                store_back = Some(StoreInst::new(*ss, replace).into());
+                store_back = Some(StoreInst::new(*ss, replace).with_8byte().into());
             }
             new_insts.push(new_inst);
 
@@ -262,36 +262,15 @@ fn handle_stack(func: &mut Func) -> Result<()> {
 }
 
 fn handle_mem(func: &mut Func) -> Result<()> {
-    let stack_size = func.stack_allocator().expect("").allocated();
-    // align stack size to 16
-    let stack_size = (stack_size + 15) & !15;
-    let new_addr = |ss: &StackSlot| -> (Imm, Reg) {
-        if ss.start() > stack_size >> 1 {
-            (ss.start().into(), REG_SP)
-        } else {
-            (((ss.start() as i64) - (stack_size as i64)).into(), REG_S0)
-        }
-    };
+    let stack_size = final_stack_size(func)?;
     for bb in func.iter_bbs_mut() {
-        let mut new_insts: Vec<Inst> = Vec::new();
-        for inst in bb.insts() {
+        for inst in bb.insts_mut() {
             match inst {
-                Inst::Load(inst) => {
-                    let (off, base) = new_addr(inst.src());
-                    let lw = LwInst::new(*inst.dst(), off, base);
-                    new_insts.push(lw.into());
-                }
-                Inst::Store(inst) => {
-                    let (off, base) = new_addr(inst.dst());
-                    let sw = SwInst::new(*inst.src(), off, base);
-                    new_insts.push(sw.into());
-                }
-                _ => {
-                    new_insts.push(inst.clone());
-                }
-            }
+                Inst::Load(load) => *inst = load.phisicalize(stack_size)?,
+                Inst::Store(store) => *inst = store.phisicalize(stack_size)?,
+                _ => {}
+            };
         }
-        *bb.insts_mut() = new_insts;
     }
     Ok(())
 }

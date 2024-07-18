@@ -95,9 +95,9 @@ impl RegDefs for Inst {
     }
 }
 
-impl RegUses for LaInst {}
+impl RegUses for LlaInst {}
 
-impl RegDefs for LaInst {
+impl RegDefs for LlaInst {
     fn defs(&self) -> Vec<&Reg> {
         vec![self.dst()]
     }

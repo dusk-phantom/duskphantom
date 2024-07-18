@@ -250,7 +250,7 @@ impl IRBuilder {
             ret.push(ld.into());
         } else if let Ok(var) = Self::global_name_from(&load.address) {
             let addr = reg_gener.gen_virtual_usual_reg();
-            let la = LaInst::new(addr, var.into());
+            let la = LlaInst::new(addr, var.into());
             ret.push(la.into());
             let lw = LwInst::new(dst_reg, 0.into(), addr);
             ret.push(lw.into());
@@ -312,7 +312,7 @@ impl IRBuilder {
                                     name
                                 };
                                 let addr = reg_gener.gen_virtual_usual_reg();
-                                let la = LaInst::new(addr, n.into());
+                                let la = LlaInst::new(addr, n.into());
                                 ret_insts.push(la.into());
                                 let loadf: Inst =
                                     if matches!(f, llvm_ir::constant::Float::Single(_)) {
