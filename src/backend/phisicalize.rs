@@ -71,6 +71,9 @@ pub fn phisicalize_reg(func: &mut Func) -> Result<()> {
             // 处理使用临时寄存器替换虚拟寄存器之后要把值store回栈中
             let mut store_back: Option<Inst> = None;
             for d in defs {
+                if d.is_phisic() {
+                    continue;
+                }
                 let ss = v_ss.get(d).unwrap();
                 let replace = if d.is_usual() {
                     let i_r = i_regs.iter().find(|&&r| !tmp_used.contains(&r)).unwrap();
