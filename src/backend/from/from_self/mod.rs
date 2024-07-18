@@ -13,9 +13,9 @@ pub use instruction::*;
 #[allow(unused)]
 pub use operand::*;
 
-use super::super::prog;
-use crate::errors::*;
 use crate::middle;
+
+use crate::backend::irs::Program;
 
 /// 中端层面，地址是唯一的
 /// 因此我可以将地址作为 id
@@ -23,10 +23,6 @@ use crate::middle;
 type Address = usize;
 
 #[allow(unused)]
-pub fn gen(program: &middle::Program) -> Result<prog::Program, BackendError> {
-    // TODO
-    Ok(prog::Program {
-        entry: None,
-        modules: vec![],
-    })
+pub fn gen_from_self(program: &middle::Program) -> Result<Program> {
+    builder::IRBuilder::gen_from_self(program)
 }
