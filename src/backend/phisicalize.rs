@@ -54,7 +54,7 @@ fn phisicalize_reg(func: &mut Func) -> Result<()> {
     for bb in func.iter_bbs_mut() {
         let mut new_insts: Vec<Inst> = Vec::new();
         for inst in bb.insts() {
-            let mut replace_map: HashMap<Reg, Reg> = HashMap::new();
+            // dbg!("process inst:", inst.gen_asm());
             let mut tmp_used: HashSet<Reg> = HashSet::new();
             let uses = inst.uses();
             let defs = inst.defs();
@@ -67,15 +67,14 @@ fn phisicalize_reg(func: &mut Func) -> Result<()> {
                 let ss = v_ss.get(u).unwrap();
                 let replace = if u.is_usual() {
                     let i_r = i_regs.iter().find(|&&r| !tmp_used.contains(&r)).unwrap();
-                    replace_map.insert(*u, *i_r);
                     *i_r
                 } else {
                     let f_r = f_regs.iter().find(|&&r| !tmp_used.contains(&r)).unwrap();
-                    replace_map.insert(*u, *f_r);
                     *f_r
                 };
                 tmp_used.insert(replace);
                 new_inst.replace_use(*u, replace)?;
+                // dbg!("replace use:", u.gen_asm(), replace.gen_asm());
                 new_insts.push(LoadInst::new(replace, *ss).into());
             }
 
@@ -88,11 +87,9 @@ fn phisicalize_reg(func: &mut Func) -> Result<()> {
                 let ss = v_ss.get(d).unwrap();
                 let replace = if d.is_usual() {
                     let i_r = i_regs.iter().find(|&&r| !tmp_used.contains(&r)).unwrap();
-                    replace_map.insert(*d, *i_r);
                     *i_r
                 } else {
                     let f_r = f_regs.iter().find(|&&r| !tmp_used.contains(&r)).unwrap();
-                    replace_map.insert(*d, *f_r);
                     *f_r
                 };
                 tmp_used.insert(replace);
@@ -100,8 +97,9 @@ fn phisicalize_reg(func: &mut Func) -> Result<()> {
                 store_back = Some(StoreInst::new(*ss, replace).into());
             }
             new_insts.push(new_inst);
-            if let Some(inst) = store_back {
-                new_insts.push(inst);
+
+            if let Some(store_back) = store_back {
+                new_insts.push(store_back);
             }
         }
         *bb.insts_mut() = new_insts;

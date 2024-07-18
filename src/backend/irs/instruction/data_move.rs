@@ -34,6 +34,7 @@ impl StoreInst {
         format!("store {},{}", self.src.gen_asm(), self.dst.gen_asm())
     }
 }
+
 impl LoadInst {
     pub fn new(dst: Reg, src: StackSlot) -> Self {
         Self { dst, src }
@@ -103,7 +104,7 @@ impl RegReplace for LoadInst {
     }
 }
 impl RegReplace for StoreInst {
-    fn replace_def(&mut self, from: Reg, to: Reg) -> Result<()> {
+    fn replace_use(&mut self, from: Reg, to: Reg) -> Result<()> {
         if self.src == from {
             self.src = to;
         }
