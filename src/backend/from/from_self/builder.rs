@@ -13,9 +13,15 @@ impl IRBuilder {
     pub fn gen_from_self(program: &middle::Program) -> Result<Program> {
         let self_module = &program.module;
         // dbg!(&llvm.types);
-        let global_vars = Self::build_global_var(&self_module.global_variables)?;
+        let mut global_vars = Self::build_global_var(&self_module.global_variables)?;
+        let mut fmms: HashMap<Fmm, FloatVar> = HashMap::new();
+
         // dbg!(&global_vars);
-        let funcs = Self::build_funcs(&self_module.functions)?;
+        let funcs = Self::build_funcs(&self_module.functions, &mut fmms)?;
+
+        for (_, float_var) in fmms {
+            global_vars.push(float_var.into());
+        }
 
         let mdl = module::Module {
             name: "main".to_string(),
@@ -64,13 +70,13 @@ impl IRBuilder {
                 middle::ir::Constant::Array(arr) => {
                     match arr.first().with_context(|| context!())? {
                         // 不可能出现: arr 是混合的
-                        middle::ir::Constant::Int(_) => {
+                        middle::ir::Constant::Bool(_) | middle::ir::Constant::Int(_) => {
                             let mut init = Vec::new();
                             for (index, con) in arr.iter().enumerate() {
                                 if let middle::ir::Constant::Int(value) = con {
                                     init.push((index, *value as u32)); // FIXME 这里 i32 和 u32 注意
                                 } else {
-                                    return Err(anyhow!("arr can't be mixed with int and others"))
+                                    return Err(anyhow!("arr can't be mixed with other-type"))
                                         .with_context(|| context!());
                                 }
                             }
@@ -102,24 +108,6 @@ impl IRBuilder {
                             });
                             global_vars.push(arr_var);
                         }
-                        middle::ir::Constant::Bool(_) => {
-                            let mut init = Vec::new();
-                            for (index, con) in arr.iter().enumerate() {
-                                if let middle::ir::Constant::Bool(value) = con {
-                                    init.push((index, *value as i32 as u32)); // FIXME 这里注意一下
-                                } else {
-                                    return Err(anyhow!("arr can't be mixed with bool and others"))
-                                        .with_context(|| context!());
-                                }
-                            }
-                            let arr_var = Var::IntArr(ArrVar::<u32> {
-                                name: name.to_string(),
-                                capacity: arr.len(),
-                                init,
-                                is_const: false,
-                            });
-                            global_vars.push(arr_var);
-                        }
                         // TODO 是否有全局初始化过的二维数组 ？
                         _ => {
                             unreachable!();
@@ -131,7 +119,10 @@ impl IRBuilder {
         Ok(global_vars)
     }
 
-    pub fn build_funcs(self_funcs: &Vec<middle::ir::FunPtr>) -> Result<Vec<Func>> {
+    pub fn build_funcs(
+        self_funcs: &Vec<middle::ir::FunPtr>,
+        fmms: &mut HashMap<Fmm, FloatVar>,
+    ) -> Result<Vec<Func>> {
         let mut funcs = Vec::new();
         for fu in self_funcs {
             // dbg!(&f);
@@ -140,34 +131,63 @@ impl IRBuilder {
             let mut regs: HashMap<Address, Reg> = HashMap::new();
             let mut stack_allocator = StackAllocator::new();
             let mut stack_slots: HashMap<Address, StackSlot> = HashMap::new();
-            let entry = Self::build_entry(
+            let (entry, caller_reg_stack) = Self::build_entry(
                 fu,
                 &mut stack_allocator,
                 &mut stack_slots,
                 &mut reg_gener,
                 &mut regs,
+                fmms,
             )?;
             let mut m_f = Func::new(fu.name.to_string(), args, entry);
-
+            // 设置 def-use
+            match &fu.return_type {
+                middle::ir::ValueType::Void => { /* do nothing */ }
+                middle::ir::ValueType::Int
+                | middle::ir::ValueType::Bool
+                | middle::ir::ValueType::Pointer(_) /* 返回指针是 UB */ => {
+                    m_f.ret_mut().replace(REG_A0);
+                }
+                middle::ir::ValueType::Float => {
+                    m_f.ret_mut().replace(REG_FA0);
+                }
+                middle::ir::ValueType::Array(_, _) => todo!(),
+            }
+            *m_f.caller_regs_stack_mut() = Some(caller_reg_stack.try_into()?);
             for bb in Self::build_other_bbs(
                 fu,
                 &mut stack_allocator,
                 &mut stack_slots,
                 &mut reg_gener,
                 &mut regs,
+                fmms,
             )? {
                 m_f.push_bb(bb);
             }
-            // count stack size,
-            // let stack_size = stack_allocator.allocated();
-            // // align to 16
-            // let stack_size = if stack_size % 16 == 0 {
-            //     stack_size
-            // } else {
-            //     stack_size - stack_size % 16 + 16
-            // };
+            *m_f.stack_allocator_mut() = Some(stack_allocator);
             funcs.push(m_f);
         }
+
+        // 看一个函数，他里面的所有的调用
+        let name_func: HashMap<String, u32> = funcs
+            .iter()
+            .map(|f| (f.name().to_string(), f.caller_regs_stack()))
+            .collect();
+
+        for f in &mut funcs {
+            let mut max_callee_regs_stack = 0;
+            for bb in f.iter_bbs() {
+                for inst in bb.insts() {
+                    if let Inst::Call(c) = inst {
+                        let callee_regs_stack = *name_func.get(c.func_name().as_str()).unwrap();
+                        max_callee_regs_stack =
+                            std::cmp::max(max_callee_regs_stack, callee_regs_stack);
+                    }
+                }
+            }
+            *f.max_callee_regs_stack_mut() = Some(max_callee_regs_stack);
+        }
+
         Ok(funcs)
     }
 
@@ -177,6 +197,7 @@ impl IRBuilder {
         stack_slots: &mut HashMap<Address, StackSlot>,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
+        fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<Vec<Block>> {
         // let mut blocks: Vec<Block> = Vec::new();
         // for ptr_bb in f.dfs_iter() {
@@ -185,7 +206,9 @@ impl IRBuilder {
         // }
         // Ok(blocks)
         func.dfs_iter()
-            .map(|ptr_bb| Self::build_bb(&ptr_bb, stack_allocator, stack_slots, reg_gener, regs))
+            .map(|ptr_bb| {
+                Self::build_bb(&ptr_bb, stack_allocator, stack_slots, reg_gener, regs, fmms)
+            })
             .collect()
     }
 
@@ -195,17 +218,18 @@ impl IRBuilder {
         stack_slots: &mut HashMap<Address, StackSlot>,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
+        fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<Block> {
         // basic 的 label 注意一下
         let label = bb.as_ref() as *const _ as Address;
         let mut m_bb = Block::new(label.to_string());
         for inst in bb.iter() {
             let gen_insts =
-                Self::build_instruction(&inst, stack_allocator, stack_slots, reg_gener, regs)
+                Self::build_instruction(&inst, stack_allocator, stack_slots, reg_gener, regs, fmms)
                     .with_context(|| context!())?;
             m_bb.extend_insts(gen_insts);
         }
-        let gen_insts = Self::build_term_inst(&bb.get_last_inst(), regs, reg_gener)
+        let gen_insts = Self::build_term_inst(&bb.get_last_inst(), regs, reg_gener, fmms)
             .with_context(|| context!())?;
         m_bb.extend_insts(gen_insts);
         Ok(m_bb)
@@ -217,74 +241,75 @@ impl IRBuilder {
         stack_slots: &mut HashMap<Address, StackSlot>,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
-    ) -> Result<Block> {
+        fmms: &mut HashMap<Fmm, FloatVar>,
+    ) -> Result<(Block, usize)> {
         let mut insts: Vec<Inst> = Vec::new();
-        // 处理函数的形参
-        for (i, param) in func.params.iter().enumerate() {
-            if i <= 7 {
-                let reg: Reg = match &param.value_type {
-                    // 返回生成的 虚拟寄存器
-                    middle::ir::ValueType::Void => {
-                        return Err(anyhow!(
-                            "it is impossible to receive void-type parameter: {}",
-                            param
-                        ))
-                    }
-                    middle::ir::ValueType::Array(_, _) => {
-                        return Err(anyhow!("array should be pointer {}", param))
-                    }
-                    middle::ir::ValueType::Int => {
-                        let reg = reg_gener.gen_virtual_usual_reg();
-                        insts.push(Inst::Mv(MvInst::new(
-                            reg.into(),
-                            Reg::new(REG_A0.id() + i as u32, true).into(),
-                        )));
-                        reg
-                    }
-                    middle::ir::ValueType::Float => {
-                        let reg = reg_gener.gen_virtual_float_reg();
-                        insts.push(Inst::Mv(MvInst::new(
-                            reg.into(),
-                            Reg::new(REG_FA0.id() + i as u32, true).into(),
-                        )));
-                        reg
-                    }
-                    middle::ir::ValueType::Bool => {
-                        let reg = reg_gener.gen_virtual_usual_reg();
-                        insts.push(Inst::Mv(MvInst::new(
-                            reg.into(),
-                            Reg::new(REG_A0.id() + i as u32, true).into(),
-                        )));
-                        reg
-                    }
-                    middle::ir::ValueType::Pointer(_typ) => {
-                        let reg = reg_gener.gen_virtual_usual_reg();
-                        insts.push(Inst::Mv(MvInst::new(
-                            reg.into(),
-                            Reg::new(REG_A0.id() + i as u32, true).into(),
-                        )));
-                        reg
-                    }
-                };
-                regs.insert(param.as_ref() as *const _ as Address, reg);
-            } else {
-                // 从栈中 ld 第8个参数
 
-                // TODO 如果参数的个数大于 7
-                unimplemented!();
+        let mut caller_regs_stack = 0;
+        let mut float_idx = 0;
+        let mut usual_idx = 0;
+
+        // 处理函数的形参
+        for param in func.params.iter() {
+            let is_usual: bool = match &param.value_type {
+                // 返回生成的 虚拟寄存器
+                middle::ir::ValueType::Void => {
+                    return Err(anyhow!(
+                        "it is impossible to receive void-type parameter: {}",
+                        param
+                    ))
+                }
+                middle::ir::ValueType::Array(_, _) => {
+                    return Err(anyhow!("array should be pointer {}", param))
+                }
+                middle::ir::ValueType::Float => false,
+                middle::ir::ValueType::Pointer(_)
+                | middle::ir::ValueType::Bool
+                | middle::ir::ValueType::Int => true,
+            };
+
+            let v_reg = reg_gener.gen_virtual_reg(is_usual);
+            regs.insert(param.as_ref() as *const _ as Address, v_reg); // 参数绑定寄存器
+
+            if is_usual && usual_idx <= 7 {
+                let a_reg = Reg::new(REG_A0.id() + usual_idx, is_usual);
+                let mv = MvInst::new(v_reg.into(), a_reg.into());
+                insts.push(mv.into());
+                usual_idx += 1;
+            }
+            if !is_usual && float_idx <= 7 {
+                let a_reg = Reg::new(REG_FA0.id() + float_idx, is_usual);
+                let mv = MvInst::new(v_reg.into(), a_reg.into());
+                insts.push(mv.into()); // TODO 但是 mv 指令可能有点问题, mv 是伪指令, 能不能 mv float, float ?
+                float_idx += 1;
+            }
+
+            //  参数多了的情况
+
+            if (is_usual && usual_idx > 7) || (!is_usual && float_idx > 7) {
+                let ld_inst = LdInst::new(v_reg, caller_regs_stack.into(), REG_S0);
+                insts.push(ld_inst.into());
+                caller_regs_stack += 8;
             }
         }
 
-        let bb = func.entry.with_context(|| context!())?;
+        let bb = func.entry.with_context(|| context!())?; // FIXME func 的其他 blocks 是不是不包含 entry ?
         for inst in bb.iter() {
             let gen_insts =
-                Self::build_instruction(&inst, stack_allocator, stack_slots, reg_gener, regs)
+                Self::build_instruction(&inst, stack_allocator, stack_slots, reg_gener, regs, fmms)
                     .with_context(|| context!())?;
             insts.extend(gen_insts);
         }
-        insts.extend(Self::build_term_inst(&bb.get_last_inst(), regs, reg_gener)?);
+        insts.extend(Self::build_term_inst(
+            &bb.get_last_inst(),
+            regs,
+            reg_gener,
+            fmms,
+        )?);
+
         let mut entry = Block::new("entry".to_string());
         entry.extend_insts(insts);
-        Ok(entry)
+        let caller_regs_stack = usize::try_from(caller_regs_stack)?;
+        Ok((entry, caller_regs_stack))
     }
 }

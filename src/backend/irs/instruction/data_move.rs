@@ -1,3 +1,5 @@
+use anyhow::Ok;
+
 use super::*;
 
 // 实现一些用于辅助的伪指令
@@ -36,18 +38,23 @@ impl LoadInst {
     pub fn new(dst: Reg, src: StackSlot) -> Self {
         Self { dst, src }
     }
+    #[inline]
     pub fn dst(&self) -> &Reg {
         &self.dst
     }
+    #[inline]
     pub fn src(&self) -> &StackSlot {
         &self.src
     }
+    #[inline]
     pub fn dst_mut(&mut self) -> &mut Reg {
         &mut self.dst
     }
+    #[inline]
     pub fn src_mut(&mut self) -> &mut StackSlot {
         &mut self.src
     }
+    #[inline]
     pub fn gen_asm(&self) -> String {
         format!("load {},{}", self.dst.gen_asm(), self.src.gen_asm())
     }
@@ -80,5 +87,82 @@ impl LaInst {
     }
     pub fn gen_asm(&self) -> String {
         format!("la {},{}", self.0.gen_asm(), self.1.gen_asm())
+    }
+}
+
+//*********************************************************************************
+// impl RegReplace for data move inst
+//*********************************************************************************
+
+impl RegReplace for LoadInst {
+    fn replace_def(&mut self, from: Reg, to: Reg) -> Result<()> {
+        if self.dst() == &from {
+            *self.dst_mut() = to;
+        }
+        Ok(())
+    }
+}
+impl RegReplace for StoreInst {
+    fn replace_def(&mut self, from: Reg, to: Reg) -> Result<()> {
+        if self.src == from {
+            self.src = to;
+        }
+        Ok(())
+    }
+}
+impl RegReplace for LdInst {
+    fn replace_def(&mut self, from: Reg, to: Reg) -> Result<()> {
+        if self.dst() == &from {
+            *self.dst_mut() = to;
+        }
+        Ok(())
+    }
+    fn replace_use(&mut self, from: Reg, to: Reg) -> Result<()> {
+        if self.base() == &from {
+            *self.base_mut() = to;
+        }
+        Ok(())
+    }
+}
+impl RegReplace for SdInst {
+    fn replace_use(&mut self, from: Reg, to: Reg) -> Result<()> {
+        if self.base() == &from {
+            *self.base_mut() = to;
+        }
+        if self.base() == &from {
+            *self.base_mut() = to;
+        }
+        Ok(())
+    }
+}
+impl RegReplace for SwInst {
+    fn replace_use(&mut self, from: Reg, to: Reg) -> Result<()> {
+        if self.base() == &from {
+            *self.base_mut() = to;
+        }
+        Ok(())
+    }
+}
+impl RegReplace for LwInst {
+    fn replace_def(&mut self, from: Reg, to: Reg) -> Result<()> {
+        if self.dst() == &from {
+            *self.dst_mut() = to;
+        }
+        Ok(())
+    }
+    fn replace_use(&mut self, from: Reg, to: Reg) -> Result<()> {
+        if self.base() == &from {
+            *self.base_mut() = to;
+        }
+        Ok(())
+    }
+}
+
+impl RegReplace for LaInst {
+    fn replace_def(&mut self, from: Reg, to: Reg) -> Result<()> {
+        if self.0 == from {
+            self.0 = to;
+        }
+        Ok(())
     }
 }

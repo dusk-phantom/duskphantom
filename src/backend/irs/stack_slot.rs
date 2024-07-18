@@ -24,6 +24,7 @@ impl StackSlot {
 }
 
 // StackAllocator: a simple stack allocator for stack slots.
+#[derive(Debug)]
 pub struct StackAllocator {
     alloc_from: u32,
 }

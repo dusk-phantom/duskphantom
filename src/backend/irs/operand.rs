@@ -1,4 +1,5 @@
 use crate::utils::paral_counter::ParalCounter;
+use std::hash::Hash;
 use std::ops::Deref;
 
 use super::{BackendError, StackSlot};
@@ -17,6 +18,19 @@ pub struct Reg {
     is_usual: bool,
 }
 impl Reg {
+    pub const fn physical_regs() -> [Reg; 64] {
+        [
+            // usual registers
+            REG_ZERO, REG_RA, REG_SP, REG_GP, REG_TP, REG_T0, REG_T1, REG_T2, REG_S0, REG_S1,
+            REG_A0, REG_A1, REG_A2, REG_A3, REG_A4, REG_A5, REG_A6, REG_A7, REG_S2, REG_S3, REG_S4,
+            REG_S5, REG_S6, REG_S7, REG_S8, REG_S9, REG_S10, REG_S11, REG_T3, REG_T4, REG_T5,
+            REG_T6, // float registers
+            REG_FT0, REG_FT1, REG_FT2, REG_FT3, REG_FT4, REG_FT5, REG_FT6, REG_FT7, REG_FS0,
+            REG_FS1, REG_FA0, REG_FA1, REG_FA2, REG_FA3, REG_FA4, REG_FA5, REG_FA6, REG_FA7,
+            REG_FS2, REG_FS3, REG_FS4, REG_FS5, REG_FS6, REG_FS7, REG_FS8, REG_FS9, REG_FS10,
+            REG_FS11, REG_FT8, REG_FT9, REG_FT10, REG_FT11,
+        ]
+    }
     pub const fn new(id: u32, is_usual: bool) -> Self {
         Self { id, is_usual }
     }
@@ -27,10 +41,47 @@ impl Reg {
         self.is_usual
     }
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Imm(i64);
 #[derive(Clone, Debug)]
 pub struct Fmm(f64);
+
+impl TryInto<f32> for Fmm {
+    type Error = BackendError;
+    fn try_into(self) -> Result<f32, Self::Error> {
+        if f64::is_nan(self.0) {
+            Ok(f32::NAN)
+        } else if self.0 < f32::MAX as f64 && self.0 > f32::MIN as f64 {
+            Ok(self.0 as f32)
+        } else {
+            Err(BackendError::InternalConsistencyError(
+                "Fmm is not a valid f32".to_string(),
+            ))
+        }
+    }
+}
+
+impl PartialEq for Fmm {
+    fn eq(&self, other: &Self) -> bool {
+        if f64::is_nan(self.0) && f64::is_nan(other.0) {
+            true
+        } else {
+            self.0 == other.0
+        }
+    }
+}
+impl Eq for Fmm {}
+impl Hash for Fmm {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        if f64::is_nan(self.0) {
+            // NOTICE: f64::NAN.to_bits() is not always the same value in different platforms
+            f64::NAN.to_bits().hash(state);
+        } else {
+            self.0.to_bits().hash(state);
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Label(String);
 
@@ -43,6 +94,20 @@ impl From<i64> for Imm {
 impl From<f64> for Fmm {
     fn from(val: f64) -> Self {
         Self(val)
+    }
+}
+impl From<&f32> for Fmm {
+    fn from(value: &f32) -> Self {
+        if f32::is_nan(*value) {
+            Self(f64::NAN)
+        } else {
+            Self(*value as f64)
+        }
+    }
+}
+impl From<&f64> for Fmm {
+    fn from(value: &f64) -> Self {
+        Self(*value)
     }
 }
 impl From<String> for Label {
@@ -63,6 +128,11 @@ impl From<Reg> for Operand {
 impl From<Imm> for Operand {
     fn from(val: Imm) -> Self {
         Self::Imm(val)
+    }
+}
+impl From<&Imm> for Operand {
+    fn from(val: &Imm) -> Self {
+        Self::Imm(val.clone())
     }
 }
 impl From<Fmm> for Operand {
@@ -114,6 +184,7 @@ impl Deref for Label {
         &self.0
     }
 }
+
 impl Deref for Reg {
     type Target = u32;
     fn deref(&self) -> &Self::Target {
@@ -219,6 +290,13 @@ impl Default for RegGenerator {
 impl RegGenerator {
     pub fn new() -> Self {
         Self::default()
+    }
+    pub fn gen_virtual_reg(&mut self, is_usual: bool) -> Reg {
+        if is_usual {
+            self.gen_virtual_usual_reg()
+        } else {
+            self.gen_virtual_float_reg()
+        }
     }
     pub fn gen_virtual_usual_reg(&mut self) -> Reg {
         let id = self.usual_counter.get_id().unwrap();
@@ -340,47 +418,54 @@ impl Reg {
     }
 }
 impl Imm {
+    #[inline]
     pub fn gen_asm(&self) -> String {
         format!("{}", self.0)
     }
 }
 impl Fmm {
+    #[inline]
     pub fn gen_asm(&self) -> String {
         format!("{}", self.0)
     }
 }
 impl Label {
+    #[inline]
     pub fn gen_asm(&self) -> String {
         self.0.clone()
     }
 }
 
 impl Operand {
+    #[inline]
     pub fn reg(&self) -> Option<Reg> {
         match self {
             Self::Reg(reg) => Some(*reg),
             _ => None,
         }
     }
+    #[inline]
     pub fn imm(&self) -> Option<Imm> {
         match self {
             Self::Imm(imm) => Some(imm.clone()),
             _ => None,
         }
     }
+    #[inline]
     pub fn fmm(&self) -> Option<Fmm> {
         match self {
             Self::Fmm(fmm) => Some(fmm.clone()),
             _ => None,
         }
     }
+    #[inline]
     pub fn label(&self) -> Option<Label> {
         match self {
             Self::Label(label) => Some(label.clone()),
             _ => None,
         }
     }
-
+    #[inline]
     pub fn gen_asm(&self) -> String {
         match self {
             Self::Reg(reg) => reg.gen_asm(),
@@ -450,6 +535,23 @@ impl TryInto<Label> for Operand {
     }
 }
 
+impl<'a> TryInto<&'a Label> for &'a Operand {
+    type Error = BackendError;
+    fn try_into(self) -> Result<&'a Label, Self::Error> {
+        match self {
+            Operand::Label(label) => Ok(label),
+            _ => Err(BackendError::InternalConsistencyError(
+                "Operand is not a Label".to_string(),
+            )),
+        }
+    }
+}
+impl<'a> TryInto<&'a str> for &'a Label {
+    type Error = BackendError;
+    fn try_into(self) -> Result<&'a str, Self::Error> {
+        Ok(self.0.as_str())
+    }
+}
 impl From<&Reg> for Operand {
     fn from(value: &Reg) -> Self {
         Operand::Reg(*value)
@@ -614,5 +716,19 @@ pub mod tests {
         assert_eq!(REG_FT9.gen_asm(), "ft9");
         assert_eq!(REG_FT10.gen_asm(), "ft10");
         assert_eq!(REG_FT11.gen_asm(), "ft11");
+    }
+
+    #[test]
+    fn test_f64_as_f32() {
+        // FIXME
+        let f1: f32 = f32::MIN;
+        let f2: f64 = f1 as f64;
+        let f3 = f2 as f32;
+        assert!(f1 == f3);
+    }
+    #[test]
+    fn test_constant_physical_regs() {
+        let p_regs: HashSet<Reg> = Reg::physical_regs().into_iter().collect();
+        assert_eq!(p_regs.len(), 64);
     }
 }

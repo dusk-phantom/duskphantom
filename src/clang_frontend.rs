@@ -1,9 +1,13 @@
+use anyhow::anyhow;
+use anyhow::Context;
 use llvm_ir::Module;
 use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fs;
 use std::process::Command;
 use tempfile::NamedTempFile;
+
+use crate::context;
 
 pub struct Program {
     pub tmp_cfile: NamedTempFile,
@@ -46,8 +50,10 @@ impl Program {
             llvm,
         }
     }
-    pub fn gen_ll(&self) -> String {
-        fs::read_to_string(self.tmp_llvm_file.path()).expect("msg: read llvm file failed")
+    pub fn gen_ll(&self) -> anyhow::Result<String> {
+        fs::read_to_string(self.tmp_llvm_file.path())
+            .map_err(|e| anyhow!("{e}"))
+            .with_context(|| context!())
     }
 }
 
@@ -70,15 +76,27 @@ impl Display for Program {
     }
 }
 
-pub fn optimize(program: &mut Program) {
+pub fn optimize(program: &mut Program) -> anyhow::Result<()> {
     // 使用clang 命令优化.ll 代码
     let llvm_path = program.tmp_llvm_file.path();
     let mut cmd = Command::new("opt");
-    cmd.arg("-O3").arg(llvm_path).arg("-o").arg(llvm_path);
-    let output = cmd.output().expect("msg: exec clang failed");
+    cmd.arg("-S")
+        .arg("-O3")
+        .arg(llvm_path)
+        .arg("-o")
+        .arg(llvm_path);
+    let output = cmd
+        .output()
+        .map_err(|e| anyhow!("{e}"))
+        .with_context(|| context!())?;
+
     if !output.status.success() {
-        panic!("msg: exec clang failed");
+        return Err(anyhow!("msg: exec opt failed")).with_context(|| context!());
     }
-    let llvm = Module::from_ir_path(llvm_path).expect("msg: parse llvm ir failed");
+
+    let llvm = Module::from_ir_path(llvm_path)
+        .map_err(|e| anyhow!("{e}"))
+        .with_context(|| context!())?;
     program.llvm = llvm;
+    Ok(())
 }
