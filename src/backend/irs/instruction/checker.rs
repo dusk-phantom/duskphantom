@@ -68,7 +68,7 @@ pub mod riscv {
     impl CheckValidInst for SdInst {}
     impl CheckValidInst for SwInst {}
     impl CheckValidInst for LwInst {}
-    impl CheckValidInst for LaInst {}
+    impl CheckValidInst for LlaInst {}
     impl CheckValidInst for LoadInst {
         /// 在riscv 阶段，不应该存在load指令
         fn check_valid(&self) -> bool {

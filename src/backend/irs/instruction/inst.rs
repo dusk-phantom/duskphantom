@@ -65,7 +65,7 @@ pub enum Inst {
     Sd(SdInst),
     Lw(LwInst),
     Sw(SwInst),
-    La(LaInst),
+    La(LlaInst),
     Load(LoadInst),
     Store(StoreInst),
 
@@ -283,7 +283,7 @@ impl_inst_convert!(SeqzInst, Seqz);
 
 // inst for data transfer
 impl_inst_convert!(MvInst, Mv);
-impl_inst_convert!(LaInst, La);
+impl_inst_convert!(LlaInst, La);
 impl_inst_convert!(SdInst, Sd);
 impl_inst_convert!(LdInst, Ld);
 impl_inst_convert!(LwInst, Lw);
