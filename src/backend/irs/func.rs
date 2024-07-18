@@ -32,6 +32,9 @@ impl Func {
     pub fn entry(&self) -> &Block {
         &self.entry
     }
+    pub fn entry_mut(&mut self) -> &mut Block {
+        &mut self.entry
+    }
 
     pub fn gen_asm(&self) -> String {
         let thread_pool = rayon::ThreadPoolBuilder::new()
@@ -97,8 +100,8 @@ impl Func {
         self.other_bbs.extend(bbs);
     }
     /// check if there is a call instruction in the function
-    pub fn is_caller(f: &Func) -> bool {
-        for bb in f.iter_bbs() {
+    pub fn is_caller(&self) -> bool {
+        for bb in self.iter_bbs() {
             for inst in bb.insts() {
                 if let Inst::Call { .. } = inst {
                     return true;
@@ -155,6 +158,26 @@ impl Func {
             }
         }
         ret
+    }
+
+    // get all the bbs that end with ret or tail call in mutable way
+    pub fn exit_bbs_mut(&mut self) -> impl Iterator<Item = &mut Block> {
+        let mut ret = vec![];
+        for bb in self.iter_bbs_mut() {
+            let insts = bb.insts();
+            if let Some(last_inst) = insts.last() {
+                match last_inst {
+                    Inst::Ret { .. } => {
+                        ret.push(bb);
+                    }
+                    Inst::Tail { .. } => {
+                        ret.push(bb);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        ret.into_iter()
     }
 }
 /// impl Some functionality for reg alloc
@@ -304,10 +327,10 @@ impl Func {
         // for each physical register, add it to the graph
         let p_regs = Reg::physical_regs();
         for p_reg in p_regs {
-            graph.insert(p_reg, HashSet::new());
+            graph.insert(*p_reg, HashSet::new());
             for other_p_reg in p_regs {
                 if p_reg != other_p_reg {
-                    graph.get_mut(&p_reg).unwrap().insert(other_p_reg);
+                    graph.get_mut(p_reg).unwrap().insert(*other_p_reg);
                 }
             }
         }
