@@ -36,6 +36,9 @@ pub mod riscv {
                 Inst::Bgt(inst) => inst.check_valid(),
                 Inst::Ble(inst) => inst.check_valid(),
 
+                Inst::F2i(inst) => inst.check_valid(),
+                Inst::I2f(inst) => inst.check_valid(),
+
                 Inst::Call(inst) => inst.check_valid(),
                 Inst::SRA(inst) => inst.check_valid(),
                 Inst::Ret => true,
@@ -44,6 +47,7 @@ pub mod riscv {
                 Inst::Xor(inst) => inst.check_valid(),
                 Inst::Tail(inst) => inst.check_valid(),
                 Inst::Li(inst) => inst.check_valid(),
+                Inst::Seqz(inst) => inst.check_valid(),
             }
         }
     }
@@ -97,6 +101,21 @@ pub mod riscv {
     impl CheckValidInst for LiInst {
         fn check_valid(&self) -> bool {
             matches!(self.dst(), Operand::Reg(_)) && matches!(self.src(), Operand::Imm(_))
+        }
+    }
+    impl CheckValidInst for SeqzInst {
+        fn check_valid(&self) -> bool {
+            matches!(self.dst(), Operand::Reg(_)) && matches!(self.src(), Operand::Reg(_))
+        }
+    }
+    impl CheckValidInst for F2iInst {
+        fn check_valid(&self) -> bool {
+            matches!(self.dst(), Operand::Reg(_)) && matches!(self.src(), Operand::Reg(_))
+        }
+    }
+    impl CheckValidInst for I2fInst {
+        fn check_valid(&self) -> bool {
+            matches!(self.dst(), Operand::Reg(_)) && matches!(self.src(), Operand::Reg(_))
         }
     }
 }

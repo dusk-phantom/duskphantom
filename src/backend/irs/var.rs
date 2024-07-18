@@ -1,4 +1,4 @@
-use gen_asm::{ Data, GenTool };
+use gen_asm::{Data, GenTool};
 
 #[allow(unused)]
 use super::*;
@@ -80,5 +80,12 @@ impl Var {
             Var::IntArr(arr) => arr.gen_asm(),
             Var::FloatArr(arr) => arr.gen_asm(),
         }
+    }
+}
+
+// impl from for vars
+impl From<FloatVar> for Var {
+    fn from(value: FloatVar) -> Self {
+        Var::Prim(PrimVar::FloatVar(value))
     }
 }

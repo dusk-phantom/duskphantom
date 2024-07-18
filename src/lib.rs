@@ -76,10 +76,11 @@ pub fn compile_clang(
 
     let mut program = clang_frontend::Program::parse(src_file);
     if opt_flag {
-        clang_frontend::optimize(&mut program);
+        clang_frontend::optimize(&mut program)?;
     }
     if let Some(ll_path) = ll_path {
-        std::fs::write(ll_path, program.gen_ll()).map_err(CompilerError::IOError)?;
+        std::fs::write(ll_path, program.gen_ll().with_context(|| context!())?)
+            .map_err(CompilerError::IOError)?;
     }
     let mut program = backend::gen_from_clang(&program)
         .map_err(|e| BackendError::GenFromLlvmError(format!("{e:?}")))?;
@@ -118,10 +119,11 @@ pub fn compile_clang_llc(
 ) -> Result<(), CompilerError> {
     let mut program = clang_frontend::Program::parse(src_file);
     if opt_flag {
-        clang_frontend::optimize(&mut program);
+        clang_frontend::optimize(&mut program)?;
     }
     if let Some(ll_path) = ll_path {
-        std::fs::write(ll_path, program.gen_ll()).map_err(CompilerError::IOError)?;
+        std::fs::write(ll_path, program.gen_ll().with_context(|| context!())?)
+            .map_err(CompilerError::IOError)?;
     }
     let mut program = clang_backend::gen_from_clang(&program)?;
     if opt_flag {
@@ -138,6 +140,7 @@ pub fn compile_self_llc(
     output_path: &str,
     opt_flag: bool,
     asm_flag: bool,
+    ll_path: Option<String>,
 ) -> Result<(), CompilerError> {
     use std::fs;
 
@@ -149,6 +152,9 @@ pub fn compile_self_llc(
     let mut program = middle::gen(&program)?;
     if opt_flag {
         middle::optimize(&mut program);
+    }
+    if let Some(ll_path) = ll_path {
+        std::fs::write(ll_path, program.module.gen_llvm_ir()).with_context(|| context!())?;
     }
     // 中端接clang
     let llvm_ir = format!(
@@ -186,14 +192,14 @@ pub fn asm2bin(asm: String) -> String {
         let tmp_bin_path = tmp_bin_file.path();
         let tmp_asm_path = tmp_asm_file.path();
         std::fs::write(tmp_asm_path, asm).expect("msg: write asm failed");
-        let mut cmd = std::process::Command::new("lcc");
+        let mut cmd = std::process::Command::new("llc");
         cmd.arg("-o")
             .arg(tmp_bin_path)
             .arg(tmp_asm_path)
             .arg("-Wl,-Ttext=0x80000000");
-        let output = cmd.output().expect("msg: exec lcc failed");
+        let output = cmd.output().expect("msg: exec llc failed");
         if !output.status.success() {
-            panic!("msg: exec lcc failed");
+            panic!("msg: exec llc failed");
         }
         let bin = std::fs::read(tmp_bin_path).expect("msg: read bin failed");
         let mut bin_str = String::new();

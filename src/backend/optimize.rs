@@ -2,8 +2,16 @@ use super::*;
 
 #[allow(unused)]
 pub fn optimize(program: &mut prog::Program) {
-    // 乘除法优化
-    // 块重排
-    // 指令调度
-    // 寄存器分配与合并
+    // 不调整块顺序的优化
+    for m in program.modules.iter_mut() {
+        for f in m.funcs.iter_mut() {
+            // inst combine? 匹配一些模式,将多条指令合并成一条
+            // mul and div to shift
+            // inst scheduling
+            // register allocation
+            // processing caller-save and callee-save
+            // processing stack frame's opening and closing
+            // block reordering
+        }
+    }
 }

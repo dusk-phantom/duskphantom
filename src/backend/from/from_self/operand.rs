@@ -21,16 +21,11 @@ impl IRBuilder {
         matches!(ty, middle::ir::ValueType::Float)
     }
 
-    pub fn address_from(
+    pub fn stack_slot_from(
         operand: &middle::ir::Operand,
         stack_slots: &HashMap<Address, StackSlot>,
     ) -> Result<Operand> {
         Ok(match operand {
-            middle::ir::Operand::Constant(_) => todo!(),
-            // TODO store 中的 dst 可能是 全局变量
-            middle::ir::Operand::Global(_) => todo!(),
-            middle::ir::Operand::Parameter(_) => todo!(),
-            // 来源于 get_element_ptr 或者是 alloca
             middle::ir::Operand::Instruction(instr) => stack_slots
                 .get(&(instr.as_ref().as_ref() as *const dyn Instruction as *const () as Address))
                 .ok_or(anyhow!(
@@ -39,9 +34,17 @@ impl IRBuilder {
                 ))
                 .with_context(|| context!())?
                 .into(), // 这个 into 将 stackslot -> operand
+            _ => {
+                /* Constant, Global */
+                /* Parameter 只有 void, int, float 三种类型 */
+                return Err(anyhow!("operand is not local var:{}", operand))
+                    .with_context(|| context!());
+            }
         })
     }
 
+    /// 找到指令的 output 对应的 reg, 查表 !
+    /// 在这里好像看不出来是 int 还是 float
     pub fn local_var_from(
         instr: &ObjPtr<Box<dyn Instruction>>,
         regs: &HashMap<Address, Reg>,
@@ -67,22 +70,26 @@ impl IRBuilder {
             }
         })
     }
+
+    /// 因为 build_entry 的时候, 就已经把参数 mv <虚拟寄存器>, <param> 了
     pub fn parameter_from(
-        param: &ObjPtr<middle::ir::Parameter>,
+        param: &middle::ir::Parameter,
         regs: &HashMap<Address, Reg>,
     ) -> Result<Operand> {
-        let addr = param.as_ref() as *const _ as Address;
+        let addr = param as *const _ as Address;
         let reg = regs
             .get(&addr)
             .ok_or(anyhow!(
                 "local var not found {}",
-                param.as_ref() as *const _ as Address
+                param as *const _ as Address
             ))
             .with_context(|| context!())?;
         Ok((*reg).into())
     }
 
-    /// 要不是 instruction 的输出, 要不是 constant
+    /// 要不是 instruction 的输出, 要不是 constant 要不是 parameter
+    /// 这个只是将 instruction 和 constant 包装成 Operand
+    /// 里面不会出现 asm 的输出
     pub fn local_operand_from(
         operand: &middle::ir::Operand,
         regs: &HashMap<Address, Reg>,
@@ -99,23 +106,60 @@ impl IRBuilder {
         }
     }
 
-    #[allow(unused)]
-    #[inline]
-    pub fn global_name_from(operand: &middle::ir::Operand) -> Result<Address> {
-        unimplemented!();
+    pub fn pointer_from(
+        operand: &middle::ir::Operand,
+        regs: &mut HashMap<Address, Reg>,
+    ) -> Result<Reg> {
         match operand {
-            middle::ir::Operand::Constant(con) => match con {
-                middle::ir::Constant::Int(_) => todo!(),
-                middle::ir::Constant::Float(_) => todo!(),
-                middle::ir::Constant::Bool(_) => todo!(),
-                middle::ir::Constant::Array(_) => todo!(),
-                _ => todo!(),
-            },
-            middle::ir::Operand::Instruction(instr) => {
-                Err(anyhow!("local operand".to_string())).with_context(|| context!())
+            middle::ir::Operand::Parameter(param) => {
+                let param = param.as_ref();
+                match param.value_type {
+                    middle::ir::ValueType::Array(_, _) | middle::ir::ValueType::Pointer(_) => {
+                        let addr = param as *const _ as Address;
+                        let reg = regs
+                            .get(&addr)
+                            .ok_or(anyhow!(
+                                "local var not found {}",
+                                param as *const _ as Address
+                            ))
+                            .with_context(|| context!())?;
+                        Ok(*reg)
+                    }
+                    _ => Err(anyhow!(
+                        "it is impossible to load from a void/bool/int/float paramter: {}",
+                        operand
+                    ))
+                    .with_context(|| context!()),
+                }
             }
-            middle::ir::Operand::Global(_) => todo!(),
-            middle::ir::Operand::Parameter(_) => todo!(),
+            middle::ir::Operand::Instruction(_) => {
+                /* FIXME 这应该是一个 UB */
+                unimplemented!()
+            }
+            middle::ir::Operand::Constant(_) => Err(anyhow!(
+                "it is impossible to load from a constant: {}",
+                operand
+            ))
+            .with_context(|| context!()),
+            middle::ir::Operand::Global(_) => Err(anyhow!(
+                "global have been processed in global_from: {}",
+                operand
+            ))
+            .with_context(|| context!()),
+        }
+    }
+
+    /// 我们的 global/函数名 都是来自于中端的 name 的, 其他的 id 来自于中端的地址
+    #[inline]
+    pub fn global_from(operand: &middle::ir::Operand) -> Result<String> {
+        // TODO
+        match operand {
+            middle::ir::Operand::Global(glo) => {
+                let glo = glo.as_ref();
+                let label = glo.name.clone();
+                Ok(label)
+            }
+            _ => Err(anyhow!("not a global var:{}", operand)).with_context(|| context!()),
         }
     }
 }
