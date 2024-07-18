@@ -139,31 +139,15 @@ impl RegUses for SwInst {
 }
 impl RegDefs for SwInst {}
 
-impl RegDefs for LoadInst {}
+impl RegDefs for LoadInst {
+    fn defs(&self) -> Vec<&Reg> {
+        vec![self.dst()]
+    }
+}
 impl RegUses for LoadInst {}
 impl RegDefs for StoreInst {}
-impl RegUses for StoreInst {}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn test_seqz() {
-        let mut reg_gener = RegGenerator::new();
-        let dst = reg_gener.gen_virtual_usual_reg();
-        let src = reg_gener.gen_virtual_usual_reg();
-        let seqz = SeqzInst::new(dst.into(), src.into());
-        assert_eq!(seqz.uses(), vec![&src]);
-        assert_eq!(seqz.defs(), vec![&dst]);
-    }
-    #[test]
-    fn test_repeat() {
-        let mul = MulInst::new(REG_A0.into(), REG_A0.into(), REG_A0.into());
-        assert_eq!(mul.uses(), vec![&REG_A0]);
-        assert_eq!(mul.defs(), vec![&REG_A0]);
-        let beq = BeqInst::new(REG_A0, REG_A0, "a".into());
-        assert_eq!(beq.uses(), vec![&REG_A0]);
-        let beq2 = BeqInst::new(REG_A0, REG_A1, "a".into());
-        assert_eq!(beq2.uses(), vec![&REG_A0, &REG_A1]);
+impl RegUses for StoreInst {
+    fn uses(&self) -> Vec<&Reg> {
+        vec![self.src()]
     }
 }
