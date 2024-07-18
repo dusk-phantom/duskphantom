@@ -1,5 +1,5 @@
 use crate::utils::mem::ObjPtr;
-use crate::{backend::*, ssa2tac_binary_usual};
+use crate::{backend::*, ssa2tac_three_usual};
 use crate::{context, middle};
 
 use crate::middle::ir::instruction::binary_inst::BinaryInst;
@@ -40,7 +40,7 @@ impl IRBuilder {
                 Self::build_store_inst(store, stack_slots, reg_gener, regs)
             }
             middle::ir::instruction::InstType::Add => {
-                ssa2tac_binary_usual!(AddInst, Add, inst, regs, reg_gener)
+                ssa2tac_three_usual!(AddInst, Add, inst, regs, reg_gener)
             }
             middle::ir::instruction::InstType::FAdd => {
                 // TODO 浮点型指令, 立即数处理
@@ -87,7 +87,7 @@ impl IRBuilder {
                 Ok(ret)
             }
             middle::ir::instruction::InstType::Sub => {
-                ssa2tac_binary_usual!(SubInst, Sub, inst, regs, reg_gener)
+                ssa2tac_three_usual!(SubInst, Sub, inst, regs, reg_gener)
             }
             // 通过类型转换，可以做到: FAdd 的输入一定是 Float 类型的寄存器
             middle::ir::instruction::InstType::FSub => {
@@ -95,17 +95,17 @@ impl IRBuilder {
                 todo!()
             }
             middle::ir::instruction::InstType::Mul => {
-                ssa2tac_binary_usual!(MulInst, Mul, inst, regs, reg_gener)
+                ssa2tac_three_usual!(MulInst, Mul, inst, regs, reg_gener)
             }
             middle::ir::instruction::InstType::FMul => {
                 // ssa2tac_binary_float!(inst, regs, reg_gener, FMul, Mul, MulInst)
                 todo!()
             }
             middle::ir::instruction::InstType::SDiv => {
-                ssa2tac_binary_usual!(DivInst, SDiv, inst, regs, reg_gener)
+                ssa2tac_three_usual!(DivInst, SDiv, inst, regs, reg_gener)
             }
             middle::ir::instruction::InstType::SRem => {
-                ssa2tac_binary_usual!(RemInst, SRem, inst, regs, reg_gener)
+                ssa2tac_three_usual!(RemInst, SRem, inst, regs, reg_gener)
             }
 
             // TODO 目前还没有 udiv 和 urem
@@ -113,7 +113,7 @@ impl IRBuilder {
             middle::ir::instruction::InstType::URem => todo!(),
             middle::ir::instruction::InstType::FDiv => todo!(),
             middle::ir::instruction::InstType::Shl => {
-                ssa2tac_binary_usual!(SllInst, Shl, inst, regs, reg_gener)
+                ssa2tac_three_usual!(SllInst, Shl, inst, regs, reg_gener)
             }
             middle::ir::instruction::InstType::LShr => {
                 // ssa2tac_binary_usual!(inst, regs, reg_gener, LShr, Srl, SrlInst)
@@ -125,13 +125,13 @@ impl IRBuilder {
                 todo!()
             }
             middle::ir::instruction::InstType::And => {
-                ssa2tac_binary_usual!(AndInst, And, inst, regs, reg_gener)
+                ssa2tac_three_usual!(AndInst, And, inst, regs, reg_gener)
             }
             middle::ir::instruction::InstType::Or => {
-                ssa2tac_binary_usual!(OrInst, Or, inst, regs, reg_gener)
+                ssa2tac_three_usual!(OrInst, Or, inst, regs, reg_gener)
             }
             middle::ir::instruction::InstType::Xor => {
-                ssa2tac_binary_usual!(XorInst, Xor, inst, regs, reg_gener)
+                ssa2tac_three_usual!(XorInst, Xor, inst, regs, reg_gener)
             }
             middle::ir::instruction::InstType::Ret => {
                 let ret = downcast_ref::<middle::ir::instruction::terminator_inst::Ret>(
@@ -181,7 +181,7 @@ impl IRBuilder {
         let mut ret = Vec::new();
         let dest: Address = icmp as *const _ as Address;
         match icmp.op {
-            middle::ir::instruction::misc_inst::ICmpOp::Ne => {
+            middle::ir::instruction::misc_inst::ICmpOp::Eq => {
                 let op0 =
                     Self::local_operand_from(icmp.get_lhs(), regs).with_context(|| context!())?;
                 let op1 =
@@ -189,7 +189,7 @@ impl IRBuilder {
                 if let (Operand::Reg(reg0), Operand::Reg(reg1)) = (&op0, &op1) {
                     let dst = reg_gener.gen_virtual_usual_reg();
                     let sub = SubInst::new(dst.into(), reg0.into(), reg1.into());
-                    ret.push(sub.into());
+                    ret.push(sub.into()); // sub, 然后判断是否为 0
                     let flag = reg_gener.gen_virtual_usual_reg();
                     let seqz = SeqzInst::new(flag.into(), dst.into());
                     ret.push(seqz.into());
@@ -209,11 +209,56 @@ impl IRBuilder {
                     unimplemented!();
                 }
             }
-            middle::ir::instruction::misc_inst::ICmpOp::Eq => {
-                unimplemented!()
+            middle::ir::instruction::misc_inst::ICmpOp::Ne => {
+                let op0 =
+                    Self::local_operand_from(icmp.get_lhs(), regs).with_context(|| context!())?;
+                let op1 =
+                    Self::local_operand_from(icmp.get_rhs(), regs).with_context(|| context!())?;
+                if let (Operand::Reg(reg0), Operand::Reg(reg1)) = (&op0, &op1) {
+                    let dst = reg_gener.gen_virtual_usual_reg();
+                    let sub = SubInst::new(dst.into(), reg0.into(), reg1.into());
+                    ret.push(sub.into()); // sub, 然后判断是否为 0
+                    let flag = reg_gener.gen_virtual_usual_reg();
+                    // TODO 这里可以使用 snez : sltu zero, rs1
+                    let seqz = SeqzInst::new(flag.into(), dst.into());
+                    ret.push(seqz.into());
+                    regs.insert(dest, flag);
+                } else if let (Operand::Reg(reg), Operand::Imm(imm))
+                | (Operand::Imm(imm), Operand::Reg(reg)) = (op0, op1)
+                {
+                    let dst = reg_gener.gen_virtual_usual_reg();
+                    let sub = SubInst::new(dst.into(), reg.into(), imm.into());
+                    ret.push(sub.into());
+                    let flag = reg_gener.gen_virtual_usual_reg();
+                    let seqz = SeqzInst::new(flag.into(), dst.into());
+                    ret.push(seqz.into());
+                    regs.insert(dest, flag);
+                } else {
+                    // 应该不太可能出现: (imm, imm) 的情况
+                    unimplemented!();
+                }
             }
             middle::ir::instruction::misc_inst::ICmpOp::Slt => {
-                unimplemented!()
+                let op0 =
+                    Self::local_operand_from(icmp.get_lhs(), regs).with_context(|| context!())?;
+                let op1 =
+                    Self::local_operand_from(icmp.get_rhs(), regs).with_context(|| context!())?;
+                if let (Operand::Reg(reg0), Operand::Reg(reg1)) = (&op0, &op1) {
+                    let flag = reg_gener.gen_virtual_usual_reg();
+                    let slt = SltInst::new(flag.into(), reg0.into(), reg1.into());
+                    ret.push(slt.into());
+                    regs.insert(dest, flag);
+                } else if let (Operand::Reg(reg), Operand::Imm(imm))
+                | (Operand::Imm(imm), Operand::Reg(reg)) = (op0, op1)
+                {
+                    let flag = reg_gener.gen_virtual_usual_reg();
+                    let slt = SubInst::new(flag.into(), reg.into(), imm.into());
+                    ret.push(slt.into());
+                    regs.insert(dest, flag);
+                } else {
+                    // 应该不太可能出现: (imm, imm) 的情况
+                    unimplemented!();
+                }
             }
             middle::ir::instruction::misc_inst::ICmpOp::Sle => {
                 todo!()

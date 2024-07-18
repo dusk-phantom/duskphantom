@@ -1,5 +1,5 @@
 #[macro_export]
-macro_rules! ssa2tac_binary_usual {
+macro_rules! ssa2tac_three_usual {
     ($tac_inst_ty:ident /* AddInst */,  $ssa_inst_type:ident /* Add */, $inst:ident, $regs:ident, $reg_gener:ident ) => {{
         let add = downcast_ref::<middle::ir::instruction::binary_inst::$ssa_inst_type>(
             $inst.as_ref().as_ref(),
@@ -31,7 +31,7 @@ macro_rules! ssa2tac_binary_usual {
 }
 
 #[macro_export]
-macro_rules! ssa2tac_binary_float {
+macro_rules! ssa2tac_three_float {
     ($inst:ident, $regs:ident, $reg_gener:ident, $ssa_ty:ident, $tac_enum:ident, $tac_inst:ident) => {{
         let dinst =
             downcast_ref::<middle::ir::instruction::binary_inst::$ssa_ty>($inst.as_ref().as_ref());
