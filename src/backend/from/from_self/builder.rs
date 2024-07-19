@@ -231,8 +231,8 @@ impl IRBuilder {
         fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<Block> {
         // basic 的 label 注意一下
-        let label = bb.as_ref() as *const _ as Address;
-        let mut m_bb = Block::new(label.to_string());
+        let label = format!(".l{}", bb.as_ref() as *const _ as Address);
+        let mut m_bb = Block::new(label);
         for inst in bb.iter() {
             let gen_insts =
                 Self::build_instruction(&inst, stack_allocator, stack_slots, reg_gener, regs, fmms)
