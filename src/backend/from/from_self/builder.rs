@@ -304,14 +304,14 @@ impl IRBuilder {
             }
         }
 
-        let bb = func.entry.with_context(|| context!())?; // FIXME func 的其他 blocks 是不是不包含 entry ?
+        let bb = func.entry.with_context(|| context!())?;
         for inst in bb.iter() {
             let gen_insts =
                 Self::build_instruction(&inst, stack_allocator, stack_slots, reg_gener, regs, fmms)
                     .with_context(|| context!())?;
             insts.extend(gen_insts);
         }
-        // // FIXME 上面 bb.iter 会包含这个 term_inst
+        // // 上面 bb.iter 会包含这个 term_inst
         // insts.extend(Self::build_term_inst(
         //     &bb.get_last_inst(),
         //     regs,
