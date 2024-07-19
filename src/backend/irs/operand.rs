@@ -81,6 +81,12 @@ impl TryInto<f32> for Fmm {
     }
 }
 
+impl From<Imm> for i64 {
+    fn from(value: Imm) -> Self {
+        value.0
+    }
+}
+
 impl PartialEq for Fmm {
     fn eq(&self, other: &Self) -> bool {
         if f64::is_nan(self.0) && f64::is_nan(other.0) {
