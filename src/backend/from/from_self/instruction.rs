@@ -87,22 +87,90 @@ impl IRBuilder {
                 Ok(ret)
             }
             middle::ir::instruction::InstType::Sub => {
-                ssa2tac_three_usual!(SubInst, Sub, inst, regs, reg_gener)
+                // ssa2tac_three_usual!(SubInst, Sub, inst, regs, reg_gener)
+                let sub = downcast_ref::<middle::ir::instruction::binary_inst::Sub>(
+                    inst.as_ref().as_ref(),
+                );
+                let op0 = Self::local_operand_from(sub.get_lhs(), regs)?;
+                let op1 = Self::local_operand_from(sub.get_rhs(), regs)?;
+                if let (Operand::Reg(op0), Operand::Reg(op1)) = (&op0, &op1) {
+                    let dst = reg_gener.gen_virtual_usual_reg();
+                    regs.insert(sub as *const _ as Address, dst);
+                    let sub_inst = SubInst::new(dst.into(), op0.into(), op1.into());
+                    Ok(vec![sub_inst.into()])
+                } else if let (Operand::Reg(op0), Operand::Imm(op1)) = (&op0, &op1) {
+                    let dst = reg_gener.gen_virtual_usual_reg();
+                    regs.insert(sub as *const _ as Address, dst);
+                    let imm: i64 = (*op1).clone().into();
+                    let sub_inst = AddInst::new(dst.into(), op0.into(), (-imm).into());
+                    Ok(vec![sub_inst.into()])
+                }
+                /* llvm ir 中, 不能出现 lhs=<imm>, rhs=<reg> 的情况 */
+                else {
+                    // 不太可能两个都是 Imm
+                    Err(anyhow!("operand type not supported")).with_context(|| context!())
+                }
             }
             // 通过类型转换，可以做到: FAdd 的输入一定是 Float 类型的寄存器
             middle::ir::instruction::InstType::FSub => {
                 // ssa2tac_binary_float!(inst, regs, reg_gener, FSub, Sub, SubInst)
-                todo!()
+                todo!();
             }
             middle::ir::instruction::InstType::Mul => {
-                ssa2tac_three_usual!(MulInst, Mul, inst, regs, reg_gener)
+                // ssa2tac_three_usual!(MulInst, Mul, inst, regs, reg_gener)
+                let mul = downcast_ref::<middle::ir::instruction::binary_inst::Mul>(
+                    inst.as_ref().as_ref(),
+                );
+                let op0 = Self::local_operand_from(mul.get_lhs(), regs)?;
+                let op1 = Self::local_operand_from(mul.get_rhs(), regs)?;
+                if let (Operand::Reg(op0), Operand::Reg(op1)) = (&op0, &op1) {
+                    let dst = reg_gener.gen_virtual_usual_reg();
+                    regs.insert(mul as *const _ as Address, dst);
+                    let mul_inst = MulInst::new(dst.into(), op0.into(), op1.into());
+                    Ok(vec![mul_inst.into()])
+                } else if let (Operand::Reg(op0), Operand::Imm(op1)) = (&op0, &op1) {
+                    let dst = reg_gener.gen_virtual_usual_reg();
+                    let li = LiInst::new(dst.into(), op1.into());
+                    let dst = reg_gener.gen_virtual_usual_reg();
+                    let mul_inst = MulInst::new(dst.into(), op0.into(), dst.into());
+                    regs.insert(mul as *const _ as Address, dst);
+                    Ok(vec![li.into(), mul_inst.into()])
+                }
+                /* llvm ir 中, 不能出现 lhs=<imm>, rhs=<reg> 的情况 */
+                else {
+                    // 不太可能两个都是 Imm
+                    Err(anyhow!("operand type not supported")).with_context(|| context!())
+                }
             }
             middle::ir::instruction::InstType::FMul => {
                 // ssa2tac_binary_float!(inst, regs, reg_gener, FMul, Mul, MulInst)
                 todo!()
             }
             middle::ir::instruction::InstType::SDiv => {
-                ssa2tac_three_usual!(DivInst, SDiv, inst, regs, reg_gener)
+                // ssa2tac_three_usual!(DivInst, SDiv, inst, regs, reg_gener)
+                let div = downcast_ref::<middle::ir::instruction::binary_inst::SDiv>(
+                    inst.as_ref().as_ref(),
+                );
+                let op0 = Self::local_operand_from(div.get_lhs(), regs)?;
+                let op1 = Self::local_operand_from(div.get_rhs(), regs)?;
+                if let (Operand::Reg(op0), Operand::Reg(op1)) = (&op0, &op1) {
+                    let dst = reg_gener.gen_virtual_usual_reg();
+                    regs.insert(div as *const _ as Address, dst);
+                    let div_inst = DivInst::new(dst.into(), op0.into(), op1.into());
+                    Ok(vec![div_inst.into()])
+                } else if let (Operand::Reg(op0), Operand::Imm(op1)) = (&op0, &op1) {
+                    let dst = reg_gener.gen_virtual_usual_reg();
+                    let li = LiInst::new(dst.into(), op1.into());
+                    let dst = reg_gener.gen_virtual_usual_reg();
+                    let div_inst = DivInst::new(dst.into(), op0.into(), dst.into());
+                    regs.insert(div as *const _ as Address, dst);
+                    Ok(vec![li.into(), div_inst.into()])
+                }
+                /* llvm ir 中, 不能出现 lhs=<imm>, rhs=<reg> 的情况 */
+                else {
+                    // 不太可能两个都是 Imm
+                    Err(anyhow!("operand type not supported")).with_context(|| context!())
+                }
             }
             middle::ir::instruction::InstType::SRem => {
                 ssa2tac_three_usual!(RemInst, SRem, inst, regs, reg_gener)
@@ -198,7 +266,8 @@ impl IRBuilder {
                 | (Operand::Imm(imm), Operand::Reg(reg)) = (op0, op1)
                 {
                     let dst = reg_gener.gen_virtual_usual_reg();
-                    let sub = SubInst::new(dst.into(), reg.into(), imm.into());
+                    let imm: i64 = imm.into();
+                    let sub = AddInst::new(dst.into(), reg.into(), (-imm).into());
                     ret.push(sub.into());
                     let flag = reg_gener.gen_virtual_usual_reg();
                     let seqz = SeqzInst::new(flag.into(), dst.into());
@@ -210,33 +279,34 @@ impl IRBuilder {
                 }
             }
             middle::ir::instruction::misc_inst::ICmpOp::Ne => {
-                let op0 =
-                    Self::local_operand_from(icmp.get_lhs(), regs).with_context(|| context!())?;
-                let op1 =
-                    Self::local_operand_from(icmp.get_rhs(), regs).with_context(|| context!())?;
-                if let (Operand::Reg(reg0), Operand::Reg(reg1)) = (&op0, &op1) {
-                    let dst = reg_gener.gen_virtual_usual_reg();
-                    let sub = SubInst::new(dst.into(), reg0.into(), reg1.into());
-                    ret.push(sub.into()); // sub, 然后判断是否为 0
-                    let flag = reg_gener.gen_virtual_usual_reg();
-                    // TODO 这里可以使用 snez : sltu zero, rs1
-                    let seqz = SeqzInst::new(flag.into(), dst.into());
-                    ret.push(seqz.into());
-                    regs.insert(dest, flag);
-                } else if let (Operand::Reg(reg), Operand::Imm(imm))
-                | (Operand::Imm(imm), Operand::Reg(reg)) = (op0, op1)
-                {
-                    let dst = reg_gener.gen_virtual_usual_reg();
-                    let sub = SubInst::new(dst.into(), reg.into(), imm.into());
-                    ret.push(sub.into());
-                    let flag = reg_gener.gen_virtual_usual_reg();
-                    let seqz = SeqzInst::new(flag.into(), dst.into());
-                    ret.push(seqz.into());
-                    regs.insert(dest, flag);
-                } else {
-                    // 应该不太可能出现: (imm, imm) 的情况
-                    unimplemented!();
-                }
+                todo!()
+                // let op0 =
+                //     Self::local_operand_from(icmp.get_lhs(), regs).with_context(|| context!())?;
+                // let op1 =
+                //     Self::local_operand_from(icmp.get_rhs(), regs).with_context(|| context!())?;
+                // if let (Operand::Reg(reg0), Operand::Reg(reg1)) = (&op0, &op1) {
+                //     let dst = reg_gener.gen_virtual_usual_reg();
+                //     let sub = SubInst::new(dst.into(), reg0.into(), reg1.into());
+                //     ret.push(sub.into()); // sub, 然后判断是否为 0
+                //     let flag = reg_gener.gen_virtual_usual_reg();
+                //     // TODO 这里可以使用 snez : sltu zero, rs1
+                //     let seqz = SeqzInst::new(flag.into(), dst.into());
+                //     ret.push(seqz.into());
+                //     regs.insert(dest, flag);
+                // } else if let (Operand::Reg(reg), Operand::Imm(imm))
+                // | (Operand::Imm(imm), Operand::Reg(reg)) = (op0, op1)
+                // {
+                //     let dst = reg_gener.gen_virtual_usual_reg();
+                //     let sub = SubInst::new(dst.into(), reg.into(), imm.into());
+                //     ret.push(sub.into());
+                //     let flag = reg_gener.gen_virtual_usual_reg();
+                //     let seqz = SeqzInst::new(flag.into(), dst.into());
+                //     ret.push(seqz.into());
+                //     regs.insert(dest, flag);
+                // } else {
+                //     // 应该不太可能出现: (imm, imm) 的情况
+                //     unimplemented!();
+                // }
             }
             middle::ir::instruction::misc_inst::ICmpOp::Slt => {
                 let op0 =
@@ -248,11 +318,12 @@ impl IRBuilder {
                     let slt = SltInst::new(flag.into(), reg0.into(), reg1.into());
                     ret.push(slt.into());
                     regs.insert(dest, flag);
-                } else if let (Operand::Reg(reg), Operand::Imm(imm))
+                } else if let (Operand::Reg(reg), Operand::Imm(imm))  // FIXME 这里逻辑有误
                 | (Operand::Imm(imm), Operand::Reg(reg)) = (op0, op1)
                 {
                     let flag = reg_gener.gen_virtual_usual_reg();
-                    let slt = SubInst::new(flag.into(), reg.into(), imm.into());
+                    let imm: i64 = imm.into();
+                    let slt = AddInst::new(flag.into(), reg.into(), (-imm).into());
                     ret.push(slt.into());
                     regs.insert(dest, flag);
                 } else {
