@@ -26,6 +26,8 @@
             glib
             gcc
             libxml2
+            (with pkgsCross.riscv64; [ glib.stdenv.cc buildPackages.gdb ])
+            qemu
           ];
           LD_LIBRARY_PATH = libPath;
           RUSTC_VERSION = overrides.toolchain.channel;
