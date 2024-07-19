@@ -215,6 +215,7 @@ impl IRBuilder {
         // }
         // Ok(blocks)
         func.dfs_iter()
+            .skip(1)
             .map(|ptr_bb| {
                 Self::build_bb(&ptr_bb, stack_allocator, stack_slots, reg_gener, regs, fmms)
             })
@@ -238,9 +239,9 @@ impl IRBuilder {
                     .with_context(|| context!())?;
             m_bb.extend_insts(gen_insts);
         }
-        let gen_insts = Self::build_term_inst(&bb.get_last_inst(), regs, reg_gener, fmms)
-            .with_context(|| context!())?;
-        m_bb.extend_insts(gen_insts);
+        // let gen_insts = Self::build_term_inst(&bb.get_last_inst(), regs, reg_gener, fmms)
+        //     .with_context(|| context!())?;
+        // m_bb.extend_insts(gen_insts);
         Ok(m_bb)
     }
 
@@ -310,12 +311,13 @@ impl IRBuilder {
                     .with_context(|| context!())?;
             insts.extend(gen_insts);
         }
-        insts.extend(Self::build_term_inst(
-            &bb.get_last_inst(),
-            regs,
-            reg_gener,
-            fmms,
-        )?);
+        // // FIXME 上面 bb.iter 会包含这个 term_inst
+        // insts.extend(Self::build_term_inst(
+        //     &bb.get_last_inst(),
+        //     regs,
+        //     reg_gener,
+        //     fmms,
+        // )?);
 
         let mut entry = Block::new("entry".to_string());
         entry.extend_insts(insts);

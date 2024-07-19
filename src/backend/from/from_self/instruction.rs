@@ -319,7 +319,7 @@ impl IRBuilder {
         match val {
             Operand::Imm(imm) => {
                 let dst = reg_gener.gen_virtual_usual_reg(); // 分配一个临时的 dest, 用来存储 imm, 因此 sd reg, stack_slot
-                let li = AddInst::new(dst.into(), REG_ZERO.into(), imm.into()); // li dst, imm
+                let li = LiInst::new(dst.into(), imm.into()); // li dst, imm
                 let src = dst;
                 let sd = StoreInst::new(address.try_into()?, src); // sd src, stack_slot
                 ret.push(li.into());
@@ -329,6 +329,7 @@ impl IRBuilder {
                 return Err(anyhow!("store instruction with float value".to_string(),))
                     .with_context(|| context!());
             }
+            // TODO Reg
             _ => (),
         }
         Ok(ret)
@@ -602,6 +603,7 @@ impl IRBuilder {
     }
 
     /// 不是 ret 就是 br
+    #[allow(unused)]
     pub fn build_term_inst(
         term: &ObjPtr<Box<dyn middle::ir::Instruction>>,
         regs: &mut HashMap<Address, Reg>,
