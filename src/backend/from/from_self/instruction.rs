@@ -358,7 +358,7 @@ impl IRBuilder {
             }
         };
         regs.insert(load as *const _ as Address, dst_reg);
-        // 两种情况: 1. 从栈上获取(之前 alloca 过一次), 2. 从非栈上获取(paramete-pointer, global)
+        // 两种情况: 1. 从栈上获取(之前 alloca 过一次), 2. 从非栈上获取(parameter-pointer, global)
         if let Ok(slot) = Self::stack_slot_from(load.get_ptr(), stack_slots) {
             let ld = LoadInst::new(dst_reg, slot.try_into()?);
             ret.push(ld.into());
@@ -574,29 +574,29 @@ impl IRBuilder {
                 .first()
                 .ok_or(anyhow!("iftrue get error",))
                 .with_context(|| context!())?;
+
+            let iftrue_label = format!(".l{}", iftrue.as_ref() as *const _ as Address);
+
             let iffalse = succs
                 .get(1)
                 .ok_or(anyhow!("iffalse get error",))
                 .with_context(|| context!())?;
 
+            let iffalse_label = format!(".l{}", iffalse.as_ref() as *const _ as Address);
+
             br_insts.extend(vec![
-                Inst::Beq(BeqInst::new(
-                    reg,
-                    REG_ZERO,
-                    (iffalse.as_ref() as *const _ as Address).to_string().into(),
-                )),
-                Inst::Jmp(JmpInst::new(
-                    (iftrue.as_ref() as *const _ as Address).to_string().into(),
-                )),
+                Inst::Beq(BeqInst::new(reg, REG_ZERO, iffalse_label.into())),
+                Inst::Jmp(JmpInst::new(iftrue_label.into())),
             ]);
         } else {
             let succ = succs
                 .first()
                 .ok_or(anyhow!("iftrue get error",))
                 .with_context(|| context!())?;
-            br_insts.push(Inst::Jmp(JmpInst::new(
-                (succ.as_ref() as *const _ as Address).to_string().into(),
-            )))
+
+            let label = format!(".l{}", succ.as_ref() as *const _ as Address);
+
+            br_insts.push(Inst::Jmp(JmpInst::new(label.into())))
         }
 
         Ok(br_insts)
@@ -723,7 +723,7 @@ impl IRBuilder {
         /* ---------- call 指令本身 ---------- */
 
         // 函数是全局的，因此用的是名字
-        let mut call_inst: CallInst = CallInst::new(call.func.name.to_string().into()); // call <label>
+        let mut call_inst: CallInst = CallInst::new(call.func.name.to_string().into()); // call <一个全局的 name >
 
         let dest_name = call as *const _ as Address;
 
