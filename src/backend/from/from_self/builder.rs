@@ -319,7 +319,8 @@ impl IRBuilder {
         //     fmms,
         // )?);
 
-        let mut entry = Block::new("entry".to_string());
+        let label = format!(".l{}", bb.as_ref() as *const _ as Address);
+        let mut entry = Block::new(label);
         entry.extend_insts(insts);
         let caller_regs_stack = usize::try_from(caller_regs_stack)?;
         Ok((entry, caller_regs_stack))
