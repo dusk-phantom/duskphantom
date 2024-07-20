@@ -7,7 +7,7 @@ use crate::middle::irgen::program_kit::ProgramKit;
 use crate::middle::irgen::value::Value;
 use anyhow::{anyhow, Context};
 
-use super::constant::{collapse_array, type_to_const};
+use super::constant::collapse_array;
 
 impl<'a> ProgramKit<'a> {
     /// Generate a global declaration into the program
@@ -28,7 +28,7 @@ impl<'a> ProgramKit<'a> {
                 // Get initializer
                 let mut initializer = match val {
                     Some(v) => self.gen_const_expr(v)?,
-                    None => type_to_const(&value_type)?,
+                    None => value_type.default_initializer()?,
                 };
 
                 // Collapse initializer array
