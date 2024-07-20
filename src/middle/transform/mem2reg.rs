@@ -91,7 +91,14 @@ pub fn mem2reg(entry: BBPtr, mem_pool: &mut Pin<Box<IRBuilder>>) -> Result<()> {
                 return Ok(value.clone());
             }
         }
-        Err(anyhow::anyhow!("variable value not found")).with_context(|| context!())
+        let ValueType::Pointer(ptr) = variable.get_value_type() else {
+            return Err(anyhow::anyhow!("variable type is not pointer"))
+                .with_context(|| context!());
+        };
+
+        // Value not found can happen when out of scope of a variable, or not defined
+        // To keep consistent with LLVM, return default initializer
+        Ok(Operand::Constant(ptr.default_initializer()?))
     }
 
     /// Start from entry node, decide the value for each "phi" instruction
@@ -300,7 +307,13 @@ fn get_dominance_frontiers(entry: BBPtr) -> BTreeMap<BBPtr, BTreeSet<BBPtr>> {
             let mut runner = *pred;
             while runner != idoms[bb] {
                 df.entry(runner).or_insert(BTreeSet::new()).insert(*bb);
-                runner = idoms[&runner];
+
+                // Only update runner if it's not dead block
+                if let Some(new_runner) = idoms.get(&runner) {
+                    runner = *new_runner;
+                } else {
+                    break;
+                }
             }
         }
     }
@@ -771,6 +784,167 @@ pub mod tests_mem2reg {
 
         final9:
         br label %final6
+
+
+        }
+        "###);
+    }
+
+    #[test]
+    fn test_mem2reg_uninitialized() {
+        let code = r#"
+            int main() {
+                int x;
+                // "x" is not initialized in this case
+                // We expect the compiler not to panic
+                return x;
+            }
+        "#;
+
+        // Check before optimization
+        let parsed = parse(code).unwrap();
+        let mut program = gen(&parsed).unwrap();
+        let llvm_before = program.module.gen_llvm_ir();
+
+        // Check after optimization
+        mem2reg(
+            program.module.functions[0].entry.unwrap(),
+            &mut program.mem_pool,
+        )
+        .unwrap();
+        let llvm_after = program.module.gen_llvm_ir();
+        assert_snapshot!(format!(
+            "BEFORE:\n{}\n\nAFTER:\n{}",
+            llvm_before, llvm_after
+        ), @r###"
+        BEFORE:
+        define i32 @main() {
+        entry:
+        %alloca_2 = alloca i32
+        %alloca_5 = alloca i32
+        %load_6 = load i32, ptr %alloca_5
+        store i32 %load_6, ptr %alloca_2
+        br label %exit
+
+        exit:
+        %load_3 = load i32, ptr %alloca_2
+        ret i32 %load_3
+
+
+        }
+
+
+        AFTER:
+        define i32 @main() {
+        entry:
+        %alloca_2 = alloca i32
+        %alloca_5 = alloca i32
+        br label %exit
+
+        exit:
+        ret i32 0
+
+
+        }
+        "###);
+    }
+
+    #[test]
+    fn test_mem2reg_dead_block() {
+        let code = r#"
+            int a = 7;
+            int func() {
+                int b = a;
+                int a = 1;
+                // When both routes return, "final3" block will still be created,
+                // but will never be visited
+                if (a == b) {
+                    a = a + 1;
+                    return 1;
+                }
+                else
+                    return 0;
+            }
+        "#;
+
+        // Check before optimization
+        let parsed = parse(code).unwrap();
+        let mut program = gen(&parsed).unwrap();
+        let llvm_before = program.module.gen_llvm_ir();
+
+        // Check after optimization
+        mem2reg(
+            program.module.functions[0].entry.unwrap(),
+            &mut program.mem_pool,
+        )
+        .unwrap();
+        let llvm_after = program.module.gen_llvm_ir();
+        assert_snapshot!(format!(
+            "BEFORE:\n{}\n\nAFTER:\n{}",
+            llvm_before, llvm_after
+        ), @r###"
+        BEFORE:
+        @a = dso_local global i32 7
+        define i32 @func() {
+        entry:
+        %alloca_2 = alloca i32
+        %alloca_5 = alloca i32
+        %load_6 = load i32, ptr @a
+        store i32 %load_6, ptr %alloca_5
+        %alloca_8 = alloca i32
+        store i32 1, ptr %alloca_8
+        br label %cond0
+
+        cond0:
+        %load_15 = load i32, ptr %alloca_8
+        %load_16 = load i32, ptr %alloca_5
+        %icmp_17 = icmp eq i32 %load_15, %load_16
+        br i1 %icmp_17, label %then1, label %alt2
+
+        then1:
+        %load_19 = load i32, ptr %alloca_8
+        %Add_20 = add i32 %load_19, 1
+        store i32 %Add_20, ptr %alloca_8
+        store i32 1, ptr %alloca_2
+        br label %exit
+
+        alt2:
+        store i32 0, ptr %alloca_2
+        br label %exit
+
+        exit:
+        %load_3 = load i32, ptr %alloca_2
+        ret i32 %load_3
+
+
+        }
+
+
+        AFTER:
+        @a = dso_local global i32 7
+        define i32 @func() {
+        entry:
+        %alloca_2 = alloca i32
+        %alloca_5 = alloca i32
+        %load_6 = load i32, ptr @a
+        %alloca_8 = alloca i32
+        br label %cond0
+
+        cond0:
+        %icmp_17 = icmp eq i32 1, %load_6
+        br i1 %icmp_17, label %then1, label %alt2
+
+        then1:
+        %Add_20 = add i32 1, 1
+        br label %exit
+
+        alt2:
+        br label %exit
+
+        exit:
+        %phi_28 = phi i32 [%Add_20, %then1], [1, %alt2]
+        %phi_27 = phi i32 [1, %then1], [0, %alt2]
+        ret i32 %phi_27
 
 
         }

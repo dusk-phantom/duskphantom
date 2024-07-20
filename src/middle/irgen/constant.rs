@@ -1,29 +1,9 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::Result;
 
-use crate::context;
 use crate::middle::ir::{Constant, ValueType};
 use std::cmp;
 use std::collections::VecDeque;
 use std::ops;
-
-/// Convert a type to its default constant
-pub fn type_to_const(ty: &ValueType) -> Result<Constant> {
-    match ty {
-        ValueType::Void => {
-            Err(anyhow!("Cannot convert void type to constant")).with_context(|| context!())
-        }
-        ValueType::Int => Ok(Constant::Int(0)),
-        ValueType::Float => Ok(Constant::Float(0.0)),
-        ValueType::Bool => Ok(Constant::Bool(false)),
-        ValueType::Pointer(_) => {
-            Err(anyhow!("Cannot convert pointer type to constant")).with_context(|| context!())
-        }
-        ValueType::Array(ty, num) => {
-            let inner_const = type_to_const(ty)?;
-            Ok(Constant::Array(vec![inner_const; *num]))
-        }
-    }
-}
 
 /// Collapse a possibly flattened constant array to nested
 ///
@@ -52,7 +32,7 @@ pub fn collapse_array(arr: &mut VecDeque<Constant>, ty: &ValueType) -> Result<Co
         Ok(val)
     } else {
         // TODO use zero initializer
-        type_to_const(ty)
+        ty.default_initializer()
     }
 }
 
