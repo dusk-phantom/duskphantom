@@ -56,6 +56,16 @@ pub fn make_const(decl: Decl) -> Decl {
 }
 
 pub fn decl(input: &mut &str) -> PResult<Decl> {
+    // Attempt to match a macro.
+    if input.starts_with('#') {
+        return alt((
+            (token("#include"), take_until(0.., '\n'), blank).value(Decl::Stack(vec![])),
+            (token("#define"), pad(ident), expr)
+                .map(|(_, id, expr)| Decl::Const(Type::Int32, id, Some(expr))),
+        ))
+        .parse_next(input);
+    }
+
     // Match const token.
     let is_const = opt(token("const")).parse_next(input)?.is_some();
 
