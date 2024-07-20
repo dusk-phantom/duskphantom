@@ -1,4 +1,7 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet, HashSet},
+    pin::Pin,
+};
 
 use anyhow::{Context, Result};
 
@@ -7,11 +10,21 @@ use crate::{
     middle::{
         ir::{
             instruction::{downcast_mut, misc_inst::Phi, InstType},
-            BBPtr, InstPtr, Operand, ValueType,
+            BBPtr, IRBuilder, InstPtr, Operand, ValueType,
         },
         Program,
     },
 };
+
+#[allow(unused)]
+pub fn optimize_program(program: &mut Program) -> Result<()> {
+    for func in &program.module.functions {
+        if let Some(entry) = func.entry {
+            mem2reg(entry, &mut program.mem_pool)?;
+        }
+    }
+    Ok(())
+}
 
 /// A single argument of "phi" instruction
 type PhiArg = (BBPtr, Operand);
@@ -29,7 +42,7 @@ impl PhiPack {
     /// Errors when variable is not of pointer type
     pub fn new_from_variable(
         variable: InstPtr,
-        program: &mut Program,
+        mem_pool: &mut Pin<Box<IRBuilder>>,
         bb: &mut BBPtr,
     ) -> Result<Self> {
         // Get type of phi variable
@@ -39,7 +52,7 @@ impl PhiPack {
         };
 
         // Get and insert empty "phi" instruction
-        let phi = program.mem_pool.get_phi(*ty, vec![]);
+        let phi = mem_pool.get_phi(*ty, vec![]);
         bb.push_front(phi);
 
         // Return phi pack
@@ -61,11 +74,11 @@ impl PhiPack {
 
 /// The mem2reg pass
 #[allow(unused)]
-pub fn mem2reg(entry: BBPtr, program: &mut Program) -> Result<()> {
+pub fn mem2reg(entry: BBPtr, mem_pool: &mut Pin<Box<IRBuilder>>) -> Result<()> {
     let mut variable_to_phi_insertion: BTreeMap<InstPtr, BTreeSet<BBPtr>> =
         get_variable_to_phi_insertion(entry);
     let mut block_to_phi_insertion: BTreeMap<BBPtr, Vec<PhiPack>> =
-        insert_empty_phi(entry, program, variable_to_phi_insertion)?;
+        insert_empty_phi(entry, mem_pool, variable_to_phi_insertion)?;
 
     /// For each "phi" insert position, decide the value for each argument
     /// Errors when variable is not found in current_variable_value
@@ -191,7 +204,7 @@ pub fn mem2reg(entry: BBPtr, program: &mut Program) -> Result<()> {
 #[allow(unused)]
 fn insert_empty_phi(
     entry: BBPtr,
-    program: &mut Program,
+    mem_pool: &mut Pin<Box<IRBuilder>>,
     phi_insert_positions: BTreeMap<InstPtr, BTreeSet<BBPtr>>,
 ) -> Result<BTreeMap<BBPtr, Vec<PhiPack>>> {
     let mut block_to_phi_insertion: BTreeMap<BBPtr, Vec<PhiPack>> = BTreeMap::new();
@@ -202,7 +215,7 @@ fn insert_empty_phi(
                 .or_default()
                 .push(PhiPack::new_from_variable(
                     variable,
-                    program,
+                    mem_pool,
                     &mut position,
                 )?);
         }
@@ -213,14 +226,15 @@ fn insert_empty_phi(
 /// Get places to insert "phi" instructions for each "alloca" instruction
 #[allow(unused)]
 fn get_variable_to_phi_insertion(entry: BBPtr) -> BTreeMap<InstPtr, BTreeSet<BBPtr>> {
-    let mut phi_positions = BTreeMap::new();
+    let mut phi_positions: BTreeMap<InstPtr, BTreeSet<BBPtr>> = BTreeMap::new();
+    let mut store_positions: BTreeMap<InstPtr, BTreeSet<BBPtr>> = BTreeMap::new();
+    let dominance_frontiers: BTreeMap<BBPtr, BTreeSet<BBPtr>> = get_dominance_frontiers(entry);
 
-    /// For each "store", make insert position at the beginning of the dominance frontier
-    fn dfs_insertion(
+    /// Build a mapping from variable to store positions
+    fn build_store_positions(
         current_bb: BBPtr,
-        visited: &mut BTreeSet<BBPtr>,
-        df: &BTreeMap<BBPtr, BTreeSet<BBPtr>>,
-        phi_positions: &mut BTreeMap<InstPtr, BTreeSet<BBPtr>>,
+        visited: &mut HashSet<BBPtr>,
+        store_positions: &mut BTreeMap<InstPtr, BTreeSet<BBPtr>>,
     ) {
         if visited.contains(&current_bb) {
             return;
@@ -235,23 +249,37 @@ fn get_variable_to_phi_insertion(entry: BBPtr) -> BTreeMap<InstPtr, BTreeSet<BBP
                 // Only insert "phi" when store destination is a constant pointer
                 if let Operand::Instruction(inst) = store_ptr {
                     if inst.get_type() == InstType::Alloca {
-                        for df_bb in df.get(&current_bb).unwrap_or(&BTreeSet::new()).iter() {
-                            phi_positions.entry(*inst).or_default().insert(*df_bb);
-                        }
+                        store_positions.entry(*inst).or_default().insert(current_bb);
                     }
                 }
             }
         }
         for succ in current_bb.get_succ_bb() {
-            dfs_insertion(*succ, visited, df, phi_positions);
+            build_store_positions(*succ, visited, store_positions);
         }
     }
-    dfs_insertion(
-        entry,
-        &mut BTreeSet::new(),
-        &get_dominance_frontiers(entry),
-        &mut phi_positions,
-    );
+
+    // For each variable, find all dominance frontiers and insert "phi" instructions
+    // After inserting "phi" at a block, find its dominance frontiers and insert "phi" recursively
+    build_store_positions(entry, &mut HashSet::new(), &mut store_positions);
+    for (variable, vis) in store_positions.iter_mut() {
+        let mut positions = vis.clone();
+        while !positions.is_empty() {
+            let position = positions.pop_first().unwrap();
+            let Some(dfs) = dominance_frontiers.get(&position) else {
+                continue;
+            };
+            for df in dfs {
+                phi_positions.entry(*variable).or_default().insert(*df);
+
+                // Only insert positions never considered before
+                if (!vis.contains(df)) {
+                    vis.insert(*df);
+                    positions.insert(*df);
+                }
+            }
+        }
+    }
 
     // Return result
     phi_positions
@@ -378,7 +406,11 @@ pub mod tests_mem2reg {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        mem2reg(program.module.functions[0].entry.unwrap(), &mut program).unwrap();
+        mem2reg(
+            program.module.functions[0].entry.unwrap(),
+            &mut program.mem_pool,
+        )
+        .unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(format!(
             "BEFORE:\n{}\n\nAFTER:\n{}",
@@ -437,7 +469,11 @@ pub mod tests_mem2reg {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        mem2reg(program.module.functions[0].entry.unwrap(), &mut program).unwrap();
+        mem2reg(
+            program.module.functions[0].entry.unwrap(),
+            &mut program.mem_pool,
+        )
+        .unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(format!(
             "BEFORE:\n{}\n\nAFTER:\n{}",
@@ -530,7 +566,11 @@ pub mod tests_mem2reg {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        mem2reg(program.module.functions[0].entry.unwrap(), &mut program).unwrap();
+        mem2reg(
+            program.module.functions[0].entry.unwrap(),
+            &mut program.mem_pool,
+        )
+        .unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(format!(
             "BEFORE:\n{}\n\nAFTER:\n{}",
@@ -614,7 +654,11 @@ pub mod tests_mem2reg {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        mem2reg(program.module.functions[0].entry.unwrap(), &mut program).unwrap();
+        mem2reg(
+            program.module.functions[0].entry.unwrap(),
+            &mut program.mem_pool,
+        )
+        .unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(format!(
             "BEFORE:\n{}\n\nAFTER:\n{}",
@@ -688,7 +732,7 @@ pub mod tests_mem2reg {
         br label %cond0
 
         cond0:
-        %phi_42 = phi i32 [0, %entry], [%phi_43, %final6]
+        %phi_42 = phi i32 [0, %entry], [%phi_44, %final6]
         %icmp_37 = icmp slt i32 %phi_42, 10
         br i1 %icmp_37, label %body1, label %final2
 
@@ -718,6 +762,7 @@ pub mod tests_mem2reg {
         br i1 %icmp_31, label %body8, label %final9
 
         final6:
+        %phi_44 = phi i32 [%phi_43, %final9], [%Add_12, %alt5]
         br label %cond0
 
         body8:
@@ -754,8 +799,16 @@ pub mod tests_mem2reg {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        mem2reg(program.module.functions[0].entry.unwrap(), &mut program).unwrap();
-        mem2reg(program.module.functions[1].entry.unwrap(), &mut program).unwrap();
+        mem2reg(
+            program.module.functions[0].entry.unwrap(),
+            &mut program.mem_pool,
+        )
+        .unwrap();
+        mem2reg(
+            program.module.functions[1].entry.unwrap(),
+            &mut program.mem_pool,
+        )
+        .unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(format!(
             "BEFORE:\n{}\n\nAFTER:\n{}",
