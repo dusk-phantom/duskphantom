@@ -51,6 +51,16 @@ impl<'a> ProgramKit<'a> {
         insert("starttime", ValueType::Void, vec![]);
         insert("stoptime", ValueType::Void, vec![]);
         insert("putf", ValueType::Void, vec![]);
+        insert(
+            "llvm.memset.p0.i32",
+            ValueType::Void,
+            vec![
+                ValueType::Pointer(ValueType::Int.into()),
+                ValueType::SignedChar,
+                ValueType::Int,
+                ValueType::Bool,
+            ],
+        );
     }
 }
 

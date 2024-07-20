@@ -2,6 +2,7 @@ use super::*;
 
 #[derive(Clone, Debug)]
 pub enum Constant {
+    SignedChar(i8),
     Int(i32),
     Float(f32),
     Bool(bool),
@@ -11,6 +12,7 @@ pub enum Constant {
 impl std::fmt::Display for Constant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Constant::SignedChar(c) => write!(f, "{}", c),
             Constant::Int(i) => write!(f, "{}", i),
             Constant::Float(fl) => {
                 // write float in hexidemal form (IEEE-754) like 0x1234567800000000
@@ -39,6 +41,7 @@ impl std::fmt::Display for Constant {
 impl Constant {
     pub fn get_type(&self) -> ValueType {
         match self {
+            Constant::SignedChar(_) => ValueType::SignedChar,
             Constant::Int(_) => ValueType::Int,
             Constant::Float(_) => ValueType::Float,
             Constant::Bool(_) => ValueType::Bool,
