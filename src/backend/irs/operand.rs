@@ -54,11 +54,17 @@ impl Reg {
     pub const fn new(id: u32, is_usual: bool) -> Self {
         Self { id, is_usual }
     }
+    #[inline]
     pub fn id(&self) -> u32 {
         self.id
     }
+    #[inline]
     pub fn is_usual(&self) -> bool {
         self.is_usual
+    }
+    #[inline]
+    pub fn is_float(&self) -> bool {
+        !self.is_usual
     }
 }
 #[derive(Clone, Debug, Eq, PartialEq)]

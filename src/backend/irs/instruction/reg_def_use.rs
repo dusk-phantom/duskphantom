@@ -45,11 +45,13 @@ impl RegUses for Inst {
             Inst::Or(inst) => inst.uses(),
             Inst::Xor(inst) => inst.uses(),
             Inst::Ret => vec![],
-            Inst::Tail(_) => vec![],
+            Inst::Tail(tail) => tail.uses(),
             Inst::Li(inst) => inst.uses(),
             Inst::Seqz(inst) => inst.uses(),
             Inst::I2f(i2f) => i2f.uses(),
             Inst::F2i(f2i) => f2i.uses(),
+            Inst::Snez(snez) => snez.uses(),
+            Inst::Not(not) => not.uses(),
         }
     }
 }
@@ -85,12 +87,14 @@ impl RegDefs for Inst {
             Inst::Ble(inst) => inst.defs(),
             Inst::Call(inst) => inst.defs(),
             Inst::Ret => vec![],
-            Inst::Tail(_) => vec![],
+            Inst::Tail(tail) => tail.defs(),
             Inst::Slt(inst) => inst.defs(),
             Inst::Li(inst) => inst.defs(),
             Inst::Seqz(inst) => inst.defs(),
             Inst::I2f(i2f) => i2f.defs(),
             Inst::F2i(f2i) => f2i.defs(),
+            Inst::Snez(snez) => snez.defs(),
+            Inst::Not(not) => not.defs(),
         }
     }
 }
@@ -151,3 +155,5 @@ impl RegUses for StoreInst {
         vec![self.src()]
     }
 }
+impl RegDefs for TailInst {}
+impl RegUses for TailInst {}

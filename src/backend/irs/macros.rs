@@ -355,6 +355,7 @@ macro_rules! impl_unary_inst {
                 format!("{} {}", $inst_name, dst)
             }
         }
+
         impl RegReplace for $ty_name {
             fn replace_def(&mut self, from: Reg, to: Reg) -> Result<()> {
                 if let Operand::Reg(reg) = self.dst_mut() {

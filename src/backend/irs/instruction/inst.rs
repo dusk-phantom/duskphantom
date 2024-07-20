@@ -49,14 +49,16 @@ pub enum Inst {
     Sll(SllInst),
     Srl(SrlInst),
     SRA(SraInst),
+    Not(NotInst),
     And(AndInst),
     Or(OrInst),
     Xor(XorInst),
     Neg(NegInst),
-    Slt(SltInst),
 
     // comparison operation
+    Slt(SltInst),
     Seqz(SeqzInst),
+    Snez(SnezInst),
 
     // data transfer operation
     Mv(MvInst),
@@ -154,6 +156,8 @@ impl Inst {
             Inst::Seqz(inst) => inst.gen_asm(),
             Inst::I2f(i2f) => i2f.gen_asm(),
             Inst::F2i(f2i) => f2i.gen_asm(),
+            Inst::Snez(snez) => snez.gen_asm(),
+            Inst::Not(not) => not.gen_asm(),
         }
     }
 }
@@ -211,6 +215,8 @@ impl RegReplace for Inst {
             Inst::Xor(inst) => inst.replace_use(from, to),
             Inst::Tail(inst) => inst.replace_use(from, to),
             Inst::Seqz(inst) => inst.replace_use(from, to),
+            Inst::Snez(snez) => snez.replace_use(from, to),
+            Inst::Not(not) => not.replace_use(from, to),
         }
     }
 
@@ -251,6 +257,8 @@ impl RegReplace for Inst {
             Inst::Xor(inst) => inst.replace_def(from, to),
             Inst::Tail(inst) => inst.replace_def(from, to),
             Inst::Seqz(inst) => inst.replace_def(from, to),
+            Inst::Snez(snez) => snez.replace_use(from, to),
+            Inst::Not(not) => not.replace_use(from, to),
         }
     }
 }
@@ -275,11 +283,13 @@ impl_inst_convert!(OrInst, Or);
 impl_inst_convert!(XorInst, Xor);
 impl_inst_convert!(SllInst, Sll);
 impl_inst_convert!(SrlInst, Srl);
-impl_inst_convert!(SltInst, Slt);
 impl_inst_convert!(SraInst, SRA);
+impl_inst_convert!(NotInst, Not);
 
 // for comparison
+impl_inst_convert!(SltInst, Slt);
 impl_inst_convert!(SeqzInst, Seqz);
+impl_inst_convert!(SnezInst, Snez);
 
 // inst for data transfer
 impl_inst_convert!(MvInst, Mv);
