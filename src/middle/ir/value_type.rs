@@ -8,6 +8,7 @@ use super::Constant;
 #[derive(Clone, PartialEq, Eq)]
 pub enum ValueType {
     Void,
+    SignedChar,
     Int,
     Float,
     Bool,
@@ -19,6 +20,7 @@ impl std::fmt::Display for ValueType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ValueType::Void => write!(f, "void"),
+            ValueType::SignedChar => write!(f, "i8"),
             ValueType::Int => write!(f, "i32"),
             ValueType::Float => write!(f, "float"),
             ValueType::Bool => write!(f, "i1"),
@@ -50,6 +52,14 @@ impl ValueType {
         matches!(self, ValueType::Array(_, _))
     }
 
+    /// Get array dimension.
+    pub fn array_dimension(&self) -> usize {
+        match self {
+            ValueType::Array(element_type, dim) => *dim * element_type.array_dimension(),
+            _ => 1,
+        }
+    }
+
     /// Get subtype of the value type.
     /// Subtype is the type of the element in the array or the type of the pointer.
     pub fn get_sub_type(&self) -> Option<&ValueType> {
@@ -67,6 +77,7 @@ impl ValueType {
                 Err(anyhow!("Cannot convert void type to constant")).with_context(|| context!())
             }
             ValueType::Int => Ok(Constant::Int(0)),
+            ValueType::SignedChar => Ok(Constant::SignedChar(0)),
             ValueType::Float => Ok(Constant::Float(0.0)),
             ValueType::Bool => Ok(Constant::Bool(false)),
             ValueType::Pointer(_) => {
