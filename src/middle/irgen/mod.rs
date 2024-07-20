@@ -909,10 +909,11 @@ mod tests {
         %alloca_5 = alloca [1 x [1 x i32]]*
         store [1 x [1 x i32]]* %x, ptr %alloca_5
         %load_7 = load [1 x [1 x i32]]*, ptr %alloca_5
-        %getelementptr_8 = getelementptr [1 x [1 x i32]], ptr %load_7, i32 0, i32 0
-        %getelementptr_9 = getelementptr [1 x i32], ptr %getelementptr_8, i32 0, i32 0
-        %load_10 = load i32, ptr %getelementptr_9
-        store i32 %load_10, ptr %alloca_2
+        %getelementptr_8 = getelementptr [1 x [1 x i32]], ptr %load_7, i32 0
+        %getelementptr_9 = getelementptr [1 x [1 x i32]], ptr %getelementptr_8, i32 0, i32 0
+        %getelementptr_10 = getelementptr [1 x i32], ptr %getelementptr_9, i32 0, i32 0
+        %load_11 = load i32, ptr %getelementptr_10
+        store i32 %load_11, ptr %alloca_2
         br label %exit
 
         exit:
@@ -1062,15 +1063,16 @@ mod tests {
     fn test_pointer() {
         let code = r#"
             int main() {
-                int arr[1] = {8};
+                int arr[3] = {8};
                 f(arr);
-                putarray(1, arr);
+                putarray(3, arr);
                 return 0;
             }
 
             int f(int a[]) {
-                a[0] = 1;
-                return a[0];
+                // Non-0 index requires GEP to work correctly
+                a[2] = 1;
+                return a[2];
             }
         "#;
         let program = parse(code).unwrap();
@@ -1080,14 +1082,14 @@ mod tests {
         define i32 @main() {
         entry:
         %alloca_2 = alloca i32
-        %alloca_5 = alloca [1 x i32]
-        %getelementptr_6 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
+        %alloca_5 = alloca [3 x i32]
+        %getelementptr_6 = getelementptr [3 x i32], ptr %alloca_5, i32 0, i32 0
         %getelementptr_7 = getelementptr i32, ptr %getelementptr_6, i32 0
         store i32 8, ptr %getelementptr_7
-        %getelementptr_9 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
+        %getelementptr_9 = getelementptr [3 x i32], ptr %alloca_5, i32 0, i32 0
         %call_10 = call i32 @f(i32* %getelementptr_9)
-        %getelementptr_11 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
-        call void @putarray(i32 1, i32* %getelementptr_11)
+        %getelementptr_11 = getelementptr [3 x i32], ptr %alloca_5, i32 0, i32 0
+        call void @putarray(i32 3, i32* %getelementptr_11)
         store i32 0, ptr %alloca_2
         br label %exit
 
@@ -1103,10 +1105,12 @@ mod tests {
         %alloca_20 = alloca i32*
         store i32* %a, ptr %alloca_20
         %load_22 = load i32*, ptr %alloca_20
-        store i32 1, ptr %load_22
-        %load_24 = load i32*, ptr %alloca_20
-        %load_25 = load i32, ptr %load_24
-        store i32 %load_25, ptr %alloca_17
+        %getelementptr_23 = getelementptr i32, ptr %load_22, i32 2
+        store i32 1, ptr %getelementptr_23
+        %load_25 = load i32*, ptr %alloca_20
+        %getelementptr_26 = getelementptr i32, ptr %load_25, i32 2
+        %load_27 = load i32, ptr %getelementptr_26
+        store i32 %load_27, ptr %alloca_17
         br label %exit
 
         exit:
@@ -1472,14 +1476,14 @@ mod tests {
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
         assert_snapshot!(llvm_ir, @r###"
-        @format0 = dso_local constant [7 x i32] [i32 120, i32 32, i32 61, i32 32, i32 37, i32 100, i32 0]
+        @format0 = dso_local constant [2 x i32] [i32 540876920, i32 25637]
         define i32 @main() {
         entry:
         %alloca_2 = alloca i32
         %alloca_5 = alloca i32
         %call_6 = call i32 @getint()
         store i32 %call_6, ptr %alloca_5
-        %getelementptr_8 = getelementptr [7 x i32], ptr @format0, i32 0, i32 0
+        %getelementptr_8 = getelementptr [2 x i32], ptr @format0, i32 0, i32 0
         %load_9 = load i32, ptr %alloca_5
         call void @putf(i32* %getelementptr_8, i32 %load_9)
         store i32 0, ptr %alloca_2

@@ -1015,10 +1015,12 @@ pub mod tests_mem2reg {
         %alloca_20 = alloca i32*
         store i32* %a, ptr %alloca_20
         %load_22 = load i32*, ptr %alloca_20
-        store i32 1, ptr %load_22
-        %load_24 = load i32*, ptr %alloca_20
-        %load_25 = load i32, ptr %load_24
-        store i32 %load_25, ptr %alloca_17
+        %getelementptr_23 = getelementptr i32, ptr %load_22, i32 0
+        store i32 1, ptr %getelementptr_23
+        %load_25 = load i32*, ptr %alloca_20
+        %getelementptr_26 = getelementptr i32, ptr %load_25, i32 0
+        %load_27 = load i32, ptr %getelementptr_26
+        store i32 %load_27, ptr %alloca_17
         br label %exit
 
         exit:
@@ -1052,12 +1054,14 @@ pub mod tests_mem2reg {
         entry:
         %alloca_17 = alloca i32
         %alloca_20 = alloca i32*
-        store i32 1, ptr %a
-        %load_25 = load i32, ptr %a
+        %getelementptr_23 = getelementptr i32, ptr %a, i32 0
+        store i32 1, ptr %getelementptr_23
+        %getelementptr_26 = getelementptr i32, ptr %a, i32 0
+        %load_27 = load i32, ptr %getelementptr_26
         br label %exit
 
         exit:
-        ret i32 %load_25
+        ret i32 %load_27
 
 
         }

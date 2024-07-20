@@ -49,11 +49,23 @@ impl<'a> ProgramKit<'a> {
             Expr::Int32(x) => Ok(Constant::Int(*x)),
             Expr::Float32(x) => Ok(Constant::Float(*x)),
             Expr::String(str) => {
-                let mut vec = str
-                    .chars()
-                    .map(|x| Constant::Int(x as i32))
-                    .collect::<Vec<_>>();
-                vec.push(Constant::Int(0));
+                let mut vec = vec![];
+
+                // Add trailing zero to bytes, pad bytes to multiple of 4
+                let mut bytes = str.as_bytes().to_vec();
+                bytes.push(0);
+                while bytes.len() % 4 != 0 {
+                    bytes.push(0);
+                }
+
+                // Convert to little indian
+                for i in 0..(bytes.len() / 4) {
+                    let mut val: u32 = bytes[i * 4 + 3] as u32;
+                    val = val * 256 + bytes[i * 4 + 2] as u32;
+                    val = val * 256 + bytes[i * 4 + 1] as u32;
+                    val = val * 256 + bytes[i * 4] as u32;
+                    vec.push(Constant::Int(val as i32));
+                }
                 Ok(Constant::Array(vec))
             }
             Expr::Char(_) => Err(anyhow!("char not implemented")).with_context(|| context!()),
