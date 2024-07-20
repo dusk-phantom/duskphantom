@@ -67,6 +67,14 @@ impl IRBuilder {
                     }));
                     global_vars.push(var);
                 }
+                middle::ir::Constant::SignedChar(value) => {
+                    let var = Var::Prim(PrimVar::IntVar(IntVar {
+                        name: name.to_string(),
+                        init: Some(*value as i32),
+                        is_const: false,
+                    }));
+                    global_vars.push(var);
+                }
                 middle::ir::Constant::Array(arr) => {
                     match arr.first().with_context(|| context!())? {
                         // 不可能出现: arr 是混合的
@@ -144,6 +152,7 @@ impl IRBuilder {
             match &fu.return_type {
                 middle::ir::ValueType::Void => { /* do nothing */ }
                 middle::ir::ValueType::Int
+                | middle::ir::ValueType::SignedChar
                 | middle::ir::ValueType::Bool
                 | middle::ir::ValueType::Pointer(_) /* 返回指针是 UB */ => {
                     m_f.ret_mut().replace(REG_A0);
@@ -264,6 +273,7 @@ impl IRBuilder {
                 }
                 middle::ir::ValueType::Float => false,
                 middle::ir::ValueType::Pointer(_)
+                | middle::ir::ValueType::SignedChar
                 | middle::ir::ValueType::Bool
                 | middle::ir::ValueType::Int => true,
             };

@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 
 use crate::frontend::Decl;
+use crate::middle::ir::Operand;
 use crate::middle::irgen::function_kit::FunctionKit;
 use crate::{context, middle::ir::Constant};
 use anyhow::{anyhow, Context};
@@ -57,8 +58,20 @@ impl<'a> FunctionKit<'a> {
                     // Generate expression as variable type
                     let mut rhs = self.gen_expr(expr)?;
 
-                    // Collapse if `rhs` is array
+                    // Collapse and memset 0 if `rhs` is array
                     if let Value::Array(arr) = rhs {
+                        let ptr = lhs.clone().load_uncast(self)?.0;
+                        let memset_func = self.get_fun_env("llvm.memset.p0.i32").unwrap();
+                        let memset_call = self.program.mem_pool.get_call(
+                            memset_func,
+                            vec![
+                                ptr,
+                                Operand::Constant(Constant::SignedChar(0)),
+                                Operand::Constant(Constant::Int(ty.array_dimension() as i32 * 4)),
+                                Operand::Constant(Constant::Bool(false)),
+                            ],
+                        );
+                        self.exit.unwrap().push_back(memset_call);
                         rhs = value::collapse_array(&mut VecDeque::from(arr), &ty)?;
                     }
 
