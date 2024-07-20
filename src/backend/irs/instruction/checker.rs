@@ -48,6 +48,8 @@ pub mod riscv {
                 Inst::Tail(inst) => inst.check_valid(),
                 Inst::Li(inst) => inst.check_valid(),
                 Inst::Seqz(inst) => inst.check_valid(),
+                Inst::Snez(snez) => snez.check_valid(),
+                Inst::Not(not) => not.check_valid(),
             }
         }
     }
@@ -128,10 +130,32 @@ pub mod riscv {
     }
     impl CheckValidInst for F2iInst {
         fn check_valid(&self) -> bool {
-            matches!(self.dst(), Operand::Reg(_)) && matches!(self.src(), Operand::Reg(_))
+            (match self.dst() {
+                Operand::Reg(r) => r.is_usual(),
+                _ => false,
+            }) && (match self.src() {
+                Operand::Reg(r) => r.is_float(),
+                _ => false,
+            })
         }
     }
     impl CheckValidInst for I2fInst {
+        fn check_valid(&self) -> bool {
+            (match self.dst() {
+                Operand::Reg(r) => r.is_float(),
+                _ => false,
+            }) && (match self.src() {
+                Operand::Reg(r) => r.is_usual(),
+                _ => false,
+            })
+        }
+    }
+    impl CheckValidInst for SnezInst {
+        fn check_valid(&self) -> bool {
+            matches!(self.dst(), Operand::Reg(_)) && matches!(self.src(), Operand::Reg(_))
+        }
+    }
+    impl CheckValidInst for NotInst {
         fn check_valid(&self) -> bool {
             matches!(self.dst(), Operand::Reg(_)) && matches!(self.src(), Operand::Reg(_))
         }

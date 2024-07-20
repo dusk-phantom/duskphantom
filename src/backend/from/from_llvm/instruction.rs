@@ -76,7 +76,7 @@ impl IRBuilder {
             llvm_ir::Instruction::AtomicRMW(_) => todo!(),
             llvm_ir::Instruction::GetElementPtr(_) => todo!(),
             llvm_ir::Instruction::Trunc(_) => todo!(),
-            llvm_ir::Instruction::ZExt(_) => todo!(),
+            llvm_ir::Instruction::ZExt(zext) => Self::build_zext_inst(zext, reg_gener, regs),
             llvm_ir::Instruction::SExt(_) => todo!(),
             llvm_ir::Instruction::FPTrunc(_) => todo!(),
             llvm_ir::Instruction::FPExt(_) => todo!(),
@@ -90,7 +90,9 @@ impl IRBuilder {
             llvm_ir::Instruction::ICmp(icmp) => Self::build_icmp_inst(icmp, reg_gener, regs),
             llvm_ir::Instruction::FCmp(_) => todo!(),
             llvm_ir::Instruction::Phi(_) => todo!(),
-            llvm_ir::Instruction::Select(_) => todo!(),
+            llvm_ir::Instruction::Select(select) => {
+                Self::build_select_inst(select, reg_gener, regs)
+            }
             llvm_ir::Instruction::Freeze(_) => todo!(),
             llvm_ir::Instruction::Call(call) => {
                 Self::build_call_inst(call, stack_allocator, stack_slots, reg_gener, regs)
@@ -101,55 +103,129 @@ impl IRBuilder {
             llvm_ir::Instruction::CleanupPad(_) => todo!(),
         }
     }
+
+    fn build_select_inst(
+        select: &llvm_ir::instruction::Select,
+        reg_gener: &mut RegGenerator,
+        regs: &mut HashMap<Name, Reg>,
+    ) -> Result<Vec<Inst>> {
+        dbg!(select);
+        // unimplemented!();
+        let mut ret: Vec<Inst> = Vec::new();
+        let cond = Self::local_var_from(&select.condition, regs)?;
+        let and_op0 = reg_gener.gen_virtual_usual_reg();
+        let seqz = SeqzInst::new(and_op0.into(), cond);
+        ret.push(seqz.into());
+        let and_op1 = reg_gener.gen_virtual_usual_reg();
+        let not = NotInst::new(and_op1.into(), and_op0.into());
+        ret.push(not.into());
+
+        let true_value = Self::value_from(&select.true_value, regs)?;
+        let false_value = Self::value_from(&select.false_value, regs)?;
+
+        match true_value {
+            Operand::Reg(r) => {
+                // count and_op0 & true_value
+                if r.is_usual() {
+                    let and_op0_true = reg_gener.gen_virtual_usual_reg();
+                    let and = AndInst::new(and_op0_true.into(), and_op0.into(), true_value);
+                    ret.push(and.into());
+                    let and_op1_false = reg_gener.gen_virtual_usual_reg();
+                    let and = AndInst::new(and_op1_false.into(), and_op1.into(), false_value);
+                    ret.push(and.into());
+                    let dst = reg_gener.gen_virtual_usual_reg();
+                    let or = OrInst::new(dst.into(), and_op0_true.into(), and_op1_false.into());
+                    regs.insert(select.dest.clone(), dst);
+                    ret.push(or.into());
+                } else {
+                    unimplemented!();
+                }
+            }
+            _ => {
+                dbg!(true_value);
+                unimplemented!();
+            }
+        }
+        Ok(ret)
+    }
+
+    fn build_zext_inst(
+        zext: &llvm_ir::instruction::ZExt,
+        _reg_gener: &mut RegGenerator,
+        regs: &mut HashMap<Name, Reg>,
+    ) -> Result<Vec<Inst>> {
+        if Self::is_ty_int(&zext.to_type) {
+            let src = Self::local_var_from(&zext.operand, regs)?;
+            let src: Reg = src.try_into().with_context(|| context!())?;
+            regs.insert(zext.dest.clone(), src);
+            Ok(vec![])
+        } else {
+            unimplemented!();
+        }
+    }
+
     fn build_icmp_inst(
         icmp: &llvm_ir::instruction::ICmp,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
-        let mut ret: Vec<Inst> = Vec::new();
+        let op0 = Self::value_from(&icmp.operand0, regs)?;
+        let op1 = &Self::value_from(&icmp.operand1, regs)?;
         match icmp.predicate {
-            llvm_ir::IntPredicate::EQ => todo!(),
+            llvm_ir::IntPredicate::EQ => {
+                // 判断eq的时候需要考虑顺序吗?不需要,因为对对应的优化汇编也没考虑
+                let mid_var = reg_gener.gen_virtual_usual_reg();
+                let xor = XorInst::new(mid_var.into(), op0.clone(), op1.clone());
+                let dst = reg_gener.gen_virtual_usual_reg();
+                let seqz = SeqzInst::new(dst.into(), mid_var.into());
+                regs.insert(icmp.dest.clone(), dst);
+                Ok(vec![xor.into(), seqz.into()])
+            }
             llvm_ir::IntPredicate::NE => {
-                let op0 = &Self::value_from(&icmp.operand0, regs)?;
-                let op1 = &Self::value_from(&icmp.operand1, regs)?;
-                let dest = icmp.dest.clone();
-                if let (Operand::Imm(imm0), Operand::Imm(imm1)) = (op0, op1) {
-                    let imm = if imm0 == imm1 { 0 } else { 1 };
-                    let flag = reg_gener.gen_virtual_usual_reg();
-                    let li = LiInst::new(flag.into(), imm.into());
-                    regs.insert(dest, flag);
-                    ret.push(li.into());
-                } else if let (Operand::Reg(reg0), Operand::Reg(reg1)) = (op0, op1) {
-                    assert!(reg0.is_usual() == reg1.is_usual());
-                    let dst = reg_gener.gen_virtual_usual_reg();
-                    let sub = SubInst::new(dst.into(), reg0.into(), reg1.into());
-                    let flag = reg_gener.gen_virtual_usual_reg();
-                    let seqz = SeqzInst::new(flag.into(), dst.into());
-                    ret.push(sub.into());
-                    ret.push(seqz.into());
-                    regs.insert(dest, flag);
-                } else if let (Operand::Reg(reg), Operand::Imm(imm)) = (op0, op1) {
-                    let dst = reg_gener.gen_virtual_usual_reg();
-                    let sub = SubInst::new(dst.into(), reg.into(), imm.into());
-                    let flag = reg_gener.gen_virtual_usual_reg();
-                    let seqz = SeqzInst::new(flag.into(), dst.into());
-                    ret.push(sub.into());
-                    ret.push(seqz.into());
-                    regs.insert(dest, flag);
-                } else {
-                    unimplemented!();
-                }
+                let mid_var = reg_gener.gen_virtual_usual_reg();
+                let xor = XorInst::new(mid_var.into(), op0.clone(), op1.clone());
+                let dst = reg_gener.gen_virtual_usual_reg();
+                let snez = SnezInst::new(dst.into(), mid_var.into());
+                regs.insert(icmp.dest.clone(), dst);
+                Ok(vec![xor.into(), snez.into()])
             }
             llvm_ir::IntPredicate::UGT => todo!(),
             llvm_ir::IntPredicate::UGE => todo!(),
             llvm_ir::IntPredicate::ULT => todo!(),
             llvm_ir::IntPredicate::ULE => todo!(),
-            llvm_ir::IntPredicate::SGT => todo!(),
-            llvm_ir::IntPredicate::SGE => todo!(),
-            llvm_ir::IntPredicate::SLT => todo!(),
-            llvm_ir::IntPredicate::SLE => todo!(),
+            llvm_ir::IntPredicate::SGT => {
+                let dst = reg_gener.gen_virtual_usual_reg();
+                // notice sge(op0,op1) equal to slt(op0,op1)
+                let slt = SltInst::new(dst.into(), op1.clone(), op0.clone());
+                regs.insert(icmp.dest.clone(), dst);
+                Ok(vec![slt.into()])
+            }
+            llvm_ir::IntPredicate::SGE => {
+                let mid_var = reg_gener.gen_virtual_usual_reg();
+                let slt = SltInst::new(mid_var.into(), op0.clone(), op1.clone());
+                let dst = reg_gener.gen_virtual_usual_reg();
+                // FIXME: 这里要检查一下用 xori dst,mid,1 与 用 snez dst,mid 的执行效率是否有差别
+                let xori = XorInst::new(dst.into(), mid_var.into(), 1.into());
+                regs.insert(icmp.dest.clone(), dst);
+                Ok(vec![slt.into(), xori.into()])
+            }
+            llvm_ir::IntPredicate::SLT => {
+                let op0 = &Self::value_from(&icmp.operand0, regs)?;
+                let op1 = &Self::value_from(&icmp.operand1, regs)?;
+                let dst = reg_gener.gen_virtual_usual_reg();
+                let slt = SltInst::new(dst.into(), op0.clone(), op1.clone());
+                regs.insert(icmp.dest.clone(), dst);
+                Ok(vec![slt.into()])
+            }
+            llvm_ir::IntPredicate::SLE => {
+                let mid_var = reg_gener.gen_virtual_usual_reg();
+                let slt = SltInst::new(mid_var.into(), op1.clone(), op0.clone());
+                let dst = reg_gener.gen_virtual_usual_reg();
+                let xori = XorInst::new(dst.into(), mid_var.into(), 1.into());
+                regs.insert(icmp.dest.clone(), dst);
+                Ok(vec![slt.into(), xori.into()])
+            }
         }
-        Ok(ret)
     }
 
     fn build_si2f_inst(
