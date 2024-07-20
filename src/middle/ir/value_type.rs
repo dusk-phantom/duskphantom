@@ -1,3 +1,9 @@
+use anyhow::{anyhow, Context, Result};
+
+use crate::context;
+
+use super::Constant;
+
 /// Represent the type of a value.
 #[derive(Clone, PartialEq, Eq)]
 pub enum ValueType {
@@ -51,6 +57,25 @@ impl ValueType {
             ValueType::Array(sub_type, _) => Some(sub_type.as_ref()),
             ValueType::Pointer(sub_type) => Some(sub_type.as_ref()),
             _ => None,
+        }
+    }
+
+    /// Get default initializer of this type.
+    pub fn default_initializer(&self) -> Result<Constant> {
+        match self {
+            ValueType::Void => {
+                Err(anyhow!("Cannot convert void type to constant")).with_context(|| context!())
+            }
+            ValueType::Int => Ok(Constant::Int(0)),
+            ValueType::Float => Ok(Constant::Float(0.0)),
+            ValueType::Bool => Ok(Constant::Bool(false)),
+            ValueType::Pointer(_) => {
+                Err(anyhow!("Cannot convert pointer type to constant")).with_context(|| context!())
+            }
+            ValueType::Array(ty, num) => {
+                let inner_const = ty.default_initializer()?;
+                Ok(Constant::Array(vec![inner_const; *num]))
+            }
         }
     }
 }
