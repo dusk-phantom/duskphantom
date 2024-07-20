@@ -181,20 +181,40 @@ impl Value {
             }
             Value::Array(_) => Err(anyhow!("cannot GEP from array")).with_context(|| context!()),
             Value::ReadWrite(pointer) => {
-                let inst = match value_type {
+                match value_type {
                     // Treat pointer as array here, convert `element_type**` to `element_type*` with `load`
-                    ValueType::Pointer(_) => kit.program.mem_pool.get_load(value_type, pointer),
+                    ValueType::Pointer(ref element_type) => {
+                        let load = kit.program.mem_pool.get_load(value_type.clone(), pointer);
+                        kit.exit.unwrap().push_back(load);
+
+                        // Remove the first element of index array
+                        let mut vec_deque = VecDeque::from(index);
+                        vec_deque.pop_front();
+
+                        // Build the rest of GEP if there is more indexes
+                        if vec_deque.is_empty() {
+                            Ok(Value::ReadWrite(load.into()))
+                        } else {
+                            let gep = kit.program.mem_pool.get_getelementptr(
+                                *element_type.clone(),
+                                Operand::Instruction(load),
+                                vec_deque.into(),
+                            );
+                            kit.exit.unwrap().push_back(gep);
+                            Ok(Value::ReadWrite(gep.into()))
+                        }
+                    }
 
                     // Convert `[n x element_type]*` to `element_type*` with `getelementptr`
-                    _ => kit
-                        .program
-                        .mem_pool
-                        .get_getelementptr(value_type, pointer, index),
-                };
-                kit.exit.unwrap().push_back(inst);
-
-                // Construct new value
-                Ok(Value::ReadWrite(inst.into()))
+                    _ => {
+                        let gep = kit
+                            .program
+                            .mem_pool
+                            .get_getelementptr(value_type, pointer, index);
+                        kit.exit.unwrap().push_back(gep);
+                        Ok(Value::ReadWrite(gep.into()))
+                    }
+                }
             }
         }
     }
