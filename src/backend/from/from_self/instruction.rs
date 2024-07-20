@@ -242,6 +242,7 @@ impl IRBuilder {
             }
             middle::ir::ValueType::Float => 8,
             middle::ir::ValueType::Bool => 8,
+            middle::ir::ValueType::SignedChar => 8,
             middle::ir::ValueType::Array(_, _) => todo!(),
             middle::ir::ValueType::Pointer(_) => todo!(), // 4B
                                                           // _ => todo!(),
@@ -343,6 +344,11 @@ impl IRBuilder {
             let op = ret.get_return_value();
             match op {
                 middle::ir::Operand::Constant(c) => match c {
+                    middle::ir::Constant::SignedChar(c) => {
+                        let imm: Operand = (*c as i64).into();
+                        let li = AddInst::new(REG_A0.into(), REG_ZERO.into(), imm);
+                        ret_insts.push(li.into());
+                    }
                     middle::ir::Constant::Int(i) => {
                         let imm: Operand = (*i as i64).into();
                         let li = AddInst::new(REG_A0.into(), REG_ZERO.into(), imm);
@@ -388,13 +394,16 @@ impl IRBuilder {
                         .get(&addr)
                         .ok_or(anyhow!("could not get {} from map", &addr).context(context!()))?; // 获取返回值对应的虚拟寄存器
                     let mv_inst = match instr.get_value_type() {
-                        middle::ir::ValueType::Int => MvInst::new(REG_A0.into(), (*reg).into()),
+                        middle::ir::ValueType::Int
+                        | middle::ir::ValueType::Bool
+                        | middle::ir::ValueType::SignedChar => {
+                            MvInst::new(REG_A0.into(), (*reg).into())
+                        }
                         middle::ir::ValueType::Float => MvInst::new(REG_FA0.into(), (*reg).into()),
                         middle::ir::ValueType::Void => {
                             return Err(anyhow!("return not is_void, but get void type"))
                                 .with_context(|| context!())
                         }
-                        middle::ir::ValueType::Bool => MvInst::new(REG_A0.into(), (*reg).into()),
                         middle::ir::ValueType::Array(_, _) => {
                             return Err(anyhow!("return array is not allow for sysy"))
                                 .with_context(|| context!())
@@ -419,9 +428,12 @@ impl IRBuilder {
                             return Err(anyhow!("return not is_void, but get void type"))
                                 .with_context(|| context!())
                         }
-                        middle::ir::ValueType::Int => MvInst::new(REG_A0.into(), (*reg).into()),
+                        middle::ir::ValueType::Int
+                        | middle::ir::ValueType::Bool
+                        | middle::ir::ValueType::SignedChar => {
+                            MvInst::new(REG_A0.into(), (*reg).into())
+                        }
                         middle::ir::ValueType::Float => MvInst::new(REG_FA0.into(), (*reg).into()),
-                        middle::ir::ValueType::Bool => MvInst::new(REG_A0.into(), (*reg).into()),
                         middle::ir::ValueType::Array(_, _) => {
                             return Err(anyhow!("return array is not allow for sysy"))
                                 .with_context(|| context!())
