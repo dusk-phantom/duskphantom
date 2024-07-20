@@ -1,6 +1,7 @@
 use crate::middle::ir;
 use crate::middle::ir::{BBPtr, FunPtr, InstPtr, Operand};
 
+#[allow(unused)]
 pub fn deadcode_elimination(modu: &mut ir::Module) {
     modu.functions
         .iter()
@@ -8,8 +9,7 @@ pub fn deadcode_elimination(modu: &mut ir::Module) {
 }
 
 pub fn deadcode_elimination_func(func: FunPtr) {
-    func.bfs_iter_rev()
-        .for_each(deadcode_elimination_block);
+    func.bfs_iter_rev().for_each(deadcode_elimination_block);
 }
 pub fn deadcode_elimination_block(bb: BBPtr) {
     bb.iter().for_each(deadcode_elimination_inst);
@@ -25,7 +25,7 @@ pub fn deadcode_elimination_inst(mut inst: InstPtr) {
             // Need to call deadcode_elimination again?
             Operand::Instruction(i) => deadcode_elimination_inst(i),
             // TODO: Other Operand
-            Operand::Global(_) => {},
+            Operand::Global(_) => {}
             _ => {}
         }
     }

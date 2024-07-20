@@ -43,7 +43,10 @@ impl Program {
         }
         let output = cmd.output().expect("msg: exec llc failed");
         if !output.status.success() {
-            panic!("msg: exec llc failed");
+            panic!(
+                "msg: exec llc failed\n{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
         }
         std::fs::read_to_string(tmp_llvm_file).expect("msg: read asm failed")
     }

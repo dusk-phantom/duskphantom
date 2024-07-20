@@ -1,5 +1,6 @@
 use crate::{errors::MiddleError, frontend, utils::mem::ObjPtr};
 use ir::ir_builder::IRBuilder;
+use transform::mem2reg;
 
 mod analysis;
 pub mod ir;
@@ -8,7 +9,6 @@ mod transform;
 
 use std::pin::Pin;
 
-use self::transform::deadcode_elimination::deadcode_elimination;
 pub struct Program {
     pub module: ir::Module,
     pub mem_pool: Pin<Box<IRBuilder>>,
@@ -22,7 +22,8 @@ pub fn gen(program: &frontend::Program) -> Result<Program, MiddleError> {
 }
 
 pub fn optimize(_program: &mut Program) {
-    deadcode_elimination(&mut _program.module);
+    // deadcode_elimination(&mut _program.module);
+    mem2reg::optimize_program(_program).unwrap();
 }
 
 impl Default for Program {

@@ -199,7 +199,10 @@ pub fn asm2bin(asm: String) -> String {
             .arg("-Wl,-Ttext=0x80000000");
         let output = cmd.output().expect("msg: exec llc failed");
         if !output.status.success() {
-            panic!("msg: exec llc failed");
+            panic!(
+                "msg: exec llc failed\n{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
         }
         let bin = std::fs::read(tmp_bin_path).expect("msg: read bin failed");
         let mut bin_str = String::new();
