@@ -175,9 +175,7 @@ impl IRBuilder {
             middle::ir::instruction::InstType::SRem => {
                 ssa2tac_three_usual!(RemInst, SRem, inst, regs, reg_gener)
             }
-
-            // TODO 目前还没有 udiv 和 urem
-            middle::ir::instruction::InstType::UDiv => todo!(),
+            middle::ir::instruction::InstType::UDiv => todo!(), // TODO 目前还没有 udiv 和 urem
             middle::ir::instruction::InstType::URem => todo!(),
             middle::ir::instruction::InstType::FDiv => todo!(),
             middle::ir::instruction::InstType::Shl => {
@@ -227,8 +225,28 @@ impl IRBuilder {
                 Self::build_zext_inst(zext, reg_gener, regs)
             }
             middle::ir::instruction::InstType::SextTo => todo!(),
-            middle::ir::instruction::InstType::ItoFp => todo!(),
-            middle::ir::instruction::InstType::FpToI => todo!(),
+            middle::ir::instruction::InstType::ItoFp => {
+                let itofp = downcast_ref::<middle::ir::instruction::extend_inst::ItoFp>(
+                    inst.as_ref().as_ref(),
+                );
+                let src =
+                    Self::local_operand_from(itofp.get_src(), regs).with_context(|| context!())?;
+                let dst = reg_gener.gen_virtual_float_reg();
+                let fcvtsw = I2fInst::new(dst.into(), src); // FIXME 不过我对这里有点疑惑: 中端会不会给浮点型立即数, 然后浮点型立即数实际上也需要特殊处理
+                regs.insert(itofp as *const _ as Address, dst);
+                Ok(vec![fcvtsw.into()])
+            }
+            middle::ir::instruction::InstType::FpToI => {
+                let fptoi = downcast_ref::<middle::ir::instruction::extend_inst::FpToI>(
+                    inst.as_ref().as_ref(),
+                );
+                let src =
+                    Self::local_operand_from(fptoi.get_src(), regs).with_context(|| context!())?;
+                let dst = reg_gener.gen_virtual_usual_reg();
+                let fcvtws = I2fInst::new(dst.into(), src); //
+                regs.insert(fptoi as *const _ as Address, dst);
+                Ok(vec![fcvtws.into()])
+            }
             middle::ir::instruction::InstType::ICmp => {
                 let icmp = downcast_ref::<middle::ir::instruction::misc_inst::ICmp>(
                     inst.as_ref().as_ref(),
