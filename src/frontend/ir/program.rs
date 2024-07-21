@@ -19,13 +19,3 @@ impl Program {
 /// A module is a single file.
 /// Only declaration can appear at top level.
 pub type Module = Vec<Decl>;
-
-pub fn parse(src: &str) -> Result<Program, FrontendError> {
-    preceded(blank, repeat(0.., decl))
-        .map(Program::new)
-        .parse(src)
-        .map_err(|err| FrontendError::ParseError(err.to_string()))
-}
-
-#[allow(unused)]
-pub fn optimize(program: &mut Program) {}

@@ -2,7 +2,7 @@
 mod tests {
     use insta::assert_snapshot;
 
-    use compiler::frontend::program::parse;
+    use compiler::frontend::parse;
     use compiler::middle::irgen::*;
 
     #[test]
