@@ -54,7 +54,7 @@ mod test_reg_replace {
         let src = Reg::new(5, true);
         let mut not = NotInst::new(dst.into(), src.into());
         dbg!(&not);
-        not.replace_def(dst, Reg::new(6, true));
+        not.replace_def(dst, Reg::new(6, true)).unwrap();
         dbg!(&not);
     }
 }
