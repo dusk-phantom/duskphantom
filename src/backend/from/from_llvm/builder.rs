@@ -97,9 +97,12 @@ impl IRBuilder {
         }
         // count max_callee_regs_stack
         Self::prepare_max_callee_regs_stack(&mut funcs);
+        // realloc stack slots considering max_callee_regs_stack
+        Self::realloc_stack_slots(&mut funcs);
 
         Ok(funcs)
     }
+
     pub fn build_func(
         llvm_func: &llvm_ir::Function,
         fmms: &mut HashMap<Fmm, FloatVar>,
@@ -115,6 +118,7 @@ impl IRBuilder {
         let mut regs: HashMap<Name, Reg> = HashMap::new();
         let mut stack_allocator = StackAllocator::new();
         let mut stack_slots: HashMap<Name, StackSlot> = HashMap::new();
+
         let (entry, caller_reg_stack) = Self::build_entry(
             llvm_func,
             &mut stack_allocator,
@@ -125,6 +129,8 @@ impl IRBuilder {
             &mut insert_back_for_remove_phi,
         )?;
         let mut m_f = Func::new(llvm_func.name.to_string(), args, entry);
+        *m_f.caller_regs_stack_mut() = Some(caller_reg_stack.try_into()?);
+
         let ret_ty = llvm_func.return_type.as_ref();
         if Self::is_ty_float(ret_ty) {
             m_f.ret_mut().replace(REG_FA0);
@@ -136,7 +142,6 @@ impl IRBuilder {
             unimplemented!("return type is not int or float");
         }
 
-        *m_f.caller_regs_stack_mut() = Some(caller_reg_stack.try_into()?);
         for bb in Self::build_other_bbs(
             llvm_func,
             &mut stack_allocator,
@@ -176,7 +181,7 @@ impl IRBuilder {
         Ok(m_f)
     }
 
-    pub fn prepare_max_callee_regs_stack(funcs: &mut Vec<Func>) {
+    fn prepare_max_callee_regs_stack(funcs: &mut Vec<Func>) {
         let name_func: HashMap<String, u32> = funcs
             .iter()
             .map(|f| (f.name().to_string(), f.caller_regs_stack()))
@@ -194,6 +199,72 @@ impl IRBuilder {
                 }
             }
             *f.max_callee_regs_stack_mut() = Some(max_callee_regs_stack);
+        }
+    }
+
+    fn realloc_stack_slots(funcs: &mut Vec<Func>) {
+        for f in funcs {
+            let mut old_stack_slots: HashMap<StackSlot, usize> = HashMap::new();
+            let mut new_stack_allocator = StackAllocator::new();
+            for bb in f.iter_bbs() {
+                for inst in bb.insts() {
+                    let stack_slot = match inst {
+                        Inst::Load(load) => *load.src(),
+                        Inst::Store(store) => *store.dst(),
+                        _ => {
+                            continue;
+                        }
+                    };
+                    let new_times = old_stack_slots.get(&stack_slot).unwrap_or(&0) + 1;
+                    old_stack_slots.insert(stack_slot, new_times);
+                }
+            }
+            let max_callee_regs_need = f.max_callee_regs_stack();
+            new_stack_allocator.alloc(max_callee_regs_need);
+            let mut old_stack_slots: Vec<(StackSlot, usize)> =
+                old_stack_slots.into_iter().collect();
+            old_stack_slots.sort_by(|a, b| a.1.cmp(&b.1));
+
+            let order_stack_slots = |old_stack_slots: Vec<(StackSlot, usize)>| {
+                let mut left_sss: Vec<StackSlot> = Vec::new();
+                let mut right_sss: Vec<StackSlot> = Vec::new();
+                for (idx, (ss, _)) in old_stack_slots.iter().rev().enumerate() {
+                    if idx % 2 == 0 {
+                        left_sss.push(*ss);
+                    } else {
+                        right_sss.push(*ss);
+                    }
+                }
+                left_sss.extend(right_sss.iter().rev());
+                left_sss
+            };
+            let ordered_stack_slots = order_stack_slots(old_stack_slots);
+
+            let mut new_stack_slots: HashMap<StackSlot, StackSlot> = HashMap::new();
+            for ss in ordered_stack_slots {
+                let new_ss = new_stack_allocator.alloc(ss.size());
+                new_stack_slots.insert(ss, new_ss);
+            }
+
+            for bb in f.iter_bbs_mut() {
+                for inst in bb.insts_mut() {
+                    match inst {
+                        Inst::Load(load) => {
+                            let new_ss = new_stack_slots.get(load.src()).unwrap();
+                            *load.src_mut() = *new_ss;
+                        }
+                        Inst::Store(store) => {
+                            let new_ss = new_stack_slots.get(store.dst()).unwrap();
+                            *store.dst_mut() = *new_ss;
+                        }
+                        _ => {
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            f.stack_allocator_mut().replace(new_stack_allocator);
         }
     }
 
@@ -263,6 +334,7 @@ impl IRBuilder {
         let caller_regs_stack = usize::try_from(caller_regs_stack)?; // 这是将 i64 转换为 usize
         Ok((entry, caller_regs_stack))
     }
+
     fn build_other_bbs(
         f: &llvm_ir::Function,
         stack_allocator: &mut StackAllocator,

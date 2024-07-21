@@ -27,9 +27,11 @@ pub fn phisicalize(program: &mut Program) -> Result<(), BackendError> {
     }
     Ok(())
 }
+
 const fn tmp_i_regs() -> [Reg; 3] {
     [REG_T0, REG_T1, REG_T2]
 }
+
 const fn tmp_f_regs() -> [Reg; 3] {
     [REG_FT0, REG_FT1, REG_FT2]
 }
@@ -224,7 +226,6 @@ fn handle_ra(func: &mut Func) -> Result<()> {
     Ok(())
 }
 
-/// FIXME: 此处没有考虑 保存 被call的函数的 额外参数需要的栈空间
 fn final_stack_size(func: &Func) -> Result<u32> {
     let r = func.stack_allocator().expect("").allocated();
     let r = (r as u64 + 15) & !15;
@@ -234,7 +235,6 @@ fn final_stack_size(func: &Func) -> Result<u32> {
     Ok(r as u32)
 }
 
-/// FIXME: 此处没有考虑 保存 被call的函数的 额外参数需要的栈空间
 fn handle_stack(func: &mut Func) -> Result<()> {
     // alloc stack for s0, in fact, we could choose not to store-restore s0
     _ = func.stack_allocator_mut().iter_mut().map(|sa| sa.alloc(8));
@@ -263,7 +263,6 @@ fn handle_stack(func: &mut Func) -> Result<()> {
     Ok(())
 }
 
-/// FIXME: 此处没有考虑 保存 被call的函数的 额外参数需要的栈空间
 fn handle_mem(func: &mut Func) -> Result<()> {
     let stack_size = final_stack_size(func)?;
     for bb in func.iter_bbs_mut() {
