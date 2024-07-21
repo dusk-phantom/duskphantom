@@ -195,7 +195,7 @@ impl IRBuilder {
 
     fn build_sext_inst(
         sext: &llvm_ir::instruction::SExt,
-        reg_gener: &mut RegGenerator,
+        _reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
         if Self::is_ty_int(&sext.to_type) {

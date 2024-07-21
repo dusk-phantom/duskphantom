@@ -67,7 +67,7 @@ pub enum Inst {
     Sd(SdInst),
     Lw(LwInst),
     Sw(SwInst),
-    La(LlaInst),
+    Lla(LlaInst),
     Load(LoadInst),
     Store(StoreInst),
 
@@ -135,7 +135,7 @@ impl Inst {
             Inst::Sd(inst) => inst.gen_asm(),
             Inst::Sw(inst) => inst.gen_asm(),
             Inst::Lw(inst) => inst.gen_asm(),
-            Inst::La(inst) => inst.gen_asm(),
+            Inst::Lla(inst) => inst.gen_asm(),
             Inst::Li(inst) => inst.gen_asm(),
             Inst::Load(inst) => inst.gen_asm(),
             Inst::Store(inst) => inst.gen_asm(),
@@ -196,7 +196,7 @@ impl RegReplace for Inst {
             Inst::Sw(inst) => inst.replace_use(from, to),
             Inst::Load(inst) => inst.replace_use(from, to),
             Inst::Store(inst) => inst.replace_use(from, to),
-            Inst::La(inst) => inst.replace_use(from, to),
+            Inst::Lla(inst) => inst.replace_use(from, to),
             Inst::Li(inst) => inst.replace_use(from, to),
             Inst::I2f(i2f) => i2f.replace_use(from, to),
             Inst::F2i(f2i) => f2i.replace_use(from, to),
@@ -238,7 +238,7 @@ impl RegReplace for Inst {
             Inst::Sw(inst) => inst.replace_def(from, to),
             Inst::Load(inst) => inst.replace_def(from, to),
             Inst::Store(inst) => inst.replace_def(from, to),
-            Inst::La(inst) => inst.replace_def(from, to),
+            Inst::Lla(inst) => inst.replace_def(from, to),
             Inst::Li(inst) => inst.replace_def(from, to),
             Inst::I2f(i2f) => i2f.replace_def(from, to),
             Inst::F2i(f2i) => f2i.replace_def(from, to),
@@ -293,7 +293,7 @@ impl_inst_convert!(SnezInst, Snez);
 
 // inst for data transfer
 impl_inst_convert!(MvInst, Mv);
-impl_inst_convert!(LlaInst, La);
+impl_inst_convert!(LlaInst, Lla);
 impl_inst_convert!(SdInst, Sd);
 impl_inst_convert!(LdInst, Ld);
 impl_inst_convert!(LwInst, Lw);

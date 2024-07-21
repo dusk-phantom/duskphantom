@@ -25,7 +25,7 @@ pub mod riscv {
                 Inst::Sd(inst) => inst.check_valid(),
                 Inst::Sw(inst) => inst.check_valid(),
                 Inst::Lw(inst) => inst.check_valid(),
-                Inst::La(inst) => inst.check_valid(),
+                Inst::Lla(inst) => inst.check_valid(),
                 Inst::Load(inst) => inst.check_valid(),
                 Inst::Store(inst) => inst.check_valid(),
                 Inst::Jmp(inst) => inst.check_valid(),
