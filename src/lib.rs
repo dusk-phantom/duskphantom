@@ -149,15 +149,11 @@ pub fn compile_self_llc(
     if opt_flag {
         middle::optimize(&mut program);
     }
-    if let Some(ll_path) = ll_path {
-        std::fs::write(ll_path, program.module.gen_llvm_ir()).with_context(|| context!())?;
-    }
     // 中端接clang
-    let llvm_ir = format!(
-        "{}\n{}",
-        include_str!("../lib/sylib.ll"),
-        program.module.gen_llvm_ir()
-    );
+    let llvm_ir = program.module.gen_llvm_ir();
+    if let Some(ll_path) = ll_path {
+        std::fs::write(ll_path, llvm_ir.clone()).with_context(|| context!())?;
+    }
     let mut builder = tempfile::Builder::new();
     let tmp_cfile = builder.suffix(".c").tempfile().unwrap();
     let tmp_llvm_file = builder.suffix(".ll").tempfile().unwrap();

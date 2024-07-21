@@ -57,14 +57,24 @@ impl Function {
     }
 
     pub fn gen_llvm_ir(&self) -> String {
-        let mut ir = format!("define {} @{}(", self.return_type, self.name);
+        let header = if self.is_lib() { "declare" } else { "define" };
+        let mut ir = format!("{} {} @{}(", header, self.return_type, self.name);
         if !self.params.is_empty() {
             for param in self.params.iter() {
                 ir += &format!("{}, ", param.as_ref());
             }
             let _ = ir.split_off(ir.len() - 2);
         }
-        ir += ") {\n";
+        ir += ")";
+
+        // If it is a library function, there is no need to generate the body
+        if self.is_lib() {
+            ir += "\n";
+            return ir;
+        }
+
+        // Otherwise, generate the body of the function
+        ir += " {\n";
         self.bfs_iter().for_each(|bb| {
             ir += &bb.gen_llvm_ir();
         });
