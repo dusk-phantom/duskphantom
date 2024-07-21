@@ -13,6 +13,7 @@ impl IRBuilder {
         stack_slots: &mut HashMap<Name, StackSlot>,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
+        insert_back_for_remove_phi: &mut HashMap<String, Vec<(llvm_ir::operand::Operand, Reg)>>,
     ) -> Result<Vec<Inst>> {
         // dbg!(&inst);
         match inst {
@@ -89,7 +90,9 @@ impl IRBuilder {
             llvm_ir::Instruction::AddrSpaceCast(_) => todo!(),
             llvm_ir::Instruction::ICmp(icmp) => Self::build_icmp_inst(icmp, reg_gener, regs),
             llvm_ir::Instruction::FCmp(_) => todo!(),
-            llvm_ir::Instruction::Phi(_) => todo!(),
+            llvm_ir::Instruction::Phi(phi) => {
+                Self::build_phi_inst(phi, reg_gener, regs, insert_back_for_remove_phi)
+            }
             llvm_ir::Instruction::Select(select) => {
                 Self::build_select_inst(select, reg_gener, regs)
             }
@@ -102,6 +105,27 @@ impl IRBuilder {
             llvm_ir::Instruction::CatchPad(_) => todo!(),
             llvm_ir::Instruction::CleanupPad(_) => todo!(),
         }
+    }
+
+    fn build_phi_inst(
+        phi: &llvm_ir::instruction::Phi,
+        reg_gener: &mut RegGenerator,
+        regs: &mut HashMap<Name, Reg>,
+        insert_back_for_remove_phi: &mut HashMap<String, Vec<(llvm_ir::operand::Operand, Reg)>>,
+    ) -> Result<Vec<Inst>> {
+        let dst_reg = Self::new_var(&phi.to_type, reg_gener)?;
+        regs.insert(phi.dest.clone(), dst_reg);
+        for (op, bb) in &phi.incoming_values {
+            let bb_name = Self::label_name_from(bb)?;
+            let Some(insert_backs) = insert_back_for_remove_phi.get_mut(&bb_name) else {
+                let new_insert_back = vec![(op.clone(), dst_reg)];
+                insert_back_for_remove_phi.insert(bb_name.clone(), new_insert_back);
+                continue;
+            };
+            insert_backs.push((op.clone(), dst_reg));
+        }
+        // insert_back_for_remove_phi.insert(phi.dest.clone(), phi_regs);
+        Ok(vec![])
     }
 
     fn build_select_inst(
