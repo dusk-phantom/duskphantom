@@ -4,8 +4,8 @@ use transform::mem2reg;
 
 mod analysis;
 pub mod ir;
-mod irgen;
-mod transform;
+pub mod irgen;
+pub mod transform;
 
 use std::pin::Pin;
 
