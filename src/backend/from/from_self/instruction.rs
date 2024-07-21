@@ -301,16 +301,20 @@ impl IRBuilder {
             middle::ir::instruction::misc_inst::ICmpOp::Ne => {
                 if let (Operand::Reg(reg0), Operand::Reg(reg1)) = (&op0, &op1) {
                     // 不相等的话, 为任意值, 相等的话, 为 0
+                    let dst = reg_gener.gen_virtual_usual_reg();
+                    let xor = XorInst::new(dst.into(), reg0.into(), reg1.into());
                     let flag = reg_gener.gen_virtual_usual_reg();
-                    let xor = XorInst::new(flag.into(), reg0.into(), reg1.into());
+                    let snez = SnezInst::new(flag.into(), dst.into());
                     regs.insert(dest, flag);
-                    Ok(vec![xor.into()])
+                    Ok(vec![xor.into(), snez.into()])
                 } else if let (Operand::Reg(reg), Operand::Imm(imm)) = (op0, op1) {
-                    let flag = reg_gener.gen_virtual_usual_reg();
+                    let dst = reg_gener.gen_virtual_usual_reg();
                     let imm: i64 = imm.into();
-                    let xor = XorInst::new(flag.into(), reg.into(), imm.into());
+                    let xor = XorInst::new(dst.into(), reg.into(), imm.into());
+                    let flag = reg_gener.gen_virtual_usual_reg();
+                    let snez = SnezInst::new(flag.into(), dst.into());
                     regs.insert(dest, flag);
-                    Ok(vec![xor.into()])
+                    Ok(vec![xor.into(), snez.into()])
                 } else {
                     unimplemented!();
                 }
