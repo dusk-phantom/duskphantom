@@ -3,11 +3,11 @@ use super::*;
 pub fn atom_type(input: &mut &str) -> PResult<Type> {
     alt((
         token("void").value(Type::Void),
-        token("int").value(Type::Int32),
-        token("float").value(Type::Float32),
+        token("int").value(Type::Int),
+        token("float").value(Type::Float),
         token("string").value(Type::String),
         token("char").value(Type::Char),
-        token("bool").value(Type::Boolean),
+        token("bool").value(Type::Bool),
         (token("enum"), ident).map(|(_, ty)| Type::Enum(ty)),
         (token("union"), ident).map(|(_, ty)| Type::Union(ty)),
         (token("struct"), ident).map(|(_, ty)| Type::Struct(ty)),
@@ -80,7 +80,7 @@ pub mod tests_typed {
     fn test_atom() {
         let code = "int";
         match atom_type.parse(code) {
-            Ok(result) => assert_eq!(result, Type::Int32),
+            Ok(result) => assert_eq!(result, Type::Int),
             Err(err) => panic!("failed to parse {}: {}", code, err),
         }
     }
@@ -93,8 +93,8 @@ pub mod tests_typed {
             Ok(result) => assert_eq!(
                 result,
                 Type::Pointer(Box::new(Type::Function(
-                    Box::new(Type::Int32),
-                    vec![TypedIdent::new(Type::Int32, Some("u".to_string()))],
+                    Box::new(Type::Int),
+                    vec![TypedIdent::new(Type::Int, Some("u".to_string()))],
                 )))
             ),
             Err(err) => panic!("failed to parse {}: {}", code, err),
@@ -108,8 +108,8 @@ pub mod tests_typed {
             Ok(result) => assert_eq!(
                 result,
                 Type::Pointer(Box::new(Type::Function(
-                    Box::new(Type::Int32),
-                    vec![TypedIdent::new(Type::Int32, None)],
+                    Box::new(Type::Int),
+                    vec![TypedIdent::new(Type::Int, None)],
                 )))
             ),
             Err(err) => panic!("failed to parse {}: {}", code, err),
@@ -124,8 +124,8 @@ pub mod tests_typed {
             Ok(result) => assert_eq!(
                 result,
                 Type::Function(
-                    Box::new(Type::Pointer(Box::new(Type::Int32))),
-                    vec![TypedIdent::new(Type::Int32, None)],
+                    Box::new(Type::Pointer(Box::new(Type::Int))),
+                    vec![TypedIdent::new(Type::Int, None)],
                 )
             ),
             Err(err) => panic!("failed to parse {}: {}", code, err),
@@ -139,8 +139,8 @@ pub mod tests_typed {
             Ok(result) => assert_eq!(
                 result,
                 Type::Function(
-                    Box::new(Type::Pointer(Box::new(Type::Int32))),
-                    vec![TypedIdent::new(Type::Int32, Some("u".to_string()))],
+                    Box::new(Type::Pointer(Box::new(Type::Int))),
+                    vec![TypedIdent::new(Type::Int, Some("u".to_string()))],
                 )
             ),
             Err(err) => panic!("failed to parse {}: {}", code, err),
@@ -155,7 +155,7 @@ pub mod tests_typed {
                 result,
                 LVal::Pointer(Box::new(LVal::Call(
                     Box::new(LVal::Nothing),
-                    vec![TypedIdent::new(Type::Int32, None)],
+                    vec![TypedIdent::new(Type::Int, None)],
                 )))
             ),
             Err(err) => panic!("failed to parse {}: {}", code, err),
@@ -169,8 +169,8 @@ pub mod tests_typed {
             Ok(result) => assert_eq!(
                 result,
                 Type::Function(
-                    Box::new(Type::Pointer(Box::new(Type::Int32))),
-                    vec![TypedIdent::new(Type::Int32, None)],
+                    Box::new(Type::Pointer(Box::new(Type::Int))),
+                    vec![TypedIdent::new(Type::Int, None)],
                 )
             ),
             Err(err) => panic!("failed to parse {}: {}", code, err),
@@ -184,8 +184,8 @@ pub mod tests_typed {
             Ok(result) => assert_eq!(
                 result,
                 Type::Pointer(Box::new(Type::Array(
-                    Box::new(Type::Int32),
-                    Box::new(Expr::Int32(4))
+                    Box::new(Type::Int),
+                    Box::new(Expr::Int(4))
                 )))
             ),
             Err(err) => panic!("failed to parse {}: {}", code, err),
@@ -203,13 +203,13 @@ pub mod tests_typed {
                 TypedIdent::new(
                     Type::Pointer(Box::new(Type::Function(
                         Box::new(Type::Pointer(Box::new(Type::Function(
-                            Box::new(Type::Int32),
-                            vec![TypedIdent::new(Type::Int32, None)],
+                            Box::new(Type::Int),
+                            vec![TypedIdent::new(Type::Int, None)],
                         )))),
                         vec![TypedIdent::new(
                             Type::Pointer(Box::new(Type::Function(
-                                Box::new(Type::Int32),
-                                vec![TypedIdent::new(Type::Int32, None)],
+                                Box::new(Type::Int),
+                                vec![TypedIdent::new(Type::Int, None)],
                             ))),
                             None
                         )],

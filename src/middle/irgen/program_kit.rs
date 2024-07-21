@@ -60,11 +60,11 @@ impl<'a> ProgramKit<'a> {
     pub fn translate_type(&self, ty: &Type) -> Result<ValueType> {
         match ty {
             Type::Void => Ok(ValueType::Void),
-            Type::Int32 => Ok(ValueType::Int),
-            Type::Float32 => Ok(ValueType::Float),
+            Type::Int => Ok(ValueType::Int),
+            Type::Float => Ok(ValueType::Float),
             Type::String => Err(anyhow!("string not supported")).with_context(|| context!()),
             Type::Char => Err(anyhow!("char not supported")).with_context(|| context!()),
-            Type::Boolean => Ok(ValueType::Bool),
+            Type::Bool => Ok(ValueType::Bool),
             Type::Pointer(ty) => Ok(ValueType::Pointer(Box::new(self.translate_type(ty)?))),
             Type::Array(ty, index_expr) => {
                 let index_constant = self.gen_const_expr(index_expr)?;

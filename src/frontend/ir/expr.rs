@@ -10,7 +10,7 @@ pub enum Expr {
 
     /// An array, union or struct.
     /// Example: `{ 1, 2, 3 }`
-    Pack(Vec<Expr>),
+    Array(Vec<Expr>),
 
     /// A named instantiation of an union or struct.
     /// Example: `{ x: 1, y: 2 }` or `{ .x = 1 }`
@@ -30,11 +30,11 @@ pub enum Expr {
 
     /// A single 32-bit integer.
     /// Example: `8`
-    Int32(i32),
+    Int(i32),
 
     /// A single-precision floating-point number.
     /// Example: `3.6`
-    Float32(f32),
+    Float(f32),
 
     /// A string literal.
     /// Example: `"good"`

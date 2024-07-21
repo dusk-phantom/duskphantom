@@ -4,3 +4,5 @@ pub mod paral_counter;
 pub mod mem;
 #[macro_use]
 pub mod error;
+
+pub mod frame_map;

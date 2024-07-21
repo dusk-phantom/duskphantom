@@ -18,14 +18,14 @@ pub fn prefix(input: &mut &str) -> PResult<Expr> {
     let disp = dispatch! { peek(any);
         '{' => alt((
             // TODO memoize expr here
-            curly(separated(0.., expr, token(","))).map(Expr::Pack),
+            curly(separated(0.., expr, token(","))).map(Expr::Array),
             curly(separated(0.., map_entry, token(","))).map(Expr::Map)
         )),
         '.' | '0'..='9' => pad(constant_number),
         '"' => pad(string_lit).map(Expr::String),
         '\'' => pad(char_lit).map(Expr::Char),
-        'f' => token("false").value(Expr::Bool(false)),
-        't' => token("true").value(Expr::Bool(true)),
+        'f' => token("false").value(Expr::Int(0)),
+        't' => token("true").value(Expr::Int(1)),
         '(' => paren(expr),
         _ => fail,
     };

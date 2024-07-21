@@ -15,7 +15,7 @@ pub fn decl(input: &mut &str) -> PResult<Decl> {
         return alt((
             (token("#include"), take_until(0.., '\n'), blank).value(Decl::Stack(vec![])),
             (token("#define"), pad(ident), expr)
-                .map(|(_, id, expr)| Decl::Const(Type::Int32, id, Some(expr))),
+                .map(|(_, id, expr)| Decl::Const(Type::Int, id, Some(expr))),
         ))
         .parse_next(input);
     }
