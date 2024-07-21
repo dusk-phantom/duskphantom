@@ -109,43 +109,48 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
+        fn build_and_op(
+            cond: &llvm_ir::operand::Operand,
+            reg_gener: &mut RegGenerator,
+            regs: &HashMap<Name, Reg>,
+            insts: &mut Vec<Inst>,
+        ) -> Result<Operand> {
+            let cond = IRBuilder::local_var_from(cond, regs)?;
+            let mid_var = reg_gener.gen_virtual_usual_reg();
+            let seqz = SeqzInst::new(mid_var.into(), cond);
+            insts.push(seqz.into());
+            let and_op = reg_gener.gen_virtual_usual_reg();
+            let add = AddInst::new(and_op.into(), mid_var.into(), (-1).into());
+            insts.push(add.into());
+            Ok(and_op.into())
+        }
+
         dbg!(select);
         // unimplemented!();
         let mut ret: Vec<Inst> = Vec::new();
-        let cond = Self::local_var_from(&select.condition, regs)?;
-        let and_op0 = reg_gener.gen_virtual_usual_reg();
-        let seqz = SeqzInst::new(and_op0.into(), cond);
-        ret.push(seqz.into());
-        let and_op1 = reg_gener.gen_virtual_usual_reg();
-        let not = NotInst::new(and_op1.into(), and_op0.into());
+        let and_op0 = build_and_op(&select.condition, reg_gener, regs, &mut ret)?;
+        let and_op1: Operand = reg_gener.gen_virtual_usual_reg().into();
+        let not = NotInst::new(and_op1.clone(), and_op0.clone());
         ret.push(not.into());
 
-        let true_value = Self::value_from(&select.true_value, regs)?;
-        let false_value = Self::value_from(&select.false_value, regs)?;
+        let (true_value, pre_insts) = Self::prepare_rhs(&select.true_value, reg_gener, regs)?;
+        ret.extend(pre_insts);
+        let (false_value, pre_insts) = Self::prepare_rhs(&select.false_value, reg_gener, regs)?;
+        ret.extend(pre_insts);
 
-        match true_value {
-            Operand::Reg(r) => {
-                // count and_op0 & true_value
-                if r.is_usual() {
-                    let and_op0_true = reg_gener.gen_virtual_usual_reg();
-                    let and = AndInst::new(and_op0_true.into(), and_op0.into(), true_value);
-                    ret.push(and.into());
-                    let and_op1_false = reg_gener.gen_virtual_usual_reg();
-                    let and = AndInst::new(and_op1_false.into(), and_op1.into(), false_value);
-                    ret.push(and.into());
-                    let dst = reg_gener.gen_virtual_usual_reg();
-                    let or = OrInst::new(dst.into(), and_op0_true.into(), and_op1_false.into());
-                    regs.insert(select.dest.clone(), dst);
-                    ret.push(or.into());
-                } else {
-                    unimplemented!();
-                }
-            }
-            _ => {
-                dbg!(true_value);
-                unimplemented!();
-            }
-        }
+        let and_op0_true = reg_gener.gen_virtual_usual_reg();
+        let and = AndInst::new(and_op0_true.into(), and_op0.clone(), true_value);
+        ret.push(and.into());
+
+        let and_op1_false = reg_gener.gen_virtual_usual_reg();
+        let and = AndInst::new(and_op1_false.into(), and_op1.clone(), false_value);
+        ret.push(and.into());
+
+        let dst = reg_gener.gen_virtual_usual_reg();
+        let or = OrInst::new(dst.into(), and_op0_true.into(), and_op1_false.into());
+        regs.insert(select.dest.clone(), dst);
+        ret.push(or.into());
+
         Ok(ret)
     }
 

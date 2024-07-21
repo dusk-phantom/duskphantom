@@ -257,8 +257,8 @@ impl RegReplace for Inst {
             Inst::Xor(inst) => inst.replace_def(from, to),
             Inst::Tail(inst) => inst.replace_def(from, to),
             Inst::Seqz(inst) => inst.replace_def(from, to),
-            Inst::Snez(snez) => snez.replace_use(from, to),
-            Inst::Not(not) => not.replace_use(from, to),
+            Inst::Snez(snez) => snez.replace_def(from, to),
+            Inst::Not(not) => not.replace_def(from, to),
         }
     }
 }

@@ -464,6 +464,18 @@ impl Imm {
     pub fn gen_asm(&self) -> String {
         format!("{}", self.0)
     }
+    pub fn in_limit(&self, bits: usize) -> bool {
+        if bits <= 64 {
+            if bits == 0 {
+                return false;
+            }
+            let max = (1 << bits) - 1;
+            let min = -(1 << bits);
+            self.0 <= max && self.0 >= min
+        } else {
+            true
+        }
+    }
 }
 impl Fmm {
     #[inline]

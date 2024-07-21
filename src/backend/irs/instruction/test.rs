@@ -32,4 +32,29 @@ mod test_reg_def_use {
 }
 
 #[cfg(test)]
-mod test_reg_replace {}
+mod test_reg_replace {
+    use crate::backend::{RegDefs, RegUses, REG_A0};
+
+    use super::irs::{NotInst, Reg, RegGenerator, RegReplace, REG_A1};
+
+    #[test]
+    fn test_not() {
+        let mut reg_genner = RegGenerator::new();
+        let r1 = reg_genner.gen_virtual_usual_reg();
+        let r2 = reg_genner.gen_virtual_usual_reg();
+        let mut not = NotInst::new(r1.into(), r2.into());
+        not.replace_use(r2, REG_A1).unwrap();
+        assert_eq!(not.uses(), vec![&REG_A1]);
+        not.replace_def(r1, REG_A0).unwrap();
+        assert_eq!(not.defs(), vec![&REG_A0]);
+    }
+    #[test]
+    fn test_not_2() {
+        let dst = Reg::new(40, true);
+        let src = Reg::new(5, true);
+        let mut not = NotInst::new(dst.into(), src.into());
+        dbg!(&not);
+        not.replace_def(dst, Reg::new(6, true));
+        dbg!(&not);
+    }
+}
