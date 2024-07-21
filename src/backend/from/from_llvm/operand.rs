@@ -76,7 +76,7 @@ impl IRBuilder {
         let name = &name
             .strip_prefix('%')
             .ok_or(anyhow!("").context(context!()))?;
-        Ok(name.to_string())
+        Ok(format!(".LBB_{}", name))
     }
 
     pub fn const_from(operand: &llvm_ir::Operand) -> Result<Operand> {
