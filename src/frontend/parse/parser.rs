@@ -76,7 +76,7 @@ pub fn constant_number(input: &mut &str) -> PResult<Expr> {
         };
         return i32::from_str_radix(before_point, radix)
             .map_err(|_| ErrMode::from_error_kind(input, ErrorKind::Verify).cut())
-            .map(Expr::Int32);
+            .map(Expr::Int);
     }
 
     // Read exponent value only if there is exponent indicator ("e" | "E" | "p" | "P")
@@ -95,12 +95,12 @@ pub fn constant_number(input: &mut &str) -> PResult<Expr> {
     if is_hex {
         parse_hexf32(&number, false)
             .map_err(|_| ErrMode::from_error_kind(input, ErrorKind::Verify).cut())
-            .map(Expr::Float32)
+            .map(Expr::Float)
     } else {
         number
             .parse()
             .map_err(|_| ErrMode::from_error_kind(input, ErrorKind::Verify).cut())
-            .map(Expr::Float32)
+            .map(Expr::Float)
     }
 }
 

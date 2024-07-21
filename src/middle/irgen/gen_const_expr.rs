@@ -24,7 +24,7 @@ impl<'a> ProgramKit<'a> {
                     _ => Err(anyhow!("variable is not a constant")).with_context(|| context!()),
                 }
             }
-            Expr::Pack(ls) => Ok(Constant::Array(
+            Expr::Array(ls) => Ok(Constant::Array(
                 ls.iter()
                     .map(|x| self.gen_const_expr(x))
                     .collect::<anyhow::Result<_, _>>()?,
@@ -46,8 +46,8 @@ impl<'a> ProgramKit<'a> {
             }
             Expr::Field(_, _) => Err(anyhow!("field not implemented")).with_context(|| context!()),
             Expr::Select(_, _) => Err(anyhow!("select not supported")).with_context(|| context!()),
-            Expr::Int32(x) => Ok(Constant::Int(*x)),
-            Expr::Float32(x) => Ok(Constant::Float(*x)),
+            Expr::Int(x) => Ok(Constant::Int(*x)),
+            Expr::Float(x) => Ok(Constant::Float(*x)),
             Expr::String(str) => {
                 let mut vec = vec![];
 

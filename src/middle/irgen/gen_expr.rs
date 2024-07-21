@@ -23,7 +23,7 @@ impl<'a> FunctionKit<'a> {
                 // Clone the operand and return, this clones the underlying value or InstPtr
                 Ok(operand.clone())
             }
-            Expr::Pack(ls) => Ok(Value::Array(
+            Expr::Array(ls) => Ok(Value::Array(
                 ls.iter()
                     .map(|x| self.gen_expr(x))
                     .collect::<anyhow::Result<_, _>>()?,
@@ -39,8 +39,8 @@ impl<'a> FunctionKit<'a> {
             }
             Expr::Field(_, _) => Err(anyhow!("field not supported")).with_context(|| context!()),
             Expr::Select(_, _) => Err(anyhow!("select not supported")).with_context(|| context!()),
-            Expr::Int32(x) => Ok(Constant::Int(*x).into()),
-            Expr::Float32(x) => Ok(Constant::Float(*x).into()),
+            Expr::Int(x) => Ok(Constant::Int(*x).into()),
+            Expr::Float(x) => Ok(Constant::Float(*x).into()),
             Expr::String(_) => Err(anyhow!("string not supported")).with_context(|| context!()),
             Expr::Char(_) => Err(anyhow!("char not supported")).with_context(|| context!()),
             Expr::Bool(_) => Err(anyhow!("bool not supported")).with_context(|| context!()),

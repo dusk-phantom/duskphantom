@@ -8,10 +8,10 @@ pub enum Type {
     Void,
 
     /// 32-bit integer.
-    Int32,
+    Int,
 
     /// 32-bit floating-point number.
-    Float32,
+    Float,
 
     /// String.
     String,
@@ -20,7 +20,7 @@ pub enum Type {
     Char,
 
     /// Boolean.
-    Boolean,
+    Bool,
 
     /// Pointer to given type.
     /// Example:
