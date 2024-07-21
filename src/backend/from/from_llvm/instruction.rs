@@ -198,63 +198,86 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
-        let op0 = Self::value_from(&icmp.operand0, regs)?;
-        let op1 = &Self::value_from(&icmp.operand1, regs)?;
+        let mut ret = Vec::new();
+        let dst = reg_gener.gen_virtual_usual_reg();
+        regs.insert(icmp.dest.clone(), dst);
+
+        fn prepare_normal_op0_op1(
+            icmp: &llvm_ir::instruction::ICmp,
+            reg_gener: &mut RegGenerator,
+            regs: &HashMap<Name, Reg>,
+            insts: &mut Vec<Inst>,
+        ) -> Result<(Operand, Operand)> {
+            let (op0, prepare) = IRBuilder::prepare_lhs(&icmp.operand0, reg_gener, regs)?;
+            insts.extend(prepare);
+            let (op1, prepare) = IRBuilder::prepare_rhs(&icmp.operand1, reg_gener, regs)?;
+            insts.extend(prepare);
+            Ok((op0, op1))
+        }
+        fn prepare_rev_op0_op1(
+            icmp: &llvm_ir::instruction::ICmp,
+            reg_gener: &mut RegGenerator,
+            regs: &HashMap<Name, Reg>,
+            insts: &mut Vec<Inst>,
+        ) -> Result<(Operand, Operand)> {
+            let (op1, prepare) = IRBuilder::prepare_lhs(&icmp.operand1, reg_gener, regs)?;
+            insts.extend(prepare);
+            let (op0, prepare) = IRBuilder::prepare_rhs(&icmp.operand0, reg_gener, regs)?;
+            insts.extend(prepare);
+            Ok((op0, op1))
+        }
+
         match icmp.predicate {
             llvm_ir::IntPredicate::EQ => {
-                // 判断eq的时候需要考虑顺序吗?不需要,因为对对应的优化汇编也没考虑
+                let (op0, op1) = prepare_normal_op0_op1(icmp, reg_gener, regs, &mut ret)?;
                 let mid_var = reg_gener.gen_virtual_usual_reg();
                 let xor = XorInst::new(mid_var.into(), op0.clone(), op1.clone());
-                let dst = reg_gener.gen_virtual_usual_reg();
                 let seqz = SeqzInst::new(dst.into(), mid_var.into());
-                regs.insert(icmp.dest.clone(), dst);
-                Ok(vec![xor.into(), seqz.into()])
+                ret.push(xor.into());
+                ret.push(seqz.into());
             }
             llvm_ir::IntPredicate::NE => {
+                let (op0, op1) = prepare_normal_op0_op1(icmp, reg_gener, regs, &mut ret)?;
                 let mid_var = reg_gener.gen_virtual_usual_reg();
                 let xor = XorInst::new(mid_var.into(), op0.clone(), op1.clone());
-                let dst = reg_gener.gen_virtual_usual_reg();
                 let snez = SnezInst::new(dst.into(), mid_var.into());
-                regs.insert(icmp.dest.clone(), dst);
-                Ok(vec![xor.into(), snez.into()])
+                ret.push(xor.into());
+                ret.push(snez.into());
             }
             llvm_ir::IntPredicate::UGT => todo!(),
             llvm_ir::IntPredicate::UGE => todo!(),
             llvm_ir::IntPredicate::ULT => todo!(),
             llvm_ir::IntPredicate::ULE => todo!(),
             llvm_ir::IntPredicate::SGT => {
-                let dst = reg_gener.gen_virtual_usual_reg();
                 // notice sge(op0,op1) equal to slt(op0,op1)
+                let (op0, op1) = prepare_rev_op0_op1(icmp, reg_gener, regs, &mut ret)?;
                 let slt = SltInst::new(dst.into(), op1.clone(), op0.clone());
-                regs.insert(icmp.dest.clone(), dst);
-                Ok(vec![slt.into()])
+                ret.push(slt.into());
             }
             llvm_ir::IntPredicate::SGE => {
+                let (op0, op1) = prepare_normal_op0_op1(icmp, reg_gener, regs, &mut ret)?;
                 let mid_var = reg_gener.gen_virtual_usual_reg();
                 let slt = SltInst::new(mid_var.into(), op0.clone(), op1.clone());
-                let dst = reg_gener.gen_virtual_usual_reg();
                 // FIXME: 这里要检查一下用 xori dst,mid,1 与 用 snez dst,mid 的执行效率是否有差别
                 let xori = XorInst::new(dst.into(), mid_var.into(), 1.into());
-                regs.insert(icmp.dest.clone(), dst);
-                Ok(vec![slt.into(), xori.into()])
+                ret.push(slt.into());
+                ret.push(xori.into());
             }
             llvm_ir::IntPredicate::SLT => {
-                let op0 = &Self::value_from(&icmp.operand0, regs)?;
-                let op1 = &Self::value_from(&icmp.operand1, regs)?;
-                let dst = reg_gener.gen_virtual_usual_reg();
+                let (op0, op1) = prepare_normal_op0_op1(icmp, reg_gener, regs, &mut ret)?;
                 let slt = SltInst::new(dst.into(), op0.clone(), op1.clone());
-                regs.insert(icmp.dest.clone(), dst);
-                Ok(vec![slt.into()])
+                ret.push(slt.into());
             }
             llvm_ir::IntPredicate::SLE => {
+                let (op0, op1) = prepare_rev_op0_op1(icmp, reg_gener, regs, &mut ret)?;
                 let mid_var = reg_gener.gen_virtual_usual_reg();
                 let slt = SltInst::new(mid_var.into(), op1.clone(), op0.clone());
-                let dst = reg_gener.gen_virtual_usual_reg();
                 let xori = XorInst::new(dst.into(), mid_var.into(), 1.into());
-                regs.insert(icmp.dest.clone(), dst);
-                Ok(vec![slt.into(), xori.into()])
+                ret.push(slt.into());
+                ret.push(xori.into());
             }
         }
+        Ok(ret)
     }
 
     fn build_si2f_inst(
