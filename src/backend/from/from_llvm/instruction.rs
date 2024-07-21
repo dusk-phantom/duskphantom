@@ -78,7 +78,7 @@ impl IRBuilder {
             llvm_ir::Instruction::GetElementPtr(_) => todo!(),
             llvm_ir::Instruction::Trunc(_) => todo!(),
             llvm_ir::Instruction::ZExt(zext) => Self::build_zext_inst(zext, reg_gener, regs),
-            llvm_ir::Instruction::SExt(_) => todo!(),
+            llvm_ir::Instruction::SExt(sext) => Self::build_sext_inst(sext, reg_gener, regs),
             llvm_ir::Instruction::FPTrunc(_) => todo!(),
             llvm_ir::Instruction::FPExt(_) => todo!(),
             llvm_ir::Instruction::FPToUI(_) => todo!(),
@@ -191,6 +191,21 @@ impl IRBuilder {
         } else {
             unimplemented!();
         }
+    }
+
+    fn build_sext_inst(
+        sext: &llvm_ir::instruction::SExt,
+        reg_gener: &mut RegGenerator,
+        regs: &mut HashMap<Name, Reg>,
+    ) -> Result<Vec<Inst>> {
+        if Self::is_ty_int(&sext.to_type) {
+            let src = Self::local_var_from(&sext.operand, regs)?;
+            let src: Reg = src.try_into().with_context(|| context!())?;
+            regs.insert(sext.dest.clone(), src);
+        } else {
+            unimplemented!();
+        }
+        Ok(vec![])
     }
 
     fn build_icmp_inst(
