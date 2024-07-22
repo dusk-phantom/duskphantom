@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::{anyhow, Context, Result};
 
-use crate::backend::{Operand, Reg, StackSlot};
+use crate::backend::{Operand, Reg, RegGenerator, StackSlot};
 
 use crate::context;
 
@@ -14,11 +14,15 @@ use super::*;
 use builder::IRBuilder;
 
 impl IRBuilder {
-    pub fn is_ty_int(ty: &middle::ir::ValueType) -> bool {
-        matches!(ty, middle::ir::ValueType::Int)
-    }
-    pub fn is_ty_float(ty: &middle::ir::ValueType) -> bool {
-        matches!(ty, middle::ir::ValueType::Float)
+    pub fn new_var(ty: &middle::ir::ValueType, reg_gener: &mut RegGenerator) -> Result<Reg> {
+        let dst_reg = match ty {
+            middle::ir::ValueType::Int
+            | middle::ir::ValueType::Bool
+            | middle::ir::ValueType::Pointer(_) => reg_gener.gen_virtual_usual_reg(),
+            middle::ir::ValueType::Float => reg_gener.gen_virtual_float_reg(),
+            _ => return Err(anyhow!("phi can't be void/array")).with_context(|| context!()),
+        };
+        Ok(dst_reg)
     }
 
     pub fn stack_slot_from(
