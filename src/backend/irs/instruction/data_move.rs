@@ -191,8 +191,8 @@ impl RegReplace for SdInst {
         if self.base() == &from {
             *self.base_mut() = to;
         }
-        if self.base() == &from {
-            *self.base_mut() = to;
+        if self.dst() == &from {
+            *self.dst_mut() = to;
         }
         Ok(())
     }
@@ -201,6 +201,9 @@ impl RegReplace for SwInst {
     fn replace_use(&mut self, from: Reg, to: Reg) -> Result<()> {
         if self.base() == &from {
             *self.base_mut() = to;
+        }
+        if self.dst() == &from {
+            *self.dst_mut() = to;
         }
         Ok(())
     }

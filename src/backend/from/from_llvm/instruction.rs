@@ -343,35 +343,40 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
-        // dbg!(store);
-        let address = &store.address;
-        let val = &store.value;
-        let address = Self::stack_slot_from(address, stack_slots).with_context(|| context!())?;
-        // dbg!(address.gen_asm());
-        let val: Operand = Self::value_from(val, regs).with_context(|| context!())?;
-        // dbg!(&val);
         let mut ret: Vec<Inst> = Vec::new();
-        match val {
-            Operand::Imm(imm) => {
-                let dst = reg_gener.gen_virtual_usual_reg();
-                let li = AddInst::new(dst.into(), REG_ZERO.into(), imm.into());
-                let src = dst;
-                let sd = StoreInst::new(address.try_into()?, src);
-                ret.push(li.into());
-                ret.push(sd.into());
+        let address = Self::address_from(&store.address, stack_slots)?;
+        let (value, pre_insts) = Self::prepare_lhs(&store.value, reg_gener, regs)?;
+        ret.extend(pre_insts);
+
+        match address {
+            Operand::StackSlot(stack_slot) => match value {
+                Operand::Reg(reg) => {
+                    let sd = StoreInst::new(stack_slot, reg);
+                    ret.push(sd.into());
+                }
+                _ => unimplemented!("store instruction with other value"),
+            },
+            Operand::Label(var) => {
+                let addr = reg_gener.gen_virtual_usual_reg();
+                let lla = LlaInst::new(addr, var);
+                ret.push(lla.into());
+                match value {
+                    Operand::Reg(val) => {
+                        let sw = SwInst::new(val, 0.into(), addr);
+                        ret.push(sw.into());
+                    }
+                    _ => unimplemented!("store instruction with other value"),
+                }
             }
-            Operand::Fmm(_) => {
-                return Err(anyhow!("store instruction with float value".to_string(),))
-                    .with_context(|| context!());
+            _ => {
+                return Err(anyhow!(
+                    "store instruction with invalid address {:?}",
+                    address
+                ))
+                .with_context(|| context!());
             }
-            Operand::Reg(reg) => {
-                let src = reg;
-                let sd = StoreInst::new(address.try_into()?, src);
-                ret.push(sd.into());
-            }
-            _ => unimplemented!("store instruction with other value"),
         }
-        // dbg!(&ret);
+
         Ok(ret)
     }
 
@@ -388,18 +393,26 @@ impl IRBuilder {
         }
         let dst_reg = Self::new_var(&load.loaded_ty, reg_gener)?;
         regs.insert(load.dest.clone(), dst_reg);
-        if let Ok(stack_slot) = Self::stack_slot_from(&load.address, stack_slots) {
-            let ld = LoadInst::new(dst_reg, stack_slot.try_into()?);
-            ret.push(ld.into());
-        } else if let Ok(var) = Self::global_name_from(&load.address) {
-            let addr = reg_gener.gen_virtual_usual_reg();
-            let la = LlaInst::new(addr, var.into());
-            ret.push(la.into());
-            let lw = LwInst::new(dst_reg, 0.into(), addr);
-            ret.push(lw.into());
-        } else {
-            return Err(anyhow!("load instruction with other address".to_string()))
+        let address = Self::address_from(&load.address, stack_slots)?;
+        match address {
+            Operand::StackSlot(stack_slot) => {
+                let ld = LoadInst::new(dst_reg, stack_slot);
+                ret.push(ld.into());
+            }
+            Operand::Label(var) => {
+                let addr = reg_gener.gen_virtual_usual_reg();
+                let lla = LlaInst::new(addr, var);
+                ret.push(lla.into());
+                let lw = LwInst::new(dst_reg, 0.into(), addr);
+                ret.push(lw.into());
+            }
+            _ => {
+                return Err(anyhow!(
+                    "load instruction with invalid address {:?}",
+                    address
+                ))
                 .with_context(|| context!());
+            }
         }
         Ok(ret)
     }
