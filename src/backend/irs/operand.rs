@@ -54,6 +54,13 @@ impl Reg {
     pub const fn new(id: u32, is_usual: bool) -> Self {
         Self { id, is_usual }
     }
+    pub const fn new_usual(id: u32) -> Self {
+        Self::new(id, true)
+    }
+    pub const fn new_float(id: u32) -> Self {
+        Self::new(id, false)
+    }
+
     #[inline]
     pub fn id(&self) -> u32 {
         self.id
@@ -353,7 +360,7 @@ impl RegGenerator {
 impl Reg {
     #[inline]
     pub fn gen_asm(&self) -> String {
-        if self.is_phisic() {
+        if self.is_physical() {
             match self.is_usual {
                 true => match self.id {
                     0 => String::from("zero"),
@@ -451,12 +458,12 @@ impl Reg {
     }
 
     #[inline]
-    pub fn is_phisic(&self) -> bool {
+    pub fn is_physical(&self) -> bool {
         (0..=31).contains(&self.id)
     }
     #[inline]
     pub fn is_virtual(&self) -> bool {
-        !self.is_phisic()
+        !self.is_physical()
     }
 }
 impl Imm {
@@ -692,15 +699,15 @@ pub mod tests {
     fn test_phisic_virtual() {
         for i in 0..=31 {
             let reg = Reg::new(i, true);
-            assert!(reg.is_phisic());
+            assert!(reg.is_physical());
             assert!(!reg.is_virtual());
             let reg = Reg::new(i, false);
-            assert!(reg.is_phisic());
+            assert!(reg.is_physical());
             assert!(!reg.is_virtual());
         }
         for i in 32..=127 {
             let reg = Reg::new(i, false);
-            assert!(!reg.is_phisic());
+            assert!(!reg.is_physical());
             assert!(reg.is_virtual());
         }
     }

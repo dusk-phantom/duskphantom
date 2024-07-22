@@ -63,7 +63,7 @@ fn phisicalize_reg(func: &mut Func) -> Result<()> {
             let mut new_inst = inst.clone();
             // 首先加载uses中的寄存器需要的值
             for u in uses {
-                if u.is_phisic() {
+                if u.is_physical() {
                     continue;
                 }
                 let ss = v_ss.get(u).unwrap();
@@ -83,7 +83,7 @@ fn phisicalize_reg(func: &mut Func) -> Result<()> {
             // 处理使用临时寄存器替换虚拟寄存器之后要把值store回栈中
             let mut store_back: Option<Inst> = None;
             for d in defs {
-                if d.is_phisic() {
+                if d.is_physical() {
                     continue;
                 }
                 let ss = v_ss.get(d).unwrap();
@@ -117,8 +117,8 @@ fn handle_caller_save(func: &mut Func) -> Result<()> {
         for inst in bb.insts() {
             let uses = inst.uses();
             let defs = inst.defs();
-            regs.extend(uses.iter().filter(|r| r.is_phisic()).cloned());
-            regs.extend(defs.iter().filter(|r| r.is_phisic()).cloned());
+            regs.extend(uses.iter().filter(|r| r.is_physical()).cloned());
+            regs.extend(defs.iter().filter(|r| r.is_physical()).cloned());
         }
     }
     regs.retain(|r| Reg::callee_save_regs().contains(r));
@@ -170,8 +170,8 @@ fn handle_callee_save(func: &mut Func) -> Result<()> {
         for inst in bb.insts() {
             let uses = inst.uses();
             let defs = inst.defs();
-            regs.extend(uses.iter().filter(|r| r.is_phisic()).cloned());
-            regs.extend(defs.iter().filter(|r| r.is_phisic()).cloned());
+            regs.extend(uses.iter().filter(|r| r.is_physical()).cloned());
+            regs.extend(defs.iter().filter(|r| r.is_physical()).cloned());
         }
     }
     regs.retain(|r| Reg::callee_save_regs().contains(r));
