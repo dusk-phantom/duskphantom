@@ -146,4 +146,31 @@ pub mod tests_domin {
         check_f(2, 1);
         check_f(2, 3);
     }
+
+    #[test]
+    fn branch_nested_loop() {
+        let mut pool = IRBuilder::new();
+        let (func, bb_vec) = gen_graph(&mut pool, vec![[1, -1], [2, 3], [4, -1], [4, -1], [0, 1]]);
+        let domin = make_domin(func);
+
+        let check_t = |i, j| assert!(check_domin(&bb_vec, &domin, i, j));
+        let check_f = |i, j| assert!(!check_domin(&bb_vec, &domin, i, j));
+
+        check_t(0, 1);
+        check_t(0, 2);
+        check_t(0, 3);
+        check_t(0, 4);
+
+        check_t(1, 2);
+        check_t(1, 3);
+        check_t(1, 4);
+
+        check_f(2, 4);
+        check_f(2, 3);
+
+        check_f(3, 4);
+
+        check_f(4, 0);
+        check_f(4, 1);
+    }
 }
