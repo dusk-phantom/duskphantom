@@ -770,7 +770,7 @@ impl IRBuilder {
                 .ok_or(anyhow!("iftrue get error",))
                 .with_context(|| context!())?;
 
-            let label = Self::label_name_from(&succ);
+            let label = Self::label_name_from(succ);
 
             br_insts.push(Inst::Jmp(JmpInst::new(label.into())))
         }
