@@ -156,7 +156,7 @@ impl IRBuilder {
     ) -> Result<Operand> {
         match operand {
             middle::ir::Operand::Constant(con) => Self::const_from(con),
-            middle::ir::Operand::Parameter(param) => Self::parameter_from(param, regs),
+            middle::ir::Operand::Parameter(param) => Self::parameter_from(param, regs), // 参数实际上都是 Reg
             middle::ir::Operand::Instruction(instr) => Self::local_var_from(instr, regs),
             middle::ir::Operand::Global(glo) => Err(anyhow!(
                 "local_operand_from operand cann't not be global:{}",
