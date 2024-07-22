@@ -334,7 +334,7 @@ impl IRBuilder {
         //     blocks.push(m_bb);
         // }
         // Ok(blocks)
-        func.dfs_iter()
+        func.bfs_iter()
             .skip(1)
             .map(|ptr_bb| {
                 Self::build_bb(
