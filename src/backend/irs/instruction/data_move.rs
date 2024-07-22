@@ -74,6 +74,7 @@ impl StoreInst {
 }
 
 impl LoadInst {
+    /// new a load inst,default mem_size is four byte
     pub fn new(dst: Reg, src: StackSlot) -> Self {
         Self {
             dst,
