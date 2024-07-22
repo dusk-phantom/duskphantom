@@ -235,6 +235,10 @@ impl GenTool {
             .as_str(),
         );
         ret.push_str(format!("{0}:\n", name).as_str());
+        if init.is_empty() {
+            ret.push_str(&Self::gen_zero_fill(num_elems * size_elem as usize));
+            return ret;
+        }
         let mut init: Vec<&(usize, T)> = init.iter().collect();
         init.sort_by(|(idx1, _), (idx2, _)| idx1.cmp(idx2));
         for (index, (idx, val)) in init.iter().enumerate() {
@@ -437,6 +441,16 @@ hello:
 .zero\t28";
         assert_eq!(s, raw_match);
     }
+
+    #[test]
+    fn test_gen_empty_array() {
+        let s = GenTool::gen_array::<u32>("arr", 2, &[]);
+        assert_eq!(
+            s,
+            ".data\n.align\t3\n.globl\tarr\n.type\tarr, @object\n.size\tarr, 8\narr:\n.zero\t8"
+        );
+    }
+
     #[test]
     fn test_gen_dword_arr() {
         let s = super::GenTool::gen_array::<u64>("hello", 10, &[(0, 1), (1, 2), (2, 3)]);

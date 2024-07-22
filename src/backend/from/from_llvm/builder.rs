@@ -3,9 +3,9 @@ use super::*;
 
 use anyhow::{Context, Result};
 
-use llvm_ir::{Constant, Name};
+use llvm_ir::Name;
 use std::collections::HashMap;
-use var::{FloatVar, Var};
+use var::FloatVar;
 
 pub struct IRBuilder;
 
@@ -13,8 +13,6 @@ impl IRBuilder {
     #[cfg(feature = "clang_enabled")]
     #[allow(unused)]
     pub fn gen_from_clang(program: &clang_frontend::Program) -> Result<Program> {
-        use var::FloatVar;
-
         let llvm_module = &program.llvm;
         let mut global_vars = Self::build_global_var(&llvm_module.global_vars)?;
         let mut fmms: HashMap<Fmm, FloatVar> = HashMap::new();
@@ -33,54 +31,6 @@ impl IRBuilder {
             entry: None,
             modules: vec![mdl],
         })
-    }
-
-    pub fn build_global_var(
-        llvm_global_vars: &[llvm_ir::module::GlobalVariable],
-    ) -> Result<Vec<Var>> {
-        let mut global_vars = Vec::new();
-        for global_var in llvm_global_vars {
-            // dbg!(&global_var);
-            let name = &global_var.name.to_string()[1..];
-            if let Some(init) = &global_var.initializer {
-                // dbg!(&init);
-                let c = init.as_ref().to_owned();
-                match c {
-                    Constant::Int { bits: _, value } => {
-                        let var = var::Var::Prim(var::PrimVar::IntVar(var::IntVar {
-                            name: name.to_string(),
-                            init: Some(value as i32),
-                            is_const: false,
-                        }));
-                        global_vars.push(var);
-                    }
-                    Constant::Float(f) => match f {
-                        llvm_ir::constant::Float::Single(f) => {
-                            let var = var::Var::Prim(var::PrimVar::FloatVar(var::FloatVar {
-                                name: name.to_string(),
-                                init: Some(f),
-                                is_const: false,
-                            }));
-                            global_vars.push(var);
-                        }
-                        llvm_ir::constant::Float::Double(_) => {
-                            unimplemented!("double float");
-                            // let var = var::Var::Prim(var::PrimVar::FloatVar(var::FloatVar {
-                            //     name: name.to_string(),
-                            //     init: Some(f),
-                            //     is_const: false,
-                            // }));
-                            // global_vars.push(var);
-                        }
-                        _ => {
-                            unreachable!();
-                        }
-                    },
-                    _ => (),
-                }
-            }
-        }
-        Ok(global_vars)
     }
 
     /**
