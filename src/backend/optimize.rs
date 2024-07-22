@@ -45,17 +45,9 @@ fn available_fregs() -> &'static [Reg; 32] {
 /// # Arguments
 /// * `graph` - the interference graph
 /// # Returns
-/// * `Result<(HashMap<Reg, Reg>, HashSet<Reg>)>` - the mapping from virtual reg to physical reg, and the set of regs that need to be spilled
-/// # Example
-/// ```rust
-/// use std::collections::{HashMap, HashSet};
-/// use backend::optimize::reg_alloc;
-/// use ir::Reg;
-/// use std::iter::FromIterator;
-/// let mut graph: HashMap<Reg, HashSet<Reg>> = HashMap::new();
-/// // ... insert some edges to the graph
-/// let (colors, to_spill) = reg_alloc(&graph).unwrap();
-/// ```
+/// `Result<(colors: HashMap<Reg, Reg>, to_spill: HashSet<Reg>)>`
+/// - colors: the mapping from virtual reg to physical reg
+/// - to_spill: the set of regs that need to be spilled
 ///
 pub fn reg_alloc(graph: &HashMap<Reg, HashSet<Reg>>) -> Result<(HashMap<Reg, Reg>, HashSet<Reg>)> {
     let mut graph_to_simplify = graph.clone();
