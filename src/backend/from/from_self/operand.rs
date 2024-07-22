@@ -14,6 +14,7 @@ use super::*;
 use builder::IRBuilder;
 
 impl IRBuilder {
+    /// 用于生成虚拟寄存器
     pub fn new_var(ty: &middle::ir::ValueType, reg_gener: &mut RegGenerator) -> Result<Reg> {
         let dst_reg = match ty {
             middle::ir::ValueType::Int
@@ -47,8 +48,7 @@ impl IRBuilder {
         })
     }
 
-    /// 找到指令的 output 对应的 reg, 查表 !
-    /// 在这里好像看不出来是 int 还是 float
+    /// 这里的 local_var_from 是不包含函数的形参的
     pub fn local_var_from(
         instr: &ObjPtr<Box<dyn Instruction>>,
         regs: &HashMap<Address, Reg>,
@@ -63,6 +63,7 @@ impl IRBuilder {
             .with_context(|| context!())?;
         Ok((*reg).into())
     }
+
     pub fn const_from(con: &middle::ir::Constant) -> Result<Operand> {
         Ok(match con {
             middle::ir::Constant::Int(val) => Operand::Imm((*val as i64).into()),
@@ -94,8 +95,8 @@ impl IRBuilder {
 
     /// 获取 basic block 的 label
     #[inline]
-    pub fn label_name_from(bb: &ObjPtr<middle::ir::BasicBlock>) -> Result<String> {
-        Ok(format!(".LBB{}", bb.as_ref() as *const _ as Address))
+    pub fn label_name_from(bb: &ObjPtr<middle::ir::BasicBlock>) -> String {
+        format!(".LBB{}", bb.as_ref() as *const _ as Address)
     }
 
     /// 要不是 instruction 的输出, 要不是 constant 要不是 parameter

@@ -284,7 +284,7 @@ impl IRBuilder {
         let dst_reg = Self::new_var(&phi.get_value_type(), reg_gener)?;
         regs.insert(phi as *const _ as Address, dst_reg);
         for (op, bb) in phi.get_incoming_values() {
-            let bb_name = Self::label_name_from(bb)?;
+            let bb_name = Self::label_name_from(bb);
             let Some(insert_backs) = insert_back_for_remove_phi.get_mut(&bb_name) else {
                 let new_insert_back = vec![(op.clone(), dst_reg)];
                 insert_back_for_remove_phi.insert(bb_name.clone(), new_insert_back);
@@ -751,14 +751,14 @@ impl IRBuilder {
                 .ok_or(anyhow!("iftrue get error",))
                 .with_context(|| context!())?;
 
-            let iftrue_label = format!(".LBB{}", iftrue.as_ref() as *const _ as Address);
+            let iftrue_label = Self::label_name_from(iftrue);
 
             let iffalse = succs
                 .get(1)
                 .ok_or(anyhow!("iffalse get error",))
                 .with_context(|| context!())?;
 
-            let iffalse_label = format!(".LBB{}", iffalse.as_ref() as *const _ as Address);
+            let iffalse_label = Self::label_name_from(iffalse);
 
             br_insts.extend(vec![
                 Inst::Beq(BeqInst::new(reg, REG_ZERO, iffalse_label.into())),
@@ -770,7 +770,7 @@ impl IRBuilder {
                 .ok_or(anyhow!("iftrue get error",))
                 .with_context(|| context!())?;
 
-            let label = format!(".LBB{}", succ.as_ref() as *const _ as Address);
+            let label = Self::label_name_from(&succ);
 
             br_insts.push(Inst::Jmp(JmpInst::new(label.into())))
         }
