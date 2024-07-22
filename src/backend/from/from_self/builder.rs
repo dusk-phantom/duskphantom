@@ -354,7 +354,7 @@ impl IRBuilder {
         insert_back_for_remove_phi: &mut HashMap<String, Vec<(middle::ir::Operand, Reg)>>,
     ) -> Result<Block> {
         // basic 的 label 注意一下
-        let label = format!(".LBB{}", bb.as_ref() as *const _ as Address);
+        let label = Self::label_name_from(bb);
         let mut m_bb = Block::new(label);
         for inst in bb.iter() {
             let gen_insts = Self::build_instruction(
@@ -446,7 +446,7 @@ impl IRBuilder {
         }
 
         /* ---------- 后端的 entry bb ---------- */
-        let label = format!(".LBB{}", bb.as_ref() as *const _ as Address);
+        let label = Self::label_name_from(&bb);
         let mut entry = Block::new(label);
         entry.extend_insts(insts);
         let caller_regs_stack = usize::try_from(caller_regs_stack)?;
