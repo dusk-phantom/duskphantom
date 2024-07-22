@@ -89,28 +89,19 @@ impl IRBuilder {
             }
             middle::ir::instruction::InstType::Sub => {
                 // ssa2tac_three_usual!(SubInst, Sub, inst, regs, reg_gener)
+                let mut insts = Vec::new();
                 let sub = downcast_ref::<middle::ir::instruction::binary_inst::Sub>(
                     inst.as_ref().as_ref(),
                 );
-                let op0 = Self::value_from(sub.get_lhs(), regs)?;
-                let op1 = Self::value_from(sub.get_rhs(), regs)?;
-                if let (Operand::Reg(op0), Operand::Reg(op1)) = (&op0, &op1) {
-                    let dst = reg_gener.gen_virtual_usual_reg();
-                    regs.insert(sub as *const _ as Address, dst);
-                    let sub_inst = SubInst::new(dst.into(), op0.into(), op1.into());
-                    Ok(vec![sub_inst.into()])
-                } else if let (Operand::Reg(op0), Operand::Imm(op1)) = (&op0, &op1) {
-                    let dst = reg_gener.gen_virtual_usual_reg();
-                    regs.insert(sub as *const _ as Address, dst);
-                    let imm: i64 = (*op1).clone().into();
-                    let sub_inst = AddInst::new(dst.into(), op0.into(), (-imm).into());
-                    Ok(vec![sub_inst.into()])
-                }
-                /* llvm ir 中, 不能出现 lhs=<imm>, rhs=<reg> 的情况 */
-                else {
-                    // 不太可能两个都是 Imm
-                    Err(anyhow!("operand type not supported")).with_context(|| context!())
-                }
+                let (op0, prepare) = Self::prepare_lhs(sub.get_lhs(), reg_gener, regs)?;
+                insts.extend(prepare);
+                let (op1, prepare) = Self::prepare_lhs(sub.get_lhs(), reg_gener, regs)?;
+                insts.extend(prepare);
+                let dst = reg_gener.gen_virtual_usual_reg();
+                regs.insert(sub as *const _ as Address, dst);
+                let sub_inst = SubInst::new(dst.into(), op0, op1);
+                insts.push(sub_inst.into());
+                Ok(insts)
             }
             // 通过类型转换，可以做到: FAdd 的输入一定是 Float 类型的寄存器
             middle::ir::instruction::InstType::FSub => {
