@@ -451,10 +451,9 @@ impl IRBuilder {
         let mut ret: Vec<Inst> = Vec::new();
         match val {
             Operand::Imm(imm) => {
-                let dst = reg_gener.gen_virtual_usual_reg(); // 分配一个临时的 dest, 用来存储 imm, 因此 sd reg, stack_slot
-                let li = LiInst::new(dst.into(), imm.into()); // li dst, imm
-                let src = dst;
-                let sd = StoreInst::new(address.try_into()?, src); // sd src, stack_slot
+                let _val = reg_gener.gen_virtual_usual_reg(); // 分配一个临时的 dest, 用来存储 imm, 因此 sd reg, stack_slot
+                let li = LiInst::new(_val.into(), imm.into()); // li dst, imm
+                let sd = StoreInst::new(address.try_into()?, _val); // sd src, stack_slot
                 ret.push(li.into());
                 ret.push(sd.into());
             }
@@ -462,13 +461,17 @@ impl IRBuilder {
                 return Err(anyhow!("store instruction with float value".to_string(),))
                     .with_context(|| context!());
             }
-            // TODO Reg
-            _ => (),
+            Operand::Reg(re) => {
+                let sd = StoreInst::new(address.try_into()?, re); // sd src, stack_slot
+                ret.push(sd.into());
+            }
+            // Operand::StackSlot(_)
+            // Operand::Label(_)
+            _ => todo!(),
         }
         Ok(ret)
     }
 
-    #[allow(unused)]
     pub fn build_load_inst(
         load: &middle::ir::instruction::memory_op_inst::Load,
         stack_slots: &mut HashMap<Address, StackSlot>,
