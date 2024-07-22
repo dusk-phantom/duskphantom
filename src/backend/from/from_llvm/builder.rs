@@ -91,22 +91,33 @@ impl IRBuilder {
         fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<Vec<Func>> {
         let mut funcs = Vec::new();
+        let mut caller_regs_stacks: HashMap<String, u32> = HashMap::new();
         for llvm_func in llvm_funcs {
-            let func = Self::build_func(llvm_func, fmms)?;
+            let (func, caller_regs_stack) = Self::build_func(llvm_func, fmms)?;
+            caller_regs_stacks.insert(func.name().to_string(), caller_regs_stack);
             funcs.push(func);
         }
         // count max_callee_regs_stack
-        Self::prepare_max_callee_regs_stack(&mut funcs);
+        let max_callee_regs_stacks =
+            Self::prepare_max_callee_regs_stack(&mut funcs, &caller_regs_stacks)?;
         // realloc stack slots considering max_callee_regs_stack
-        Self::realloc_stack_slots(&mut funcs);
+        Self::realloc_stack_slots(&mut funcs, &max_callee_regs_stacks)?;
 
         Ok(funcs)
     }
 
+    /// build on-building func from llvm_ir::Function
+    /// # Arguments
+    /// * `llvm_func` - llvm_ir::Function
+    /// * `fmms` - HashMap<Fmm, FloatVar>
+    /// # Returns
+    /// `Result<(f:Func,caller_regs_stack:u32)>`
+    /// - f: the function, which is still on building,not condsidering the max_callee_regs_stack yet
+    /// - caller_regs_stack: the number of regs that the caller function needs to save
     pub fn build_func(
         llvm_func: &llvm_ir::Function,
         fmms: &mut HashMap<Fmm, FloatVar>,
-    ) -> Result<Func> {
+    ) -> Result<(Func, u32)> {
         let args: Vec<String> = llvm_func
             .parameters
             .iter()
@@ -129,7 +140,6 @@ impl IRBuilder {
             &mut insert_back_for_remove_phi,
         )?;
         let mut m_f = Func::new(llvm_func.name.to_string(), args, entry);
-        *m_f.caller_regs_stack_mut() = Some(caller_reg_stack.try_into()?);
 
         let ret_ty = llvm_func.return_type.as_ref();
         if Self::is_ty_float(ret_ty) {
@@ -181,31 +191,35 @@ impl IRBuilder {
         }
 
         *m_f.stack_allocator_mut() = Some(stack_allocator);
-        Ok(m_f)
+        Ok((m_f, caller_reg_stack.try_into()?))
     }
 
-    fn prepare_max_callee_regs_stack(funcs: &mut Vec<Func>) {
-        let name_func: HashMap<String, u32> = funcs
-            .iter()
-            .map(|f| (f.name().to_string(), f.caller_regs_stack()))
-            .collect();
+    fn prepare_max_callee_regs_stack(
+        funcs: &mut Vec<Func>,
+        caller_regs_stacks: &HashMap<String, u32>,
+    ) -> Result<HashMap<String, u32>> {
+        let mut max_callee_regs_stacks: HashMap<String, u32> = HashMap::new();
         for f in funcs {
             let mut max_callee_regs_stack = 0;
             for bb in f.iter_bbs() {
                 for inst in bb.insts() {
                     if let Inst::Call(c) = inst {
                         let callee_regs_stack =
-                            *name_func.get(c.func_name().as_str()).unwrap_or(&0);
+                            *caller_regs_stacks.get(c.func_name().as_str()).unwrap_or(&0);
                         max_callee_regs_stack =
                             std::cmp::max(max_callee_regs_stack, callee_regs_stack);
                     }
                 }
             }
-            *f.max_callee_regs_stack_mut() = Some(max_callee_regs_stack);
+            max_callee_regs_stacks.insert(f.name().to_string(), max_callee_regs_stack);
         }
+        Ok(max_callee_regs_stacks)
     }
 
-    fn realloc_stack_slots(funcs: &mut Vec<Func>) {
+    fn realloc_stack_slots(
+        funcs: &mut Vec<Func>,
+        max_callee_regs_stacks: &HashMap<String, u32>,
+    ) -> Result<()> {
         for f in funcs {
             let mut old_stack_slots: HashMap<StackSlot, usize> = HashMap::new();
             let mut new_stack_allocator = StackAllocator::new();
@@ -222,7 +236,7 @@ impl IRBuilder {
                     old_stack_slots.insert(stack_slot, new_times);
                 }
             }
-            let max_callee_regs_need = f.max_callee_regs_stack();
+            let max_callee_regs_need = *max_callee_regs_stacks.get(f.name()).unwrap_or(&0);
             new_stack_allocator.alloc(max_callee_regs_need);
             let mut old_stack_slots: Vec<(StackSlot, usize)> =
                 old_stack_slots.into_iter().collect();
@@ -253,11 +267,21 @@ impl IRBuilder {
                 for inst in bb.insts_mut() {
                     match inst {
                         Inst::Load(load) => {
-                            let new_ss = new_stack_slots.get(load.src()).unwrap();
+                            let new_ss = new_stack_slots
+                                .get(load.src())
+                                .ok_or_else(|| {
+                                    anyhow!("not found mapping of stack slot {:?} ", load.src())
+                                })
+                                .with_context(|| context!())?;
                             *load.src_mut() = *new_ss;
                         }
                         Inst::Store(store) => {
-                            let new_ss = new_stack_slots.get(store.dst()).unwrap();
+                            let new_ss = new_stack_slots
+                                .get(store.dst())
+                                .ok_or_else(|| {
+                                    anyhow!("not found mapping of stack slot {:?} ", store.dst())
+                                })
+                                .with_context(|| context!())?;
                             *store.dst_mut() = *new_ss;
                         }
                         _ => {
@@ -269,6 +293,7 @@ impl IRBuilder {
 
             f.stack_allocator_mut().replace(new_stack_allocator);
         }
+        Ok(())
     }
 
     fn build_entry(

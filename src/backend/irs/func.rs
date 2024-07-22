@@ -74,15 +74,19 @@ impl Func {
         &mut self.ret
     }
 
+    #[deprecated(note = "not used anymore")]
     pub fn caller_regs_stack(&self) -> u32 {
         self.caller_regs_stack.unwrap_or(0)
     }
+    #[deprecated(note = "not used anymore")]
     pub fn caller_regs_stack_mut(&mut self) -> &mut Option<u32> {
         &mut self.caller_regs_stack
     }
+    #[deprecated(note = "not used anymore")]
     pub fn max_callee_regs_stack(&self) -> u32 {
         self.max_callee_regs_stack.unwrap_or(0)
     }
+    #[deprecated(note = "not used anymore")]
     pub fn max_callee_regs_stack_mut(&mut self) -> &mut Option<u32> {
         &mut self.max_callee_regs_stack
     }
