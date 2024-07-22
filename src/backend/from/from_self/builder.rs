@@ -132,6 +132,7 @@ impl IRBuilder {
             funcs.push(func);
         }
         Self::prepare_max_callee_regs_stack(&mut funcs);
+        Self::realloc_stack_slots(&mut funcs);
         Ok(funcs)
     }
 
@@ -245,6 +246,73 @@ impl IRBuilder {
         }
     }
 
+    fn realloc_stack_slots(funcs: &mut Vec<Func>) {
+        for f in funcs {
+            let mut old_stack_slots: HashMap<StackSlot, usize> = HashMap::new();
+            let mut new_stack_allocator = StackAllocator::new();
+            // 统计 slot 的使用次数
+            for bb in f.iter_bbs() {
+                for inst in bb.insts() {
+                    let stack_slot = match inst {
+                        Inst::Load(load) => *load.src(),
+                        Inst::Store(store) => *store.dst(),
+                        _ => {
+                            continue;
+                        }
+                    };
+                    let new_times = old_stack_slots.get(&stack_slot).unwrap_or(&0) + 1;
+                    old_stack_slots.insert(stack_slot, new_times);
+                }
+            }
+            let max_callee_regs_need = f.max_callee_regs_stack();
+            new_stack_allocator.alloc(max_callee_regs_need);
+            let mut old_stack_slots: Vec<(StackSlot, usize)> =
+                old_stack_slots.into_iter().collect();
+            old_stack_slots.sort_by(|a, b| a.1.cmp(&b.1)); // 按照 times 排序
+
+            let order_stack_slots = |old_stack_slots: Vec<(StackSlot, usize)>| {
+                let mut left_sss: Vec<StackSlot> = Vec::new();
+                let mut right_sss: Vec<StackSlot> = Vec::new();
+                for (idx, (ss, _)) in old_stack_slots.iter().rev().enumerate() {
+                    if idx % 2 == 0 {
+                        left_sss.push(*ss);
+                    } else {
+                        right_sss.push(*ss);
+                    }
+                }
+                left_sss.extend(right_sss.iter().rev());
+                left_sss
+            };
+            let ordered_stack_slots = order_stack_slots(old_stack_slots);
+
+            let mut new_stack_slots: HashMap<StackSlot, StackSlot> = HashMap::new();
+            for ss in ordered_stack_slots {
+                let new_ss = new_stack_allocator.alloc(ss.size());
+                new_stack_slots.insert(ss, new_ss);
+            }
+
+            for bb in f.iter_bbs_mut() {
+                for inst in bb.insts_mut() {
+                    match inst {
+                        Inst::Load(load) => {
+                            let new_ss = new_stack_slots.get(load.src()).unwrap();
+                            *load.src_mut() = *new_ss;
+                        }
+                        Inst::Store(store) => {
+                            let new_ss = new_stack_slots.get(store.dst()).unwrap();
+                            *store.dst_mut() = *new_ss;
+                        }
+                        _ => {
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            f.stack_allocator_mut().replace(new_stack_allocator);
+        }
+    }
+
     fn build_other_bbs(
         func: &middle::ir::Function,
         stack_allocator: &mut StackAllocator,
@@ -316,16 +384,19 @@ impl IRBuilder {
         fmms: &mut HashMap<Fmm, FloatVar>,
         insert_back_for_remove_phi: &mut HashMap<String, Vec<(middle::ir::Operand, Reg)>>,
     ) -> Result<(Block, usize)> {
+        /* ---------- 初始化 ---------- */
         let mut insts: Vec<Inst> = Vec::new();
 
+        /* ---------- 函数形参 ---------- */
         let mut caller_regs_stack = 0;
         let mut float_idx = 0;
         let mut usual_idx = 0;
-
-        // 处理函数的形参
         for param in func.params.iter() {
             let is_usual: bool = match &param.value_type {
-                // 返回生成的 虚拟寄存器
+                middle::ir::ValueType::Float => false,
+                middle::ir::ValueType::Pointer(_)
+                | middle::ir::ValueType::Bool
+                | middle::ir::ValueType::Int => true,
                 middle::ir::ValueType::Void => {
                     return Err(anyhow!(
                         "it is impossible to receive void-type parameter: {}",
@@ -335,16 +406,10 @@ impl IRBuilder {
                 middle::ir::ValueType::Array(_, _) => {
                     return Err(anyhow!("array should be pointer {}", param))
                 }
-                middle::ir::ValueType::Float => false,
-                middle::ir::ValueType::Pointer(_)
-                | middle::ir::ValueType::SignedChar
-                | middle::ir::ValueType::Bool
-                | middle::ir::ValueType::Int => true,
+                middle::ir::ValueType::SignedChar => todo!(),
             };
-
             let v_reg = reg_gener.gen_virtual_reg(is_usual);
             regs.insert(param.as_ref() as *const _ as Address, v_reg); // 参数绑定寄存器
-
             if is_usual && usual_idx <= 7 {
                 let a_reg = Reg::new(REG_A0.id() + usual_idx, is_usual);
                 let mv = MvInst::new(v_reg.into(), a_reg.into());
@@ -357,9 +422,6 @@ impl IRBuilder {
                 insts.push(mv.into()); // TODO 但是 mv 指令可能有点问题, mv 是伪指令, 能不能 mv float, float ?
                 float_idx += 1;
             }
-
-            //  参数多了的情况
-
             if (is_usual && usual_idx > 7) || (!is_usual && float_idx > 7) {
                 let ld_inst = LdInst::new(v_reg, caller_regs_stack.into(), REG_S0);
                 insts.push(ld_inst.into());
@@ -367,6 +429,7 @@ impl IRBuilder {
             }
         }
 
+        /* ---------- 指令选择 ---------- */
         let bb = func.entry.with_context(|| context!())?;
         for inst in bb.iter() {
             let gen_insts = Self::build_instruction(
@@ -381,14 +444,8 @@ impl IRBuilder {
             .with_context(|| context!())?;
             insts.extend(gen_insts);
         }
-        // // 上面 bb.iter 会包含这个 term_inst
-        // insts.extend(Self::build_term_inst(
-        //     &bb.get_last_inst(),
-        //     regs,
-        //     reg_gener,
-        //     fmms,
-        // )?);
 
+        /* ---------- 后端的 entry bb ---------- */
         let label = format!(".LBB{}", bb.as_ref() as *const _ as Address);
         let mut entry = Block::new(label);
         entry.extend_insts(insts);
