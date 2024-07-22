@@ -7,6 +7,15 @@ pub enum MemSize {
     FourByte,
     EightByte,
 }
+impl MemSize {
+    pub fn num_byte(&self) -> u32 {
+        match self {
+            MemSize::FourByte => 4,
+            MemSize::EightByte => 8,
+        }
+    }
+}
+
 fn new_addr(ss: &StackSlot, stack_size: u32) -> (Imm, Reg) {
     if ss.start() > stack_size >> 1 {
         (ss.start().into(), REG_SP)
