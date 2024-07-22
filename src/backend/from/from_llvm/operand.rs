@@ -178,6 +178,25 @@ impl IRBuilder {
             _ => Err(anyhow!("operand is not local var:{}", operand)).with_context(|| context!()),
         }
     }
+    #[inline]
+    pub fn mem_size_from(ty: &llvm_ir::Type) -> Result<MemSize> {
+        match ty {
+            llvm_ir::Type::IntegerType { bits: 8 } => unimplemented!(),
+            llvm_ir::Type::IntegerType { bits: 16 } => unimplemented!(),
+            llvm_ir::Type::IntegerType { bits: 32 } => Ok(MemSize::FourByte),
+            llvm_ir::Type::IntegerType { bits: 64 } => Ok(MemSize::EightByte),
+            llvm_ir::Type::FPType(f) => match f {
+                llvm_ir::types::FPType::Half => todo!(),
+                llvm_ir::types::FPType::BFloat => todo!(),
+                llvm_ir::types::FPType::Single => Ok(MemSize::FourByte),
+                llvm_ir::types::FPType::Double => Ok(MemSize::EightByte),
+                llvm_ir::types::FPType::FP128 => todo!(),
+                llvm_ir::types::FPType::X86_FP80 => todo!(),
+                llvm_ir::types::FPType::PPC_FP128 => todo!(),
+            },
+            _ => Err(anyhow!("mem size not supported").context(context!())),
+        }
+    }
 
     #[inline]
     pub fn global_name_from(operand: &llvm_ir::Operand) -> Result<String> {

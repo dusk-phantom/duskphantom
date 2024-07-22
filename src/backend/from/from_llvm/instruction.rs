@@ -392,19 +392,26 @@ impl IRBuilder {
             unimplemented!();
         }
         let dst_reg = Self::new_var(&load.loaded_ty, reg_gener)?;
+        let dst_size = Self::mem_size_from(&load.loaded_ty)?;
         regs.insert(load.dest.clone(), dst_reg);
         let address = Self::address_from(&load.address, stack_slots)?;
         match address {
             Operand::StackSlot(stack_slot) => {
-                let ld = LoadInst::new(dst_reg, stack_slot);
+                let ld = match dst_size {
+                    MemSize::FourByte => LoadInst::new(dst_reg, stack_slot),
+                    MemSize::EightByte => LoadInst::new(dst_reg, stack_slot).with_8byte(),
+                };
                 ret.push(ld.into());
             }
             Operand::Label(var) => {
                 let addr = reg_gener.gen_virtual_usual_reg();
                 let lla = LlaInst::new(addr, var);
                 ret.push(lla.into());
-                let lw = LwInst::new(dst_reg, 0.into(), addr);
-                ret.push(lw.into());
+                let load: Inst = match dst_size {
+                    MemSize::FourByte => LwInst::new(dst_reg, 0.into(), addr).into(),
+                    MemSize::EightByte => LdInst::new(dst_reg, 0.into(), addr).into(),
+                };
+                ret.push(load);
             }
             _ => {
                 return Err(anyhow!(
