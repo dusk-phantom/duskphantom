@@ -10,6 +10,16 @@ use crate::utils::mem::ObjPtr;
 pub struct IRBuilder;
 
 impl IRBuilder {
+    pub fn new_var(ty: &middle::ir::ValueType, reg_gener: &mut RegGenerator) -> Result<Reg> {
+        let dst_reg = match ty {
+            middle::ir::ValueType::Int
+            | middle::ir::ValueType::Bool
+            | middle::ir::ValueType::Pointer(_) => reg_gener.gen_virtual_usual_reg(),
+            middle::ir::ValueType::Float => reg_gener.gen_virtual_float_reg(),
+            _ => return Err(anyhow!("phi can't be void/array")).with_context(|| context!()),
+        };
+        Ok(dst_reg)
+    }
     pub fn gen_from_self(program: &middle::Program) -> Result<Program> {
         let self_module = &program.module;
         // dbg!(&llvm.types);
@@ -127,63 +137,110 @@ impl IRBuilder {
         Ok(global_vars)
     }
 
+    #[allow(unused)]
     pub fn build_funcs(
         self_funcs: &Vec<middle::ir::FunPtr>,
         fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<Vec<Func>> {
-        let mut funcs = Vec::new();
-        for fu in self_funcs {
-            // dbg!(&f);
-            let args: Vec<String> = fu.params.iter().map(|p| p.name.to_string()).collect();
-            let mut reg_gener = RegGenerator::new(); // 一个 func 绑定一个 reg_gener
-            let mut regs: HashMap<Address, Reg> = HashMap::new();
-            let mut stack_allocator = StackAllocator::new();
-            let mut stack_slots: HashMap<Address, StackSlot> = HashMap::new();
-            let (entry, caller_reg_stack) = Self::build_entry(
-                fu,
-                &mut stack_allocator,
-                &mut stack_slots,
-                &mut reg_gener,
-                &mut regs,
-                fmms,
-            )?;
-            let mut m_f = Func::new(fu.name.to_string(), args, entry);
-            // 设置 def-use
-            match &fu.return_type {
-                middle::ir::ValueType::Void => { /* do nothing */ }
-                middle::ir::ValueType::Int
-                | middle::ir::ValueType::SignedChar
-                | middle::ir::ValueType::Bool
-                | middle::ir::ValueType::Pointer(_) /* 返回指针是 UB */ => {
-                    m_f.ret_mut().replace(REG_A0);
-                }
-                middle::ir::ValueType::Float => {
-                    m_f.ret_mut().replace(REG_FA0);
-                }
-                middle::ir::ValueType::Array(_, _) => todo!(),
+        let _ = self_funcs;
+        todo!()
+    }
+
+    pub fn build_func(
+        self_func: &middle::ir::FunPtr,
+        fmms: &mut HashMap<Fmm, FloatVar>,
+    ) -> Result<Func> {
+        let args: Vec<_> = self_func
+            .params
+            .iter()
+            .map(|p| p.name.to_string())
+            .collect();
+
+        let mut insert_back_for_remove_phi = HashMap::new();
+        let mut reg_gener = RegGenerator::new();
+        let mut regs: HashMap<Address, Reg> = HashMap::new();
+        let mut stack_allocator = StackAllocator::new();
+        let mut stack_slots: HashMap<Address, StackSlot> = HashMap::new();
+
+        // entry
+        let (entry, caller_reg_stack) = Self::build_entry(
+            self_func,
+            &mut stack_allocator,
+            &mut stack_slots,
+            &mut reg_gener,
+            &mut regs,
+            fmms,
+            &mut insert_back_for_remove_phi,
+        )?;
+
+        let mut m_f = Func::new(self_func.name.to_string(), args, entry);
+
+        match &self_func.return_type {
+            middle::ir::ValueType::Void => { /* do nothing */ }
+            middle::ir::ValueType::Int
+            | middle::ir::ValueType::Bool
+            | middle::ir::ValueType::Pointer(_) => {
+                m_f.ret_mut().replace(REG_A0);
             }
-            *m_f.caller_regs_stack_mut() = Some(caller_reg_stack.try_into()?);
-            for bb in Self::build_other_bbs(
-                fu,
-                &mut stack_allocator,
-                &mut stack_slots,
-                &mut reg_gener,
-                &mut regs,
-                fmms,
-            )? {
-                m_f.push_bb(bb);
+            middle::ir::ValueType::Float => {
+                m_f.ret_mut().replace(REG_FA0);
             }
-            *m_f.stack_allocator_mut() = Some(stack_allocator);
-            funcs.push(m_f);
+            middle::ir::ValueType::Array(_, _) => todo!(),
+            _ => todo!(),
         }
 
-        // 看一个函数，他里面的所有的调用
+        *m_f.caller_regs_stack_mut() = Some(caller_reg_stack.try_into()?);
+        for bb in Self::build_other_bbs(
+            self_func,
+            &mut stack_allocator,
+            &mut stack_slots,
+            &mut reg_gener,
+            &mut regs,
+            fmms,
+            &mut insert_back_for_remove_phi,
+        )? {
+            m_f.push_bb(bb);
+        }
+
+        // insert back to bbs to process phi
+        let mut bbs_mut = m_f
+            .iter_bbs_mut()
+            .map(|bb| (bb.label().to_string(), bb))
+            .collect::<HashMap<String, &mut Block>>();
+        for (bb_name, insert_back) in insert_back_for_remove_phi {
+            let bb = bbs_mut
+                .get_mut(&bb_name)
+                .ok_or(anyhow!("").context(context!()))?;
+            for (from, phi_dst) in insert_back {
+                let from = Self::value_from(&from, &regs)?;
+                match from {
+                    Operand::Reg(_) => {
+                        let mv = MvInst::new(phi_dst.into(), from);
+                        bb.insert_before_term(mv.into())?;
+                    }
+                    Operand::Imm(_) => {
+                        let li = LiInst::new(phi_dst.into(), from);
+                        bb.insert_before_term(li.into())?;
+                    }
+                    _ => unimplemented!(),
+                }
+            }
+        }
+
+        *m_f.stack_allocator_mut() = Some(stack_allocator);
+        Ok(m_f)
+    }
+
+    /// caller_regs_stack 是在 build 单个 func 的时候确定的
+    /// 这里一定要放在 build_funcs 之后, 因为这个时候，所有的函数的 caller_regs_stack 才会被计算好
+    #[allow(unused)]
+    fn prepare_max_callee_regs_stack(funcs: &mut Vec<Func>) {
         let name_func: HashMap<String, u32> = funcs
             .iter()
             .map(|f| (f.name().to_string(), f.caller_regs_stack()))
             .collect();
 
-        for f in &mut funcs {
+        for f in funcs {
             let mut max_callee_regs_stack = 0;
             for bb in f.iter_bbs() {
                 for inst in bb.insts() {
@@ -196,8 +253,6 @@ impl IRBuilder {
             }
             *f.max_callee_regs_stack_mut() = Some(max_callee_regs_stack);
         }
-
-        Ok(funcs)
     }
 
     fn build_other_bbs(
@@ -207,6 +262,7 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
         fmms: &mut HashMap<Fmm, FloatVar>,
+        insert_back_for_remove_phi: &mut HashMap<String, Vec<(middle::ir::Operand, Reg)>>,
     ) -> Result<Vec<Block>> {
         // let mut blocks: Vec<Block> = Vec::new();
         // for ptr_bb in f.dfs_iter() {
@@ -217,7 +273,15 @@ impl IRBuilder {
         func.dfs_iter()
             .skip(1)
             .map(|ptr_bb| {
-                Self::build_bb(&ptr_bb, stack_allocator, stack_slots, reg_gener, regs, fmms)
+                Self::build_bb(
+                    &ptr_bb,
+                    stack_allocator,
+                    stack_slots,
+                    reg_gener,
+                    regs,
+                    fmms,
+                    insert_back_for_remove_phi,
+                )
             })
             .collect()
     }
@@ -229,14 +293,22 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
         fmms: &mut HashMap<Fmm, FloatVar>,
+        insert_back_for_remove_phi: &mut HashMap<String, Vec<(middle::ir::Operand, Reg)>>,
     ) -> Result<Block> {
         // basic 的 label 注意一下
-        let label = format!(".l{}", bb.as_ref() as *const _ as Address);
+        let label = format!(".LBB{}", bb.as_ref() as *const _ as Address);
         let mut m_bb = Block::new(label);
         for inst in bb.iter() {
-            let gen_insts =
-                Self::build_instruction(&inst, stack_allocator, stack_slots, reg_gener, regs, fmms)
-                    .with_context(|| context!())?;
+            let gen_insts = Self::build_instruction(
+                &inst,
+                stack_allocator,
+                stack_slots,
+                reg_gener,
+                regs,
+                fmms,
+                insert_back_for_remove_phi,
+            )
+            .with_context(|| context!())?;
             m_bb.extend_insts(gen_insts);
         }
         // let gen_insts = Self::build_term_inst(&bb.get_last_inst(), regs, reg_gener, fmms)
@@ -252,6 +324,7 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
         fmms: &mut HashMap<Fmm, FloatVar>,
+        insert_back_for_remove_phi: &mut HashMap<String, Vec<(middle::ir::Operand, Reg)>>,
     ) -> Result<(Block, usize)> {
         let mut insts: Vec<Inst> = Vec::new();
 
@@ -306,9 +379,16 @@ impl IRBuilder {
 
         let bb = func.entry.with_context(|| context!())?;
         for inst in bb.iter() {
-            let gen_insts =
-                Self::build_instruction(&inst, stack_allocator, stack_slots, reg_gener, regs, fmms)
-                    .with_context(|| context!())?;
+            let gen_insts = Self::build_instruction(
+                &inst,
+                stack_allocator,
+                stack_slots,
+                reg_gener,
+                regs,
+                fmms,
+                insert_back_for_remove_phi,
+            )
+            .with_context(|| context!())?;
             insts.extend(gen_insts);
         }
         // // 上面 bb.iter 会包含这个 term_inst
@@ -319,7 +399,7 @@ impl IRBuilder {
         //     fmms,
         // )?);
 
-        let label = format!(".l{}", bb.as_ref() as *const _ as Address);
+        let label = format!(".LBB{}", bb.as_ref() as *const _ as Address);
         let mut entry = Block::new(label);
         entry.extend_insts(insts);
         let caller_regs_stack = usize::try_from(caller_regs_stack)?;

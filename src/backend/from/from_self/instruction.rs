@@ -22,6 +22,7 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
         fmms: &mut HashMap<Fmm, FloatVar>,
+        insert_back_for_remove_phi: &mut HashMap<String, Vec<(middle::ir::Operand, Reg)>>,
     ) -> Result<Vec<Inst>> {
         match inst.get_type() {
             middle::ir::instruction::InstType::Head => {
@@ -78,8 +79,8 @@ impl IRBuilder {
                         _ => Err(anyhow!("operand type not supported")).with_context(|| context!()),
                     }
                 };
-                let op0 = get_reg(Self::local_operand_from(fadd.get_lhs(), regs)?)?;
-                let op1 = get_reg(Self::local_operand_from(fadd.get_rhs(), regs)?)?;
+                let op0 = get_reg(Self::value_from(fadd.get_lhs(), regs)?)?;
+                let op1 = get_reg(Self::value_from(fadd.get_rhs(), regs)?)?;
                 let dst0 = reg_gener.gen_virtual_float_reg();
                 let add_inst = AddInst::new(dst0.into(), op0.into(), op1.into());
                 regs.insert(fadd as *const _ as Address, dst0);
@@ -91,8 +92,8 @@ impl IRBuilder {
                 let sub = downcast_ref::<middle::ir::instruction::binary_inst::Sub>(
                     inst.as_ref().as_ref(),
                 );
-                let op0 = Self::local_operand_from(sub.get_lhs(), regs)?;
-                let op1 = Self::local_operand_from(sub.get_rhs(), regs)?;
+                let op0 = Self::value_from(sub.get_lhs(), regs)?;
+                let op1 = Self::value_from(sub.get_rhs(), regs)?;
                 if let (Operand::Reg(op0), Operand::Reg(op1)) = (&op0, &op1) {
                     let dst = reg_gener.gen_virtual_usual_reg();
                     regs.insert(sub as *const _ as Address, dst);
@@ -121,8 +122,8 @@ impl IRBuilder {
                 let mul = downcast_ref::<middle::ir::instruction::binary_inst::Mul>(
                     inst.as_ref().as_ref(),
                 );
-                let op0 = Self::local_operand_from(mul.get_lhs(), regs)?;
-                let op1 = Self::local_operand_from(mul.get_rhs(), regs)?;
+                let op0 = Self::value_from(mul.get_lhs(), regs)?;
+                let op1 = Self::value_from(mul.get_rhs(), regs)?;
                 if let (Operand::Reg(op0), Operand::Reg(op1)) = (&op0, &op1) {
                     let dst = reg_gener.gen_virtual_usual_reg();
                     regs.insert(mul as *const _ as Address, dst);
@@ -151,8 +152,8 @@ impl IRBuilder {
                 let div = downcast_ref::<middle::ir::instruction::binary_inst::SDiv>(
                     inst.as_ref().as_ref(),
                 );
-                let op0 = Self::local_operand_from(div.get_lhs(), regs)?;
-                let op1 = Self::local_operand_from(div.get_rhs(), regs)?;
+                let op0 = Self::value_from(div.get_lhs(), regs)?;
+                let op1 = Self::value_from(div.get_rhs(), regs)?;
                 if let (Operand::Reg(op0), Operand::Reg(op1)) = (&op0, &op1) {
                     let dst = reg_gener.gen_virtual_usual_reg();
                     regs.insert(div as *const _ as Address, dst);
@@ -229,8 +230,7 @@ impl IRBuilder {
                 let itofp = downcast_ref::<middle::ir::instruction::extend_inst::ItoFp>(
                     inst.as_ref().as_ref(),
                 );
-                let src =
-                    Self::local_operand_from(itofp.get_src(), regs).with_context(|| context!())?;
+                let src = Self::value_from(itofp.get_src(), regs).with_context(|| context!())?;
                 let dst = reg_gener.gen_virtual_float_reg();
                 let fcvtsw = I2fInst::new(dst.into(), src); // FIXME 不过我对这里有点疑惑: 中端会不会给浮点型立即数, 然后浮点型立即数实际上也需要特殊处理
                 regs.insert(itofp as *const _ as Address, dst);
@@ -240,8 +240,7 @@ impl IRBuilder {
                 let fptoi = downcast_ref::<middle::ir::instruction::extend_inst::FpToI>(
                     inst.as_ref().as_ref(),
                 );
-                let src =
-                    Self::local_operand_from(fptoi.get_src(), regs).with_context(|| context!())?;
+                let src = Self::value_from(fptoi.get_src(), regs).with_context(|| context!())?;
                 let dst = reg_gener.gen_virtual_usual_reg();
                 let fcvtws = I2fInst::new(dst.into(), src); //
                 regs.insert(fptoi as *const _ as Address, dst);
@@ -254,7 +253,11 @@ impl IRBuilder {
                 Self::build_icmp_inst(icmp, reg_gener, regs)
             }
             middle::ir::instruction::InstType::FCmp => todo!(),
-            middle::ir::instruction::InstType::Phi => todo!(),
+            middle::ir::instruction::InstType::Phi => {
+                let phi =
+                    downcast_ref::<middle::ir::instruction::misc_inst::Phi>(inst.as_ref().as_ref());
+                Self::build_phi_inst(phi, reg_gener, regs, insert_back_for_remove_phi)
+            }
             middle::ir::instruction::InstType::Call => {
                 let call = downcast_ref::<middle::ir::instruction::misc_inst::Call>(
                     inst.as_ref().as_ref(),
@@ -271,6 +274,27 @@ impl IRBuilder {
     // ) -> Result<Vec<Inst>> {
     //     todo!()
     // }
+
+    fn build_phi_inst(
+        phi: &middle::ir::instruction::misc_inst::Phi,
+        reg_gener: &mut RegGenerator,
+        regs: &mut HashMap<Address, Reg>,
+        insert_back_for_remove_phi: &mut HashMap<String, Vec<(middle::ir::Operand, Reg)>>,
+    ) -> Result<Vec<Inst>> {
+        let dst_reg = Self::new_var(&phi.get_value_type(), reg_gener)?;
+        regs.insert(phi as *const _ as Address, dst_reg);
+        for (op, bb) in phi.get_incoming_values() {
+            let bb_name = Self::label_name_from(bb)?;
+            let Some(insert_backs) = insert_back_for_remove_phi.get_mut(&bb_name) else {
+                let new_insert_back = vec![(op.clone(), dst_reg)];
+                insert_back_for_remove_phi.insert(bb_name.clone(), new_insert_back);
+                continue;
+            };
+            insert_backs.push((op.clone(), dst_reg));
+        }
+        // insert_back_for_remove_phi.insert(phi.dest.clone(), phi_regs);
+        Ok(vec![])
+    }
 
     #[allow(unused)]
     fn build_zext_inst(
@@ -293,8 +317,8 @@ impl IRBuilder {
     ) -> Result<Vec<Inst>> {
         // let mut ret = Vec::new();
         let dest: Address = icmp as *const _ as Address;
-        let op0 = Self::local_operand_from(icmp.get_lhs(), regs).with_context(|| context!())?;
-        let op1 = Self::local_operand_from(icmp.get_rhs(), regs).with_context(|| context!())?;
+        let op0 = Self::value_from(icmp.get_lhs(), regs).with_context(|| context!())?;
+        let op1 = Self::value_from(icmp.get_rhs(), regs).with_context(|| context!())?;
         match icmp.op {
             middle::ir::instruction::misc_inst::ICmpOp::Eq => {
                 if let (Operand::Reg(reg0), Operand::Reg(reg1)) = (&op0, &op1) {
@@ -466,7 +490,7 @@ impl IRBuilder {
         // address 这个地址是 stack 上的地址
         let address = Self::stack_slot_from(address, stack_slots).with_context(|| context!())?;
         let val = &store.get_value();
-        let val = Self::local_operand_from(val, regs).with_context(|| context!())?;
+        let val = Self::value_from(val, regs).with_context(|| context!())?;
         let mut ret: Vec<Inst> = Vec::new();
         match val {
             Operand::Imm(imm) => {
@@ -727,14 +751,14 @@ impl IRBuilder {
                 .ok_or(anyhow!("iftrue get error",))
                 .with_context(|| context!())?;
 
-            let iftrue_label = format!(".l{}", iftrue.as_ref() as *const _ as Address);
+            let iftrue_label = format!(".LBB{}", iftrue.as_ref() as *const _ as Address);
 
             let iffalse = succs
                 .get(1)
                 .ok_or(anyhow!("iffalse get error",))
                 .with_context(|| context!())?;
 
-            let iffalse_label = format!(".l{}", iffalse.as_ref() as *const _ as Address);
+            let iffalse_label = format!(".LBB{}", iffalse.as_ref() as *const _ as Address);
 
             br_insts.extend(vec![
                 Inst::Beq(BeqInst::new(reg, REG_ZERO, iffalse_label.into())),
@@ -746,7 +770,7 @@ impl IRBuilder {
                 .ok_or(anyhow!("iftrue get error",))
                 .with_context(|| context!())?;
 
-            let label = format!(".l{}", succ.as_ref() as *const _ as Address);
+            let label = format!(".LBB{}", succ.as_ref() as *const _ as Address);
 
             br_insts.push(Inst::Jmp(JmpInst::new(label.into())))
         }
@@ -810,7 +834,7 @@ impl IRBuilder {
         let mut phisic_arg_regs: Vec<Reg> = Vec::new();
         let arguments = call.get_operand(); // 参数列表, 这个可以类比成 llvm_ir::call::arguments
         for arg in arguments {
-            let ope = Self::local_operand_from(arg, regs).context(context!())?;
+            let ope = Self::value_from(arg, regs).context(context!())?;
             match ope {
                 Operand::Reg(r) => {
                     if r.is_usual() && i_arg_num < 8 {

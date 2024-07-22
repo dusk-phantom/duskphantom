@@ -88,10 +88,16 @@ impl IRBuilder {
         Ok((*reg).into())
     }
 
+    /// 获取 basic block 的 label
+    #[inline]
+    pub fn label_name_from(bb: &ObjPtr<middle::ir::BasicBlock>) -> Result<String> {
+        Ok(format!(".LBB{}", bb.as_ref() as *const _ as Address))
+    }
+
     /// 要不是 instruction 的输出, 要不是 constant 要不是 parameter
     /// 这个只是将 instruction 和 constant 包装成 Operand
     /// 里面不会出现 asm 的输出
-    pub fn local_operand_from(
+    pub fn value_from(
         operand: &middle::ir::Operand,
         regs: &HashMap<Address, Reg>,
     ) -> Result<Operand> {
@@ -134,8 +140,7 @@ impl IRBuilder {
                 }
             }
             middle::ir::Operand::Instruction(_) => {
-                /* FIXME 这应该是一个 UB */
-                unimplemented!()
+                unimplemented!() /* FIXME 这应该是一个 UB */
             }
             middle::ir::Operand::Constant(_) => Err(anyhow!(
                 "it is impossible to load from a constant: {}",
