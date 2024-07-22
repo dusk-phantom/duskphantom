@@ -112,6 +112,8 @@ impl IRBuilder {
     }
 
     /// 需要注意的是 指令的 lvalue 只能是寄存器,所以如果value是个常数,则需要用一个寄存器来存储,并且需要生成一条指令
+    /// so this function promise that the return value is a (reg,pre_insts) tuple
+    /// pre_insts is the insts that generate the reg,which should be inserted before the insts that use the reg
     #[allow(unused)]
     pub fn prepare_lhs(
         value: &llvm_ir::operand::Operand,
@@ -155,6 +157,25 @@ impl IRBuilder {
             }
             Operand::Reg(_) => Ok((value, insts)),
             _ => unimplemented!(),
+        }
+    }
+
+    #[inline]
+    pub fn address_from(
+        operand: &llvm_ir::Operand,
+        stack_slots: &HashMap<Name, StackSlot>,
+    ) -> Result<Operand> {
+        match operand {
+            llvm_ir::Operand::LocalOperand { name: _, ty: _ } => {
+                Self::stack_slot_from(operand, stack_slots)
+            }
+            llvm_ir::Operand::ConstantOperand(c) => match c.as_ref() {
+                Constant::GlobalReference { name: _, ty: _ } => {
+                    Self::global_name_from(operand).map(|s| s.into())
+                }
+                _ => todo!(),
+            },
+            _ => Err(anyhow!("operand is not local var:{}", operand)).with_context(|| context!()),
         }
     }
 
