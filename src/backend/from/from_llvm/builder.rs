@@ -160,7 +160,10 @@ impl IRBuilder {
             .map(|bb| (bb.label().to_string(), bb))
             .collect::<HashMap<String, &mut Block>>();
         for (bb_name, insert_back) in insert_back_for_remove_phi {
-            let bb = bbs_mut.get_mut(&bb_name).unwrap();
+            let bb = bbs_mut
+                .get_mut(&bb_name)
+                .ok_or_else(|| anyhow!("{:?} not found", &bb_name))
+                .with_context(|| context!())?;
             for (from, phi_dst) in insert_back {
                 let from = Self::value_from(&from, &regs)?;
                 match from {
