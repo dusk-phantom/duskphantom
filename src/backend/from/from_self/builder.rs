@@ -10,16 +10,6 @@ use crate::utils::mem::ObjPtr;
 pub struct IRBuilder;
 
 impl IRBuilder {
-    pub fn new_var(ty: &middle::ir::ValueType, reg_gener: &mut RegGenerator) -> Result<Reg> {
-        let dst_reg = match ty {
-            middle::ir::ValueType::Int
-            | middle::ir::ValueType::Bool
-            | middle::ir::ValueType::Pointer(_) => reg_gener.gen_virtual_usual_reg(),
-            middle::ir::ValueType::Float => reg_gener.gen_virtual_float_reg(),
-            _ => return Err(anyhow!("phi can't be void/array")).with_context(|| context!()),
-        };
-        Ok(dst_reg)
-    }
     pub fn gen_from_self(program: &middle::Program) -> Result<Program> {
         let self_module = &program.module;
         // dbg!(&llvm.types);
@@ -51,7 +41,7 @@ impl IRBuilder {
         for global_var in self_global_vars {
             // dbg!(&global_var);
             let name = &global_var.name.to_string(); // 这里的 name 是不带 @ 的
-            dbg!(&name);
+                                                     // dbg!(&name);
             match &global_var.initializer {
                 middle::ir::Constant::Int(value) => {
                     let var = Var::Prim(PrimVar::IntVar(IntVar {
@@ -77,14 +67,7 @@ impl IRBuilder {
                     }));
                     global_vars.push(var);
                 }
-                middle::ir::Constant::SignedChar(value) => {
-                    let var = Var::Prim(PrimVar::IntVar(IntVar {
-                        name: name.to_string(),
-                        init: Some(*value as i32),
-                        is_const: false,
-                    }));
-                    global_vars.push(var);
-                }
+                // FIXME 中端来的 arr, 可能是部分初始化
                 middle::ir::Constant::Array(arr) => {
                     match arr.first().with_context(|| context!())? {
                         // 不可能出现: arr 是混合的
@@ -132,37 +115,38 @@ impl IRBuilder {
                         }
                     }
                 }
+                middle::ir::Constant::SignedChar(_) => todo!(),
             }
         }
         Ok(global_vars)
     }
 
-    #[allow(unused)]
     pub fn build_funcs(
         self_funcs: &Vec<middle::ir::FunPtr>,
         fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<Vec<Func>> {
-        let _ = self_funcs;
-        todo!()
+        let mut funcs = Vec::new();
+        for self_func in self_funcs {
+            let fu = self_func.as_ref();
+            let func = Self::build_func(fu, fmms)?;
+            funcs.push(func);
+        }
+        Self::prepare_max_callee_regs_stack(&mut funcs);
+        Ok(funcs)
     }
 
     pub fn build_func(
-        self_func: &middle::ir::FunPtr,
+        self_func: &middle::ir::Function,
         fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<Func> {
-        let args: Vec<_> = self_func
-            .params
-            .iter()
-            .map(|p| p.name.to_string())
-            .collect();
-
-        let mut insert_back_for_remove_phi = HashMap::new();
-        let mut reg_gener = RegGenerator::new();
-        let mut regs: HashMap<Address, Reg> = HashMap::new();
+        /* ---------- 初始化一些分配器 ---------- */
         let mut stack_allocator = StackAllocator::new();
         let mut stack_slots: HashMap<Address, StackSlot> = HashMap::new();
+        let mut reg_gener = RegGenerator::new();
+        let mut regs: HashMap<Address, Reg> = HashMap::new();
+        let mut insert_back_for_remove_phi = HashMap::new();
 
-        // entry
+        /* ---------- 根据 entry 创建 func ---------- */
         let (entry, caller_reg_stack) = Self::build_entry(
             self_func,
             &mut stack_allocator,
@@ -172,9 +156,15 @@ impl IRBuilder {
             fmms,
             &mut insert_back_for_remove_phi,
         )?;
-
+        let args: Vec<_> = self_func
+            .params
+            .iter()
+            .map(|p| p.name.to_string())
+            .collect();
         let mut m_f = Func::new(self_func.name.to_string(), args, entry);
+        *m_f.caller_regs_stack_mut() = Some(caller_reg_stack.try_into()?); // caller_reg_stack 是 build_entry 的时候确定的, 然后绑定到函数里面
 
+        /* ---------- 返回值 ---------- */
         match &self_func.return_type {
             middle::ir::ValueType::Void => { /* do nothing */ }
             middle::ir::ValueType::Int
@@ -189,7 +179,7 @@ impl IRBuilder {
             _ => todo!(),
         }
 
-        *m_f.caller_regs_stack_mut() = Some(caller_reg_stack.try_into()?);
+        /* ---------- build other bbs ---------- */
         for bb in Self::build_other_bbs(
             self_func,
             &mut stack_allocator,
@@ -202,8 +192,8 @@ impl IRBuilder {
             m_f.push_bb(bb);
         }
 
-        // insert back to bbs to process phi
-        let mut bbs_mut = m_f
+        /* ---------- phi ---------- */
+        let mut bbs_mut = m_f // insert back to bbs to process phi
             .iter_bbs_mut()
             .map(|bb| (bb.label().to_string(), bb))
             .collect::<HashMap<String, &mut Block>>();
@@ -233,7 +223,6 @@ impl IRBuilder {
 
     /// caller_regs_stack 是在 build 单个 func 的时候确定的
     /// 这里一定要放在 build_funcs 之后, 因为这个时候，所有的函数的 caller_regs_stack 才会被计算好
-    #[allow(unused)]
     fn prepare_max_callee_regs_stack(funcs: &mut Vec<Func>) {
         let name_func: HashMap<String, u32> = funcs
             .iter()
@@ -245,7 +234,8 @@ impl IRBuilder {
             for bb in f.iter_bbs() {
                 for inst in bb.insts() {
                     if let Inst::Call(c) = inst {
-                        let callee_regs_stack = *name_func.get(c.func_name().as_str()).unwrap();
+                        let callee_regs_stack =
+                            *name_func.get(c.func_name().as_str()).unwrap_or(&0);
                         max_callee_regs_stack =
                             std::cmp::max(max_callee_regs_stack, callee_regs_stack);
                     }
@@ -256,7 +246,7 @@ impl IRBuilder {
     }
 
     fn build_other_bbs(
-        func: &ObjPtr<middle::ir::Function>,
+        func: &middle::ir::Function,
         stack_allocator: &mut StackAllocator,
         stack_slots: &mut HashMap<Address, StackSlot>,
         reg_gener: &mut RegGenerator,
@@ -318,7 +308,7 @@ impl IRBuilder {
     }
 
     fn build_entry(
-        func: &ObjPtr<middle::ir::Function>,
+        func: &middle::ir::Function,
         stack_allocator: &mut StackAllocator,
         stack_slots: &mut HashMap<Address, StackSlot>,
         reg_gener: &mut RegGenerator,
