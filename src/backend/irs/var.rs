@@ -89,3 +89,33 @@ impl From<FloatVar> for Var {
         Var::Prim(PrimVar::FloatVar(value))
     }
 }
+impl From<IntVar> for Var {
+    fn from(value: IntVar) -> Self {
+        Var::Prim(PrimVar::IntVar(value))
+    }
+}
+impl From<ArrVar<u32>> for Var {
+    fn from(value: ArrVar<u32>) -> Self {
+        Var::IntArr(value)
+    }
+}
+impl From<ArrVar<f32>> for Var {
+    fn from(value: ArrVar<f32>) -> Self {
+        Var::FloatArr(value)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_gen_asm() {
+        let var = Var::IntArr(ArrVar {
+            name: "arr".to_string(),
+            capacity: 2,
+            init: vec![],
+            is_const: false,
+        });
+        dbg!(var.gen_asm());
+    }
+}

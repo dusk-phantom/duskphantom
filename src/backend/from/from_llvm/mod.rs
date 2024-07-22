@@ -3,6 +3,7 @@ mod instruction;
 #[macro_use]
 mod macros;
 mod operand;
+mod vars;
 
 pub use super::irs::*;
 pub use crate::clang_frontend;
