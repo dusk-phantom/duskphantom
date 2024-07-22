@@ -160,10 +160,10 @@ impl IRBuilder {
                     let div_inst = DivInst::new(dst.into(), op0.into(), op1.into());
                     Ok(vec![div_inst.into()])
                 } else if let (Operand::Reg(op0), Operand::Imm(op1)) = (&op0, &op1) {
+                    let _op2 = reg_gener.gen_virtual_usual_reg();
+                    let li = LiInst::new(_op2.into(), op1.into());
                     let dst = reg_gener.gen_virtual_usual_reg();
-                    let li = LiInst::new(dst.into(), op1.into());
-                    let dst = reg_gener.gen_virtual_usual_reg();
-                    let div_inst = DivInst::new(dst.into(), op0.into(), dst.into());
+                    let div_inst = DivInst::new(dst.into(), op0.into(), _op2.into());
                     regs.insert(div as *const _ as Address, dst);
                     Ok(vec![li.into(), div_inst.into()])
                 }
