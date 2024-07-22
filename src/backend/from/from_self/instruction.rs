@@ -315,138 +315,95 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
     ) -> Result<Vec<Inst>> {
+        /* ---------- 辅助函数 ---------- */
+        fn prepare_normal_op0_op1(
+            icmp: &middle::ir::instruction::misc_inst::ICmp,
+            reg_gener: &mut RegGenerator,
+            regs: &HashMap<Address, Reg>,
+            insts: &mut Vec<Inst>,
+        ) -> Result<(Operand, Operand)> {
+            let (op0, prepare) = IRBuilder::prepare_lhs(icmp.get_lhs(), reg_gener, regs)?;
+            insts.extend(prepare);
+            let (op1, prepare) = IRBuilder::prepare_rhs(icmp.get_rhs(), reg_gener, regs)?;
+            insts.extend(prepare);
+            Ok((op0, op1))
+        }
+        fn prepare_rev_op0_op1(
+            icmp: &middle::ir::instruction::misc_inst::ICmp,
+            reg_gener: &mut RegGenerator,
+            regs: &HashMap<Address, Reg>,
+            insts: &mut Vec<Inst>,
+        ) -> Result<(Operand, Operand)> {
+            let (op1, prepare) = IRBuilder::prepare_lhs(icmp.get_rhs(), reg_gener, regs)?;
+            insts.extend(prepare);
+            let (op0, prepare) = IRBuilder::prepare_rhs(icmp.get_lhs(), reg_gener, regs)?;
+            insts.extend(prepare);
+            Ok((op0, op1))
+        }
+
+        /* ----------  ---------- */
+
         // let mut ret = Vec::new();
-        let dest: Address = icmp as *const _ as Address;
-        let op0 = Self::value_from(icmp.get_lhs(), regs).with_context(|| context!())?;
-        let op1 = Self::value_from(icmp.get_rhs(), regs).with_context(|| context!())?;
+        let flag = reg_gener.gen_virtual_usual_reg();
+        regs.insert(icmp as *const _ as Address, flag);
+
+        let mut ret = Vec::new();
+
         match icmp.op {
             middle::ir::instruction::misc_inst::ICmpOp::Eq => {
-                if let (Operand::Reg(reg0), Operand::Reg(reg1)) = (&op0, &op1) {
-                    let dst = reg_gener.gen_virtual_usual_reg();
-                    let xor = XorInst::new(dst.into(), reg0.into(), reg1.into());
-                    let flag = reg_gener.gen_virtual_usual_reg();
-                    let seqz = SeqzInst::new(flag.into(), dst.into());
-                    regs.insert(dest, flag);
-                    Ok(vec![xor.into(), seqz.into()])
-                } else if let (Operand::Reg(reg), Operand::Imm(imm)) = (op0, op1) {
-                    let dst = reg_gener.gen_virtual_usual_reg();
-                    let imm: i64 = imm.into();
-                    let xor = XorInst::new(dst.into(), reg.into(), imm.into());
-                    let flag = reg_gener.gen_virtual_usual_reg();
-                    let seqz = SeqzInst::new(flag.into(), dst.into());
-                    regs.insert(dest, flag);
-                    Ok(vec![xor.into(), seqz.into()])
-                } else {
-                    unimplemented!();
-                }
+                // a == b <=> a ^ b == 0
+                let (op0, op1) = prepare_normal_op0_op1(icmp, reg_gener, regs, &mut ret)?;
+                let _mid = reg_gener.gen_virtual_usual_reg();
+                let xor = XorInst::new(_mid.into(), op0, op1);
+                let seqz = SeqzInst::new(flag.into(), _mid.into());
+                ret.push(xor.into());
+                ret.push(seqz.into());
             }
             middle::ir::instruction::misc_inst::ICmpOp::Ne => {
-                if let (Operand::Reg(reg0), Operand::Reg(reg1)) = (&op0, &op1) {
-                    // 不相等的话, 为任意值, 相等的话, 为 0
-                    let dst = reg_gener.gen_virtual_usual_reg();
-                    let xor = XorInst::new(dst.into(), reg0.into(), reg1.into());
-                    let flag = reg_gener.gen_virtual_usual_reg();
-                    let snez = SnezInst::new(flag.into(), dst.into());
-                    regs.insert(dest, flag);
-                    Ok(vec![xor.into(), snez.into()])
-                } else if let (Operand::Reg(reg), Operand::Imm(imm)) = (op0, op1) {
-                    let dst = reg_gener.gen_virtual_usual_reg();
-                    let imm: i64 = imm.into();
-                    let xor = XorInst::new(dst.into(), reg.into(), imm.into());
-                    let flag = reg_gener.gen_virtual_usual_reg();
-                    let snez = SnezInst::new(flag.into(), dst.into());
-                    regs.insert(dest, flag);
-                    Ok(vec![xor.into(), snez.into()])
-                } else {
-                    unimplemented!();
-                }
+                // a != b <=> a ^ b != 0
+                let (op0, op1) = prepare_normal_op0_op1(icmp, reg_gener, regs, &mut ret)?;
+                let _mid = reg_gener.gen_virtual_usual_reg();
+                let xor = XorInst::new(_mid.into(), op0, op1);
+                let snez = SnezInst::new(flag.into(), _mid.into());
+                ret.push(xor.into());
+                ret.push(snez.into());
             }
             middle::ir::instruction::misc_inst::ICmpOp::Slt => {
-                if let (Operand::Reg(reg0), Operand::Reg(reg1)) = (&op0, &op1) {
-                    let flag = reg_gener.gen_virtual_usual_reg();
-                    let slt = SltInst::new(flag.into(), reg0.into(), reg1.into());
-                    // ret.push(slt.into());
-                    regs.insert(dest, flag);
-                    Ok(vec![slt.into()])
-                } else if let (Operand::Reg(reg), Operand::Imm(imm)) = (&op0, &op1) {
-                    let flag = reg_gener.gen_virtual_usual_reg();
-                    let slt = SltInst::new(flag.into(), reg.into(), imm.into());
-                    // ret.push(slt.into());
-                    regs.insert(dest, flag);
-                    Ok(vec![slt.into()])
-                } else {
-                    unimplemented!()
-                }
+                // a < b
+                let (op0, op1) = prepare_normal_op0_op1(icmp, reg_gener, regs, &mut ret)?;
+                let slt = SltInst::new(flag.into(), op0, op1);
+                ret.push(slt.into());
             }
             middle::ir::instruction::misc_inst::ICmpOp::Sle => {
                 // op0 <= op1 <=> ~(op0 > op1) <=> (op0 > op1) == 0 <=> (op1 < op0) == 0
-                if let (Operand::Reg(reg0), Operand::Reg(reg1)) = (&op0, &op1) {
-                    let dst = reg_gener.gen_virtual_usual_reg();
-                    let slt = SltInst::new(dst.into(), reg1.into(), reg0.into());
-                    let flag = reg_gener.gen_virtual_usual_reg();
-                    let seqz = SeqzInst::new(flag.into(), dst.into());
-                    regs.insert(dest, flag);
-                    Ok(vec![slt.into(), seqz.into()])
-                } else if let (Operand::Reg(reg), Operand::Imm(imm)) = (op0, op1) {
-                    let imm: i64 = imm.into();
-                    let op1_1 = reg_gener.gen_virtual_usual_reg();
-                    let li = LiInst::new(op1_1.into(), imm.into());
-                    let dst = reg_gener.gen_virtual_usual_reg();
-                    let slt = SltInst::new(dst.into(), op1_1.into(), reg.into());
-                    let flag = reg_gener.gen_virtual_usual_reg();
-                    let seqz = SeqzInst::new(flag.into(), dst.into());
-                    regs.insert(dest, flag);
-                    Ok(vec![li.into(), slt.into(), seqz.into()])
-                } else {
-                    unimplemented!();
-                }
+                let (op0, op1) = prepare_rev_op0_op1(icmp, reg_gener, regs, &mut ret)?;
+                let _mid = reg_gener.gen_virtual_usual_reg();
+                let slt = SltInst::new(_mid.into(), op0, op1);
+                let seqz = SeqzInst::new(flag.into(), _mid.into());
+                ret.push(slt.into());
+                ret.push(seqz.into());
             }
             middle::ir::instruction::misc_inst::ICmpOp::Sgt => {
                 // op0 > op1 <=> op1 < op0
-                if let (Operand::Reg(reg0), Operand::Reg(reg1)) = (&op0, &op1) {
-                    let flag = reg_gener.gen_virtual_usual_reg();
-                    let slt = SltInst::new(flag.into(), reg1.into(), reg0.into());
-                    regs.insert(dest, flag);
-                    Ok(vec![slt.into()])
-                } else if let (Operand::Reg(reg), Operand::Imm(imm)) = (op0, op1) {
-                    let imm: i64 = imm.into();
-                    let op1_1 = reg_gener.gen_virtual_usual_reg();
-                    let li = LiInst::new(op1_1.into(), imm.into());
-                    let flag = reg_gener.gen_virtual_usual_reg();
-                    let slt = SltInst::new(flag.into(), op1_1.into(), reg.into());
-                    regs.insert(dest, flag);
-                    Ok(vec![li.into(), slt.into()])
-                } else {
-                    unimplemented!();
-                }
+                let (op0, op1) = prepare_rev_op0_op1(icmp, reg_gener, regs, &mut ret)?;
+                let slt = SltInst::new(flag.into(), op0, op1);
+                ret.push(slt.into());
             }
             middle::ir::instruction::misc_inst::ICmpOp::Sge => {
                 // op0 >= op1 <=> ~(op0 < op1) <=> (op0 < op1) == 0
-                if let (Operand::Reg(reg0), Operand::Reg(reg1)) = (&op0, &op1) {
-                    let dst = reg_gener.gen_virtual_usual_reg();
-                    let slt = SltInst::new(dst.into(), reg0.into(), reg1.into());
-                    let flag = reg_gener.gen_virtual_usual_reg();
-                    let seqz = SeqzInst::new(flag.into(), dst.into());
-                    regs.insert(dest, flag);
-                    Ok(vec![slt.into(), seqz.into()])
-                } else if let (Operand::Reg(reg), Operand::Imm(imm)) = (op0, op1) {
-                    let flag = reg_gener.gen_virtual_usual_reg();
-                    let imm: i64 = imm.into();
-                    let op1_1 = reg_gener.gen_virtual_usual_reg();
-                    let li = LiInst::new(op1_1.into(), imm.into());
-                    let slt = AddInst::new(flag.into(), op1_1.into(), reg.into());
-                    regs.insert(dest, flag);
-                    Ok(vec![li.into(), slt.into()])
-                } else {
-                    unimplemented!();
-                }
+                let (op0, op1) = prepare_normal_op0_op1(icmp, reg_gener, regs, &mut ret)?;
+                let _mid = reg_gener.gen_virtual_usual_reg();
+                let slt = SltInst::new(_mid.into(), op0, op1);
+                let seqz = SeqzInst::new(flag.into(), _mid.into());
+                ret.push(slt.into());
+                ret.push(seqz.into());
             }
             middle::ir::instruction::misc_inst::ICmpOp::Ult => todo!(),
             middle::ir::instruction::misc_inst::ICmpOp::Ule => todo!(),
             middle::ir::instruction::misc_inst::ICmpOp::Ugt => todo!(),
             middle::ir::instruction::misc_inst::ICmpOp::Uge => todo!(),
         }
-        // Ok(ret)
+        Ok(ret)
     }
 
     /// alloca instruction only instruct allocating memory on stack,not generate one-one instruction

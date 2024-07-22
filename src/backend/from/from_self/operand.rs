@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::{anyhow, Context, Result};
 
-use crate::backend::{Operand, Reg, RegGenerator, StackSlot};
+use crate::backend::{Inst, LiInst, Operand, Reg, RegGenerator, StackSlot};
 
 use crate::context;
 
@@ -97,6 +97,54 @@ impl IRBuilder {
     #[inline]
     pub fn label_name_from(bb: &ObjPtr<middle::ir::BasicBlock>) -> String {
         format!(".LBB{}", bb.as_ref() as *const _ as Address)
+    }
+
+    /// 需要注意的是 指令的 lvalue 只能是寄存器,所以如果value是个常数,则需要用一个寄存器来存储,并且需要生成一条指令
+    /// so this function promise that the return value is a (reg,pre_insts) tuple
+    /// pre_insts is the insts that generate the reg,which should be inserted before the insts that use the reg
+    pub fn prepare_lhs(
+        value: &middle::ir::Operand,
+        reg_gener: &mut RegGenerator,
+        regs: &HashMap<Address, Reg>,
+    ) -> Result<(Operand, Vec<Inst>)> {
+        let mut insts = Vec::new();
+        let value = IRBuilder::value_from(value, regs)?;
+        match &value {
+            Operand::Imm(imm) => {
+                let dst = reg_gener.gen_virtual_usual_reg();
+                let li = LiInst::new(dst.into(), imm.into());
+                insts.push(li.into());
+                Ok((dst.into(), insts))
+            }
+            Operand::Reg(_) => Ok((value, insts)),
+            _ => unimplemented!(),
+        }
+    }
+
+    /// 如果value是个寄存器,直接返回,
+    /// 如果是个常数,如果超出范围,则需要用一个寄存器来存储,并且需要生成一条指令
+    /// 如果是不超出范围的常数,则直接返回
+    pub fn prepare_rhs(
+        value: &middle::ir::Operand,
+        reg_gener: &mut RegGenerator,
+        regs: &HashMap<Address, Reg>,
+    ) -> Result<(Operand, Vec<Inst>)> {
+        let mut insts: Vec<Inst> = Vec::new();
+        let value = IRBuilder::value_from(value, regs)?;
+        match &value {
+            Operand::Imm(imm) => {
+                if imm.in_limit(12) {
+                    Ok((value, insts))
+                } else {
+                    let dst = reg_gener.gen_virtual_usual_reg();
+                    let li = LiInst::new(dst.into(), imm.into());
+                    insts.push(li.into());
+                    Ok((dst.into(), insts))
+                }
+            }
+            Operand::Reg(_) => Ok((value, insts)),
+            _ => unimplemented!(),
+        }
     }
 
     /// 要不是 instruction 的输出, 要不是 constant 要不是 parameter
