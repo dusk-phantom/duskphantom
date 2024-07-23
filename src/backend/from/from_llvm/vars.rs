@@ -189,8 +189,8 @@ impl IRBuilder {
             } = elem.as_ref()
             {
                 let (cap, inits) = Self::cap_inits_from_array(element_type, elements)?;
-                total_capacity += cap;
                 total_inits.extend(inits.into_iter().map(|(i, f)| (i + total_capacity, f)));
+                total_capacity += cap;
             } else if let Constant::AggregateZero(arr) = elem.as_ref() {
                 let cap = Self::cap_from_empty_array(arr);
                 total_capacity += cap;
@@ -198,6 +198,8 @@ impl IRBuilder {
                 unimplemented!();
             }
         }
+        dbg!(e_ty, elems);
+        dbg!(total_capacity, &total_inits);
         Ok((total_capacity, total_inits))
     }
 
