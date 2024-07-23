@@ -41,7 +41,7 @@ impl IRBuilder {
                 Self::build_store_inst(store, stack_slots, reg_gener, regs)
             }
             middle::ir::instruction::InstType::Add => {
-                ssa2tac_three_usual_Rtype!(AddInst, Add, inst, regs, reg_gener)
+                ssa2tac_three_usual_Itype!(AddInst, Add, inst, regs, reg_gener)
             }
             middle::ir::instruction::InstType::FAdd => {
                 // TODO 浮点型指令, 立即数处理
@@ -237,7 +237,13 @@ impl IRBuilder {
             middle::ir::Operand::Constant(_) => todo!(),
             middle::ir::Operand::Global(_) => todo!(),
             middle::ir::Operand::Parameter(_) => todo!(),
-            middle::ir::Operand::Instruction(_) => todo!(),
+            middle::ir::Operand::Instruction(instr) => {
+                let src = Self::local_var_from(instr, regs).with_context(|| context!())?;
+                let dst = reg_gener.gen_virtual_usual_reg();
+                regs.insert(zext as *const _ as Address, dst);
+                let xt = AndInst::new(dst.into(), src, (-1).into());
+                Ok(vec![xt.into()])
+            }
         }
     }
 
