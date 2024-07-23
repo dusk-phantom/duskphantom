@@ -1,32 +1,40 @@
 #[macro_export]
-macro_rules! ssa2tac_three_usual {
-    ($tac_inst_ty:ident /* AddInst */,  $ssa_inst_type:ident /* Add */, $inst:ident, $regs:ident, $reg_gener:ident ) => {{
-        let add = downcast_ref::<middle::ir::instruction::binary_inst::$ssa_inst_type>(
+macro_rules! ssa2tac_three_usual_Rtype {
+    ($tac_inst_ty:ident /* AddInst */,  $ssa_inst_type:ident /* Add */, $inst:ident, $regs:ident, $reg_gener:ident) => {{
+        let mut insts = Vec::new();
+        let sub = downcast_ref::<middle::ir::instruction::binary_inst::$ssa_inst_type>(
             $inst.as_ref().as_ref(),
         );
-        let op0 = Self::value_from(add.get_lhs(), $regs)?;
-        let op1 = Self::value_from(add.get_rhs(), $regs)?;
-        if let (Operand::Reg(op0), Operand::Reg(op1)) = (&op0, &op1) {
-            let dst = $reg_gener.gen_virtual_usual_reg();
-            $regs.insert(add as *const _ as Address, dst);
-            let add_inst = $tac_inst_ty::new(dst.into(), op0.into(), op1.into());
-            Ok(vec![add_inst.into()])
-        } else if let (Operand::Reg(op0), Operand::Imm(op1)) = (&op0, &op1) {
-            let dst = $reg_gener.gen_virtual_usual_reg();
-            $regs.insert(add as *const _ as Address, dst);
-            let add_inst = $tac_inst_ty::new(dst.into(), op0.into(), op1.into());
-            Ok(vec![add_inst.into()])
-        } else if let (Operand::Imm(op0), Operand::Reg(op1)) = (&op0, &op1) {
-            let dst0 = $reg_gener.gen_virtual_usual_reg();
-            let li = LiInst::new(dst0.into(), op0.into());
-            let dst1 = $reg_gener.gen_virtual_usual_reg();
-            $regs.insert(add as *const _ as Address, dst1);
-            let add_inst = $tac_inst_ty::new(dst1.into(), dst0.into(), op1.into());
-            Ok(vec![li.into(), add_inst.into()])
-        } else {
-            // 不太可能两个都是 Imm
-            Err(anyhow!("operand type not supported")).with_context(|| context!())
-        }
+        let (op0, prepare) = Self::prepare_lhs(sub.get_lhs(), $reg_gener, $regs)?;
+        insts.extend(prepare);
+        // 这里使用的是 prepare_lhs, mul rs1/rs2 都只能是 Reg
+        let (op1, prepare) = Self::prepare_lhs(sub.get_rhs(), $reg_gener, $regs)?;
+        insts.extend(prepare);
+        let dst = $reg_gener.gen_virtual_usual_reg();
+        $regs.insert(sub as *const _ as Address, dst);
+        let sub_inst = $tac_inst_ty::new(dst.into(), op0, op1);
+        insts.push(sub_inst.into());
+        Ok(insts)
+    }};
+}
+
+#[macro_export]
+macro_rules! ssa2tac_three_usual_Itype {
+    ($tac_inst_ty:ident /* AddInst */,  $ssa_inst_type:ident /* Add */, $inst:ident, $regs:ident, $reg_gener:ident) => {{
+        let mut insts = Vec::new();
+        let addi = downcast_ref::<middle::ir::instruction::binary_inst::$ssa_inst_type>(
+            $inst.as_ref().as_ref(),
+        );
+        let (op0, prepare) = Self::prepare_lhs(addi.get_lhs(), $reg_gener, $regs)?;
+        insts.extend(prepare);
+        // 这里使用的是 prepare_lhs, mul rs1/rs2 都只能是 Reg
+        let (op1, prepare) = Self::prepare_rhs(addi.get_rhs(), $reg_gener, $regs)?;
+        insts.extend(prepare);
+        let dst = $reg_gener.gen_virtual_usual_reg();
+        $regs.insert(addi as *const _ as Address, dst);
+        let addi_inst = $tac_inst_ty::new(dst.into(), op0, op1);
+        insts.push(addi_inst.into());
+        Ok(insts)
     }};
 }
 
