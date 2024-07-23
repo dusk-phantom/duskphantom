@@ -41,6 +41,7 @@ impl IRBuilder {
         fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<Vec<Func>> {
         let mut funcs = Vec::new();
+        let mut caller_regs_stacks: HashMap<String, u32> = HashMap::new();
         for self_func in self_funcs {
             // Do not build library function
             if self_func.is_lib() {
@@ -49,18 +50,20 @@ impl IRBuilder {
 
             // Build the function
             let fu = self_func.as_ref();
-            let func = Self::build_func(fu, fmms)?;
+            let (func, caller_regs_stack) = Self::build_func(fu, fmms)?;
+            caller_regs_stacks.insert(func.name().to_string(), caller_regs_stack);
             funcs.push(func);
         }
-        Self::prepare_max_callee_regs_stack(&mut funcs);
-        Self::realloc_stack_slots(&mut funcs);
+        let max_callee_regs_stacks =
+            Self::prepare_max_callee_regs_stack(&mut funcs, &caller_regs_stacks)?;
+        Self::realloc_stack_slots(&mut funcs, &max_callee_regs_stacks)?;
         Ok(funcs)
     }
 
     pub fn build_func(
         self_func: &middle::ir::Function,
         fmms: &mut HashMap<Fmm, FloatVar>,
-    ) -> Result<Func> {
+    ) -> Result<(Func, u32)> {
         /* ---------- 初始化一些分配器 ---------- */
         let mut stack_allocator = StackAllocator::new();
         let mut stack_slots: HashMap<Address, StackSlot> = HashMap::new();
@@ -78,13 +81,9 @@ impl IRBuilder {
             fmms,
             &mut insert_back_for_remove_phi,
         )?;
-        let args: Vec<_> = self_func
-            .params
-            .iter()
-            .map(|p| p.name.to_string())
-            .collect();
-        let mut m_f = Func::new(self_func.name.to_string(), args, entry);
-        *m_f.caller_regs_stack_mut() = Some(caller_reg_stack.try_into()?); // caller_reg_stack 是 build_entry 的时候确定的, 然后绑定到函数里面
+        let params: Vec<_> = self_func.params.iter().map(|p| p.name.clone()).collect();
+        let mut m_f = Func::new(self_func.name.clone(), params, entry);
+        // *m_f.caller_regs_stack_mut() = Some(caller_reg_stack.try_into()?); // caller_reg_stack 是 build_entry 的时候确定的, 然后绑定到函数里面
 
         /* ---------- 返回值 ---------- */
         match &self_func.return_type {
@@ -140,34 +139,37 @@ impl IRBuilder {
         }
 
         *m_f.stack_allocator_mut() = Some(stack_allocator);
-        Ok(m_f)
+        Ok((m_f, caller_reg_stack.try_into()?))
     }
 
     /// caller_regs_stack 是在 build 单个 func 的时候确定的
     /// 这里一定要放在 build_funcs 之后, 因为这个时候，所有的函数的 caller_regs_stack 才会被计算好
-    fn prepare_max_callee_regs_stack(funcs: &mut Vec<Func>) {
-        let name_func: HashMap<String, u32> = funcs
-            .iter()
-            .map(|f| (f.name().to_string(), f.caller_regs_stack()))
-            .collect();
-
+    fn prepare_max_callee_regs_stack(
+        funcs: &mut Vec<Func>,
+        caller_regs_stacks: &HashMap<String, u32>,
+    ) -> Result<HashMap<String, u32>> {
+        let mut max_callee_regs_stacks: HashMap<String, u32> = HashMap::new();
         for f in funcs {
             let mut max_callee_regs_stack = 0;
             for bb in f.iter_bbs() {
                 for inst in bb.insts() {
                     if let Inst::Call(c) = inst {
                         let callee_regs_stack =
-                            *name_func.get(c.func_name().as_str()).unwrap_or(&0);
+                            *caller_regs_stacks.get(c.func_name().as_str()).unwrap_or(&0);
                         max_callee_regs_stack =
                             std::cmp::max(max_callee_regs_stack, callee_regs_stack);
                     }
                 }
+                max_callee_regs_stacks.insert(f.name().to_string(), max_callee_regs_stack);
             }
-            *f.max_callee_regs_stack_mut() = Some(max_callee_regs_stack);
         }
+        Ok(max_callee_regs_stacks)
     }
 
-    fn realloc_stack_slots(funcs: &mut Vec<Func>) {
+    fn realloc_stack_slots(
+        funcs: &mut Vec<Func>,
+        max_callee_regs_stacks: &HashMap<String, u32>,
+    ) -> Result<()> {
         for f in funcs {
             let mut old_stack_slots: HashMap<StackSlot, usize> = HashMap::new();
             let mut new_stack_allocator = StackAllocator::new();
@@ -185,7 +187,7 @@ impl IRBuilder {
                     old_stack_slots.insert(stack_slot, new_times);
                 }
             }
-            let max_callee_regs_need = f.max_callee_regs_stack();
+            let max_callee_regs_need = *max_callee_regs_stacks.get(f.name()).unwrap_or(&0);
             new_stack_allocator.alloc(max_callee_regs_need);
             let mut old_stack_slots: Vec<(StackSlot, usize)> =
                 old_stack_slots.into_iter().collect();
@@ -216,11 +218,21 @@ impl IRBuilder {
                 for inst in bb.insts_mut() {
                     match inst {
                         Inst::Load(load) => {
-                            let new_ss = new_stack_slots.get(load.src()).unwrap();
+                            let new_ss = new_stack_slots
+                                .get(load.src())
+                                .ok_or_else(|| {
+                                    anyhow!("not found mapping of stack slot {:?}", load.src())
+                                })
+                                .with_context(|| context!())?;
                             *load.src_mut() = *new_ss;
                         }
                         Inst::Store(store) => {
-                            let new_ss = new_stack_slots.get(store.dst()).unwrap();
+                            let new_ss = new_stack_slots
+                                .get(store.dst())
+                                .ok_or_else(|| {
+                                    anyhow!("not found mapping of stack slot {:?}", store.src())
+                                })
+                                .with_context(|| context!())?;
                             *store.dst_mut() = *new_ss;
                         }
                         _ => {
@@ -232,6 +244,7 @@ impl IRBuilder {
 
             f.stack_allocator_mut().replace(new_stack_allocator);
         }
+        Ok(())
     }
 
     fn build_other_bbs(
@@ -275,8 +288,7 @@ impl IRBuilder {
         insert_back_for_remove_phi: &mut HashMap<String, Vec<(middle::ir::Operand, Reg)>>,
     ) -> Result<Block> {
         // basic 的 label 注意一下
-        let label = Self::label_name_from(bb);
-        let mut m_bb = Block::new(label);
+        let mut m_bb = Block::new(Self::label_name_from(bb));
         for inst in bb.iter() {
             let gen_insts = Self::build_instruction(
                 &inst,
