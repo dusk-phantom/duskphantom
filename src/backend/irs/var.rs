@@ -47,7 +47,16 @@ pub struct ArrVar<T: Data> {
     pub init: Vec<(usize, T)>,
     pub is_const: bool,
 }
-
+impl<T: Data> ArrVar<T> {
+    pub fn new(name: String, capacity: usize, init: Vec<(usize, T)>, is_const: bool) -> Self {
+        Self {
+            name,
+            capacity,
+            init,
+            is_const: false,
+        }
+    }
+}
 impl<T: Data> ArrVar<T> {
     pub fn gen_asm(&self) -> String {
         GenTool::gen_array(&self.name, self.capacity, &self.init)
