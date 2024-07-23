@@ -109,30 +109,21 @@ impl IRBuilder {
                 todo!();
             }
             middle::ir::instruction::InstType::Mul => {
-                // ssa2tac_three_usual!(MulInst, Mul, inst, regs, reg_gener)
+                // ssa2tac_three_usual!(SubInst, Sub, inst, regs, reg_gener)
+                let mut insts = Vec::new();
                 let mul = downcast_ref::<middle::ir::instruction::binary_inst::Mul>(
                     inst.as_ref().as_ref(),
                 );
-                let op0 = Self::value_from(mul.get_lhs(), regs)?;
-                let op1 = Self::value_from(mul.get_rhs(), regs)?;
-                if let (Operand::Reg(op0), Operand::Reg(op1)) = (&op0, &op1) {
-                    let dst = reg_gener.gen_virtual_usual_reg();
-                    regs.insert(mul as *const _ as Address, dst);
-                    let mul_inst = MulInst::new(dst.into(), op0.into(), op1.into());
-                    Ok(vec![mul_inst.into()])
-                } else if let (Operand::Reg(op0), Operand::Imm(op1)) = (&op0, &op1) {
-                    let dst = reg_gener.gen_virtual_usual_reg();
-                    let li = LiInst::new(dst.into(), op1.into());
-                    let dst = reg_gener.gen_virtual_usual_reg();
-                    let mul_inst = MulInst::new(dst.into(), op0.into(), dst.into());
-                    regs.insert(mul as *const _ as Address, dst);
-                    Ok(vec![li.into(), mul_inst.into()])
-                }
-                /* llvm ir 中, 不能出现 lhs=<imm>, rhs=<reg> 的情况 */
-                else {
-                    // 不太可能两个都是 Imm
-                    Err(anyhow!("operand type not supported")).with_context(|| context!())
-                }
+                let (op0, prepare) = Self::prepare_lhs(mul.get_lhs(), reg_gener, regs)?;
+                insts.extend(prepare);
+                // 这里使用的是 prepare_lhs, mul rs1/rs2 都只能是 Reg
+                let (op1, prepare) = Self::prepare_lhs(mul.get_rhs(), reg_gener, regs)?;
+                insts.extend(prepare);
+                let dst = reg_gener.gen_virtual_usual_reg();
+                regs.insert(mul as *const _ as Address, dst);
+                let mul_inst = MulInst::new(dst.into(), op0, op1);
+                insts.push(mul_inst.into());
+                Ok(insts)
             }
             middle::ir::instruction::InstType::FMul => {
                 // ssa2tac_binary_float!(inst, regs, reg_gener, FMul, Mul, MulInst)
