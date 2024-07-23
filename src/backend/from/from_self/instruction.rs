@@ -241,7 +241,7 @@ impl IRBuilder {
                 let src = Self::local_var_from(instr, regs).with_context(|| context!())?;
                 let dst = reg_gener.gen_virtual_usual_reg();
                 regs.insert(zext as *const _ as Address, dst);
-                let xt = AndInst::new(dst.into(), src, (-1).into());
+                let xt = AndInst::new(dst.into(), src.into(), (-1).into());
                 Ok(vec![xt.into()])
             }
         }
@@ -259,9 +259,11 @@ impl IRBuilder {
             regs: &HashMap<Address, Reg>,
             insts: &mut Vec<Inst>,
         ) -> Result<(Operand, Operand)> {
-            let (op0, prepare) = IRBuilder::prepare_lhs(icmp.get_lhs(), reg_gener, regs)?;
+            let lhs = icmp.get_lhs();
+            let rhs = icmp.get_rhs();
+            let (op0, prepare) = IRBuilder::prepare_rs1(lhs, reg_gener, regs)?;
             insts.extend(prepare);
-            let (op1, prepare) = IRBuilder::prepare_rhs(icmp.get_rhs(), reg_gener, regs)?;
+            let (op1, prepare) = IRBuilder::prepare_rs2(rhs, reg_gener, regs)?;
             insts.extend(prepare);
             Ok((op0, op1))
         }
@@ -271,9 +273,11 @@ impl IRBuilder {
             regs: &HashMap<Address, Reg>,
             insts: &mut Vec<Inst>,
         ) -> Result<(Operand, Operand)> {
-            let (op1, prepare) = IRBuilder::prepare_lhs(icmp.get_rhs(), reg_gener, regs)?;
+            let lhs = icmp.get_lhs();
+            let rhs = icmp.get_rhs();
+            let (op0, prepare) = IRBuilder::prepare_rs1(rhs, reg_gener, regs)?;
             insts.extend(prepare);
-            let (op0, prepare) = IRBuilder::prepare_rhs(icmp.get_lhs(), reg_gener, regs)?;
+            let (op1, prepare) = IRBuilder::prepare_rs2(lhs, reg_gener, regs)?;
             insts.extend(prepare);
             Ok((op0, op1))
         }
@@ -291,7 +295,7 @@ impl IRBuilder {
                 // a == b <=> a ^ b == 0
                 let (op0, op1) = prepare_normal_op0_op1(icmp, reg_gener, regs, &mut ret)?;
                 let _mid = reg_gener.gen_virtual_usual_reg();
-                let xor = XorInst::new(_mid.into(), op0, op1);
+                let xor = XorInst::new(_mid.into(), op0.clone(), op1.clone());
                 let seqz = SeqzInst::new(flag.into(), _mid.into());
                 ret.push(xor.into());
                 ret.push(seqz.into());
@@ -300,7 +304,7 @@ impl IRBuilder {
                 // a != b <=> a ^ b != 0
                 let (op0, op1) = prepare_normal_op0_op1(icmp, reg_gener, regs, &mut ret)?;
                 let _mid = reg_gener.gen_virtual_usual_reg();
-                let xor = XorInst::new(_mid.into(), op0, op1);
+                let xor = XorInst::new(_mid.into(), op0.clone(), op1.clone());
                 let snez = SnezInst::new(flag.into(), _mid.into());
                 ret.push(xor.into());
                 ret.push(snez.into());
@@ -312,7 +316,7 @@ impl IRBuilder {
                 ret.push(slt.into());
             }
             middle::ir::instruction::misc_inst::ICmpOp::Sle => {
-                // op0 <= op1 <=> ~(op0 > op1) <=> (op0 > op1) == 0 <=> (op1 < op0) == 0
+                // lhs <= rhs <=> ~(lhs > rhs) <=> (lhs > rhs) == 0 <=> (rhs < lhs) == 0 === (op0 < op1) == 0
                 let (op0, op1) = prepare_rev_op0_op1(icmp, reg_gener, regs, &mut ret)?;
                 let _mid = reg_gener.gen_virtual_usual_reg();
                 let slt = SltInst::new(_mid.into(), op0, op1);
@@ -321,7 +325,7 @@ impl IRBuilder {
                 ret.push(seqz.into());
             }
             middle::ir::instruction::misc_inst::ICmpOp::Sgt => {
-                // op0 > op1 <=> op1 < op0
+                // lhs > rhs <=> rhs < lhs <=> op0 < op1
                 let (op0, op1) = prepare_rev_op0_op1(icmp, reg_gener, regs, &mut ret)?;
                 let slt = SltInst::new(flag.into(), op0, op1);
                 ret.push(slt.into());
@@ -578,98 +582,40 @@ impl IRBuilder {
         regs: &mut HashMap<Address, Reg>,
         reg_gener: &mut RegGenerator,
     ) -> Result<Vec<Inst>> {
-        let cur = br
+        let parent_bb = br
             .get_parent_bb()
-            .ok_or(anyhow!("iffalse get error",))
+            .ok_or(anyhow!("get parent bb failed"))
             .with_context(|| context!())?;
-
-        let succs = cur.get_succ_bb();
-
         let mut br_insts: Vec<Inst> = Vec::new();
         if br.is_cond_br() {
-            // 获取 cond 对应的寄存器
-            let reg: Reg = match br.get_cond() {
-                // 如果是常数，那么需要使用 li 将常数加载到寄存器中
-                middle::ir::Operand::Constant(con) => match con {
-                    middle::ir::Constant::Int(i) => {
-                        let imm: Operand = (*i as i64).into();
-                        let reg = reg_gener.gen_virtual_usual_reg();
-                        let li = AddInst::new(reg.into(), REG_ZERO.into(), imm);
-                        br_insts.push(li.into());
-                        reg
-                    }
-                    middle::ir::Constant::Bool(bo) => {
-                        let imm: Operand = (*bo as i64).into();
-                        let reg = reg_gener.gen_virtual_usual_reg();
-                        let li = AddInst::new(reg.into(), REG_ZERO.into(), imm);
-                        br_insts.push(li.into());
-                        reg
-                    }
-                    _ => {
-                        return Err(anyhow!("cond br with array or float is not allow"))
-                            .with_context(|| context!())
-                    }
-                },
-                middle::ir::Operand::Parameter(param) => match param.as_ref().value_type {
-                    middle::ir::ValueType::Int | middle::ir::ValueType::Bool => {
-                        let addr = param.as_ref() as *const _ as Address;
-                        let reg = regs.get(&addr).ok_or(anyhow!("").context(context!()))?;
-                        *reg
-                    }
-                    _ => {
-                        return Err(anyhow!(
-                            "cond br with array/float/pointer/void is not allow"
-                        ))
-                        .with_context(|| context!())
-                    }
-                },
-                middle::ir::Operand::Instruction(instr) => match instr.get_value_type() {
-                    middle::ir::ValueType::Int | middle::ir::ValueType::Bool => {
-                        let addr = instr.as_ref().as_ref() as *const dyn middle::ir::Instruction
-                            as *const () as Address;
-                        let reg = regs.get(&addr).ok_or(anyhow!("").context(context!()))?;
-                        *reg
-                    }
-                    _ => {
-                        return Err(anyhow!(
-                            "cond br with array/float/pointer/void is not allow"
-                        ))
-                        .with_context(|| context!())
-                    }
-                },
-                middle::ir::Operand::Global(_) => {
-                    return Err(anyhow!("cond br with global is not allow"))
-                        .with_context(|| context!())
-                }
-            };
-
-            let iftrue = succs
+            let (cond, instrs) =
+                Self::prepare_cond(br.get_cond(), reg_gener, regs).with_context(|| context!())?;
+            br_insts.extend(instrs);
+            let true_bb = parent_bb
+                .get_succ_bb()
                 .first()
-                .ok_or(anyhow!("iftrue get error",))
+                .ok_or(anyhow!("get true bb failed"))
                 .with_context(|| context!())?;
-
-            let iftrue_label = Self::label_name_from(iftrue);
-
-            let iffalse = succs
+            let true_label = Self::label_name_from(true_bb);
+            let false_bb = parent_bb
+                .get_succ_bb()
                 .get(1)
-                .ok_or(anyhow!("iffalse get error",))
+                .ok_or(anyhow!("get false bb failed"))
                 .with_context(|| context!())?;
-
-            let iffalse_label = Self::label_name_from(iffalse);
-
-            br_insts.extend(vec![
-                Inst::Beq(BeqInst::new(reg, REG_ZERO, iffalse_label.into())),
-                Inst::Jmp(JmpInst::new(iftrue_label.into())),
-            ]);
+            let false_label = Self::label_name_from(false_bb);
+            let beqz = BeqInst::new(cond, REG_ZERO, false_label.into());
+            let j = JmpInst::new(true_label.into());
+            br_insts.push(beqz.into());
+            br_insts.push(j.into());
         } else {
-            let succ = succs
+            let succ = parent_bb
+                .get_succ_bb()
                 .first()
-                .ok_or(anyhow!("iftrue get error",))
+                .ok_or(anyhow!("get succ bb failed"))
                 .with_context(|| context!())?;
-
-            let label = Self::label_name_from(succ);
-
-            br_insts.push(Inst::Jmp(JmpInst::new(label.into())))
+            let succ_label = Self::label_name_from(succ);
+            let j = JmpInst::new(succ_label.into());
+            br_insts.push(j.into());
         }
 
         Ok(br_insts)

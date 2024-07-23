@@ -5,10 +5,10 @@ macro_rules! ssa2tac_three_usual_Rtype {
         let sub = downcast_ref::<middle::ir::instruction::binary_inst::$ssa_inst_type>(
             $inst.as_ref().as_ref(),
         );
-        let (op0, prepare) = Self::prepare_lhs(sub.get_lhs(), $reg_gener, $regs)?;
+        let (op0, prepare) = Self::prepare_rs1(sub.get_lhs(), $reg_gener, $regs)?;
         insts.extend(prepare);
-        // 这里使用的是 prepare_lhs, mul rs1/rs2 都只能是 Reg
-        let (op1, prepare) = Self::prepare_lhs(sub.get_rhs(), $reg_gener, $regs)?;
+        // 这里使用的是 prepare_lhs, mul rs1/rs2 都只能是 Reg, 这个很重要
+        let (op1, prepare) = Self::prepare_rs1(sub.get_rhs(), $reg_gener, $regs)?;
         insts.extend(prepare);
         let dst = $reg_gener.gen_virtual_usual_reg();
         $regs.insert(sub as *const _ as Address, dst);
@@ -25,10 +25,9 @@ macro_rules! ssa2tac_three_usual_Itype {
         let addi = downcast_ref::<middle::ir::instruction::binary_inst::$ssa_inst_type>(
             $inst.as_ref().as_ref(),
         );
-        let (op0, prepare) = Self::prepare_lhs(addi.get_lhs(), $reg_gener, $regs)?;
+        let (op0, prepare) = Self::prepare_rs1(addi.get_lhs(), $reg_gener, $regs)?;
         insts.extend(prepare);
-        // 这里使用的是 prepare_lhs, mul rs1/rs2 都只能是 Reg
-        let (op1, prepare) = Self::prepare_rhs(addi.get_rhs(), $reg_gener, $regs)?;
+        let (op1, prepare) = Self::prepare_rs2(addi.get_rhs(), $reg_gener, $regs)?;
         insts.extend(prepare);
         let dst = $reg_gener.gen_virtual_usual_reg();
         $regs.insert(addi as *const _ as Address, dst);

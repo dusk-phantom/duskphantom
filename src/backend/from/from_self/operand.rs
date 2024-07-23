@@ -48,22 +48,21 @@ impl IRBuilder {
         })
     }
 
-    /// 这里的 local_var_from 是不包含函数的形参的
+    /// 这里不包含有 函数的形参。local_var_from 返回 Reg
+    #[inline]
     pub fn local_var_from(
         instr: &ObjPtr<Box<dyn Instruction>>,
         regs: &HashMap<Address, Reg>,
-    ) -> Result<Operand> {
+    ) -> Result<Reg> {
         let addr = instr.as_ref().as_ref() as *const dyn Instruction as *const () as Address;
         let reg = regs
             .get(&addr)
-            .ok_or(anyhow!(
-                "local var not found {}",
-                instr.as_ref().as_ref() as *const dyn Instruction as *const () as Address
-            ))
+            .ok_or(anyhow!("local var not found {}", addr))
             .with_context(|| context!())?;
-        Ok((*reg).into())
+        Ok(*reg)
     }
 
+    #[inline]
     pub fn const_from(con: &middle::ir::Constant) -> Result<Operand> {
         Ok(match con {
             middle::ir::Constant::Int(val) => Operand::Imm((*val as i64).into()),
@@ -102,7 +101,7 @@ impl IRBuilder {
     /// 需要注意的是 指令的 lvalue 只能是寄存器,所以如果value是个常数,则需要用一个寄存器来存储,并且需要生成一条指令
     /// so this function promise that the return value is a (reg,pre_insts) tuple
     /// pre_insts is the insts that generate the reg,which should be inserted before the insts that use the reg
-    pub fn prepare_lhs(
+    pub fn prepare_rs1(
         value: &middle::ir::Operand,
         reg_gener: &mut RegGenerator,
         regs: &HashMap<Address, Reg>,
@@ -124,7 +123,7 @@ impl IRBuilder {
     /// 如果value是个寄存器,直接返回,
     /// 如果是个常数,如果超出范围,则需要用一个寄存器来存储,并且需要生成一条指令
     /// 如果是不超出范围的常数,则直接返回
-    pub fn prepare_rhs(
+    pub fn prepare_rs2(
         value: &middle::ir::Operand,
         reg_gener: &mut RegGenerator,
         regs: &HashMap<Address, Reg>,
@@ -147,6 +146,31 @@ impl IRBuilder {
         }
     }
 
+    #[allow(unused)]
+    pub fn prepare_cond(
+        cond: &middle::ir::Operand,
+        reg_gener: &mut RegGenerator,
+        regs: &HashMap<Address, Reg>,
+    ) -> Result<(Reg, Vec<Inst>)> {
+        match cond {
+            middle::ir::Operand::Constant(_) => todo!(),
+            middle::ir::Operand::Global(_) => todo!(),
+            middle::ir::Operand::Parameter(_) => todo!(),
+            middle::ir::Operand::Instruction(instr) => {
+                // let instr = instr.as_ref();
+
+                // let addr = instr as *const _ as Address;
+                // let reg = regs
+                //     .get(&addr)
+                //     .ok_or(anyhow!("local var not found {}", addr))
+                //     .with_context(|| context!())?;
+                // Ok(((*reg).into(), vec![]))
+                let ope = Self::local_var_from(instr, regs)?;
+                Ok((ope, Vec::new()))
+            }
+        }
+    }
+
     /// 要不是 instruction 的输出, 要不是 constant 要不是 parameter
     /// 这个只是将 instruction 和 constant 包装成 Operand
     /// 里面不会出现 asm 的输出
@@ -157,7 +181,10 @@ impl IRBuilder {
         match operand {
             middle::ir::Operand::Constant(con) => Self::const_from(con),
             middle::ir::Operand::Parameter(param) => Self::parameter_from(param, regs), // 参数实际上都是 Reg
-            middle::ir::Operand::Instruction(instr) => Self::local_var_from(instr, regs),
+            middle::ir::Operand::Instruction(instr) => {
+                let reg = Self::local_var_from(instr, regs).with_context(|| context!())?;
+                Ok(reg.into())
+            }
             middle::ir::Operand::Global(glo) => Err(anyhow!(
                 "local_operand_from operand cann't not be global:{}",
                 glo
