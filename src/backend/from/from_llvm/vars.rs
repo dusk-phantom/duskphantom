@@ -1,4 +1,5 @@
 use super::*;
+use bitvec::ptr::Const;
 use builder::IRBuilder;
 use llvm_ir::{constant::Float, Constant, ConstantRef, Type};
 
@@ -10,7 +11,8 @@ impl IRBuilder {
     ) -> Result<Vec<Var>> {
         let mut global_vars = Vec::new();
         for global_var in llvm_global_vars {
-            // dbg!(&global_var);
+            dbg!(&global_var);
+            // continue;
             let name = &global_var.name.to_string()[1..];
             if let Some(init) = &global_var.initializer {
                 let c = init.as_ref().to_owned();
@@ -22,7 +24,7 @@ impl IRBuilder {
                     Constant::Array {
                         element_type,
                         elements,
-                    } => Self::build_array(name, &element_type, &elements)?,
+                    } => Self::build_array_var(name, &element_type, &elements)?,
                     _ => {
                         dbg!(&global_var);
                         unimplemented!()
@@ -55,12 +57,6 @@ impl IRBuilder {
             }
             llvm_ir::constant::Float::Double(_) => {
                 unimplemented!("double float");
-                // let var = var::Var::Prim(var::PrimVar::FloatVar(var::FloatVar {
-                //     name: name.to_string(),
-                //     init: Some(f),
-                //     is_const: false,
-                // }));
-                // global_vars.push(var);
             }
             _ => {
                 dbg!(f);
@@ -70,9 +66,10 @@ impl IRBuilder {
     }
 
     /// 处理0初始化的数组
+    #[inline]
     pub fn build_aggregate_zero_var(name: &str, arr: &Type) -> Result<Var> {
         let capacity = Self::capacity_of_empty_array(arr);
-        let base_ty = Self::base_element_type(arr);
+        let base_ty = Self::basic_element_type(arr);
         if Self::is_ty_int(base_ty) {
             let var = ArrVar::<u32> {
                 name: name.to_string(),
@@ -106,7 +103,7 @@ impl IRBuilder {
                     *num_elements
                 } else if Self::is_ty_float(element_type) {
                     *num_elements
-                } else if Self::is_array_type(element_type) {
+                } else if Self::is_ty_array_type(element_type) {
                     let sub = Self::capacity_of_empty_array(element_type);
                     *num_elements * sub
                 } else {
@@ -117,17 +114,8 @@ impl IRBuilder {
             _ => unimplemented!(),
         }
     }
-    pub fn base_element_type(ty: &llvm_ir::Type) -> &llvm_ir::Type {
-        match ty {
-            llvm_ir::Type::ArrayType {
-                element_type,
-                num_elements: _,
-            } => Self::base_element_type(element_type),
-            _ => ty,
-        }
-    }
 
-    pub fn is_array_type(ty: &llvm_ir::Type) -> bool {
+    pub fn is_ty_array_type(ty: &llvm_ir::Type) -> bool {
         matches!(
             ty,
             Type::ArrayType {
@@ -137,12 +125,76 @@ impl IRBuilder {
         )
     }
 
-    /// 处理有初始值的数组
+    #[inline]
+    pub fn build_array_var(
+        name: &str,
+        element_type: &Type,
+        elements: &[ConstantRef],
+    ) -> Result<Var> {
+        let base_ty = Self::basic_element_type(element_type);
+        let (capacity, init) = Self::cap_inits_from_array(element_type, elements)?;
+        let new_var = if Self::is_ty_int(base_ty) {
+            ArrVar::<u32>::new(name.to_string(), capacity, init, false).into()
+        } else if Self::is_ty_float(base_ty) {
+            let init = init
+                .into_iter()
+                .map(|(i, f)| (i, f32::from_bits(f)))
+                .collect();
+            dbg!(&init);
+            ArrVar::<f32>::new(name.to_string(), capacity, init, false).into()
+        } else {
+            dbg!(base_ty);
+            unimplemented!();
+        };
+        Ok(new_var)
+    }
+    /// 处理有初始值的数组,返回(数组容量,数组初始值)
     #[allow(unused)]
-    pub fn build_array(name: &str, e_ty: &Type, elems: &[ConstantRef]) -> Result<Var> {
+    pub fn cap_inits_from_array(
+        e_ty: &Type,
+        elems: &[ConstantRef],
+    ) -> Result<(usize, Vec<(usize, u32)>)> {
+        // 首先处理递归基线 process recursive base line
+        // 递归基线1: 空数组 base line 1: empty array
+        if elems.is_empty() {
+            let capacity = Self::capacity_of_empty_array(e_ty);
+            return Ok((capacity, vec![]));
+        }
+        // 递归基线2: 数组元素为常量 base line 2: array elements are constants
+        if Self::is_ty_float(e_ty) || Self::is_ty_int(e_ty) {
+            let mut init = Vec::new();
+            for (i, elem) in elems.iter().enumerate() {
+                if let Constant::Float(f) = elem.as_ref() {
+                    if let llvm_ir::constant::Float::Single(f) = f {
+                        init.push((i, f.to_bits()));
+                    } else {
+                        unimplemented!();
+                    }
+                } else if let Constant::Int { bits: _, value } = elem.as_ref() {
+                    init.push((i, *value as u32));
+                } else {
+                    unimplemented!();
+                }
+            }
+            return Ok((elems.len(), init));
+        }
+        // 递归部分 recursive part
         dbg!(e_ty);
         dbg!(elems);
 
         unimplemented!();
+    }
+
+    #[inline]
+    pub fn basic_element_type(ty: &llvm_ir::Type) -> &llvm_ir::Type {
+        match ty {
+            llvm_ir::Type::ArrayType {
+                element_type,
+                num_elements: _,
+            } => Self::basic_element_type(element_type),
+            llvm_ir::Type::IntegerType { .. } => ty,
+            llvm_ir::Type::FPType { .. } => ty,
+            _ => ty,
+        }
     }
 }

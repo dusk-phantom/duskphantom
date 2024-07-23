@@ -1,3 +1,4 @@
+use core::num;
 use std::collections::HashMap;
 
 use super::*;
@@ -173,6 +174,19 @@ impl IRBuilder {
                 Constant::GlobalReference { name: _, ty: _ } => {
                     Self::global_name_from(operand).map(|s| s.into())
                 }
+                Constant::GetElementPtr(gep) => {
+                    dbg!(gep);
+                    match gep.address.as_ref() {
+                        Constant::GlobalReference { name, ty } => {
+                            // dbg!(gep);
+                            let dims = Self::dimensions_from_array(ty)?;
+                            dbg!(&dims);
+                            todo!();
+                        }
+                        _ => unimplemented!(),
+                    };
+                    unimplemented!();
+                }
                 _ => {
                     dbg!(c);
                     unimplemented!();
@@ -181,6 +195,24 @@ impl IRBuilder {
             _ => Err(anyhow!("operand is not local var:{}", operand)).with_context(|| context!()),
         }
     }
+    #[inline]
+    pub fn dimensions_from_array(arr_ty: &llvm_ir::Type) -> Result<Vec<usize>> {
+        match arr_ty {
+            llvm_ir::Type::ArrayType {
+                element_type,
+                num_elements,
+            } => {
+                let mut dims = vec![*num_elements];
+                let mut suf_dims = Self::dimensions_from_array(element_type)?;
+                dims.extend(suf_dims);
+                Ok(dims)
+            }
+            llvm_ir::Type::IntegerType { bits: _ } => Ok(vec![]),
+            llvm_ir::Type::FPType(_) => Ok(vec![]),
+            _ => unimplemented!(),
+        }
+    }
+
     #[inline]
     pub fn mem_size_from(ty: &llvm_ir::Type) -> Result<MemSize> {
         match ty {
