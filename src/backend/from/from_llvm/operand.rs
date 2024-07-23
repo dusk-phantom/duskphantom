@@ -173,7 +173,10 @@ impl IRBuilder {
                 Constant::GlobalReference { name: _, ty: _ } => {
                     Self::global_name_from(operand).map(|s| s.into())
                 }
-                _ => todo!(),
+                _ => {
+                    dbg!(c);
+                    unimplemented!();
+                }
             },
             _ => Err(anyhow!("operand is not local var:{}", operand)).with_context(|| context!()),
         }
