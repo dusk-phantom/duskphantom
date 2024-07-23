@@ -1,5 +1,5 @@
 use crate::utils::mem::ObjPtr;
-use crate::{backend::*, ssa2tac_three_usual};
+use crate::{backend::*, ssa2tac_three_usual_Itype, ssa2tac_three_usual_Rtype};
 use crate::{context, middle};
 
 use crate::middle::ir::instruction::binary_inst::BinaryInst;
@@ -41,7 +41,7 @@ impl IRBuilder {
                 Self::build_store_inst(store, stack_slots, reg_gener, regs)
             }
             middle::ir::instruction::InstType::Add => {
-                ssa2tac_three_usual!(AddInst, Add, inst, regs, reg_gener)
+                ssa2tac_three_usual_Rtype!(AddInst, Add, inst, regs, reg_gener)
             }
             middle::ir::instruction::InstType::FAdd => {
                 // TODO 浮点型指令, 立即数处理
@@ -88,21 +88,7 @@ impl IRBuilder {
                 Ok(ret)
             }
             middle::ir::instruction::InstType::Sub => {
-                // ssa2tac_three_usual!(SubInst, Sub, inst, regs, reg_gener)
-                let mut insts = Vec::new();
-                let sub = downcast_ref::<middle::ir::instruction::binary_inst::Sub>(
-                    inst.as_ref().as_ref(),
-                );
-                let (op0, prepare) = Self::prepare_lhs(sub.get_lhs(), reg_gener, regs)?;
-                insts.extend(prepare);
-                // 这里使用的是 prepare_lhs, mul rs1/rs2 都只能是 Reg
-                let (op1, prepare) = Self::prepare_lhs(sub.get_rhs(), reg_gener, regs)?;
-                insts.extend(prepare);
-                let dst = reg_gener.gen_virtual_usual_reg();
-                regs.insert(sub as *const _ as Address, dst);
-                let sub_inst = SubInst::new(dst.into(), op0, op1);
-                insts.push(sub_inst.into());
-                Ok(insts)
+                ssa2tac_three_usual_Rtype!(SubInst, Sub, inst, regs, reg_gener)
             }
             // 通过类型转换，可以做到: FAdd 的输入一定是 Float 类型的寄存器
             middle::ir::instruction::InstType::FSub => {
@@ -110,78 +96,40 @@ impl IRBuilder {
                 todo!();
             }
             middle::ir::instruction::InstType::Mul => {
-                // ssa2tac_three_usual!(SubInst, Sub, inst, regs, reg_gener)
-                let mut insts = Vec::new();
-                let mul = downcast_ref::<middle::ir::instruction::binary_inst::Mul>(
-                    inst.as_ref().as_ref(),
-                );
-                let (op0, prepare) = Self::prepare_lhs(mul.get_lhs(), reg_gener, regs)?;
-                insts.extend(prepare);
-                // 这里使用的是 prepare_lhs, mul rs1/rs2 都只能是 Reg
-                let (op1, prepare) = Self::prepare_lhs(mul.get_rhs(), reg_gener, regs)?;
-                insts.extend(prepare);
-                let dst = reg_gener.gen_virtual_usual_reg();
-                regs.insert(mul as *const _ as Address, dst);
-                let mul_inst = MulInst::new(dst.into(), op0, op1);
-                insts.push(mul_inst.into());
-                Ok(insts)
+                ssa2tac_three_usual_Rtype!(MulInst, Mul, inst, regs, reg_gener)
             }
             middle::ir::instruction::InstType::FMul => {
                 // ssa2tac_binary_float!(inst, regs, reg_gener, FMul, Mul, MulInst)
                 todo!()
             }
             middle::ir::instruction::InstType::SDiv => {
-                // ssa2tac_three_usual!(DivInst, SDiv, inst, regs, reg_gener)
-                let div = downcast_ref::<middle::ir::instruction::binary_inst::SDiv>(
-                    inst.as_ref().as_ref(),
-                );
-                let op0 = Self::value_from(div.get_lhs(), regs)?;
-                let op1 = Self::value_from(div.get_rhs(), regs)?;
-                if let (Operand::Reg(op0), Operand::Reg(op1)) = (&op0, &op1) {
-                    let dst = reg_gener.gen_virtual_usual_reg();
-                    regs.insert(div as *const _ as Address, dst);
-                    let div_inst = DivInst::new(dst.into(), op0.into(), op1.into());
-                    Ok(vec![div_inst.into()])
-                } else if let (Operand::Reg(op0), Operand::Imm(op1)) = (&op0, &op1) {
-                    let _op2 = reg_gener.gen_virtual_usual_reg();
-                    let li = LiInst::new(_op2.into(), op1.into());
-                    let dst = reg_gener.gen_virtual_usual_reg();
-                    let div_inst = DivInst::new(dst.into(), op0.into(), _op2.into());
-                    regs.insert(div as *const _ as Address, dst);
-                    Ok(vec![li.into(), div_inst.into()])
-                }
-                /* llvm ir 中, 不能出现 lhs=<imm>, rhs=<reg> 的情况 */
-                else {
-                    // 不太可能两个都是 Imm
-                    Err(anyhow!("operand type not supported")).with_context(|| context!())
-                }
+                ssa2tac_three_usual_Rtype!(DivInst, SDiv, inst, regs, reg_gener)
             }
             middle::ir::instruction::InstType::SRem => {
-                ssa2tac_three_usual!(RemInst, SRem, inst, regs, reg_gener)
+                ssa2tac_three_usual_Rtype!(RemInst, SRem, inst, regs, reg_gener)
             }
             middle::ir::instruction::InstType::UDiv => todo!(), // TODO 目前还没有 udiv 和 urem
             middle::ir::instruction::InstType::URem => todo!(),
             middle::ir::instruction::InstType::FDiv => todo!(),
             middle::ir::instruction::InstType::Shl => {
-                ssa2tac_three_usual!(SllInst, Shl, inst, regs, reg_gener)
+                ssa2tac_three_usual_Itype!(SllInst, Shl, inst, regs, reg_gener)
             }
             middle::ir::instruction::InstType::LShr => {
-                // ssa2tac_binary_usual!(inst, regs, reg_gener, LShr, Srl, SrlInst)
-                todo!()
+                ssa2tac_three_usual_Itype!(SrlInst, LShr, inst, regs, reg_gener)
             }
             middle::ir::instruction::InstType::AShr => {
                 // ssa2tac_binary_usual!(SraInst, AShr, inst, regs, reg_gener)
                 // .into() 会报错
-                todo!()
+                ssa2tac_three_usual_Itype!(SraInst, AShr, inst, regs, reg_gener)
             }
             middle::ir::instruction::InstType::And => {
-                ssa2tac_three_usual!(AndInst, And, inst, regs, reg_gener)
+                ssa2tac_three_usual_Itype!(AndInst, And, inst, regs, reg_gener)
             }
             middle::ir::instruction::InstType::Or => {
-                ssa2tac_three_usual!(OrInst, Or, inst, regs, reg_gener)
+                ssa2tac_three_usual_Itype!(OrInst, Or, inst, regs, reg_gener)
             }
             middle::ir::instruction::InstType::Xor => {
-                ssa2tac_three_usual!(XorInst, Xor, inst, regs, reg_gener)
+                ssa2tac_three_usual_Itype!(XorInst, Xor, inst, regs, reg_gener)
             }
             middle::ir::instruction::InstType::Ret => {
                 let ret = downcast_ref::<middle::ir::instruction::terminator_inst::Ret>(
