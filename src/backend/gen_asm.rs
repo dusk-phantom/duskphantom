@@ -244,6 +244,7 @@ impl GenTool {
         for (index, (idx, val)) in init.iter().enumerate() {
             if index == 0 && idx != &0 {
                 ret.push_str(&Self::gen_zero_fill(idx * size_elem as usize));
+                ret.push('\n');
             } else if index != 0 {
                 let prev_idx = init[index - 1].0;
                 if idx - prev_idx != 1 {
@@ -440,6 +441,12 @@ hello:
 .word\t0x3
 .zero\t28";
         assert_eq!(s, raw_match);
+    }
+    #[test]
+    fn test_gen_word_arr2() {
+        let init = [(2, 1), (3, 0)];
+        let s = GenTool::gen_array::<u32>("arr", 4, &init);
+        assert_eq!(s,".data\n.align\t3\n.globl\tarr\n.type\tarr, @object\n.size\tarr, 16\narr:\n.zero\t8\n.word\t0x1\n.word\t0x0\n.zero")
     }
 
     #[test]
