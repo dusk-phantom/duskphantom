@@ -53,7 +53,7 @@ impl<T: Data> ArrVar<T> {
             name,
             capacity,
             init,
-            is_const: false,
+            is_const,
         }
     }
 }

@@ -1,4 +1,3 @@
-use core::num;
 use std::collections::HashMap;
 
 use super::*;
@@ -174,17 +173,17 @@ impl IRBuilder {
                 Constant::GlobalReference { name: _, ty: _ } => {
                     Self::global_name_from(operand).map(|s| s.into())
                 }
-                Constant::GetElementPtr(gep) => {
-                    dbg!(gep);
-                    match gep.address.as_ref() {
-                        Constant::GlobalReference { name, ty } => {
-                            // dbg!(gep);
-                            let dims = Self::dimensions_from_array(ty)?;
-                            dbg!(&dims);
-                            todo!();
-                        }
-                        _ => unimplemented!(),
-                    };
+                Constant::GetElementPtr(_gep) => {
+                    // dbg!(gep);
+                    // match gep.address.as_ref() {
+                    //     Constant::GlobalReference { name, ty } => {
+                    //         // dbg!(gep);
+                    //         let dims = Self::dimensions_from_array(ty)?;
+                    //         dbg!(&dims);
+                    //         todo!();
+                    //     }
+                    //     _ => unimplemented!(),
+                    // };
                     unimplemented!();
                 }
                 _ => {
@@ -196,6 +195,7 @@ impl IRBuilder {
         }
     }
     #[inline]
+    #[allow(unused)]
     pub fn dimensions_from_array(arr_ty: &llvm_ir::Type) -> Result<Vec<usize>> {
         match arr_ty {
             llvm_ir::Type::ArrayType {
