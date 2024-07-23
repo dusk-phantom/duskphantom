@@ -95,7 +95,8 @@ impl IRBuilder {
                 );
                 let (op0, prepare) = Self::prepare_lhs(sub.get_lhs(), reg_gener, regs)?;
                 insts.extend(prepare);
-                let (op1, prepare) = Self::prepare_rhs(sub.get_rhs(), reg_gener, regs)?;
+                // 这里使用的是 prepare_lhs, mul rs1/rs2 都只能是 Reg
+                let (op1, prepare) = Self::prepare_lhs(sub.get_rhs(), reg_gener, regs)?;
                 insts.extend(prepare);
                 let dst = reg_gener.gen_virtual_usual_reg();
                 regs.insert(sub as *const _ as Address, dst);
