@@ -24,6 +24,14 @@ impl IRBuilder {
                         element_type,
                         elements,
                     } => Self::build_array_var(name, &element_type, &elements)?,
+                    Constant::Struct {
+                        name,
+                        values,
+                        is_packed,
+                    } => {
+                        dbg!(name, values, is_packed);
+                        unimplemented!();
+                    }
                     _ => {
                         dbg!(&global_var);
                         unimplemented!()
@@ -177,6 +185,7 @@ impl IRBuilder {
                     unimplemented!();
                 }
             }
+            init.retain(|(_, f)| *f != 0);
             return Ok((elems.len(), init));
         }
         // 递归部分 recursive part
