@@ -1,6 +1,6 @@
 use anyhow::Result;
 use std::collections::HashMap;
-use var::{ArrVar, FloatVar, IntVar, PrimVar, Var};
+use var::FloatVar;
 
 use super::Address;
 use crate::backend::*;
@@ -29,96 +29,11 @@ impl IRBuilder {
             global: global_vars,
             funcs,
         };
+
         Ok(prog::Program {
             entry: None,
             modules: vec![mdl],
         })
-    }
-
-    pub fn build_global_var(self_global_vars: &Vec<middle::ir::GlobalPtr>) -> Result<Vec<Var>> {
-        let mut global_vars = Vec::new();
-
-        for global_var in self_global_vars {
-            // dbg!(&global_var);
-            let name = &global_var.name.to_string(); // 这里的 name 是不带 @ 的
-                                                     // dbg!(&name);
-            match &global_var.initializer {
-                middle::ir::Constant::Int(value) => {
-                    let var = Var::Prim(PrimVar::IntVar(IntVar {
-                        name: name.to_string(),
-                        init: Some(*value),
-                        is_const: false, // TODO 这个可能要删掉
-                    }));
-                    global_vars.push(var);
-                }
-                middle::ir::Constant::Float(value) => {
-                    let var = Var::Prim(PrimVar::FloatVar(FloatVar {
-                        name: name.to_string(),
-                        init: Some(*value),
-                        is_const: false,
-                    }));
-                    global_vars.push(var);
-                }
-                middle::ir::Constant::Bool(value) => {
-                    let var = Var::Prim(PrimVar::IntVar(IntVar {
-                        name: name.to_string(),
-                        init: Some(*value as i32),
-                        is_const: false,
-                    }));
-                    global_vars.push(var);
-                }
-                // FIXME 中端来的 arr, 可能是部分初始化
-                middle::ir::Constant::Array(arr) => {
-                    match arr.first().with_context(|| context!())? {
-                        // 不可能出现: arr 是混合的
-                        middle::ir::Constant::Bool(_) | middle::ir::Constant::Int(_) => {
-                            let mut init = Vec::new();
-                            for (index, con) in arr.iter().enumerate() {
-                                if let middle::ir::Constant::Int(value) = con {
-                                    init.push((index, *value as u32)); // FIXME 这里 i32 和 u32 注意
-                                } else {
-                                    return Err(anyhow!("arr can't be mixed with other-type"))
-                                        .with_context(|| context!());
-                                }
-                            }
-                            let arr_var = Var::IntArr(ArrVar::<u32> {
-                                name: name.to_string(),
-                                capacity: arr.len(),
-                                init,
-                                is_const: false,
-                            });
-                            global_vars.push(arr_var);
-                        }
-                        middle::ir::Constant::Float(_) => {
-                            let mut init = Vec::new();
-                            for (index, con) in arr.iter().enumerate() {
-                                if let middle::ir::Constant::Float(value) = con {
-                                    init.push((index, *value));
-                                } else {
-                                    return Err(anyhow!(
-                                        "arr can't be mixed with float and others"
-                                    ))
-                                    .with_context(|| context!());
-                                }
-                            }
-                            let arr_var = Var::FloatArr(ArrVar::<f32> {
-                                name: name.to_string(),
-                                capacity: arr.len(),
-                                init,
-                                is_const: false,
-                            });
-                            global_vars.push(arr_var);
-                        }
-                        // TODO 是否有全局初始化过的二维数组 ？
-                        _ => {
-                            unreachable!();
-                        }
-                    }
-                }
-                middle::ir::Constant::SignedChar(_) => todo!(),
-            }
-        }
-        Ok(global_vars)
     }
 
     pub fn build_funcs(
