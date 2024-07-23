@@ -1,5 +1,4 @@
 use super::*;
-use bitvec::ptr::Const;
 use builder::IRBuilder;
 use llvm_ir::{constant::Float, Constant, ConstantRef, Type};
 
@@ -30,6 +29,7 @@ impl IRBuilder {
                         unimplemented!()
                     }
                 };
+                dbg!(&new_var);
                 global_vars.push(new_var);
             }
         }
@@ -68,7 +68,7 @@ impl IRBuilder {
     /// 处理0初始化的数组
     #[inline]
     pub fn build_aggregate_zero_var(name: &str, arr: &Type) -> Result<Var> {
-        let capacity = Self::capacity_of_empty_array(arr);
+        let capacity = Self::cap_from_empty_array(arr);
         let base_ty = Self::basic_element_type(arr);
         if Self::is_ty_int(base_ty) {
             let var = ArrVar::<u32> {
@@ -93,7 +93,7 @@ impl IRBuilder {
     }
 
     #[allow(clippy::if_same_then_else)]
-    pub fn capacity_of_empty_array(ty: &llvm_ir::Type) -> usize {
+    pub fn cap_from_empty_array(ty: &llvm_ir::Type) -> usize {
         match ty {
             llvm_ir::Type::ArrayType {
                 element_type,
@@ -104,7 +104,7 @@ impl IRBuilder {
                 } else if Self::is_ty_float(element_type) {
                     *num_elements
                 } else if Self::is_ty_array_type(element_type) {
-                    let sub = Self::capacity_of_empty_array(element_type);
+                    let sub = Self::cap_from_empty_array(element_type);
                     *num_elements * sub
                 } else {
                     dbg!(ty);
@@ -148,6 +148,7 @@ impl IRBuilder {
         };
         Ok(new_var)
     }
+
     /// 处理有初始值的数组,返回(数组容量,数组初始值)
     #[allow(unused)]
     pub fn cap_inits_from_array(
@@ -157,7 +158,7 @@ impl IRBuilder {
         // 首先处理递归基线 process recursive base line
         // 递归基线1: 空数组 base line 1: empty array
         if elems.is_empty() {
-            let capacity = Self::capacity_of_empty_array(e_ty);
+            let capacity = Self::cap_from_empty_array(e_ty);
             return Ok((capacity, vec![]));
         }
         // 递归基线2: 数组元素为常量 base line 2: array elements are constants
@@ -179,10 +180,25 @@ impl IRBuilder {
             return Ok((elems.len(), init));
         }
         // 递归部分 recursive part
-        dbg!(e_ty);
-        dbg!(elems);
-
-        unimplemented!();
+        let mut total_capacity: usize = 0;
+        let mut total_inits = vec![];
+        for elem in elems {
+            if let Constant::Array {
+                element_type,
+                elements,
+            } = elem.as_ref()
+            {
+                let (cap, inits) = Self::cap_inits_from_array(element_type, elements)?;
+                total_capacity += cap;
+                total_inits.extend(inits.into_iter().map(|(i, f)| (i + total_capacity, f)));
+            } else if let Constant::AggregateZero(arr) = elem.as_ref() {
+                let cap = Self::cap_from_empty_array(arr);
+                total_capacity += cap;
+            } else {
+                unimplemented!();
+            }
+        }
+        Ok((total_capacity, total_inits))
     }
 
     #[inline]
@@ -194,7 +210,7 @@ impl IRBuilder {
             } => Self::basic_element_type(element_type),
             llvm_ir::Type::IntegerType { .. } => ty,
             llvm_ir::Type::FPType { .. } => ty,
-            _ => ty,
+            _ => unimplemented!("basic_element_type"),
         }
     }
 }
