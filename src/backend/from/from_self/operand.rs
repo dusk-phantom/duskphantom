@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use anyhow::{anyhow, Context, Result};
 
-use crate::backend::{Inst, LiInst, Operand, Reg, RegGenerator, StackSlot};
+use crate::backend::var::FloatVar;
+use crate::backend::{Fmm, Inst, LiInst, LlaInst, LwInst, Operand, Reg, RegGenerator, StackSlot};
 
 use crate::context;
 
@@ -77,6 +78,7 @@ impl IRBuilder {
     }
 
     /// 因为 build_entry 的时候, 就已经把参数 mv <虚拟寄存器>, <param> 了
+    #[inline]
     pub fn parameter_from(
         param: &middle::ir::Parameter,
         regs: &HashMap<Address, Reg>,
@@ -146,10 +148,52 @@ impl IRBuilder {
         }
     }
 
-    #[allow(unused)]
+    #[inline]
+    pub fn prepare_f(
+        value: &middle::ir::Operand,
+        reg_gener: &mut RegGenerator,
+        regs: &HashMap<Address, Reg>,
+        fmms: &mut HashMap<Fmm, FloatVar>,
+    ) -> Result<(Operand, Vec<Inst>)> {
+        let mut insts: Vec<Inst> = Vec::new();
+        let value = IRBuilder::value_from(value, regs)?;
+        match &value {
+            Operand::Reg(_) => Ok((value, insts)),
+            Operand::Fmm(fmm) => {
+                let n = if let Some(f_var) = fmms.get(fmm) {
+                    f_var.name.clone()
+                } else {
+                    let name = Self::fmm_lit_label_from(fmm);
+                    fmms.insert(
+                        fmm.clone(),
+                        FloatVar {
+                            name: name.clone(),
+                            init: Some(fmm.clone().try_into()?),
+                            is_const: true,
+                        },
+                    );
+                    name
+                };
+                let addr = reg_gener.gen_virtual_usual_reg();
+                let la = LlaInst::new(addr, n.into());
+                insts.push(la.into());
+                let dst = reg_gener.gen_virtual_float_reg();
+                let loadf = LwInst::new(dst, 0.into(), addr);
+                insts.push(loadf.into());
+                Ok((dst.into(), insts))
+            }
+            _ => unimplemented!(),
+        }
+    }
+
+    #[inline]
+    pub fn fmm_lit_label_from(fmm: &Fmm) -> String {
+        format!("_fc_{:x}", fmm.to_bits())
+    }
+
+    #[inline]
     pub fn prepare_cond(
         cond: &middle::ir::Operand,
-        reg_gener: &mut RegGenerator,
         regs: &HashMap<Address, Reg>,
     ) -> Result<(Reg, Vec<Inst>)> {
         match cond {
@@ -185,6 +229,7 @@ impl IRBuilder {
         }
     }
 
+    #[inline]
     pub fn pointer_from(
         operand: &middle::ir::Operand,
         regs: &mut HashMap<Address, Reg>,

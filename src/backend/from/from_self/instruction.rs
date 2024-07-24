@@ -44,48 +44,20 @@ impl IRBuilder {
                 ssa2tac_three_usual_Itype!(AddInst, Add, inst, regs, reg_gener)
             }
             middle::ir::instruction::InstType::FAdd => {
-                // TODO 浮点型指令, 立即数处理
                 // ssa2tac_binary_float!(inst, regs, reg_gener, FAdd, Add, AddInst)
-                let mut ret = Vec::new();
+                let mut insts = Vec::new();
                 let fadd = downcast_ref::<middle::ir::instruction::binary_inst::FAdd>(
                     inst.as_ref().as_ref(),
                 );
-                let mut get_reg = |op: Operand| -> Result<Reg> {
-                    match op {
-                        Operand::Reg(reg) => Ok(reg),
-                        Operand::Fmm(fmm) => {
-                            let n = if let Some(f_var) = fmms.get(&fmm) {
-                                f_var.name.clone()
-                            } else {
-                                let name = format!("_fc_{:x}", fmm.to_bits());
-                                fmms.insert(
-                                    fmm.clone(),
-                                    FloatVar {
-                                        name: name.clone(),
-                                        init: Some(fmm.try_into()?),
-                                        is_const: true,
-                                    },
-                                );
-                                name
-                            };
-                            let addr = reg_gener.gen_virtual_usual_reg(); // 地址
-                            let la = LlaInst::new(addr, n.into());
-                            ret.push(la.into());
-                            let dst = reg_gener.gen_virtual_float_reg(); // fmm
-                            let loadf = LwInst::new(dst, 0.into(), addr);
-                            ret.push(loadf.into());
-                            Ok(dst)
-                        }
-                        _ => Err(anyhow!("operand type not supported")).with_context(|| context!()),
-                    }
-                };
-                let op0 = get_reg(Self::value_from(fadd.get_lhs(), regs)?)?;
-                let op1 = get_reg(Self::value_from(fadd.get_rhs(), regs)?)?;
+                let (op0, prepare) = Self::prepare_f(fadd.get_lhs(), reg_gener, regs, fmms)?;
+                insts.extend(prepare);
+                let (op1, prepare) = Self::prepare_f(fadd.get_rhs(), reg_gener, regs, fmms)?;
+                insts.extend(prepare);
                 let dst0 = reg_gener.gen_virtual_float_reg();
-                let add_inst = AddInst::new(dst0.into(), op0.into(), op1.into());
+                let add_inst = AddInst::new(dst0.into(), op0, op1);
                 regs.insert(fadd as *const _ as Address, dst0);
-                ret.push(add_inst.into());
-                Ok(ret)
+                insts.push(add_inst.into());
+                Ok(insts)
             }
             middle::ir::instruction::InstType::Sub => {
                 ssa2tac_three_usual_Rtype!(SubInst, Sub, inst, regs, reg_gener)
@@ -141,7 +113,7 @@ impl IRBuilder {
                 let br = downcast_ref::<middle::ir::instruction::terminator_inst::Br>(
                     inst.as_ref().as_ref(),
                 );
-                Self::build_br_inst(br, regs, reg_gener)
+                Self::build_br_inst(br, regs)
             }
             middle::ir::instruction::InstType::Load => {
                 let load = downcast_ref::<middle::ir::instruction::memory_op_inst::Load>(
@@ -580,7 +552,6 @@ impl IRBuilder {
     pub fn build_br_inst(
         br: &middle::ir::instruction::terminator_inst::Br,
         regs: &mut HashMap<Address, Reg>,
-        reg_gener: &mut RegGenerator,
     ) -> Result<Vec<Inst>> {
         let parent_bb = br
             .get_parent_bb()
@@ -589,7 +560,7 @@ impl IRBuilder {
         let mut br_insts: Vec<Inst> = Vec::new();
         if br.is_cond_br() {
             let (cond, instrs) =
-                Self::prepare_cond(br.get_cond(), reg_gener, regs).with_context(|| context!())?;
+                Self::prepare_cond(br.get_cond(), regs).with_context(|| context!())?;
             br_insts.extend(instrs);
             let true_bb = parent_bb
                 .get_succ_bb()
@@ -621,42 +592,42 @@ impl IRBuilder {
         Ok(br_insts)
     }
 
-    /// 不是 ret 就是 br
-    #[allow(unused)]
-    pub fn build_term_inst(
-        term: &ObjPtr<Box<dyn middle::ir::Instruction>>,
-        regs: &mut HashMap<Address, Reg>,
-        reg_gener: &mut RegGenerator,
-        fmms: &mut HashMap<Fmm, FloatVar>,
-    ) -> Result<Vec<Inst>> {
-        let mut ret_insts: Vec<Inst> = Vec::new();
-        // dbg!(term);
+    // /// 不是 ret 就是 br
+    // #[allow(unused)]
+    // pub fn build_term_inst(
+    //     term: &ObjPtr<Box<dyn middle::ir::Instruction>>,
+    //     regs: &mut HashMap<Address, Reg>,
+    //     reg_gener: &mut RegGenerator,
+    //     fmms: &mut HashMap<Fmm, FloatVar>,
+    // ) -> Result<Vec<Inst>> {
+    //     let mut ret_insts: Vec<Inst> = Vec::new();
+    //     // dbg!(term);
 
-        let insts = match term.get_type() {
-            middle::ir::instruction::InstType::Ret => {
-                let ret = downcast_ref::<middle::ir::instruction::terminator_inst::Ret>(
-                    term.as_ref().as_ref(),
-                );
-                Self::build_ret_inst(ret, reg_gener, regs, fmms)?
-            }
-            middle::ir::instruction::InstType::Br => {
-                let br = downcast_ref::<middle::ir::instruction::terminator_inst::Br>(
-                    term.as_ref().as_ref(),
-                );
-                Self::build_br_inst(br, regs, reg_gener)?
-            }
-            _ => {
-                return Err(anyhow!("get_last_inst only to be ret or br"))
-                    .with_context(|| context!())
-            }
-        };
+    //     let insts = match term.get_type() {
+    //         middle::ir::instruction::InstType::Ret => {
+    //             let ret = downcast_ref::<middle::ir::instruction::terminator_inst::Ret>(
+    //                 term.as_ref().as_ref(),
+    //             );
+    //             Self::build_ret_inst(ret, reg_gener, regs, fmms)?
+    //         }
+    //         middle::ir::instruction::InstType::Br => {
+    //             let br = downcast_ref::<middle::ir::instruction::terminator_inst::Br>(
+    //                 term.as_ref().as_ref(),
+    //             );
+    //             Self::build_br_inst(br, regs)?
+    //         }
+    //         _ => {
+    //             return Err(anyhow!("get_last_inst only to be ret or br"))
+    //                 .with_context(|| context!())
+    //         }
+    //     };
 
-        // TODO 这里 return 还要记得 退栈
+    //     // TODO 这里 return 还要记得 退栈
 
-        ret_insts.extend(insts);
+    //     ret_insts.extend(insts);
 
-        Ok(ret_insts)
-    }
+    //     Ok(ret_insts)
+    // }
 
     #[allow(unused)]
     pub fn build_call_inst(
