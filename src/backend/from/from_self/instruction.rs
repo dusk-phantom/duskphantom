@@ -383,14 +383,11 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &HashMap<Address, Reg>,
     ) -> Result<Vec<Inst>> {
-        // 这个 address
-        // 有三种来源: 1. 全局变量 2. alloca 3. get_element_ptr // TODO 目前只有 stack
+        let mut ret: Vec<Inst> = Vec::new();
         let src: &&middle::ir::Operand = &store.get_ptr();
-        // address 这个地址是 stack 上的地址
         let address = Self::stack_slot_from(src, stack_slots).with_context(|| context!())?;
         let val = &store.get_value();
         let val = Self::no_load_from(val, regs).with_context(|| context!())?;
-        let mut ret: Vec<Inst> = Vec::new();
         match val {
             Operand::Imm(imm) => {
                 let _val = reg_gener.gen_virtual_usual_reg(); // 分配一个临时的 dest, 用来存储 imm, 因此 sd reg, stack_slot
@@ -436,21 +433,25 @@ impl IRBuilder {
         };
         regs.insert(load as *const _ as Address, dst_reg);
         // 两种情况: 1. 从栈上获取(之前 alloca 过一次), 2. 从非栈上获取(parameter-pointer, global)
-        if let Ok(slot) = Self::stack_slot_from(load.get_ptr(), stack_slots) {
-            // stack
-            let ld = LoadInst::new(dst_reg, slot.try_into()?);
-            ret.push(ld.into());
-        } else if let Ok(label) = Self::global_from(load.get_ptr()) {
-            let addr = reg_gener.gen_virtual_usual_reg();
-            let la = LlaInst::new(addr, label.into());
-            ret.push(la.into());
-            let lw = LwInst::new(dst_reg, 0.into(), addr);
-            ret.push(lw.into());
-        } else if let Ok(base /* 基地址 */) = Self::pointer_from(load.get_ptr(), regs) {
-            let lw = LwInst::new(dst_reg, 0.into(), base);
-            ret.push(lw.into());
-        } else {
-            return Err(anyhow!("load instruction with other address")).with_context(|| context!());
+        let addr =
+            Self::address_from(load.get_ptr(), regs, stack_slots).with_context(|| context!())?;
+        match addr {
+            Operand::Reg(base) => {
+                let lw = LwInst::new(dst_reg, 0.into(), base);
+                ret.push(lw.into());
+            }
+            Operand::StackSlot(slot) => {
+                let ld = LoadInst::new(dst_reg, slot); // 对于 stack, 就是使用的 ld
+                ret.push(ld.into());
+            }
+            Operand::Label(label) => {
+                let addr = reg_gener.gen_virtual_usual_reg();
+                let lla = LlaInst::new(addr, label);
+                ret.push(lla.into());
+                let lw = LwInst::new(dst_reg, 0.into(), addr);
+                ret.push(lw.into());
+            }
+            _ => {} // imm, fmm
         }
         Ok(ret)
     }
