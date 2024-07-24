@@ -109,12 +109,6 @@ pub mod tests_domin {
 
         // check self
         assert!(bb_vec.iter().all(|bb| domin.is_dominate(*bb, *bb)));
-        check_t(0, 0);
-        check_t(1, 1);
-        check_t(2, 2);
-        check_t(3, 3);
-        check_t(4, 4);
-        check_t(5, 5);
 
         check_t(0, 1);
         check_t(0, 2);
@@ -131,5 +125,52 @@ pub mod tests_domin {
         check_f(3, 5);
 
         check_f(4, 5);
+    }
+
+    #[test]
+    fn back_edge() {
+        let mut pool = IRBuilder::new();
+        let (func, bb_vec) = gen_graph(&mut pool, vec![[1, -1], [2, 3], [1, 3], [-1, -1]]);
+        let domin = make_domin(func);
+
+        let check_t = |i, j| assert!(check_domin(&bb_vec, &domin, i, j));
+        let check_f = |i, j| assert!(!check_domin(&bb_vec, &domin, i, j));
+
+        check_t(0, 1);
+        check_t(0, 2);
+        check_t(0, 3);
+
+        check_t(1, 2);
+        check_t(1, 3);
+
+        check_f(2, 1);
+        check_f(2, 3);
+    }
+
+    #[test]
+    fn branch_nested_loop() {
+        let mut pool = IRBuilder::new();
+        let (func, bb_vec) = gen_graph(&mut pool, vec![[1, -1], [2, 3], [4, -1], [4, -1], [0, 1]]);
+        let domin = make_domin(func);
+
+        let check_t = |i, j| assert!(check_domin(&bb_vec, &domin, i, j));
+        let check_f = |i, j| assert!(!check_domin(&bb_vec, &domin, i, j));
+
+        check_t(0, 1);
+        check_t(0, 2);
+        check_t(0, 3);
+        check_t(0, 4);
+
+        check_t(1, 2);
+        check_t(1, 3);
+        check_t(1, 4);
+
+        check_f(2, 4);
+        check_f(2, 3);
+
+        check_f(3, 4);
+
+        check_f(4, 0);
+        check_f(4, 1);
     }
 }
