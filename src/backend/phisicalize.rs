@@ -5,6 +5,7 @@ use super::*;
 // turn virtual backend module to phisic backend module
 #[allow(unused)]
 pub fn phisicalize(program: &mut Program) -> Result<(), BackendError> {
+    // return Ok(()); // debug
     for module in program.modules.iter_mut() {
         for func in module.funcs.iter_mut() {
             phisicalize_reg(func)?;

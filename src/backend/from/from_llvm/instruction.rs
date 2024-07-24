@@ -419,6 +419,13 @@ impl IRBuilder {
                 };
                 ret.push(load);
             }
+            Operand::Reg(addr) => {
+                let load: Inst = match dst_size {
+                    MemSize::FourByte => LwInst::new(dst_reg, 0.into(), addr).into(),
+                    MemSize::EightByte => LdInst::new(dst_reg, 0.into(), addr).into(),
+                };
+                ret.push(load);
+            }
             _ => {
                 return Err(anyhow!(
                     "load instruction with invalid address {:?}",

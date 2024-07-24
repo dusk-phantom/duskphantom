@@ -169,7 +169,7 @@ impl IRBuilder {
         stack_slots: &HashMap<Name, StackSlot>,
     ) -> Result<(Operand, Vec<Inst>)> {
         let mut pre_insert = Vec::new();
-        let addr = match operand {
+        let addr: Operand = match operand {
             llvm_ir::Operand::LocalOperand { name: _, ty: _ } => {
                 Self::stack_slot_from(operand, stack_slots)?
             }
@@ -179,37 +179,89 @@ impl IRBuilder {
                 }
                 Constant::GetElementPtr(gep) => {
                     dbg!(gep);
-                    let idxs = Self::indices_from_gep(gep)?;
                     match gep.address.as_ref() {
                         Constant::GlobalReference { name: _, ty } => {
                             let arr_label = Self::globalname_from_operand(operand)?;
                             // dbg!(gep);
                             // lla base <arr_label>; mul of0 <index[0]> <size[0]>; add base base of0
                             let dims = Self::dimensions_from_array(ty)?;
+                            let idxs = Self::indices_from_gep(gep)?;
                             assert!(idxs.len() == dims.len());
                             let base_reg = reg_gener.gen_virtual_usual_reg();
                             let lla = LlaInst::new(base_reg, arr_label.into());
                             pre_insert.push(lla.into());
-                            let offset = reg_gener.gen_virtual_usual_reg();
+
                             let mut sizes = {
                                 let mut sizes = Vec::new();
                                 let mut size = 1;
-                                sizes.push(size);
-                                for dim in dims.iter().skip(1).rev() {
+                                for dim in dims.iter().rev() {
                                     sizes.push(size);
                                     size *= dim;
                                 }
+                                sizes.reverse();
                                 sizes
                             };
-                            dbg!(sizes);
-                            // let r=r
-                            // count the offset
-                            dbg!(&dims);
-                            dbg!(&pre_insert);
-                            todo!();
+                            assert!(sizes.len() == idxs.len());
+
+                            let mut offset = REG_ZERO;
+                            for (idx, factor) in idxs.iter().zip(sizes.iter()) {
+                                if factor == &1 {
+                                    let to_add: Imm = (*idx as i64).into();
+                                    let rhs: Operand = if to_add.in_limit(12) {
+                                        to_add.clone().into()
+                                    } else {
+                                        let rhs = reg_gener.gen_virtual_usual_reg();
+                                        let li = LiInst::new(rhs.into(), to_add.clone().into());
+                                        pre_insert.push(li.into());
+                                        rhs.into()
+                                    };
+
+                                    let new_offset = reg_gener.gen_virtual_usual_reg();
+                                    let add = AddInst::new(
+                                        new_offset.into(),
+                                        offset.into(),
+                                        to_add.into(),
+                                    );
+                                    offset = new_offset;
+                                    pre_insert.push(add.into());
+                                    continue;
+                                }
+
+                                // Note!!! the factor is a usize, so such conversion is not always safe
+                                let factor: Imm = (*factor as i64).into();
+                                let to_add = reg_gener.gen_virtual_usual_reg();
+                                let lhs = reg_gener.gen_virtual_usual_reg();
+
+                                // Note!!! the idx is a usize, so it is not always save to convert it to i64
+                                let li = LiInst::new(lhs.into(), (*idx as i64).into());
+                                pre_insert.push(li.into());
+
+                                let rhs = if factor.in_limit(12) {
+                                    factor.into()
+                                } else {
+                                    let rhs = reg_gener.gen_virtual_usual_reg();
+                                    let li = LiInst::new(rhs.into(), factor.into());
+                                    pre_insert.push(li.into());
+                                    rhs.into()
+                                };
+
+                                let mul = MulInst::new(to_add.into(), lhs.into(), rhs);
+                                pre_insert.push(mul.into());
+
+                                let new_offset = reg_gener.gen_virtual_usual_reg();
+                                let add =
+                                    AddInst::new(new_offset.into(), offset.into(), to_add.into());
+                                offset = new_offset;
+                                pre_insert.push(add.into());
+                            }
+
+                            let addr = reg_gener.gen_virtual_usual_reg();
+                            let add = AddInst::new(addr.into(), base_reg.into(), offset.into());
+                            pre_insert.push(add.into());
+                            addr.into()
                         }
                         _ => unimplemented!(),
-                    };
+                    }
                 }
                 _ => {
                     dbg!(c);
@@ -223,8 +275,8 @@ impl IRBuilder {
         };
         Ok((addr, pre_insert))
     }
+
     #[inline]
-    #[allow(unused)]
     pub fn dimensions_from_array(arr_ty: &llvm_ir::Type) -> Result<Vec<usize>> {
         match arr_ty {
             llvm_ir::Type::ArrayType {
@@ -232,7 +284,7 @@ impl IRBuilder {
                 num_elements,
             } => {
                 let mut dims = vec![*num_elements];
-                let mut suf_dims = Self::dimensions_from_array(element_type)?;
+                let suf_dims = Self::dimensions_from_array(element_type)?;
                 dims.extend(suf_dims);
                 Ok(dims)
             }
