@@ -101,7 +101,7 @@ impl IRBuilder {
     /// 需要注意的是 指令的 lvalue 只能是寄存器,所以如果value是个常数,则需要用一个寄存器来存储,并且需要生成一条指令
     /// so this function promise that the return value is a (reg,pre_insts) tuple
     /// pre_insts is the insts that generate the reg,which should be inserted before the insts that use the reg
-    pub fn prepare_rs1(
+    pub fn prepare_rs1_i(
         value: &middle::ir::Operand,
         reg_gener: &mut RegGenerator,
         regs: &HashMap<Address, Reg>,
@@ -123,7 +123,7 @@ impl IRBuilder {
     /// 如果value是个寄存器,直接返回,
     /// 如果是个常数,如果超出范围,则需要用一个寄存器来存储,并且需要生成一条指令
     /// 如果是不超出范围的常数,则直接返回
-    pub fn prepare_rs2(
+    pub fn prepare_rs2_i(
         value: &middle::ir::Operand,
         reg_gener: &mut RegGenerator,
         regs: &HashMap<Address, Reg>,
@@ -157,14 +157,6 @@ impl IRBuilder {
             middle::ir::Operand::Global(_) => todo!(),
             middle::ir::Operand::Parameter(_) => todo!(),
             middle::ir::Operand::Instruction(instr) => {
-                // let instr = instr.as_ref();
-
-                // let addr = instr as *const _ as Address;
-                // let reg = regs
-                //     .get(&addr)
-                //     .ok_or(anyhow!("local var not found {}", addr))
-                //     .with_context(|| context!())?;
-                // Ok(((*reg).into(), vec![]))
                 let ope = Self::local_var_from(instr, regs)?;
                 Ok((ope, Vec::new()))
             }
