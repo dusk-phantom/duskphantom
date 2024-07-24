@@ -121,7 +121,12 @@ impl IRBuilder {
                 );
                 Self::build_load_inst(load, stack_slots, reg_gener, regs)
             }
-            middle::ir::instruction::InstType::GetElementPtr => todo!(),
+            middle::ir::instruction::InstType::GetElementPtr => {
+                let gep = downcast_ref::<middle::ir::instruction::memory_op_inst::GetElementPtr>(
+                    inst.as_ref().as_ref(),
+                );
+                Self::build_gep_inst(gep, reg_gener, regs)
+            }
             middle::ir::instruction::InstType::ZextTo => {
                 let zext = downcast_ref::<middle::ir::instruction::extend_inst::ZextTo>(
                     inst.as_ref().as_ref(),
@@ -177,6 +182,15 @@ impl IRBuilder {
     // ) -> Result<Vec<Inst>> {
     //     todo!()
     // }
+
+    #[allow(unused)]
+    fn build_gep_inst(
+        gep: &middle::ir::instruction::memory_op_inst::GetElementPtr,
+        reg_gener: &mut RegGenerator,
+        regs: &mut HashMap<Address, Reg>,
+    ) -> Result<Vec<Inst>> {
+        todo!()
+    }
 
     fn build_phi_inst(
         phi: &middle::ir::instruction::misc_inst::Phi,
