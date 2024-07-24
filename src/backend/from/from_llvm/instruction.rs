@@ -344,7 +344,10 @@ impl IRBuilder {
         regs: &HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
         let mut ret: Vec<Inst> = Vec::new();
-        let address = Self::address_from(&store.address, stack_slots)?;
+
+        let (address, pre_insert) = Self::address_from(&store.address, reg_gener, stack_slots)?;
+        ret.extend(pre_insert);
+
         let (value, pre_insts) = Self::prepare_lhs(&store.value, reg_gener, regs)?;
         ret.extend(pre_insts);
 
@@ -394,7 +397,10 @@ impl IRBuilder {
         let dst_reg = Self::new_var(&load.loaded_ty, reg_gener)?;
         let dst_size = Self::mem_size_from(&load.loaded_ty)?;
         regs.insert(load.dest.clone(), dst_reg);
-        let address = Self::address_from(&load.address, stack_slots)?;
+
+        let (address, pre_insert) = Self::address_from(&load.address, reg_gener, stack_slots)?;
+        ret.extend(pre_insert);
+
         match address {
             Operand::StackSlot(stack_slot) => {
                 let ld = match dst_size {

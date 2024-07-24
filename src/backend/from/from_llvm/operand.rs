@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use super::*;
+
 use builder::IRBuilder;
 
 use llvm_ir::{Constant, Name};
@@ -161,38 +162,66 @@ impl IRBuilder {
     }
 
     #[inline]
+    #[allow(unused)]
     pub fn address_from(
         operand: &llvm_ir::Operand,
+        reg_gener: &mut RegGenerator,
         stack_slots: &HashMap<Name, StackSlot>,
-    ) -> Result<Operand> {
-        match operand {
+    ) -> Result<(Operand, Vec<Inst>)> {
+        let mut pre_insert = Vec::new();
+        let addr = match operand {
             llvm_ir::Operand::LocalOperand { name: _, ty: _ } => {
-                Self::stack_slot_from(operand, stack_slots)
+                Self::stack_slot_from(operand, stack_slots)?
             }
             llvm_ir::Operand::ConstantOperand(c) => match c.as_ref() {
                 Constant::GlobalReference { name: _, ty: _ } => {
-                    Self::global_name_from(operand).map(|s| s.into())
+                    Self::globalname_from_operand(operand).map(|s| s.into())?
                 }
-                Constant::GetElementPtr(_gep) => {
-                    // dbg!(gep);
-                    // match gep.address.as_ref() {
-                    //     Constant::GlobalReference { name, ty } => {
-                    //         // dbg!(gep);
-                    //         let dims = Self::dimensions_from_array(ty)?;
-                    //         dbg!(&dims);
-                    //         todo!();
-                    //     }
-                    //     _ => unimplemented!(),
-                    // };
-                    unimplemented!();
+                Constant::GetElementPtr(gep) => {
+                    dbg!(gep);
+                    let idxs = Self::indices_from_gep(gep)?;
+                    match gep.address.as_ref() {
+                        Constant::GlobalReference { name: _, ty } => {
+                            let arr_label = Self::globalname_from_operand(operand)?;
+                            // dbg!(gep);
+                            // lla base <arr_label>; mul of0 <index[0]> <size[0]>; add base base of0
+                            let dims = Self::dimensions_from_array(ty)?;
+                            assert!(idxs.len() == dims.len());
+                            let base_reg = reg_gener.gen_virtual_usual_reg();
+                            let lla = LlaInst::new(base_reg, arr_label.into());
+                            pre_insert.push(lla.into());
+                            let offset = reg_gener.gen_virtual_usual_reg();
+                            let mut sizes = {
+                                let mut sizes = Vec::new();
+                                let mut size = 1;
+                                sizes.push(size);
+                                for dim in dims.iter().skip(1).rev() {
+                                    sizes.push(size);
+                                    size *= dim;
+                                }
+                                sizes
+                            };
+                            dbg!(sizes);
+                            // let r=r
+                            // count the offset
+                            dbg!(&dims);
+                            dbg!(&pre_insert);
+                            todo!();
+                        }
+                        _ => unimplemented!(),
+                    };
                 }
                 _ => {
                     dbg!(c);
                     unimplemented!();
                 }
             },
-            _ => Err(anyhow!("operand is not local var:{}", operand)).with_context(|| context!()),
-        }
+            _ => {
+                return Err(anyhow!("operand is not local var:{}", operand))
+                    .with_context(|| context!())
+            }
+        };
+        Ok((addr, pre_insert))
     }
     #[inline]
     #[allow(unused)]
@@ -211,6 +240,23 @@ impl IRBuilder {
             llvm_ir::Type::FPType(_) => Ok(vec![]),
             _ => unimplemented!(),
         }
+    }
+    #[inline]
+    pub fn indices_from_gep(gep: &llvm_ir::constant::GetElementPtr) -> Result<Vec<usize>> {
+        let mut indices = Vec::new();
+        fn idx_from(c: &Constant) -> Result<usize> {
+            match c {
+                Constant::Int { bits: _, value } => Ok(*value as usize),
+                _ => {
+                    dbg!(c);
+                    unimplemented!();
+                }
+            }
+        }
+        for idx in &gep.indices {
+            indices.push(idx_from(idx)?);
+        }
+        Ok(indices)
     }
 
     #[inline]
@@ -234,18 +280,31 @@ impl IRBuilder {
     }
 
     #[inline]
-    pub fn global_name_from(operand: &llvm_ir::Operand) -> Result<String> {
-        let n = match operand {
+    pub fn globalname_from_operand(operand: &llvm_ir::Operand) -> Result<String> {
+        match operand {
             llvm_ir::Operand::LocalOperand { name: _, ty: _ } => {
-                return Err(anyhow!("local operand".to_string())).with_context(|| context!())
+                Err(anyhow!("local operand".to_string())).with_context(|| context!())
             }
-            llvm_ir::Operand::ConstantOperand(c) => match c.as_ref() {
-                Constant::GlobalReference { name, ty: _ } => name.clone(),
-                _ => todo!(),
-            },
+            llvm_ir::Operand::ConstantOperand(c) => {
+                Self::globalname_from_constant(c).with_context(|| context!())
+            }
             llvm_ir::Operand::MetadataOperand => todo!(),
+        }
+    }
+
+    fn globalname_from_constant(c: &Constant) -> Result<String> {
+        let n = match c {
+            Constant::GlobalReference { name, ty: _ } => name.clone(),
+            Constant::GetElementPtr(gep) => match gep.address.as_ref() {
+                Constant::GlobalReference { name, ty: _ } => name.clone(),
+                _ => unimplemented!(),
+            },
+            _ => {
+                dbg!(c);
+                unimplemented!();
+            }
         };
-        Self::name_without_prefix(&n)
+        IRBuilder::name_without_prefix(&n)
     }
 
     #[inline]
