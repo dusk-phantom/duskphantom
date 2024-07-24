@@ -123,7 +123,7 @@ impl IRBuilder {
                 .get_mut(&bb_name)
                 .ok_or(anyhow!("").context(context!()))?;
             for (from, phi_dst) in insert_back {
-                let from = Self::value_from(&from, &regs)?;
+                let from = Self::no_load_from(&from, &regs)?;
                 match from {
                     Operand::Reg(_) => {
                         let mv = MvInst::new(phi_dst.into(), from);
