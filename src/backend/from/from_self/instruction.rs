@@ -261,9 +261,9 @@ impl IRBuilder {
         ) -> Result<(Operand, Operand)> {
             let lhs = icmp.get_lhs();
             let rhs = icmp.get_rhs();
-            let (op0, prepare) = IRBuilder::prepare_rs1(lhs, reg_gener, regs)?;
+            let (op0, prepare) = IRBuilder::prepare_rs1_i(lhs, reg_gener, regs)?;
             insts.extend(prepare);
-            let (op1, prepare) = IRBuilder::prepare_rs2(rhs, reg_gener, regs)?;
+            let (op1, prepare) = IRBuilder::prepare_rs2_i(rhs, reg_gener, regs)?;
             insts.extend(prepare);
             Ok((op0, op1))
         }
@@ -275,9 +275,9 @@ impl IRBuilder {
         ) -> Result<(Operand, Operand)> {
             let lhs = icmp.get_lhs();
             let rhs = icmp.get_rhs();
-            let (op0, prepare) = IRBuilder::prepare_rs1(rhs, reg_gener, regs)?;
+            let (op0, prepare) = IRBuilder::prepare_rs1_i(rhs, reg_gener, regs)?;
             insts.extend(prepare);
-            let (op1, prepare) = IRBuilder::prepare_rs2(lhs, reg_gener, regs)?;
+            let (op1, prepare) = IRBuilder::prepare_rs2_i(lhs, reg_gener, regs)?;
             insts.extend(prepare);
             Ok((op0, op1))
         }
