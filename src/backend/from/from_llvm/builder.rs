@@ -91,74 +91,209 @@ impl IRBuilder {
         fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<Vec<Func>> {
         let mut funcs = Vec::new();
-        for f in llvm_funcs {
-            // dbg!(&f);
-            let args: Vec<String> = f.parameters.iter().map(|p| p.name.to_string()).collect();
-            let mut reg_gener = RegGenerator::new();
-            let mut regs: HashMap<Name, Reg> = HashMap::new();
-            let mut stack_allocator = StackAllocator::new();
-            let mut stack_slots: HashMap<Name, StackSlot> = HashMap::new();
-            let (entry, caller_reg_stack) = Self::build_entry(
-                f,
-                &mut stack_allocator,
-                &mut stack_slots,
-                &mut reg_gener,
-                &mut regs,
-                fmms,
-            )?;
-            let mut m_f = Func::new(f.name.to_string(), args, entry);
-            let ret_ty = f.return_type.as_ref();
-            if Self::is_ty_float(ret_ty) {
-                m_f.ret_mut().replace(REG_FA0);
-            } else if Self::is_ty_int(ret_ty) {
-                m_f.ret_mut().replace(REG_A0);
-            } else if Self::is_ty_void(ret_ty) {
-                // do nothing
-            } else {
-                unimplemented!("return type is not int or float");
-            }
+        let mut caller_regs_stacks: HashMap<String, u32> = HashMap::new();
+        for llvm_func in llvm_funcs {
+            let (func, caller_regs_stack) = Self::build_func(llvm_func, fmms)?;
+            caller_regs_stacks.insert(func.name().to_string(), caller_regs_stack);
+            funcs.push(func);
+        }
+        // count max_callee_regs_stack
+        let max_callee_regs_stacks =
+            Self::prepare_max_callee_regs_stack(&mut funcs, &caller_regs_stacks)?;
+        // realloc stack slots considering max_callee_regs_stack
+        Self::realloc_stack_slots(&mut funcs, &max_callee_regs_stacks)?;
 
-            *m_f.caller_regs_stack_mut() = Some(caller_reg_stack.try_into()?);
-            for bb in Self::build_other_bbs(
-                f,
-                &mut stack_allocator,
-                &mut stack_slots,
-                &mut reg_gener,
-                &mut regs,
-                fmms,
-            )? {
-                m_f.push_bb(bb);
-            }
+        Ok(funcs)
+    }
 
-            *m_f.stack_allocator_mut() = Some(stack_allocator);
-            funcs.push(m_f);
+    /// build on-building func from llvm_ir::Function
+    /// # Arguments
+    /// * `llvm_func` - llvm_ir::Function
+    /// * `fmms` - HashMap<Fmm, FloatVar>
+    /// # Returns
+    /// `Result<(f:Func,caller_regs_stack:u32)>`
+    /// - f: the function, which is still on building,not condsidering the max_callee_regs_stack yet
+    /// - caller_regs_stack: the number of regs that the caller function needs to save
+    pub fn build_func(
+        llvm_func: &llvm_ir::Function,
+        fmms: &mut HashMap<Fmm, FloatVar>,
+    ) -> Result<(Func, u32)> {
+        let args: Vec<String> = llvm_func
+            .parameters
+            .iter()
+            .map(|p| p.name.to_string())
+            .collect();
+        let mut insert_back_for_remove_phi: HashMap<String, Vec<(llvm_ir::operand::Operand, Reg)>> =
+            HashMap::new();
+        let mut reg_gener = RegGenerator::new();
+        let mut regs: HashMap<Name, Reg> = HashMap::new();
+        let mut stack_allocator = StackAllocator::new();
+        let mut stack_slots: HashMap<Name, StackSlot> = HashMap::new();
+
+        let (entry, caller_reg_stack) = Self::build_entry(
+            llvm_func,
+            &mut stack_allocator,
+            &mut stack_slots,
+            &mut reg_gener,
+            &mut regs,
+            fmms,
+            &mut insert_back_for_remove_phi,
+        )?;
+        let mut m_f = Func::new(llvm_func.name.to_string(), args, entry);
+
+        let ret_ty = llvm_func.return_type.as_ref();
+        if Self::is_ty_float(ret_ty) {
+            m_f.ret_mut().replace(REG_FA0);
+        } else if Self::is_ty_int(ret_ty) {
+            m_f.ret_mut().replace(REG_A0);
+        } else if Self::is_ty_void(ret_ty) {
+            // do nothing
+        } else {
+            unimplemented!("return type is not int or float");
         }
 
-        // count max_callee_regs_stack
-        let name_func: HashMap<String, u32> = funcs
-            .iter()
-            .map(|f| (f.name().to_string(), f.caller_regs_stack()))
-            .collect();
-        for f in &mut funcs {
+        for bb in Self::build_other_bbs(
+            llvm_func,
+            &mut stack_allocator,
+            &mut stack_slots,
+            &mut reg_gener,
+            &mut regs,
+            fmms,
+            &mut insert_back_for_remove_phi,
+        )? {
+            m_f.push_bb(bb);
+        }
+
+        // insert back to bbs to process phi
+        let mut bbs_mut = m_f
+            .iter_bbs_mut()
+            .map(|bb| (bb.label().to_string(), bb))
+            .collect::<HashMap<String, &mut Block>>();
+        for (bb_name, insert_back) in insert_back_for_remove_phi {
+            let bb = bbs_mut
+                .get_mut(&bb_name)
+                .ok_or_else(|| anyhow!("{:?} not found", &bb_name))
+                .with_context(|| context!())?;
+            for (from, phi_dst) in insert_back {
+                let from = Self::value_from(&from, &regs)?;
+                match from {
+                    Operand::Reg(_) => {
+                        let mv = MvInst::new(phi_dst.into(), from);
+                        bb.insert_before_term(mv.into())?;
+                    }
+                    Operand::Imm(_) => {
+                        let li = LiInst::new(phi_dst.into(), from);
+                        bb.insert_before_term(li.into())?;
+                    }
+                    _ => unimplemented!(),
+                }
+            }
+        }
+
+        *m_f.stack_allocator_mut() = Some(stack_allocator);
+        Ok((m_f, caller_reg_stack.try_into()?))
+    }
+
+    fn prepare_max_callee_regs_stack(
+        funcs: &mut Vec<Func>,
+        caller_regs_stacks: &HashMap<String, u32>,
+    ) -> Result<HashMap<String, u32>> {
+        let mut max_callee_regs_stacks: HashMap<String, u32> = HashMap::new();
+        for f in funcs {
             let mut max_callee_regs_stack = 0;
             for bb in f.iter_bbs() {
                 for inst in bb.insts() {
-                    // 找到所有的 call 指令, 然后找到他的参数占用多少栈空间, 然后找到最大的那个, 然后设置 max_callee_regs_stack_mut
                     if let Inst::Call(c) = inst {
-                        // NOTICE: if callee_regs_stack is None, it means the function is not defined in the current module, so we can't get the callee_regs_stack
-                        // so we just guess the callee_regs_stack is 0 now.
-                        // FIXME: we should check the function is defined in the current module or not,and if not, we should report an warning.
                         let callee_regs_stack =
-                            *name_func.get(c.func_name().as_str()).unwrap_or(&0);
+                            *caller_regs_stacks.get(c.func_name().as_str()).unwrap_or(&0);
                         max_callee_regs_stack =
                             std::cmp::max(max_callee_regs_stack, callee_regs_stack);
                     }
                 }
             }
-            *f.max_callee_regs_stack_mut() = Some(max_callee_regs_stack);
+            max_callee_regs_stacks.insert(f.name().to_string(), max_callee_regs_stack);
         }
+        Ok(max_callee_regs_stacks)
+    }
 
-        Ok(funcs)
+    fn realloc_stack_slots(
+        funcs: &mut Vec<Func>,
+        max_callee_regs_stacks: &HashMap<String, u32>,
+    ) -> Result<()> {
+        for f in funcs {
+            let mut old_stack_slots: HashMap<StackSlot, usize> = HashMap::new();
+            let mut new_stack_allocator = StackAllocator::new();
+            for bb in f.iter_bbs() {
+                for inst in bb.insts() {
+                    let stack_slot = match inst {
+                        Inst::Load(load) => *load.src(),
+                        Inst::Store(store) => *store.dst(),
+                        _ => {
+                            continue;
+                        }
+                    };
+                    let new_times = old_stack_slots.get(&stack_slot).unwrap_or(&0) + 1;
+                    old_stack_slots.insert(stack_slot, new_times);
+                }
+            }
+            let max_callee_regs_need = *max_callee_regs_stacks.get(f.name()).unwrap_or(&0);
+            new_stack_allocator.alloc(max_callee_regs_need);
+            let mut old_stack_slots: Vec<(StackSlot, usize)> =
+                old_stack_slots.into_iter().collect();
+            old_stack_slots.sort_by(|a, b| a.1.cmp(&b.1));
+
+            let order_stack_slots = |old_stack_slots: Vec<(StackSlot, usize)>| {
+                let mut left_sss: Vec<StackSlot> = Vec::new();
+                let mut right_sss: Vec<StackSlot> = Vec::new();
+                for (idx, (ss, _)) in old_stack_slots.iter().rev().enumerate() {
+                    if idx % 2 == 0 {
+                        left_sss.push(*ss);
+                    } else {
+                        right_sss.push(*ss);
+                    }
+                }
+                left_sss.extend(right_sss.iter().rev());
+                left_sss
+            };
+            let ordered_stack_slots = order_stack_slots(old_stack_slots);
+
+            let mut new_stack_slots: HashMap<StackSlot, StackSlot> = HashMap::new();
+            for ss in ordered_stack_slots {
+                let new_ss = new_stack_allocator.alloc(ss.size());
+                new_stack_slots.insert(ss, new_ss);
+            }
+
+            for bb in f.iter_bbs_mut() {
+                for inst in bb.insts_mut() {
+                    match inst {
+                        Inst::Load(load) => {
+                            let new_ss = new_stack_slots
+                                .get(load.src())
+                                .ok_or_else(|| {
+                                    anyhow!("not found mapping of stack slot {:?} ", load.src())
+                                })
+                                .with_context(|| context!())?;
+                            *load.src_mut() = *new_ss;
+                        }
+                        Inst::Store(store) => {
+                            let new_ss = new_stack_slots
+                                .get(store.dst())
+                                .ok_or_else(|| {
+                                    anyhow!("not found mapping of stack slot {:?} ", store.dst())
+                                })
+                                .with_context(|| context!())?;
+                            *store.dst_mut() = *new_ss;
+                        }
+                        _ => {
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            f.stack_allocator_mut().replace(new_stack_allocator);
+        }
+        Ok(())
     }
 
     fn build_entry(
@@ -168,6 +303,7 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
         fmms: &mut HashMap<Fmm, FloatVar>,
+        insert_back_for_remove_phi: &mut HashMap<String, Vec<(llvm_ir::operand::Operand, Reg)>>,
     ) -> Result<(Block, usize)> {
         let bb = f
             .basic_blocks
@@ -207,9 +343,15 @@ impl IRBuilder {
         }
 
         for inst in &bb.instrs {
-            let gen_insts =
-                Self::build_instruction(inst, stack_allocator, stack_slots, reg_gener, regs)
-                    .with_context(|| context!())?;
+            let gen_insts = Self::build_instruction(
+                inst,
+                stack_allocator,
+                stack_slots,
+                reg_gener,
+                regs,
+                insert_back_for_remove_phi,
+            )
+            .with_context(|| context!())?;
             insts.extend(gen_insts);
         }
 
@@ -220,6 +362,7 @@ impl IRBuilder {
         let caller_regs_stack = usize::try_from(caller_regs_stack)?; // 这是将 i64 转换为 usize
         Ok((entry, caller_regs_stack))
     }
+
     fn build_other_bbs(
         f: &llvm_ir::Function,
         stack_allocator: &mut StackAllocator,
@@ -227,10 +370,19 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
         fmms: &mut HashMap<Fmm, FloatVar>,
+        insert_back_for_remove_phi: &mut HashMap<String, Vec<(llvm_ir::operand::Operand, Reg)>>,
     ) -> Result<Vec<Block>> {
         let mut ret: Vec<Block> = Vec::new();
         for bb in &f.basic_blocks[1..] {
-            let m_bb = Self::build_bb(bb, stack_allocator, stack_slots, reg_gener, regs, fmms)?;
+            let m_bb = Self::build_bb(
+                bb,
+                stack_allocator,
+                stack_slots,
+                reg_gener,
+                regs,
+                fmms,
+                insert_back_for_remove_phi,
+            )?;
             ret.push(m_bb);
         }
         Ok(ret)
@@ -243,18 +395,19 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
         fmms: &mut HashMap<Fmm, FloatVar>,
+        insert_back_for_remove_phi: &mut HashMap<String, Vec<(llvm_ir::operand::Operand, Reg)>>,
     ) -> Result<Block> {
-        let mut m_bb = Block::new(
-            bb.name
-                .to_string()
-                .strip_prefix('%')
-                .unwrap_or(&bb.name.to_string())
-                .to_string(),
-        );
+        let mut m_bb = Block::new(Self::label_name_from(&bb.name).with_context(|| context!())?);
         for inst in &bb.instrs {
-            let gen_insts =
-                Self::build_instruction(inst, stack_allocator, stack_slots, reg_gener, regs)
-                    .with_context(|| context!())?;
+            let gen_insts = Self::build_instruction(
+                inst,
+                stack_allocator,
+                stack_slots,
+                reg_gener,
+                regs,
+                insert_back_for_remove_phi,
+            )
+            .with_context(|| context!())?;
             m_bb.extend_insts(gen_insts);
         }
         let gen_insts =

@@ -1,6 +1,6 @@
 /// StackSlot: represents a stack slot, which is a contiguous memory region on the stack.
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct StackSlot {
     start: u32,
     size: u32,

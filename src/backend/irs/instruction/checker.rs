@@ -25,7 +25,7 @@ pub mod riscv {
                 Inst::Sd(inst) => inst.check_valid(),
                 Inst::Sw(inst) => inst.check_valid(),
                 Inst::Lw(inst) => inst.check_valid(),
-                Inst::La(inst) => inst.check_valid(),
+                Inst::Lla(inst) => inst.check_valid(),
                 Inst::Load(inst) => inst.check_valid(),
                 Inst::Store(inst) => inst.check_valid(),
                 Inst::Jmp(inst) => inst.check_valid(),
@@ -48,7 +48,16 @@ pub mod riscv {
                 Inst::Tail(inst) => inst.check_valid(),
                 Inst::Li(inst) => inst.check_valid(),
                 Inst::Seqz(inst) => inst.check_valid(),
+                Inst::Snez(snez) => snez.check_valid(),
+                Inst::Not(not) => not.check_valid(),
             }
+        }
+    }
+    impl CheckValidInst for SubInst {
+        fn check_valid(&self) -> bool {
+            matches!(self.dst(), Operand::Reg(_))
+                && matches!(self.lhs(), Operand::Reg(_))
+                && matches!(self.rhs(), Operand::Reg(_))
         }
     }
 
@@ -59,7 +68,13 @@ pub mod riscv {
                 && matches!(self.rhs(), Operand::Reg(_))
         }
     }
-    impl CheckValidInst for DivInst {}
+    impl CheckValidInst for DivInst {
+        fn check_valid(&self) -> bool {
+            matches!(self.dst(), Operand::Reg(_))
+                && matches!(self.lhs(), Operand::Reg(_))
+                && matches!(self.rhs(), Operand::Reg(_))
+        }
+    }
     impl CheckValidInst for SllInst {}
     impl CheckValidInst for SrlInst {}
     impl CheckValidInst for SltInst {}
@@ -68,7 +83,7 @@ pub mod riscv {
     impl CheckValidInst for SdInst {}
     impl CheckValidInst for SwInst {}
     impl CheckValidInst for LwInst {}
-    impl CheckValidInst for LaInst {}
+    impl CheckValidInst for LlaInst {}
     impl CheckValidInst for LoadInst {
         /// 在riscv 阶段，不应该存在load指令
         fn check_valid(&self) -> bool {
@@ -95,8 +110,13 @@ pub mod riscv {
     impl CheckValidInst for XorInst {}
     impl CheckValidInst for TailInst {}
     impl CheckValidInst for AddInst {}
-    impl CheckValidInst for SubInst {}
-    impl CheckValidInst for MulInst {}
+    impl CheckValidInst for MulInst {
+        fn check_valid(&self) -> bool {
+            matches!(self.dst(), Operand::Reg(_))
+                && matches!(self.lhs(), Operand::Reg(_))
+                && matches!(self.rhs(), Operand::Reg(_))
+        }
+    }
     impl CheckValidInst for NegInst {}
     impl CheckValidInst for LiInst {
         fn check_valid(&self) -> bool {
@@ -110,10 +130,32 @@ pub mod riscv {
     }
     impl CheckValidInst for F2iInst {
         fn check_valid(&self) -> bool {
-            matches!(self.dst(), Operand::Reg(_)) && matches!(self.src(), Operand::Reg(_))
+            (match self.dst() {
+                Operand::Reg(r) => r.is_usual(),
+                _ => false,
+            }) && (match self.src() {
+                Operand::Reg(r) => r.is_float(),
+                _ => false,
+            })
         }
     }
     impl CheckValidInst for I2fInst {
+        fn check_valid(&self) -> bool {
+            (match self.dst() {
+                Operand::Reg(r) => r.is_float(),
+                _ => false,
+            }) && (match self.src() {
+                Operand::Reg(r) => r.is_usual(),
+                _ => false,
+            })
+        }
+    }
+    impl CheckValidInst for SnezInst {
+        fn check_valid(&self) -> bool {
+            matches!(self.dst(), Operand::Reg(_)) && matches!(self.src(), Operand::Reg(_))
+        }
+    }
+    impl CheckValidInst for NotInst {
         fn check_valid(&self) -> bool {
             matches!(self.dst(), Operand::Reg(_)) && matches!(self.src(), Operand::Reg(_))
         }

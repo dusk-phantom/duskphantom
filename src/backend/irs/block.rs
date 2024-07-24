@@ -59,4 +59,29 @@ impl Block {
     pub fn insts_mut(&mut self) -> &mut Vec<Inst> {
         &mut self.insts
     }
+
+    pub fn insert_before_term(&mut self, inst: Inst) -> Result<()> {
+        let is_term = |inst: &Inst| {
+            matches!(
+                inst,
+                Inst::Jmp(_)
+                    | Inst::Tail(_)
+                    | Inst::Call(_)
+                    | Inst::Ret
+                    | Inst::Beq(_)
+                    | Inst::Bne(_)
+                    | Inst::Blt(_)
+                    | Inst::Ble(_)
+                    | Inst::Bgt(_)
+                    | Inst::Bge(_)
+            )
+        };
+        let first_term = self.insts.iter().position(is_term);
+        if let Some(first_term) = first_term {
+            self.insts.insert(first_term, inst);
+        } else {
+            unreachable!("no term inst in block");
+        }
+        Ok(())
+    }
 }

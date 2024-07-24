@@ -2,20 +2,44 @@ use anyhow::Ok;
 
 use super::*;
 
+#[derive(Clone, Debug)]
+pub enum MemSize {
+    FourByte,
+    EightByte,
+}
+fn new_addr(ss: &StackSlot, stack_size: u32) -> (Imm, Reg) {
+    if ss.start() > stack_size >> 1 {
+        (ss.start().into(), REG_SP)
+    } else {
+        (((ss.start() as i64) - (stack_size as i64)).into(), REG_S0)
+    }
+}
+
 // 实现一些用于辅助的伪指令
 #[derive(Clone, Debug)]
 pub struct StoreInst {
     dst: StackSlot,
     src: Reg,
+    mode: MemSize,
 }
 #[derive(Clone, Debug)]
 pub struct LoadInst {
     dst: Reg,
     src: StackSlot,
+    mem_size: MemSize,
 }
 impl StoreInst {
     pub fn new(dst: StackSlot, src: Reg) -> Self {
-        Self { dst, src }
+        Self {
+            dst,
+            src,
+            mode: MemSize::FourByte,
+        }
+    }
+
+    pub fn with_8byte(mut self) -> Self {
+        self.mode = MemSize::EightByte;
+        self
     }
     pub fn dst(&self) -> &StackSlot {
         &self.dst
@@ -33,11 +57,35 @@ impl StoreInst {
     pub fn gen_asm(&self) -> String {
         format!("store {},{}", self.src.gen_asm(), self.dst.gen_asm())
     }
+
+    #[inline]
+    pub fn phisicalize(&self, stack_size: u32) -> Result<Inst> {
+        match self.mode {
+            MemSize::FourByte => {
+                let (off, base) = new_addr(&self.dst, stack_size);
+                Ok(SwInst::new(self.src, off, base).into())
+            }
+            MemSize::EightByte => {
+                let (off, base) = new_addr(&self.dst, stack_size);
+                Ok(SdInst::new(self.src, off, base).into())
+            }
+        }
+    }
 }
+
 impl LoadInst {
     pub fn new(dst: Reg, src: StackSlot) -> Self {
-        Self { dst, src }
+        Self {
+            dst,
+            src,
+            mem_size: MemSize::FourByte,
+        }
     }
+    pub fn with_8byte(mut self) -> Self {
+        self.mem_size = MemSize::EightByte;
+        self
+    }
+
     #[inline]
     pub fn dst(&self) -> &Reg {
         &self.dst
@@ -58,6 +106,20 @@ impl LoadInst {
     pub fn gen_asm(&self) -> String {
         format!("load {},{}", self.dst.gen_asm(), self.src.gen_asm())
     }
+
+    #[inline]
+    pub fn phisicalize(&self, stack_size: u32) -> Result<Inst> {
+        match self.mem_size {
+            MemSize::FourByte => {
+                let (off, base) = new_addr(&self.src, stack_size);
+                Ok(LwInst::new(self.dst, off, base).into())
+            }
+            MemSize::EightByte => {
+                let (off, base) = new_addr(&self.src, stack_size);
+                Ok(LdInst::new(self.dst, off, base).into())
+            }
+        }
+    }
 }
 
 impl_mem_inst!(LdInst, "ld");
@@ -68,8 +130,8 @@ impl_two_op_inst!(LiInst, "li");
 
 // la
 #[derive(Clone, Debug)]
-pub struct LaInst(Reg, Label);
-impl LaInst {
+pub struct LlaInst(Reg, Label);
+impl LlaInst {
     pub fn new(dst: Reg, label: Label) -> Self {
         Self(dst, label)
     }
@@ -86,7 +148,7 @@ impl LaInst {
         &mut self.1
     }
     pub fn gen_asm(&self) -> String {
-        format!("la {},{}", self.0.gen_asm(), self.1.gen_asm())
+        format!("lla {},{}", self.0.gen_asm(), self.1.gen_asm())
     }
 }
 
@@ -103,7 +165,7 @@ impl RegReplace for LoadInst {
     }
 }
 impl RegReplace for StoreInst {
-    fn replace_def(&mut self, from: Reg, to: Reg) -> Result<()> {
+    fn replace_use(&mut self, from: Reg, to: Reg) -> Result<()> {
         if self.src == from {
             self.src = to;
         }
@@ -129,8 +191,8 @@ impl RegReplace for SdInst {
         if self.base() == &from {
             *self.base_mut() = to;
         }
-        if self.base() == &from {
-            *self.base_mut() = to;
+        if self.dst() == &from {
+            *self.dst_mut() = to;
         }
         Ok(())
     }
@@ -139,6 +201,9 @@ impl RegReplace for SwInst {
     fn replace_use(&mut self, from: Reg, to: Reg) -> Result<()> {
         if self.base() == &from {
             *self.base_mut() = to;
+        }
+        if self.dst() == &from {
+            *self.dst_mut() = to;
         }
         Ok(())
     }
@@ -158,7 +223,7 @@ impl RegReplace for LwInst {
     }
 }
 
-impl RegReplace for LaInst {
+impl RegReplace for LlaInst {
     fn replace_def(&mut self, from: Reg, to: Reg) -> Result<()> {
         if self.0 == from {
             self.0 = to;

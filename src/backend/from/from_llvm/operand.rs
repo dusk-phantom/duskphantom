@@ -76,7 +76,7 @@ impl IRBuilder {
         let name = &name
             .strip_prefix('%')
             .ok_or(anyhow!("").context(context!()))?;
-        Ok(name.to_string())
+        Ok(format!(".LBB_{}", name))
     }
 
     pub fn const_from(operand: &llvm_ir::Operand) -> Result<Operand> {
@@ -108,6 +108,74 @@ impl IRBuilder {
             Ok(c)
         } else {
             Err(anyhow!("value neither is reg or const:{}", operand)).with_context(|| context!())
+        }
+    }
+
+    /// 需要注意的是 指令的 lvalue 只能是寄存器,所以如果value是个常数,则需要用一个寄存器来存储,并且需要生成一条指令
+    /// so this function promise that the return value is a (reg,pre_insts) tuple
+    /// pre_insts is the insts that generate the reg,which should be inserted before the insts that use the reg
+    #[allow(unused)]
+    pub fn prepare_lhs(
+        value: &llvm_ir::operand::Operand,
+        reg_gener: &mut RegGenerator,
+        regs: &HashMap<Name, Reg>,
+    ) -> Result<(Operand, Vec<Inst>)> {
+        let mut insts = Vec::new();
+        let value = IRBuilder::value_from(value, regs)?;
+        match &value {
+            Operand::Imm(imm) => {
+                let dst = reg_gener.gen_virtual_usual_reg();
+                let li = LiInst::new(dst.into(), imm.into());
+                insts.push(li.into());
+                Ok((dst.into(), insts))
+            }
+            Operand::Reg(_) => Ok((value, insts)),
+            _ => unimplemented!(),
+        }
+    }
+
+    /// 如果value是个寄存器,直接返回,
+    /// 如果是个常数,如果超出范围,则需要用一个寄存器来存储,并且需要生成一条指令
+    /// 如果是不超出范围的常数,则直接返回
+    pub fn prepare_rhs(
+        value: &llvm_ir::operand::Operand,
+        reg_gener: &mut RegGenerator,
+        regs: &HashMap<Name, Reg>,
+    ) -> Result<(Operand, Vec<Inst>)> {
+        let mut insts: Vec<Inst> = Vec::new();
+        let value = IRBuilder::value_from(value, regs)?;
+        match &value {
+            Operand::Imm(imm) => {
+                if imm.in_limit(12) {
+                    Ok((value, insts))
+                } else {
+                    let dst = reg_gener.gen_virtual_usual_reg();
+                    let li = LiInst::new(dst.into(), imm.into());
+                    insts.push(li.into());
+                    Ok((dst.into(), insts))
+                }
+            }
+            Operand::Reg(_) => Ok((value, insts)),
+            _ => unimplemented!(),
+        }
+    }
+
+    #[inline]
+    pub fn address_from(
+        operand: &llvm_ir::Operand,
+        stack_slots: &HashMap<Name, StackSlot>,
+    ) -> Result<Operand> {
+        match operand {
+            llvm_ir::Operand::LocalOperand { name: _, ty: _ } => {
+                Self::stack_slot_from(operand, stack_slots)
+            }
+            llvm_ir::Operand::ConstantOperand(c) => match c.as_ref() {
+                Constant::GlobalReference { name: _, ty: _ } => {
+                    Self::global_name_from(operand).map(|s| s.into())
+                }
+                _ => todo!(),
+            },
+            _ => Err(anyhow!("operand is not local var:{}", operand)).with_context(|| context!()),
         }
     }
 

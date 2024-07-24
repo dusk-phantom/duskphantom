@@ -49,14 +49,16 @@ pub enum Inst {
     Sll(SllInst),
     Srl(SrlInst),
     SRA(SraInst),
+    Not(NotInst),
     And(AndInst),
     Or(OrInst),
     Xor(XorInst),
     Neg(NegInst),
-    Slt(SltInst),
 
     // comparison operation
+    Slt(SltInst),
     Seqz(SeqzInst),
+    Snez(SnezInst),
 
     // data transfer operation
     Mv(MvInst),
@@ -65,7 +67,7 @@ pub enum Inst {
     Sd(SdInst),
     Lw(LwInst),
     Sw(SwInst),
-    La(LaInst),
+    Lla(LlaInst),
     Load(LoadInst),
     Store(StoreInst),
 
@@ -133,7 +135,7 @@ impl Inst {
             Inst::Sd(inst) => inst.gen_asm(),
             Inst::Sw(inst) => inst.gen_asm(),
             Inst::Lw(inst) => inst.gen_asm(),
-            Inst::La(inst) => inst.gen_asm(),
+            Inst::Lla(inst) => inst.gen_asm(),
             Inst::Li(inst) => inst.gen_asm(),
             Inst::Load(inst) => inst.gen_asm(),
             Inst::Store(inst) => inst.gen_asm(),
@@ -154,6 +156,8 @@ impl Inst {
             Inst::Seqz(inst) => inst.gen_asm(),
             Inst::I2f(i2f) => i2f.gen_asm(),
             Inst::F2i(f2i) => f2i.gen_asm(),
+            Inst::Snez(snez) => snez.gen_asm(),
+            Inst::Not(not) => not.gen_asm(),
         }
     }
 }
@@ -192,7 +196,7 @@ impl RegReplace for Inst {
             Inst::Sw(inst) => inst.replace_use(from, to),
             Inst::Load(inst) => inst.replace_use(from, to),
             Inst::Store(inst) => inst.replace_use(from, to),
-            Inst::La(inst) => inst.replace_use(from, to),
+            Inst::Lla(inst) => inst.replace_use(from, to),
             Inst::Li(inst) => inst.replace_use(from, to),
             Inst::I2f(i2f) => i2f.replace_use(from, to),
             Inst::F2i(f2i) => f2i.replace_use(from, to),
@@ -211,6 +215,8 @@ impl RegReplace for Inst {
             Inst::Xor(inst) => inst.replace_use(from, to),
             Inst::Tail(inst) => inst.replace_use(from, to),
             Inst::Seqz(inst) => inst.replace_use(from, to),
+            Inst::Snez(snez) => snez.replace_use(from, to),
+            Inst::Not(not) => not.replace_use(from, to),
         }
     }
 
@@ -232,7 +238,7 @@ impl RegReplace for Inst {
             Inst::Sw(inst) => inst.replace_def(from, to),
             Inst::Load(inst) => inst.replace_def(from, to),
             Inst::Store(inst) => inst.replace_def(from, to),
-            Inst::La(inst) => inst.replace_def(from, to),
+            Inst::Lla(inst) => inst.replace_def(from, to),
             Inst::Li(inst) => inst.replace_def(from, to),
             Inst::I2f(i2f) => i2f.replace_def(from, to),
             Inst::F2i(f2i) => f2i.replace_def(from, to),
@@ -251,6 +257,8 @@ impl RegReplace for Inst {
             Inst::Xor(inst) => inst.replace_def(from, to),
             Inst::Tail(inst) => inst.replace_def(from, to),
             Inst::Seqz(inst) => inst.replace_def(from, to),
+            Inst::Snez(snez) => snez.replace_def(from, to),
+            Inst::Not(not) => not.replace_def(from, to),
         }
     }
 }
@@ -275,15 +283,17 @@ impl_inst_convert!(OrInst, Or);
 impl_inst_convert!(XorInst, Xor);
 impl_inst_convert!(SllInst, Sll);
 impl_inst_convert!(SrlInst, Srl);
-impl_inst_convert!(SltInst, Slt);
 impl_inst_convert!(SraInst, SRA);
+impl_inst_convert!(NotInst, Not);
 
 // for comparison
+impl_inst_convert!(SltInst, Slt);
 impl_inst_convert!(SeqzInst, Seqz);
+impl_inst_convert!(SnezInst, Snez);
 
 // inst for data transfer
 impl_inst_convert!(MvInst, Mv);
-impl_inst_convert!(LaInst, La);
+impl_inst_convert!(LlaInst, Lla);
 impl_inst_convert!(SdInst, Sd);
 impl_inst_convert!(LdInst, Ld);
 impl_inst_convert!(LwInst, Lw);
