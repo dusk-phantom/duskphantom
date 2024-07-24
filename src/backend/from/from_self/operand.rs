@@ -49,22 +49,9 @@ impl IRBuilder {
         })
     }
 
-    /// 这里不包含有 函数的形参。local_var_from 返回 Reg
+    /// 这个不包含有 arr
     #[inline]
-    pub fn local_var_from(
-        instr: &ObjPtr<Box<dyn Instruction>>,
-        regs: &HashMap<Address, Reg>,
-    ) -> Result<Reg> {
-        let addr = instr.as_ref().as_ref() as *const dyn Instruction as *const () as Address;
-        let reg = regs
-            .get(&addr)
-            .ok_or(anyhow!("local var not found {}", addr))
-            .with_context(|| context!())?;
-        Ok(*reg)
-    }
-
-    #[inline]
-    pub fn const_from(con: &middle::ir::Constant) -> Result<Operand> {
+    pub fn const_except_arr_from(con: &middle::ir::Constant) -> Result<Operand> {
         Ok(match con {
             middle::ir::Constant::Int(val) => Operand::Imm((*val as i64).into()),
             middle::ir::Constant::Float(fla) => Operand::Fmm((*fla as f64).into()),
@@ -77,12 +64,23 @@ impl IRBuilder {
         })
     }
 
+    /// 这里不包含有 函数的形参。local_var_from 返回 Reg
+    #[inline]
+    pub fn local_var_except_param_from(
+        instr: &ObjPtr<Box<dyn Instruction>>,
+        regs: &HashMap<Address, Reg>,
+    ) -> Result<Reg> {
+        let addr = instr.as_ref().as_ref() as *const dyn Instruction as *const () as Address;
+        let reg = regs
+            .get(&addr)
+            .ok_or(anyhow!("local var not found {}", addr))
+            .with_context(|| context!())?;
+        Ok(*reg)
+    }
+
     /// 因为 build_entry 的时候, 就已经把参数 mv <虚拟寄存器>, <param> 了
     #[inline]
-    pub fn parameter_from(
-        param: &middle::ir::Parameter,
-        regs: &HashMap<Address, Reg>,
-    ) -> Result<Operand> {
+    pub fn param_from(param: &middle::ir::Parameter, regs: &HashMap<Address, Reg>) -> Result<Reg> {
         let addr = param as *const _ as Address;
         let reg = regs
             .get(&addr)
@@ -91,7 +89,7 @@ impl IRBuilder {
                 param as *const _ as Address
             ))
             .with_context(|| context!())?;
-        Ok((*reg).into())
+        Ok(*reg)
     }
 
     /// 获取 basic block 的 label
@@ -109,7 +107,7 @@ impl IRBuilder {
         regs: &HashMap<Address, Reg>,
     ) -> Result<(Operand, Vec<Inst>)> {
         let mut insts = Vec::new();
-        let value = IRBuilder::value_from(value, regs)?;
+        let value = IRBuilder::no_load_from(value, regs)?;
         match &value {
             Operand::Imm(imm) => {
                 let dst = reg_gener.gen_virtual_usual_reg();
@@ -131,7 +129,7 @@ impl IRBuilder {
         regs: &HashMap<Address, Reg>,
     ) -> Result<(Operand, Vec<Inst>)> {
         let mut insts: Vec<Inst> = Vec::new();
-        let value = IRBuilder::value_from(value, regs)?;
+        let value = IRBuilder::no_load_from(value, regs)?;
         match &value {
             Operand::Imm(imm) => {
                 if imm.in_limit(12) {
@@ -156,14 +154,14 @@ impl IRBuilder {
         fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<(Operand, Vec<Inst>)> {
         let mut insts: Vec<Inst> = Vec::new();
-        let value = IRBuilder::value_from(value, regs)?;
-        match &value {
+        let value = IRBuilder::no_load_from(value, regs)?;
+        match value {
             Operand::Reg(_) => Ok((value, insts)),
             Operand::Fmm(fmm) => {
-                let n = if let Some(f_var) = fmms.get(fmm) {
+                let lit = if let Some(f_var) = fmms.get(&fmm) {
                     f_var.name.clone()
                 } else {
-                    let name = Self::fmm_lit_label_from(fmm);
+                    let name = Self::fmm_lit_label_from(&fmm);
                     fmms.insert(
                         fmm.clone(),
                         FloatVar {
@@ -175,8 +173,8 @@ impl IRBuilder {
                     name
                 };
                 let addr = reg_gener.gen_virtual_usual_reg();
-                let la = LlaInst::new(addr, n.into());
-                insts.push(la.into());
+                let lla = LlaInst::new(addr, lit.into());
+                insts.push(lla.into());
                 let dst = reg_gener.gen_virtual_float_reg();
                 let loadf = LwInst::new(dst, 0.into(), addr);
                 insts.push(loadf.into());
@@ -201,24 +199,26 @@ impl IRBuilder {
             middle::ir::Operand::Global(_) => todo!(),
             middle::ir::Operand::Parameter(_) => todo!(),
             middle::ir::Operand::Instruction(instr) => {
-                let ope = Self::local_var_from(instr, regs)?;
+                let ope = Self::local_var_except_param_from(instr, regs)?;
                 Ok((ope, Vec::new()))
             }
         }
     }
 
-    /// 要不是 instruction 的输出, 要不是 constant 要不是 parameter
-    /// 这个只是将 instruction 和 constant 包装成 Operand
-    /// 里面不会出现 asm 的输出
-    pub fn value_from(
+    /// no_load_from 的特点就是, 可以直接作为 operand, 不需要经过一次 load
+    pub fn no_load_from(
         operand: &middle::ir::Operand,
         regs: &HashMap<Address, Reg>,
     ) -> Result<Operand> {
         match operand {
-            middle::ir::Operand::Constant(con) => Self::const_from(con),
-            middle::ir::Operand::Parameter(param) => Self::parameter_from(param, regs), // 参数实际上都是 Reg
+            middle::ir::Operand::Constant(con) => Self::const_except_arr_from(con),
+            middle::ir::Operand::Parameter(param) => {
+                let param = Self::param_from(param, regs).with_context(|| context!())?;
+                Ok(param.into())
+            } // 参数实际上都是 Reg
             middle::ir::Operand::Instruction(instr) => {
-                let reg = Self::local_var_from(instr, regs).with_context(|| context!())?;
+                let reg =
+                    Self::local_var_except_param_from(instr, regs).with_context(|| context!())?;
                 Ok(reg.into())
             }
             middle::ir::Operand::Global(glo) => Err(anyhow!(
@@ -239,15 +239,7 @@ impl IRBuilder {
                 let param = param.as_ref();
                 match param.value_type {
                     middle::ir::ValueType::Array(_, _) | middle::ir::ValueType::Pointer(_) => {
-                        let addr = param as *const _ as Address;
-                        let reg = regs
-                            .get(&addr)
-                            .ok_or(anyhow!(
-                                "local var not found {}",
-                                param as *const _ as Address
-                            ))
-                            .with_context(|| context!())?;
-                        Ok(*reg)
+                        Self::param_from(param, regs)
                     }
                     _ => Err(anyhow!(
                         "it is impossible to load from a void/bool/int/float paramter: {}",
@@ -256,8 +248,8 @@ impl IRBuilder {
                     .with_context(|| context!()),
                 }
             }
-            middle::ir::Operand::Instruction(_) => {
-                unimplemented!() /* FIXME 这应该是一个 UB */
+            middle::ir::Operand::Instruction(instr) => {
+                Self::local_var_except_param_from(instr, regs)
             }
             middle::ir::Operand::Constant(_) => Err(anyhow!(
                 "it is impossible to load from a constant: {}",
@@ -282,7 +274,55 @@ impl IRBuilder {
                 let label = glo.name.clone();
                 Ok(label)
             }
-            _ => Err(anyhow!("not a global var:{}", operand)).with_context(|| context!()),
+            middle::ir::Operand::Constant(con) => {
+                match con {
+                    middle::ir::Constant::Array(_) => unimplemented!(), // 这个不太可能
+                    _ => Err(anyhow!("not a global var:{}", operand)).with_context(|| context!()), /* SignedChar(_) | Bool(_) | Float(_) | Int(_) */
+                }
+            }
+            _ => Err(anyhow!("not a global var:{}", operand)).with_context(|| context!()), // Instruction(_) | Parameter(_)
+        }
+    }
+
+    /// int arr[][5][6] ==> [ 1, 6, 5 ]
+    fn _cal_dims_rev(ty: &middle::ir::ValueType) -> Vec<usize> {
+        match ty {
+            middle::ir::ValueType::Void => todo!(),
+            middle::ir::ValueType::Int
+            | middle::ir::ValueType::SignedChar
+            | middle::ir::ValueType::Float
+            | middle::ir::ValueType::Bool => {
+                vec![1]
+            }
+            middle::ir::ValueType::Pointer(_) => todo!(),
+            middle::ir::ValueType::Array(ty, sz) => {
+                let mut ret = Self::_cal_dims_rev(ty);
+                ret.push(*sz);
+                ret
+            }
+        }
+    }
+
+    #[allow(unused)]
+    pub fn _cal_offset(
+        ptr: &middle::ir::Operand,
+        idxes: &[middle::ir::Operand],
+        reg_gener: &mut RegGenerator,
+        regs: &mut HashMap<Address, Reg>,
+    ) -> Result<(Operand, Vec<Inst>)> {
+        match ptr {
+            middle::ir::Operand::Constant(_) => unimplemented!(),
+            middle::ir::Operand::Global(glo) => unimplemented!(),
+            middle::ir::Operand::Parameter(param) => match param.value_type {
+                middle::ir::ValueType::Array(_, _) => todo!(),
+                middle::ir::ValueType::Pointer(_) => todo!(),
+                _ => Err(anyhow!("can't gep from a non arr/pointer: {:?}", param))
+                    .with_context(|| context!()),
+            },
+            middle::ir::Operand::Instruction(instr) => match instr.get_type() {
+                middle::ir::instruction::InstType::Alloca => todo!(),
+                _ => todo!(),
+            },
         }
     }
 }

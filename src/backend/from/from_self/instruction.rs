@@ -54,9 +54,9 @@ impl IRBuilder {
                 let (op1, prepare) = Self::prepare_f(fadd.get_rhs(), reg_gener, regs, fmms)?;
                 insts.extend(prepare);
                 let dst0 = reg_gener.gen_virtual_float_reg();
-                let add_inst = AddInst::new(dst0.into(), op0, op1);
+                let fadd_inst = AddInst::new(dst0.into(), op0, op1);
                 regs.insert(fadd as *const _ as Address, dst0);
-                insts.push(add_inst.into());
+                insts.push(fadd_inst.into());
                 Ok(insts)
             }
             middle::ir::instruction::InstType::Sub => {
@@ -138,7 +138,7 @@ impl IRBuilder {
                 let itofp = downcast_ref::<middle::ir::instruction::extend_inst::ItoFp>(
                     inst.as_ref().as_ref(),
                 );
-                let src = Self::value_from(itofp.get_src(), regs).with_context(|| context!())?;
+                let src = Self::no_load_from(itofp.get_src(), regs).with_context(|| context!())?;
                 let dst = reg_gener.gen_virtual_float_reg();
                 let fcvtsw = I2fInst::new(dst.into(), src); // FIXME 不过我对这里有点疑惑: 中端会不会给浮点型立即数, 然后浮点型立即数实际上也需要特殊处理
                 regs.insert(itofp as *const _ as Address, dst);
@@ -148,7 +148,7 @@ impl IRBuilder {
                 let fptoi = downcast_ref::<middle::ir::instruction::extend_inst::FpToI>(
                     inst.as_ref().as_ref(),
                 );
-                let src = Self::value_from(fptoi.get_src(), regs).with_context(|| context!())?;
+                let src = Self::no_load_from(fptoi.get_src(), regs).with_context(|| context!())?;
                 let dst = reg_gener.gen_virtual_usual_reg();
                 let fcvtws = I2fInst::new(dst.into(), src); //
                 regs.insert(fptoi as *const _ as Address, dst);
@@ -189,7 +189,21 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
     ) -> Result<Vec<Inst>> {
-        todo!()
+        let mut ret = Vec::new();
+
+        // 比方说 int arr[100][100], 我要访问 int[7][11]
+        // 是 idxes[0] 表示 7 还是 11 ?
+        // 然后我这里是需要计算偏移
+        let idxes = gep.get_index();
+        let ptr = gep.get_ptr();
+        let base = Self::no_load_from(ptr, regs).with_context(|| context!())?;
+        let (ofst, prepare) =
+            Self::_cal_offset(ptr, idxes, reg_gener, regs).with_context(|| context!())?;
+        ret.extend(prepare);
+        let dst = reg_gener.gen_virtual_usual_reg();
+        let add = AddInst::new(dst.into(), base, ofst);
+        regs.insert(gep as *const _ as usize, dst);
+        Ok(ret)
     }
 
     fn build_phi_inst(
@@ -224,7 +238,8 @@ impl IRBuilder {
             middle::ir::Operand::Global(_) => todo!(),
             middle::ir::Operand::Parameter(_) => todo!(),
             middle::ir::Operand::Instruction(instr) => {
-                let src = Self::local_var_from(instr, regs).with_context(|| context!())?;
+                let src =
+                    Self::local_var_except_param_from(instr, regs).with_context(|| context!())?;
                 let dst = reg_gener.gen_virtual_usual_reg();
                 regs.insert(zext as *const _ as Address, dst);
                 let xt = AndInst::new(dst.into(), src.into(), (-1).into());
@@ -370,11 +385,11 @@ impl IRBuilder {
     ) -> Result<Vec<Inst>> {
         // 这个 address
         // 有三种来源: 1. 全局变量 2. alloca 3. get_element_ptr // TODO 目前只有 stack
-        let address: &&middle::ir::Operand = &store.get_ptr();
+        let src: &&middle::ir::Operand = &store.get_ptr();
         // address 这个地址是 stack 上的地址
-        let address = Self::stack_slot_from(address, stack_slots).with_context(|| context!())?;
+        let address = Self::stack_slot_from(src, stack_slots).with_context(|| context!())?;
         let val = &store.get_value();
-        let val = Self::value_from(val, regs).with_context(|| context!())?;
+        let val = Self::no_load_from(val, regs).with_context(|| context!())?;
         let mut ret: Vec<Inst> = Vec::new();
         match val {
             Operand::Imm(imm) => {
@@ -407,22 +422,22 @@ impl IRBuilder {
     ) -> Result<Vec<Inst>> {
         // dbg!(load);
         let mut ret: Vec<Inst> = Vec::new();
-        if regs.contains_key(&(load as *const _ as Address)) {
-            unimplemented!() // 已经 load 过一次了
-        }
+        // if regs.contains_key(&(load as *const _ as Address)) {
+        //     unimplemented!() // 已经 load 过一次了
+        // }
         let dst_reg = match load.get_value_type() {
             middle::ir::ValueType::Int => reg_gener.gen_virtual_usual_reg(),
             middle::ir::ValueType::Float => reg_gener.gen_virtual_float_reg(),
             middle::ir::ValueType::Bool => reg_gener.gen_virtual_usual_reg(),
             _ => {
-                /* void, array, pointer */
                 return Err(anyhow!("load instruction with array/pointer/void"))
-                    .with_context(|| context!());
+                    .with_context(|| context!()); /* void, array, pointer */
             }
         };
         regs.insert(load as *const _ as Address, dst_reg);
         // 两种情况: 1. 从栈上获取(之前 alloca 过一次), 2. 从非栈上获取(parameter-pointer, global)
         if let Ok(slot) = Self::stack_slot_from(load.get_ptr(), stack_slots) {
+            // stack
             let ld = LoadInst::new(dst_reg, slot.try_into()?);
             ret.push(ld.into());
         } else if let Ok(label) = Self::global_from(load.get_ptr()) {
@@ -473,7 +488,7 @@ impl IRBuilder {
                         let n = if let Some(f_var) = fmms.get(&fmm) {
                             f_var.name.clone() // 这个 name 是我们自己加进去的
                         } else {
-                            let name = format!("_fc_{:x}", fmm.to_bits());
+                            let name = Self::fmm_lit_label_from(&fmm);
                             fmms.insert(
                                 fmm.clone(),
                                 FloatVar {
@@ -662,7 +677,7 @@ impl IRBuilder {
         let mut phisic_arg_regs: Vec<Reg> = Vec::new();
         let arguments = call.get_operand(); // 参数列表, 这个可以类比成 llvm_ir::call::arguments
         for arg in arguments {
-            let ope = Self::value_from(arg, regs).context(context!())?;
+            let ope = Self::no_load_from(arg, regs).context(context!())?;
             match ope {
                 Operand::Reg(r) => {
                     if r.is_usual() && i_arg_num < 8 {
