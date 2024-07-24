@@ -384,29 +384,35 @@ impl IRBuilder {
         regs: &HashMap<Address, Reg>,
     ) -> Result<Vec<Inst>> {
         let mut ret: Vec<Inst> = Vec::new();
-        let src: &&middle::ir::Operand = &store.get_ptr();
-        let address = Self::stack_slot_from(src, stack_slots).with_context(|| context!())?;
-        let val = &store.get_value();
-        let val = Self::no_load_from(val, regs).with_context(|| context!())?;
-        match val {
-            Operand::Imm(imm) => {
-                let _val = reg_gener.gen_virtual_usual_reg(); // 分配一个临时的 dest, 用来存储 imm, 因此 sd reg, stack_slot
-                let li = LiInst::new(_val.into(), imm.into()); // li dst, imm
-                let sd = StoreInst::new(address.try_into()?, _val); // sd src, stack_slot
-                ret.push(li.into());
+        let addr =
+            Self::address_from(store.get_ptr(), regs, stack_slots).with_context(|| context!())?;
+        let (val, prepare) =
+            Self::prepare_rs1_i(store.get_value(), reg_gener, regs).with_context(|| context!())?;
+        let Operand::Reg(val) = val else {
+            // 注意, 这里可能会出现 fmm 的情况
+            return Err(anyhow!("store value is not reg")).with_context(|| context!());
+        };
+        ret.extend(prepare);
+        match addr {
+            Operand::Reg(base) => {
+                let sw = SwInst::new(val, 0.into(), base);
+                ret.push(sw.into());
+            }
+            Operand::StackSlot(slot) => {
+                let sd = StoreInst::new(slot, val);
                 ret.push(sd.into());
             }
-            Operand::Fmm(_) => {
-                return Err(anyhow!("store instruction with float value".to_string(),))
+            Operand::Label(label) => {
+                let addr = reg_gener.gen_virtual_usual_reg();
+                let lla = LlaInst::new(addr, label);
+                ret.push(lla.into());
+                let sw = SwInst::new(val, 0.into(), addr);
+                ret.push(sw.into());
+            }
+            _ => {
+                return Err(anyhow!("impossible to store from imm/fmm"))
                     .with_context(|| context!());
             }
-            Operand::Reg(re) => {
-                let sd = StoreInst::new(address.try_into()?, re); // sd src, stack_slot
-                ret.push(sd.into());
-            }
-            // Operand::StackSlot(_)
-            // Operand::Label(_)
-            _ => todo!(),
         }
         Ok(ret)
     }
@@ -451,7 +457,9 @@ impl IRBuilder {
                 let lw = LwInst::new(dst_reg, 0.into(), addr);
                 ret.push(lw.into());
             }
-            _ => {} // imm, fmm
+            _ => {
+                return Err(anyhow!("impossible to load from imm/fmm")).with_context(|| context!());
+            } // imm, fmm
         }
         Ok(ret)
     }
