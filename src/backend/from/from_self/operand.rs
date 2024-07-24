@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::{anyhow, Context, Result};
 
-use crate::backend::{Operand, Reg, StackSlot};
+use crate::backend::{Inst, LiInst, Operand, Reg, RegGenerator, StackSlot};
 
 use crate::context;
 
@@ -14,11 +14,16 @@ use super::*;
 use builder::IRBuilder;
 
 impl IRBuilder {
-    pub fn is_ty_int(ty: &middle::ir::ValueType) -> bool {
-        matches!(ty, middle::ir::ValueType::Int)
-    }
-    pub fn is_ty_float(ty: &middle::ir::ValueType) -> bool {
-        matches!(ty, middle::ir::ValueType::Float)
+    /// 用于生成虚拟寄存器
+    pub fn new_var(ty: &middle::ir::ValueType, reg_gener: &mut RegGenerator) -> Result<Reg> {
+        let dst_reg = match ty {
+            middle::ir::ValueType::Int
+            | middle::ir::ValueType::Bool
+            | middle::ir::ValueType::Pointer(_) => reg_gener.gen_virtual_usual_reg(),
+            middle::ir::ValueType::Float => reg_gener.gen_virtual_float_reg(),
+            _ => return Err(anyhow!("phi can't be void/array")).with_context(|| context!()),
+        };
+        Ok(dst_reg)
     }
 
     pub fn stack_slot_from(
@@ -43,8 +48,7 @@ impl IRBuilder {
         })
     }
 
-    /// 找到指令的 output 对应的 reg, 查表 !
-    /// 在这里好像看不出来是 int 还是 float
+    /// 这里的 local_var_from 是不包含函数的形参的
     pub fn local_var_from(
         instr: &ObjPtr<Box<dyn Instruction>>,
         regs: &HashMap<Address, Reg>,
@@ -59,6 +63,7 @@ impl IRBuilder {
             .with_context(|| context!())?;
         Ok((*reg).into())
     }
+
     pub fn const_from(con: &middle::ir::Constant) -> Result<Operand> {
         Ok(match con {
             middle::ir::Constant::Int(val) => Operand::Imm((*val as i64).into()),
@@ -88,10 +93,64 @@ impl IRBuilder {
         Ok((*reg).into())
     }
 
+    /// 获取 basic block 的 label
+    #[inline]
+    pub fn label_name_from(bb: &ObjPtr<middle::ir::BasicBlock>) -> String {
+        format!(".LBB{}", bb.as_ref() as *const _ as Address)
+    }
+
+    /// 需要注意的是 指令的 lvalue 只能是寄存器,所以如果value是个常数,则需要用一个寄存器来存储,并且需要生成一条指令
+    /// so this function promise that the return value is a (reg,pre_insts) tuple
+    /// pre_insts is the insts that generate the reg,which should be inserted before the insts that use the reg
+    pub fn prepare_lhs(
+        value: &middle::ir::Operand,
+        reg_gener: &mut RegGenerator,
+        regs: &HashMap<Address, Reg>,
+    ) -> Result<(Operand, Vec<Inst>)> {
+        let mut insts = Vec::new();
+        let value = IRBuilder::value_from(value, regs)?;
+        match &value {
+            Operand::Imm(imm) => {
+                let dst = reg_gener.gen_virtual_usual_reg();
+                let li = LiInst::new(dst.into(), imm.into());
+                insts.push(li.into());
+                Ok((dst.into(), insts))
+            }
+            Operand::Reg(_) => Ok((value, insts)),
+            _ => unimplemented!(),
+        }
+    }
+
+    /// 如果value是个寄存器,直接返回,
+    /// 如果是个常数,如果超出范围,则需要用一个寄存器来存储,并且需要生成一条指令
+    /// 如果是不超出范围的常数,则直接返回
+    pub fn prepare_rhs(
+        value: &middle::ir::Operand,
+        reg_gener: &mut RegGenerator,
+        regs: &HashMap<Address, Reg>,
+    ) -> Result<(Operand, Vec<Inst>)> {
+        let mut insts: Vec<Inst> = Vec::new();
+        let value = IRBuilder::value_from(value, regs)?;
+        match &value {
+            Operand::Imm(imm) => {
+                if imm.in_limit(12) {
+                    Ok((value, insts))
+                } else {
+                    let dst = reg_gener.gen_virtual_usual_reg();
+                    let li = LiInst::new(dst.into(), imm.into());
+                    insts.push(li.into());
+                    Ok((dst.into(), insts))
+                }
+            }
+            Operand::Reg(_) => Ok((value, insts)),
+            _ => unimplemented!(),
+        }
+    }
+
     /// 要不是 instruction 的输出, 要不是 constant 要不是 parameter
     /// 这个只是将 instruction 和 constant 包装成 Operand
     /// 里面不会出现 asm 的输出
-    pub fn local_operand_from(
+    pub fn value_from(
         operand: &middle::ir::Operand,
         regs: &HashMap<Address, Reg>,
     ) -> Result<Operand> {
@@ -134,8 +193,7 @@ impl IRBuilder {
                 }
             }
             middle::ir::Operand::Instruction(_) => {
-                /* FIXME 这应该是一个 UB */
-                unimplemented!()
+                unimplemented!() /* FIXME 这应该是一个 UB */
             }
             middle::ir::Operand::Constant(_) => Err(anyhow!(
                 "it is impossible to load from a constant: {}",

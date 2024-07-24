@@ -18,8 +18,27 @@ pub struct Reg {
     is_usual: bool,
 }
 impl Reg {
-    pub const fn physical_regs() -> [Reg; 64] {
-        [
+    #[inline]
+    pub const fn caller_save_regs() -> &'static [Reg; 35] {
+        &[
+            REG_T0, REG_T1, REG_T2, REG_T3, REG_T4, REG_T5, REG_T6, REG_A0, REG_A1, REG_A2, REG_A3,
+            REG_A4, REG_A5, REG_A6, REG_A7, REG_FT0, REG_FT1, REG_FT2, REG_FT3, REG_FT4, REG_FT5,
+            REG_FT6, REG_FT7, REG_FT8, REG_FT9, REG_FT10, REG_FT11, REG_FA0, REG_FA1, REG_FA2,
+            REG_FA3, REG_FA4, REG_FA5, REG_FA6, REG_FA7,
+        ]
+    }
+
+    #[inline]
+    pub const fn callee_save_regs() -> &'static [Reg; 23] {
+        &[
+            REG_S1, REG_S2, REG_S3, REG_S4, REG_S5, REG_S6, REG_S7, REG_S8, REG_S9, REG_S10,
+            REG_S11, REG_FS0, REG_FS1, REG_FS2, REG_FS3, REG_FS4, REG_FS5, REG_FS6, REG_FS7,
+            REG_FS8, REG_FS9, REG_FS10, REG_FS11,
+        ]
+    }
+
+    pub const fn physical_regs() -> &'static [Reg; 64] {
+        &[
             // usual registers
             REG_ZERO, REG_RA, REG_SP, REG_GP, REG_TP, REG_T0, REG_T1, REG_T2, REG_S0, REG_S1,
             REG_A0, REG_A1, REG_A2, REG_A3, REG_A4, REG_A5, REG_A6, REG_A7, REG_S2, REG_S3, REG_S4,
@@ -31,14 +50,28 @@ impl Reg {
             REG_FS11, REG_FT8, REG_FT9, REG_FT10, REG_FT11,
         ]
     }
+
     pub const fn new(id: u32, is_usual: bool) -> Self {
         Self { id, is_usual }
     }
+    pub const fn new_usual(id: u32) -> Self {
+        Self::new(id, true)
+    }
+    pub const fn new_float(id: u32) -> Self {
+        Self::new(id, false)
+    }
+
+    #[inline]
     pub fn id(&self) -> u32 {
         self.id
     }
+    #[inline]
     pub fn is_usual(&self) -> bool {
         self.is_usual
+    }
+    #[inline]
+    pub fn is_float(&self) -> bool {
+        !self.is_usual
     }
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -58,6 +91,12 @@ impl TryInto<f32> for Fmm {
                 "Fmm is not a valid f32".to_string(),
             ))
         }
+    }
+}
+
+impl From<Imm> for i64 {
+    fn from(value: Imm) -> Self {
+        value.0
     }
 }
 
@@ -86,6 +125,16 @@ impl Hash for Fmm {
 pub struct Label(String);
 
 // impl from for Operand
+impl From<u32> for Imm {
+    fn from(value: u32) -> Self {
+        Self(value as i64)
+    }
+}
+impl From<i32> for Imm {
+    fn from(value: i32) -> Self {
+        Self(value as i64)
+    }
+}
 impl From<i64> for Imm {
     fn from(val: i64) -> Self {
         Self(val)
@@ -311,7 +360,7 @@ impl RegGenerator {
 impl Reg {
     #[inline]
     pub fn gen_asm(&self) -> String {
-        if self.is_phisic() {
+        if self.is_physical() {
             match self.is_usual {
                 true => match self.id {
                     0 => String::from("zero"),
@@ -409,18 +458,30 @@ impl Reg {
     }
 
     #[inline]
-    pub fn is_phisic(&self) -> bool {
+    pub fn is_physical(&self) -> bool {
         (0..=31).contains(&self.id)
     }
     #[inline]
     pub fn is_virtual(&self) -> bool {
-        !self.is_phisic()
+        !self.is_physical()
     }
 }
 impl Imm {
     #[inline]
     pub fn gen_asm(&self) -> String {
         format!("{}", self.0)
+    }
+    pub fn in_limit(&self, bits: usize) -> bool {
+        if bits <= 64 {
+            if bits == 0 {
+                return false;
+            }
+            let max = (1 << bits) - 1;
+            let min = -(1 << bits);
+            self.0 <= max && self.0 >= min
+        } else {
+            true
+        }
     }
 }
 impl Fmm {
@@ -638,15 +699,15 @@ pub mod tests {
     fn test_phisic_virtual() {
         for i in 0..=31 {
             let reg = Reg::new(i, true);
-            assert!(reg.is_phisic());
+            assert!(reg.is_physical());
             assert!(!reg.is_virtual());
             let reg = Reg::new(i, false);
-            assert!(reg.is_phisic());
+            assert!(reg.is_physical());
             assert!(!reg.is_virtual());
         }
         for i in 32..=127 {
             let reg = Reg::new(i, false);
-            assert!(!reg.is_phisic());
+            assert!(!reg.is_physical());
             assert!(reg.is_virtual());
         }
     }
@@ -728,7 +789,7 @@ pub mod tests {
     }
     #[test]
     fn test_constant_physical_regs() {
-        let p_regs: HashSet<Reg> = Reg::physical_regs().into_iter().collect();
+        let p_regs: HashSet<Reg> = Reg::physical_regs().iter().cloned().collect();
         assert_eq!(p_regs.len(), 64);
     }
 }

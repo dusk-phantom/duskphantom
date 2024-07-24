@@ -5,6 +5,7 @@ mod convert;
 mod data_move;
 mod inst;
 mod reg_def_use;
+mod test;
 pub use super::*;
 pub use crate::{
     impl_inst_convert, impl_mem_inst, impl_three_op_inst, impl_two_op_inst, impl_unary_inst,

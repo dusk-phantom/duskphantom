@@ -13,6 +13,7 @@ impl IRBuilder {
         stack_slots: &mut HashMap<Name, StackSlot>,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
+        insert_back_for_remove_phi: &mut HashMap<String, Vec<(llvm_ir::operand::Operand, Reg)>>,
     ) -> Result<Vec<Inst>> {
         // dbg!(&inst);
         match inst {
@@ -76,8 +77,8 @@ impl IRBuilder {
             llvm_ir::Instruction::AtomicRMW(_) => todo!(),
             llvm_ir::Instruction::GetElementPtr(_) => todo!(),
             llvm_ir::Instruction::Trunc(_) => todo!(),
-            llvm_ir::Instruction::ZExt(_) => todo!(),
-            llvm_ir::Instruction::SExt(_) => todo!(),
+            llvm_ir::Instruction::ZExt(zext) => Self::build_zext_inst(zext, reg_gener, regs),
+            llvm_ir::Instruction::SExt(sext) => Self::build_sext_inst(sext, reg_gener, regs),
             llvm_ir::Instruction::FPTrunc(_) => todo!(),
             llvm_ir::Instruction::FPExt(_) => todo!(),
             llvm_ir::Instruction::FPToUI(_) => todo!(),
@@ -89,8 +90,12 @@ impl IRBuilder {
             llvm_ir::Instruction::AddrSpaceCast(_) => todo!(),
             llvm_ir::Instruction::ICmp(icmp) => Self::build_icmp_inst(icmp, reg_gener, regs),
             llvm_ir::Instruction::FCmp(_) => todo!(),
-            llvm_ir::Instruction::Phi(_) => todo!(),
-            llvm_ir::Instruction::Select(_) => todo!(),
+            llvm_ir::Instruction::Phi(phi) => {
+                Self::build_phi_inst(phi, reg_gener, regs, insert_back_for_remove_phi)
+            }
+            llvm_ir::Instruction::Select(select) => {
+                Self::build_select_inst(select, reg_gener, regs)
+            }
             llvm_ir::Instruction::Freeze(_) => todo!(),
             llvm_ir::Instruction::Call(call) => {
                 Self::build_call_inst(call, stack_allocator, stack_slots, reg_gener, regs)
@@ -101,53 +106,191 @@ impl IRBuilder {
             llvm_ir::Instruction::CleanupPad(_) => todo!(),
         }
     }
+
+    fn build_phi_inst(
+        phi: &llvm_ir::instruction::Phi,
+        reg_gener: &mut RegGenerator,
+        regs: &mut HashMap<Name, Reg>,
+        insert_back_for_remove_phi: &mut HashMap<String, Vec<(llvm_ir::operand::Operand, Reg)>>,
+    ) -> Result<Vec<Inst>> {
+        let dst_reg = Self::new_var(&phi.to_type, reg_gener)?;
+        regs.insert(phi.dest.clone(), dst_reg);
+        for (op, bb) in &phi.incoming_values {
+            let bb_name = Self::label_name_from(bb)?;
+            let Some(insert_backs) = insert_back_for_remove_phi.get_mut(&bb_name) else {
+                let new_insert_back = vec![(op.clone(), dst_reg)];
+                insert_back_for_remove_phi.insert(bb_name.clone(), new_insert_back);
+                continue;
+            };
+            insert_backs.push((op.clone(), dst_reg));
+        }
+        // insert_back_for_remove_phi.insert(phi.dest.clone(), phi_regs);
+        Ok(vec![])
+    }
+
+    fn build_select_inst(
+        select: &llvm_ir::instruction::Select,
+        reg_gener: &mut RegGenerator,
+        regs: &mut HashMap<Name, Reg>,
+    ) -> Result<Vec<Inst>> {
+        fn build_and_op(
+            cond: &llvm_ir::operand::Operand,
+            reg_gener: &mut RegGenerator,
+            regs: &HashMap<Name, Reg>,
+            insts: &mut Vec<Inst>,
+        ) -> Result<Operand> {
+            let cond = IRBuilder::local_var_from(cond, regs)?;
+            let mid_var = reg_gener.gen_virtual_usual_reg();
+            let seqz = SeqzInst::new(mid_var.into(), cond);
+            insts.push(seqz.into());
+            let and_op = reg_gener.gen_virtual_usual_reg();
+            let add = AddInst::new(and_op.into(), mid_var.into(), (-1).into());
+            insts.push(add.into());
+            Ok(and_op.into())
+        }
+
+        dbg!(select);
+        // unimplemented!();
+        let mut ret: Vec<Inst> = Vec::new();
+        let and_op0 = build_and_op(&select.condition, reg_gener, regs, &mut ret)?;
+        let and_op1: Operand = reg_gener.gen_virtual_usual_reg().into();
+        let not = NotInst::new(and_op1.clone(), and_op0.clone());
+        ret.push(not.into());
+
+        let (true_value, pre_insts) = Self::prepare_rhs(&select.true_value, reg_gener, regs)?;
+        ret.extend(pre_insts);
+        let (false_value, pre_insts) = Self::prepare_rhs(&select.false_value, reg_gener, regs)?;
+        ret.extend(pre_insts);
+
+        let and_op0_true = reg_gener.gen_virtual_usual_reg();
+        let and = AndInst::new(and_op0_true.into(), and_op0.clone(), true_value);
+        ret.push(and.into());
+
+        let and_op1_false = reg_gener.gen_virtual_usual_reg();
+        let and = AndInst::new(and_op1_false.into(), and_op1.clone(), false_value);
+        ret.push(and.into());
+
+        let dst = reg_gener.gen_virtual_usual_reg();
+        let or = OrInst::new(dst.into(), and_op0_true.into(), and_op1_false.into());
+        regs.insert(select.dest.clone(), dst);
+        ret.push(or.into());
+
+        Ok(ret)
+    }
+
+    fn build_zext_inst(
+        zext: &llvm_ir::instruction::ZExt,
+        _reg_gener: &mut RegGenerator,
+        regs: &mut HashMap<Name, Reg>,
+    ) -> Result<Vec<Inst>> {
+        if Self::is_ty_int(&zext.to_type) {
+            let src = Self::local_var_from(&zext.operand, regs)?;
+            let src: Reg = src.try_into().with_context(|| context!())?;
+            regs.insert(zext.dest.clone(), src);
+            Ok(vec![])
+        } else {
+            unimplemented!();
+        }
+    }
+
+    fn build_sext_inst(
+        sext: &llvm_ir::instruction::SExt,
+        _reg_gener: &mut RegGenerator,
+        regs: &mut HashMap<Name, Reg>,
+    ) -> Result<Vec<Inst>> {
+        if Self::is_ty_int(&sext.to_type) {
+            let src = Self::local_var_from(&sext.operand, regs)?;
+            let src: Reg = src.try_into().with_context(|| context!())?;
+            regs.insert(sext.dest.clone(), src);
+        } else {
+            unimplemented!();
+        }
+        Ok(vec![])
+    }
+
     fn build_icmp_inst(
         icmp: &llvm_ir::instruction::ICmp,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
-        let mut ret: Vec<Inst> = Vec::new();
+        let mut ret = Vec::new();
+        let dst = reg_gener.gen_virtual_usual_reg();
+        regs.insert(icmp.dest.clone(), dst);
+
+        fn prepare_normal_op0_op1(
+            icmp: &llvm_ir::instruction::ICmp,
+            reg_gener: &mut RegGenerator,
+            regs: &HashMap<Name, Reg>,
+            insts: &mut Vec<Inst>,
+        ) -> Result<(Operand, Operand)> {
+            let (op0, prepare) = IRBuilder::prepare_lhs(&icmp.operand0, reg_gener, regs)?;
+            insts.extend(prepare);
+            let (op1, prepare) = IRBuilder::prepare_rhs(&icmp.operand1, reg_gener, regs)?;
+            insts.extend(prepare);
+            Ok((op0, op1))
+        }
+        fn prepare_rev_op0_op1(
+            icmp: &llvm_ir::instruction::ICmp,
+            reg_gener: &mut RegGenerator,
+            regs: &HashMap<Name, Reg>,
+            insts: &mut Vec<Inst>,
+        ) -> Result<(Operand, Operand)> {
+            let (op1, prepare) = IRBuilder::prepare_lhs(&icmp.operand1, reg_gener, regs)?;
+            insts.extend(prepare);
+            let (op0, prepare) = IRBuilder::prepare_rhs(&icmp.operand0, reg_gener, regs)?;
+            insts.extend(prepare);
+            Ok((op0, op1))
+        }
+
         match icmp.predicate {
-            llvm_ir::IntPredicate::EQ => todo!(),
+            llvm_ir::IntPredicate::EQ => {
+                let (op0, op1) = prepare_normal_op0_op1(icmp, reg_gener, regs, &mut ret)?;
+                let mid_var = reg_gener.gen_virtual_usual_reg();
+                let xor = XorInst::new(mid_var.into(), op0.clone(), op1.clone());
+                let seqz = SeqzInst::new(dst.into(), mid_var.into());
+                ret.push(xor.into());
+                ret.push(seqz.into());
+            }
             llvm_ir::IntPredicate::NE => {
-                let op0 = &Self::value_from(&icmp.operand0, regs)?;
-                let op1 = &Self::value_from(&icmp.operand1, regs)?;
-                let dest = icmp.dest.clone();
-                if let (Operand::Imm(imm0), Operand::Imm(imm1)) = (op0, op1) {
-                    let imm = if imm0 == imm1 { 0 } else { 1 };
-                    let flag = reg_gener.gen_virtual_usual_reg();
-                    let li = LiInst::new(flag.into(), imm.into());
-                    regs.insert(dest, flag);
-                    ret.push(li.into());
-                } else if let (Operand::Reg(reg0), Operand::Reg(reg1)) = (op0, op1) {
-                    assert!(reg0.is_usual() == reg1.is_usual());
-                    let dst = reg_gener.gen_virtual_usual_reg();
-                    let sub = SubInst::new(dst.into(), reg0.into(), reg1.into());
-                    let flag = reg_gener.gen_virtual_usual_reg();
-                    let seqz = SeqzInst::new(flag.into(), dst.into());
-                    ret.push(sub.into());
-                    ret.push(seqz.into());
-                    regs.insert(dest, flag);
-                } else if let (Operand::Reg(reg), Operand::Imm(imm)) = (op0, op1) {
-                    let dst = reg_gener.gen_virtual_usual_reg();
-                    let sub = SubInst::new(dst.into(), reg.into(), imm.into());
-                    let flag = reg_gener.gen_virtual_usual_reg();
-                    let seqz = SeqzInst::new(flag.into(), dst.into());
-                    ret.push(sub.into());
-                    ret.push(seqz.into());
-                    regs.insert(dest, flag);
-                } else {
-                    unimplemented!();
-                }
+                let (op0, op1) = prepare_normal_op0_op1(icmp, reg_gener, regs, &mut ret)?;
+                let mid_var = reg_gener.gen_virtual_usual_reg();
+                let xor = XorInst::new(mid_var.into(), op0.clone(), op1.clone());
+                let snez = SnezInst::new(dst.into(), mid_var.into());
+                ret.push(xor.into());
+                ret.push(snez.into());
             }
             llvm_ir::IntPredicate::UGT => todo!(),
             llvm_ir::IntPredicate::UGE => todo!(),
             llvm_ir::IntPredicate::ULT => todo!(),
             llvm_ir::IntPredicate::ULE => todo!(),
-            llvm_ir::IntPredicate::SGT => todo!(),
-            llvm_ir::IntPredicate::SGE => todo!(),
-            llvm_ir::IntPredicate::SLT => todo!(),
-            llvm_ir::IntPredicate::SLE => todo!(),
+            llvm_ir::IntPredicate::SGT => {
+                // notice sge(op0,op1) equal to slt(op0,op1)
+                let (op0, op1) = prepare_rev_op0_op1(icmp, reg_gener, regs, &mut ret)?;
+                let slt = SltInst::new(dst.into(), op1.clone(), op0.clone());
+                ret.push(slt.into());
+            }
+            llvm_ir::IntPredicate::SGE => {
+                let (op0, op1) = prepare_normal_op0_op1(icmp, reg_gener, regs, &mut ret)?;
+                let mid_var = reg_gener.gen_virtual_usual_reg();
+                let slt = SltInst::new(mid_var.into(), op0.clone(), op1.clone());
+                // FIXME: 这里要检查一下用 xori dst,mid,1 与 用 snez dst,mid 的执行效率是否有差别
+                let xori = XorInst::new(dst.into(), mid_var.into(), 1.into());
+                ret.push(slt.into());
+                ret.push(xori.into());
+            }
+            llvm_ir::IntPredicate::SLT => {
+                let (op0, op1) = prepare_normal_op0_op1(icmp, reg_gener, regs, &mut ret)?;
+                let slt = SltInst::new(dst.into(), op0.clone(), op1.clone());
+                ret.push(slt.into());
+            }
+            llvm_ir::IntPredicate::SLE => {
+                let (op0, op1) = prepare_rev_op0_op1(icmp, reg_gener, regs, &mut ret)?;
+                let mid_var = reg_gener.gen_virtual_usual_reg();
+                let slt = SltInst::new(mid_var.into(), op1.clone(), op0.clone());
+                let xori = XorInst::new(dst.into(), mid_var.into(), 1.into());
+                ret.push(slt.into());
+                ret.push(xori.into());
+            }
         }
         Ok(ret)
     }
@@ -200,35 +343,40 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
-        // dbg!(store);
-        let address = &store.address;
-        let val = &store.value;
-        let address = Self::stack_slot_from(address, stack_slots).with_context(|| context!())?;
-        // dbg!(address.gen_asm());
-        let val: Operand = Self::value_from(val, regs).with_context(|| context!())?;
-        // dbg!(&val);
         let mut ret: Vec<Inst> = Vec::new();
-        match val {
-            Operand::Imm(imm) => {
-                let dst = reg_gener.gen_virtual_usual_reg();
-                let li = AddInst::new(dst.into(), REG_ZERO.into(), imm.into());
-                let src = dst;
-                let sd = StoreInst::new(address.try_into()?, src);
-                ret.push(li.into());
-                ret.push(sd.into());
+        let address = Self::address_from(&store.address, stack_slots)?;
+        let (value, pre_insts) = Self::prepare_lhs(&store.value, reg_gener, regs)?;
+        ret.extend(pre_insts);
+
+        match address {
+            Operand::StackSlot(stack_slot) => match value {
+                Operand::Reg(reg) => {
+                    let sd = StoreInst::new(stack_slot, reg);
+                    ret.push(sd.into());
+                }
+                _ => unimplemented!("store instruction with other value"),
+            },
+            Operand::Label(var) => {
+                let addr = reg_gener.gen_virtual_usual_reg();
+                let lla = LlaInst::new(addr, var);
+                ret.push(lla.into());
+                match value {
+                    Operand::Reg(val) => {
+                        let sw = SwInst::new(val, 0.into(), addr);
+                        ret.push(sw.into());
+                    }
+                    _ => unimplemented!("store instruction with other value"),
+                }
             }
-            Operand::Fmm(_) => {
-                return Err(anyhow!("store instruction with float value".to_string(),))
-                    .with_context(|| context!());
+            _ => {
+                return Err(anyhow!(
+                    "store instruction with invalid address {:?}",
+                    address
+                ))
+                .with_context(|| context!());
             }
-            Operand::Reg(reg) => {
-                let src = reg;
-                let sd = StoreInst::new(address.try_into()?, src);
-                ret.push(sd.into());
-            }
-            _ => unimplemented!("store instruction with other value"),
         }
-        // dbg!(&ret);
+
         Ok(ret)
     }
 
@@ -245,18 +393,26 @@ impl IRBuilder {
         }
         let dst_reg = Self::new_var(&load.loaded_ty, reg_gener)?;
         regs.insert(load.dest.clone(), dst_reg);
-        if let Ok(stack_slot) = Self::stack_slot_from(&load.address, stack_slots) {
-            let ld = LoadInst::new(dst_reg, stack_slot.try_into()?);
-            ret.push(ld.into());
-        } else if let Ok(var) = Self::global_name_from(&load.address) {
-            let addr = reg_gener.gen_virtual_usual_reg();
-            let la = LaInst::new(addr, var.into());
-            ret.push(la.into());
-            let lw = LwInst::new(dst_reg, 0.into(), addr);
-            ret.push(lw.into());
-        } else {
-            return Err(anyhow!("load instruction with other address".to_string()))
+        let address = Self::address_from(&load.address, stack_slots)?;
+        match address {
+            Operand::StackSlot(stack_slot) => {
+                let ld = LoadInst::new(dst_reg, stack_slot);
+                ret.push(ld.into());
+            }
+            Operand::Label(var) => {
+                let addr = reg_gener.gen_virtual_usual_reg();
+                let lla = LlaInst::new(addr, var);
+                ret.push(lla.into());
+                let lw = LwInst::new(dst_reg, 0.into(), addr);
+                ret.push(lw.into());
+            }
+            _ => {
+                return Err(anyhow!(
+                    "load instruction with invalid address {:?}",
+                    address
+                ))
                 .with_context(|| context!());
+            }
         }
         Ok(ret)
     }
@@ -312,7 +468,7 @@ impl IRBuilder {
                                     name
                                 };
                                 let addr = reg_gener.gen_virtual_usual_reg();
-                                let la = LaInst::new(addr, n.into());
+                                let la = LlaInst::new(addr, n.into());
                                 ret_insts.push(la.into());
                                 let loadf: Inst =
                                     if matches!(f, llvm_ir::constant::Float::Single(_)) {

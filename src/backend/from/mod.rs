@@ -1,5 +1,6 @@
 #[cfg(feature = "clang_enabled")]
 mod from_llvm;
+#[allow(deprecated)]
 mod from_self;
 
 #[allow(unused)]
