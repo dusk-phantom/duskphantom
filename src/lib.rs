@@ -220,6 +220,6 @@ pub fn asm2bin(asm: String) -> anyhow::Result<Vec<u8>> {
     }
     #[cfg(not(feature = "clang_enabled"))]
     {
-        String::new()
+        Ok(asm.as_bytes().to_vec())
     }
 }
