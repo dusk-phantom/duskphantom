@@ -3,7 +3,9 @@ use std::collections::HashMap;
 use anyhow::{anyhow, Context, Result};
 
 use crate::backend::var::FloatVar;
-use crate::backend::{Fmm, Inst, LiInst, LlaInst, LwInst, Operand, Reg, RegGenerator, StackSlot};
+use crate::backend::{
+    Fmm, Inst, Label, LiInst, LlaInst, LwInst, Operand, Reg, RegGenerator, StackSlot,
+};
 
 use crate::context;
 
@@ -232,7 +234,7 @@ impl IRBuilder {
     #[inline]
     pub fn pointer_from(
         operand: &middle::ir::Operand,
-        regs: &mut HashMap<Address, Reg>,
+        regs: &HashMap<Address, Reg>,
     ) -> Result<Reg> {
         match operand {
             middle::ir::Operand::Parameter(param) => {
@@ -266,21 +268,37 @@ impl IRBuilder {
 
     /// 我们的 global/函数名 都是来自于中端的 name 的, 其他的 id 来自于中端的地址
     #[inline]
-    pub fn global_from(operand: &middle::ir::Operand) -> Result<String> {
-        // TODO
+    pub fn global_lable_from(operand: &middle::ir::Operand) -> Result<Label> {
         match operand {
             middle::ir::Operand::Global(glo) => {
                 let glo = glo.as_ref();
                 let label = glo.name.clone();
-                Ok(label)
+                Ok(label.into())
             }
-            middle::ir::Operand::Constant(con) => {
-                match con {
-                    middle::ir::Constant::Array(_) => unimplemented!(), // 这个不太可能
-                    _ => Err(anyhow!("not a global var:{}", operand)).with_context(|| context!()), /* SignedChar(_) | Bool(_) | Float(_) | Int(_) */
-                }
-            }
+            // middle::ir::Operand::Constant(con) => {
+            //     match con {
+            // constant array 实际上只会在 build_global_var 的时候有
+            //         middle::ir::Constant::Array(_) => unimplemented!(), // 这个不太可能
+            //         _ => Err(anyhow!("not a global var:{}", operand)).with_context(|| context!()), /* SignedChar(_) | Bool(_) | Float(_) | Int(_) */
+            //     }
+            // }
             _ => Err(anyhow!("not a global var:{}", operand)).with_context(|| context!()), // Instruction(_) | Parameter(_)
+        }
+    }
+
+    pub fn address_from(
+        operand: &middle::ir::Operand,
+        regs: &HashMap<Address, Reg>,
+        stack_slots: &HashMap<Address, StackSlot>,
+    ) -> Result<Operand> {
+        if let Ok(slot) = Self::stack_slot_from(operand, stack_slots) {
+            Ok(slot)
+        } else if let Ok(label) = Self::global_lable_from(operand) {
+            Ok(label.into())
+        } else if let Ok(reg) = Self::pointer_from(operand, regs) {
+            Ok(reg.into())
+        } else {
+            Err(anyhow!("operand is not address:{}", operand)).with_context(|| context!())
         }
     }
 
