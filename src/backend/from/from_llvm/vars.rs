@@ -10,7 +10,7 @@ impl IRBuilder {
     ) -> Result<Vec<Var>> {
         let mut global_vars = Vec::new();
         for global_var in llvm_global_vars {
-            dbg!(&global_var);
+            // dbg!(&global_var);
             // continue;
             let name = &global_var.name.to_string()[1..];
             if let Some(init) = &global_var.initializer {
@@ -33,11 +33,11 @@ impl IRBuilder {
                         unimplemented!();
                     }
                     _ => {
-                        dbg!(&global_var);
+                        // dbg!(&global_var);
                         unimplemented!()
                     }
                 };
-                dbg!(&new_var);
+                // dbg!(&new_var);
                 global_vars.push(new_var);
             }
         }
@@ -207,8 +207,8 @@ impl IRBuilder {
                 unimplemented!();
             }
         }
-        dbg!(e_ty, elems);
-        dbg!(total_capacity, &total_inits);
+        // dbg!(e_ty, elems);
+        // dbg!(total_capacity, &total_inits);
         Ok((total_capacity, total_inits))
     }
 
