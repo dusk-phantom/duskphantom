@@ -125,7 +125,7 @@ impl IRBuilder {
                 let gep = downcast_ref::<middle::ir::instruction::memory_op_inst::GetElementPtr>(
                     inst.as_ref().as_ref(),
                 );
-                Self::build_gep_inst(gep, reg_gener, regs)
+                Self::build_gep_inst(gep, reg_gener, regs, stack_slots)
             }
             middle::ir::instruction::InstType::ZextTo => {
                 let zext = downcast_ref::<middle::ir::instruction::extend_inst::ZextTo>(
@@ -170,7 +170,8 @@ impl IRBuilder {
                 let call = downcast_ref::<middle::ir::instruction::misc_inst::Call>(
                     inst.as_ref().as_ref(),
                 );
-                Self::build_call_inst(call, stack_allocator, stack_slots, reg_gener, regs)
+                // Self::build_call_inst(call, stack_allocator, stack_slots, reg_gener, regs)
+                Self::build_call_inst(call, reg_gener, regs)
             }
         }
     }
@@ -188,20 +189,23 @@ impl IRBuilder {
         gep: &middle::ir::instruction::memory_op_inst::GetElementPtr,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
+        stack_slots: &HashMap<Address, StackSlot>,
     ) -> Result<Vec<Inst>> {
         let mut ret = Vec::new();
 
         // 比方说 int arr[100][100], 我要访问 int[7][11]
         // 是 idxes[0] 表示 7 还是 11 ?
         // 然后我这里是需要计算偏移
+
         let idxes = gep.get_index();
         let ptr = gep.get_ptr();
-        let base = Self::no_load_from(ptr, regs).with_context(|| context!())?;
+        let base = Self::address_from(ptr, regs, stack_slots).with_context(|| context!())?;
+        // let base = Self::no_load_from(ptr, regs).with_context(|| context!())?;
         let (ofst, prepare) =
             Self::_cal_offset(ptr, idxes, reg_gener, regs).with_context(|| context!())?;
         ret.extend(prepare);
         let dst = reg_gener.gen_virtual_usual_reg();
-        let add = AddInst::new(dst.into(), base, ofst);
+        let add = AddInst::new(dst.into(), base, ofst.into());
         regs.insert(gep as *const _ as usize, dst);
         Ok(ret)
     }
@@ -227,7 +231,6 @@ impl IRBuilder {
         Ok(vec![])
     }
 
-    #[allow(unused)]
     fn build_zext_inst(
         zext: &middle::ir::instruction::extend_inst::ZextTo,
         reg_gener: &mut RegGenerator,
@@ -356,13 +359,13 @@ impl IRBuilder {
     ) -> Result<Vec<Inst>> {
         let ty = alloca.value_type.clone();
         let bytes: u32 = match ty {
-            middle::ir::ValueType::Int => 8,
+            middle::ir::ValueType::Int
+            | middle::ir::ValueType::Float
+            | middle::ir::ValueType::Bool
+            | middle::ir::ValueType::SignedChar => 8,
             middle::ir::ValueType::Void => {
                 return Err(anyhow!("it can't alloca void")).with_context(|| context!())
             }
-            middle::ir::ValueType::Float => 8,
-            middle::ir::ValueType::Bool => 8,
-            middle::ir::ValueType::SignedChar => 8,
             middle::ir::ValueType::Array(_, _) => todo!(),
             middle::ir::ValueType::Pointer(_) => todo!(), // 4B
                                                           // _ => todo!(),
@@ -379,7 +382,7 @@ impl IRBuilder {
     /// store 指令，有几种可能: 指针/数组、全局变量、栈
     pub fn build_store_inst(
         store: &middle::ir::instruction::memory_op_inst::Store,
-        stack_slots: &mut HashMap<Address, StackSlot>,
+        stack_slots: &HashMap<Address, StackSlot>,
         reg_gener: &mut RegGenerator,
         regs: &HashMap<Address, Reg>,
     ) -> Result<Vec<Inst>> {
@@ -419,7 +422,7 @@ impl IRBuilder {
 
     pub fn build_load_inst(
         load: &middle::ir::instruction::memory_op_inst::Load,
-        stack_slots: &mut HashMap<Address, StackSlot>,
+        stack_slots: &HashMap<Address, StackSlot>,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
     ) -> Result<Vec<Inst>> {
@@ -630,49 +633,10 @@ impl IRBuilder {
         Ok(br_insts)
     }
 
-    // /// 不是 ret 就是 br
-    // #[allow(unused)]
-    // pub fn build_term_inst(
-    //     term: &ObjPtr<Box<dyn middle::ir::Instruction>>,
-    //     regs: &mut HashMap<Address, Reg>,
-    //     reg_gener: &mut RegGenerator,
-    //     fmms: &mut HashMap<Fmm, FloatVar>,
-    // ) -> Result<Vec<Inst>> {
-    //     let mut ret_insts: Vec<Inst> = Vec::new();
-    //     // dbg!(term);
-
-    //     let insts = match term.get_type() {
-    //         middle::ir::instruction::InstType::Ret => {
-    //             let ret = downcast_ref::<middle::ir::instruction::terminator_inst::Ret>(
-    //                 term.as_ref().as_ref(),
-    //             );
-    //             Self::build_ret_inst(ret, reg_gener, regs, fmms)?
-    //         }
-    //         middle::ir::instruction::InstType::Br => {
-    //             let br = downcast_ref::<middle::ir::instruction::terminator_inst::Br>(
-    //                 term.as_ref().as_ref(),
-    //             );
-    //             Self::build_br_inst(br, regs)?
-    //         }
-    //         _ => {
-    //             return Err(anyhow!("get_last_inst only to be ret or br"))
-    //                 .with_context(|| context!())
-    //         }
-    //     };
-
-    //     // TODO 这里 return 还要记得 退栈
-
-    //     ret_insts.extend(insts);
-
-    //     Ok(ret_insts)
-    // }
-
-    #[allow(unused)]
     pub fn build_call_inst(
-        // call: &llvm_ir::instruction::Call,
         call: &middle::ir::instruction::misc_inst::Call,
-        stack_allocator: &mut StackAllocator,
-        stack_slots: &mut HashMap<Address, StackSlot>,
+        // stack_allocator: &mut StackAllocator,
+        // stack_slots: &HashMap<Address, StackSlot>,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
     ) -> Result<Vec<Inst>> {
