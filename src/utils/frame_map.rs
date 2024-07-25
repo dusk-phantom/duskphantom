@@ -23,7 +23,7 @@ where
     /// Get an element.
     pub fn get(&self, k: &K) -> Option<&V> {
         for frame in self.0.iter().rev() {
-            if let Some(v) = frame.get(&k) {
+            if let Some(v) = frame.get(k) {
                 return Some(v);
             }
         }

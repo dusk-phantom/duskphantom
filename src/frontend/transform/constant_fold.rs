@@ -1,16 +1,33 @@
-use anyhow::Result;
+use anyhow::{anyhow, Context, Result};
 
 use crate::{
-    frontend::{BinaryOp, Expr, Type, UnaryOp},
+    context,
+    frontend::{BinaryOp, Decl, Expr, Program, Type, UnaryOp},
     utils::frame_map::FrameMap,
 };
+
+#[allow(unused)]
+pub fn optimize_program(program: &mut Program) -> Result<()> {
+    for decl in program.module {
+        match decl {
+            Decl::Const(_, _, _) => todo!(),
+            Decl::Var(_, _, _) => todo!(),
+            Decl::Stack(_) => todo!(),
+            Decl::Func(_, _, _) => todo!(),
+            Decl::Enum(_, _) => todo!(),
+            Decl::Union(_, _) => todo!(),
+            Decl::Struct(_, _) => todo!(),
+        }
+    }
+    Ok(())
+}
 
 impl Expr {
     fn to_i32(&self) -> Result<i32> {
         match self {
             Expr::Int(x) => Ok(*x),
             Expr::Float(x) => Ok(*x as i32),
-            _ => Err(anyhow::anyhow!("Cannot cast to i32")),
+            _ => Err(anyhow!("Cannot cast to i32")),
         }
     }
 
@@ -18,7 +35,7 @@ impl Expr {
         match self {
             Expr::Int(x) => Ok(*x as f32),
             Expr::Float(x) => Ok(*x),
-            _ => Err(anyhow::anyhow!("Cannot cast to f32")),
+            _ => Err(anyhow!("Cannot cast to f32")),
         }
     }
 }
@@ -41,11 +58,12 @@ impl From<bool> for Expr {
     }
 }
 
-pub fn fold_expr(expr: Expr, env: &FrameMap<String, Expr>, expr_type: &Type) -> Result<Expr> {
+/// Fold an expression to constant.
+pub fn fold_expr(expr: &Expr, env: &FrameMap<String, Expr>, expr_type: &Type) -> Result<Expr> {
     match expr_type {
-        Type::Array(element_type, count) => {
+        Type::Array(element_type, _) => {
             let arr = fold_array(expr, env, element_type)?;
-            Ok(Expr::Array(arr))
+            Ok(arr)
         }
         Type::Int => {
             let x = fold_i32(expr, env)?;
@@ -55,70 +73,101 @@ pub fn fold_expr(expr: Expr, env: &FrameMap<String, Expr>, expr_type: &Type) -> 
             let x = fold_f32(expr, env)?;
             Ok(Expr::Float(x))
         }
-        _ => Ok(expr),
+        _ => Err(anyhow!("cannot fold an instance of {:?}", expr_type)).with_context(|| context!()),
     }
 }
 
-pub fn fold_array(
-    expr: Expr,
+/// Fold an indexed expression to constant.
+pub fn fold_indexed(
+    expr: &Expr,
     env: &FrameMap<String, Expr>,
-    indexes: Vec<usize>,
-    element_type: &Type,
+    mut indexes: Vec<usize>,
+    expr_type: &Type,
 ) -> Result<Expr> {
-    match expr {
-        Expr::Var(id) => {
-            let Some(val) = env.get(&id) else {
-                return Err(anyhow::anyhow!("Variable not found"));
-            };
-            Ok(val.clone())
-        }
-        Expr::Array(arr) => Ok(arr),
-        Expr::Map(_) => todo!(),
-        Expr::Index(arr, ix) => {
-            let array_type = Type::Array(element_type.clone().into(), Expr::Int(0).into());
-            let arr = fold_array(*arr, env, &array_type)?;
-            let ix = ix.to_i32()?;
-            if ix < 0 || ix as usize >= arr.len() {
-                return Ok(vec![]);
-            }
-            arr[ix as usize].to_array()
-        }
-        Expr::Field(_, _) => todo!(),
-        Expr::Select(_, _) => todo!(),
-        Expr::Int(_) => todo!(),
-        Expr::Float(_) => todo!(),
-        Expr::String(_) => todo!(),
-        Expr::Char(_) => todo!(),
-        Expr::Bool(_) => todo!(),
-        Expr::Call(_, _) => todo!(),
-        Expr::Unary(_, _) => todo!(),
-        Expr::Binary(_, _) => todo!(),
-        Expr::Conditional(_, _, _) => todo!(),
+    // If not indexed, fallback to regular expression fold
+    if indexes.is_empty() {
+        return fold_expr(expr, env, expr_type);
     }
-}
 
-pub fn fold_i32(expr: Expr, env: &FrameMap<String, Expr>) -> Result<i32> {
+    // Expression is indexed
     match expr {
         Expr::Var(id) => {
             let Some(val) = env.get(id) else {
-                return Err(anyhow::anyhow!("Variable not found"));
+                return Err(anyhow!("Variable not found"));
             };
+
+            // Although val is already folded, we still need to handle the indexes
+            fold_indexed(val, env, indexes, expr_type)
+        }
+        Expr::Array(arr) => {
+            // Get index
+            let ix = indexes.pop().unwrap();
+
+            // Get default initializer if index is out of bounds
+            // This makes `int x[N] = {}; x[n]` default initializer instead of poison value
+            if ix >= arr.len() {
+                return expr_type.default_initializer();
+            }
+
+            // Index unfolded array and then fold the result, to save computation
+            fold_indexed(&arr[ix], env, indexes, expr_type)
+        }
+        Expr::Index(arr, ix) => {
+            let ix = fold_i32(ix, env)?;
+            indexes.push(ix as usize);
+            fold_indexed(arr, env, indexes, expr_type)
+        }
+        _ => Err(anyhow!("expr {:?} can't be indexed", expr)).with_context(|| context!()),
+    }
+}
+
+/// Fold a potentially array, potentially indexed expression to constant.
+pub fn fold_array(expr: &Expr, env: &FrameMap<String, Expr>, element_type: &Type) -> Result<Expr> {
+    match expr {
+        Expr::Var(id) => {
+            let Some(val) = env.get(id) else {
+                return Err(anyhow!("Variable not found"));
+            };
+
+            // Although val is already folded, we still need to handle the type
+            fold_array(val, env, element_type)
+        }
+        Expr::Array(arr) => arr
+            .iter()
+            .map(|x| fold_expr(x, env, element_type))
+            .collect::<Result<_>>()
+            .map(Expr::Array),
+        Expr::Index(arr, ix) => {
+            let ix = fold_i32(ix, env)?;
+            fold_indexed(
+                arr,
+                env,
+                vec![ix as usize],
+                &Type::Array(element_type.clone().into(), Expr::Int(0).into()),
+            )
+        }
+        _ => fold_expr(expr, env, element_type),
+    }
+}
+
+pub fn fold_i32(expr: &Expr, env: &FrameMap<String, Expr>) -> Result<i32> {
+    match expr {
+        Expr::Var(id) => {
+            let Some(val) = env.get(id) else {
+                return Err(anyhow!("Variable not found"));
+            };
+
+            // Value in environment is already folded, no need to fold again
             val.to_i32()
         }
-        Expr::Array(_) => todo!(),
-        Expr::Map(_) => todo!(),
         Expr::Index(arr, ix) => {
-            let ix = fold_i32(*ix, env)?;
-            fold_array(arr, env, vec![ix as usize], &Type::Int)
+            let ix = fold_i32(ix, env)?;
+            fold_indexed(arr, env, vec![ix as usize], &Type::Int)?.to_i32()
         }
-        Expr::Field(_, _) => todo!(),
-        Expr::Select(_, _) => todo!(),
         Expr::Int(x) => Ok(*x),
         Expr::Float(x) => Ok(*x as i32),
-        Expr::String(_) => todo!(),
         Expr::Char(x) => Ok(*x as i32),
         Expr::Bool(x) => Ok(*x as i32),
-        Expr::Call(_, _) => todo!(),
         Expr::Unary(op, expr) => {
             let x = fold_i32(expr, env)?;
             match op {
@@ -155,36 +204,26 @@ pub fn fold_i32(expr: Expr, env: &FrameMap<String, Expr>) -> Result<i32> {
             }
             Ok(x)
         }
-        Expr::Conditional(_, _, _) => todo!(),
+        _ => Err(anyhow!("expr {:?} can't be folded to i32", expr)).with_context(|| context!()),
     }
 }
 
-pub fn fold_f32(expr: Expr, env: &FrameMap<String, Expr>) -> Result<f32> {
+pub fn fold_f32(expr: &Expr, env: &FrameMap<String, Expr>) -> Result<f32> {
     match expr {
         Expr::Var(id) => {
-            let Some(val) = env.get(&id) else {
-                return Err(anyhow::anyhow!("Variable not found"));
+            let Some(val) = env.get(id) else {
+                return Err(anyhow!("Variable not found"));
             };
             val.to_f32()
         }
-        Expr::Array(_) => todo!(),
-        Expr::Map(_) => todo!(),
         Expr::Index(arr, ix) => {
-            let arr = fold_array(arr, env)?;
-            let ix = ix.to_i32()?;
-            if ix < 0 || ix as usize >= arr.len() {
-                return Err(anyhow::anyhow!("Index out of bounds"));
-            }
-            fold_f32(&arr[ix as usize], env)
+            let ix = fold_i32(ix, env)?;
+            fold_indexed(arr, env, vec![ix as usize], &Type::Float)?.to_f32()
         }
-        Expr::Field(_, _) => todo!(),
-        Expr::Select(_, _) => todo!(),
         Expr::Int(x) => Ok(*x as f32),
         Expr::Float(x) => Ok(*x),
-        Expr::String(_) => todo!(),
         Expr::Char(x) => Ok(*x as i32 as f32),
         Expr::Bool(x) => Ok(*x as i32 as f32),
-        Expr::Call(_, _) => todo!(),
         Expr::Unary(op, expr) => {
             let x = fold_f32(expr, env)?;
             match op {
@@ -204,11 +243,11 @@ pub fn fold_f32(expr: Expr, env: &FrameMap<String, Expr>) -> Result<f32> {
                     BinaryOp::Mul => x *= y,
                     BinaryOp::Div => x /= y,
                     BinaryOp::Mod => x %= y,
-                    BinaryOp::Shr => return Err(anyhow::anyhow!("Cannot shift float")),
-                    BinaryOp::Shl => return Err(anyhow::anyhow!("Cannot shift float")),
-                    BinaryOp::BitAnd => return Err(anyhow::anyhow!("Cannot bitwise and float")),
-                    BinaryOp::BitOr => return Err(anyhow::anyhow!("Cannot bitwise or float")),
-                    BinaryOp::BitXor => return Err(anyhow::anyhow!("Cannot bitwise xor float")),
+                    BinaryOp::Shr => return Err(anyhow!("Cannot shift float")),
+                    BinaryOp::Shl => return Err(anyhow!("Cannot shift float")),
+                    BinaryOp::BitAnd => return Err(anyhow!("Cannot bitwise and float")),
+                    BinaryOp::BitOr => return Err(anyhow!("Cannot bitwise or float")),
+                    BinaryOp::BitXor => return Err(anyhow!("Cannot bitwise xor float")),
                     BinaryOp::Gt => x = if x > y { 1.0 } else { 0.0 },
                     BinaryOp::Lt => x = if x < y { 1.0 } else { 0.0 },
                     BinaryOp::Ge => x = if x >= y { 1.0 } else { 0.0 },
@@ -221,6 +260,6 @@ pub fn fold_f32(expr: Expr, env: &FrameMap<String, Expr>) -> Result<f32> {
             }
             Ok(x)
         }
-        Expr::Conditional(_, _, _) => todo!(),
+        _ => Err(anyhow!("expr {:?} can't be folded to f32", expr)).with_context(|| context!()),
     }
 }
