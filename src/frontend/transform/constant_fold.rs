@@ -2,22 +2,56 @@ use anyhow::{anyhow, Context, Result};
 
 use crate::{
     context,
-    frontend::{BinaryOp, Decl, Expr, Program, Type, UnaryOp},
+    frontend::{BinaryOp, Decl, Expr, Program, Stmt, Type, UnaryOp},
     utils::frame_map::FrameMap,
 };
 
-#[allow(unused)]
 pub fn optimize_program(program: &mut Program) -> Result<()> {
-    for decl in program.module {
-        match decl {
-            Decl::Const(_, _, _) => todo!(),
-            Decl::Var(_, _, _) => todo!(),
-            Decl::Stack(_) => todo!(),
-            Decl::Func(_, _, _) => todo!(),
-            Decl::Enum(_, _) => todo!(),
-            Decl::Union(_, _) => todo!(),
-            Decl::Struct(_, _) => todo!(),
+    let mut env = FrameMap::default();
+    for decl in program.module.iter_mut() {
+        fold_decl(decl, &mut env)?;
+    }
+    Ok(())
+}
+
+/// Fold constant expression in declaration into constant.
+fn fold_decl(decl: &mut Decl, env: &mut FrameMap<String, Expr>) -> Result<()> {
+    match decl {
+        Decl::Const(ty, id, Some(expr)) => {
+            fold_type(ty, env)?;
+            *expr = fold_expr(expr, env, ty)?;
+            env.insert(id.clone(), expr.clone());
         }
+        Decl::Var(ty, _, _) => {
+            fold_type(ty, env)?;
+        }
+        Decl::Stack(vec) => {
+            for decl in vec {
+                fold_decl(decl, env)?;
+            }
+        }
+        Decl::Func(ty, _, Some(stmt)) => {
+            fold_type(ty, env)?;
+            fold_stmt(stmt, &mut env.branch())?;
+        }
+        Decl::Enum(_, _) => todo!(),
+        Decl::Union(_, _) => todo!(),
+        Decl::Struct(_, _) => todo!(),
+        _ => (),
+    }
+    Ok(())
+}
+
+/// Fold constant expression in statement into constant.
+fn fold_stmt(stmt: &mut Stmt, env: &mut FrameMap<String, Expr>) -> Result<()> {
+    match stmt {
+        Stmt::Decl(decl) => fold_decl(decl, env)?,
+        Stmt::Block(vec) => {
+            for stmt in vec {
+                fold_stmt(stmt, env)?;
+            }
+        }
+        _ => (),
     }
     Ok(())
 }
@@ -58,8 +92,23 @@ impl From<bool> for Expr {
     }
 }
 
+/// Fold a type to constant.
+fn fold_type(ty: &Type, env: &FrameMap<String, Expr>) -> Result<Type> {
+    match ty {
+        Type::Array(element_type, size) => {
+            let size = fold_i32(size, env)?;
+            let element_type = fold_type(element_type, env)?;
+            Ok(Type::Array(
+                Box::new(element_type),
+                Box::new(Expr::Int(size)),
+            ))
+        }
+        _ => Ok(ty.clone()),
+    }
+}
+
 /// Fold an expression to constant.
-pub fn fold_expr(expr: &Expr, env: &FrameMap<String, Expr>, expr_type: &Type) -> Result<Expr> {
+fn fold_expr(expr: &Expr, env: &FrameMap<String, Expr>, expr_type: &Type) -> Result<Expr> {
     match expr_type {
         Type::Array(element_type, _) => {
             let arr = fold_array(expr, env, element_type)?;
@@ -78,7 +127,7 @@ pub fn fold_expr(expr: &Expr, env: &FrameMap<String, Expr>, expr_type: &Type) ->
 }
 
 /// Fold an indexed expression to constant.
-pub fn fold_indexed(
+fn fold_indexed(
     expr: &Expr,
     env: &FrameMap<String, Expr>,
     mut indexes: Vec<usize>,
@@ -121,8 +170,8 @@ pub fn fold_indexed(
     }
 }
 
-/// Fold a potentially array, potentially indexed expression to constant.
-pub fn fold_array(expr: &Expr, env: &FrameMap<String, Expr>, element_type: &Type) -> Result<Expr> {
+/// Fold an array to constant.
+fn fold_array(expr: &Expr, env: &FrameMap<String, Expr>, element_type: &Type) -> Result<Expr> {
     match expr {
         Expr::Var(id) => {
             let Some(val) = env.get(id) else {
@@ -150,7 +199,8 @@ pub fn fold_array(expr: &Expr, env: &FrameMap<String, Expr>, element_type: &Type
     }
 }
 
-pub fn fold_i32(expr: &Expr, env: &FrameMap<String, Expr>) -> Result<i32> {
+/// Fold an i32 to constant.
+fn fold_i32(expr: &Expr, env: &FrameMap<String, Expr>) -> Result<i32> {
     match expr {
         Expr::Var(id) => {
             let Some(val) = env.get(id) else {
@@ -208,7 +258,8 @@ pub fn fold_i32(expr: &Expr, env: &FrameMap<String, Expr>) -> Result<i32> {
     }
 }
 
-pub fn fold_f32(expr: &Expr, env: &FrameMap<String, Expr>) -> Result<f32> {
+/// Fold an f32 to constant.
+fn fold_f32(expr: &Expr, env: &FrameMap<String, Expr>) -> Result<f32> {
     match expr {
         Expr::Var(id) => {
             let Some(val) = env.get(id) else {
