@@ -316,7 +316,10 @@ impl IRBuilder {
                 capas.push(*_size);
                 capas
             }
-            middle::ir::ValueType::Pointer(_ptr) => todo!(),
+            middle::ir::ValueType::Pointer(_ptr) => {
+                let _type = _ptr.as_ref();
+                Self::_cal_capas_rev(_type)
+            }
         }
     }
 
