@@ -69,7 +69,7 @@ impl<'a> FunctionKit<'a> {
                             vec![
                                 ptr,
                                 Operand::Constant(Constant::SignedChar(0)),
-                                Operand::Constant(Constant::Int(ty.array_dimension() as i32 * 4)),
+                                Operand::Constant(Constant::Int(ty.size() as i32 * 4)),
                                 Operand::Constant(Constant::Bool(false)),
                             ],
                         );

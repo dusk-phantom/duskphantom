@@ -44,6 +44,10 @@ impl ValueType {
         )
     }
 
+    pub fn is_num(&self) -> bool {
+        matches!(self, ValueType::Bool | ValueType::Int | ValueType::Float)
+    }
+
     pub fn is_pointer(&self) -> bool {
         matches!(self, ValueType::Pointer(_))
     }
@@ -52,10 +56,10 @@ impl ValueType {
         matches!(self, ValueType::Array(_, _))
     }
 
-    /// Get array dimension.
-    pub fn array_dimension(&self) -> usize {
+    /// Get size of this value type.
+    pub fn size(&self) -> usize {
         match self {
-            ValueType::Array(element_type, dim) => *dim * element_type.array_dimension(),
+            ValueType::Array(element_type, dim) => *dim * element_type.size(),
             _ => 1,
         }
     }
@@ -87,6 +91,40 @@ impl ValueType {
                 let inner_const = ty.default_initializer()?;
                 Ok(Constant::Array(vec![inner_const; *num]))
             }
+        }
+    }
+
+    /// Convert a numeric value type to its precision level.
+    /// Higher is more precise.
+    pub fn to_precision_level(&self) -> i32 {
+        match self {
+            // All boolean should be converted to int when applying `+` and etc.
+            ValueType::Bool => 1,
+            ValueType::Int => 1,
+            ValueType::Float => 2,
+            _ => 0,
+        }
+    }
+
+    /// Convert a precision level to a value type.
+    pub fn from_precision_level(level: i32) -> Self {
+        match level {
+            1 => ValueType::Int,
+            2 => ValueType::Float,
+            _ => ValueType::Void,
+        }
+    }
+
+    /// Max this type with another type, return more precise one.
+    /// If types are not number, return void.
+    pub fn max_with(&self, b: &Self) -> Self {
+        if self.is_num() && b.is_num() {
+            let a_lv = self.to_precision_level();
+            let b_lv = b.to_precision_level();
+            let max_lv = if a_lv > b_lv { a_lv } else { b_lv };
+            ValueType::from_precision_level(max_lv)
+        } else {
+            ValueType::Void
         }
     }
 }
