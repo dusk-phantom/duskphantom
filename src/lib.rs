@@ -1,5 +1,4 @@
 use anyhow::Context;
-use backend::checker::CheckValidInst;
 use errors::CompilerError;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
@@ -46,19 +45,8 @@ pub fn compile(
         backend::phisicalize(&mut program)?;
     }
     // check valid
-    {
-        for module in program.modules.iter() {
-            for func in module.funcs.iter() {
-                for bb in func.iter_bbs() {
-                    for inst in bb.insts() {
-                        if !inst.check_valid() {
-                            panic!("invalid inst: {:?}", &inst.gen_asm());
-                        }
-                    }
-                }
-            }
-        }
-    }
+    #[cfg(not(feature = "gen_virtual_asm"))]
+    checker::ProgramChecker::check_valid(&checker::Riscv, &program);
 
     let asm = program.gen_asm();
     output(asm, output_path, asm_flag)
@@ -92,19 +80,8 @@ pub fn compile_clang(
     }
     // check valid
     #[cfg(not(feature = "gen_virtual_asm"))]
-    {
-        for module in program.modules.iter() {
-            for func in module.funcs.iter() {
-                for bb in func.iter_bbs() {
-                    for inst in bb.insts() {
-                        if !inst.check_valid() {
-                            panic!("invalid inst: {:?}", &inst.gen_asm());
-                        }
-                    }
-                }
-            }
-        }
-    }
+    checker::ProgramChecker::check_valid(&checker::Riscv, &program);
+
     let asm = program.gen_asm();
     output(asm, output_path, asm_flag)
 }

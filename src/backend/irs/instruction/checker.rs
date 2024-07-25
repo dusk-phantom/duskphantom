@@ -1,163 +1,196 @@
-use super::*;
+use var::Var;
 
-pub trait CheckValidInst {
-    fn check_valid(&self) -> bool {
+use super::*;
+pub trait IRChecker: ProgramChecker {}
+
+pub trait ProgramChecker: ModuleChecker {
+    fn check_valid(&self, program: &Program) -> bool;
+}
+
+pub trait ModuleChecker: VarChecker + FuncChecker {
+    fn check_valid(&self, module: &Module) -> bool;
+}
+
+pub trait VarChecker {
+    fn check_valid(&self, var: &Var) -> bool;
+}
+
+pub trait FuncChecker: BBChecker {
+    fn check_valid(&self, func: &Func) -> bool;
+}
+
+pub trait BBChecker {
+    fn check_valid(&self, bb: &Block) -> bool;
+}
+pub trait InstChecker {
+    fn check_valid(&self, inst: &Inst) -> bool;
+}
+
+pub struct Riscv;
+
+impl IRChecker for Riscv {}
+impl ProgramChecker for Riscv {
+    fn check_valid(&self, program: &Program) -> bool {
+        for module in program.modules.iter() {
+            if !ModuleChecker::check_valid(self, module) {
+                return false;
+            }
+        }
+        true
+    }
+}
+impl ModuleChecker for Riscv {
+    fn check_valid(&self, module: &Module) -> bool {
+        for var in module.global.iter() {
+            if !VarChecker::check_valid(self, var) {
+                return false;
+            }
+        }
+        for func in module.funcs.iter() {
+            if !FuncChecker::check_valid(self, func) {
+                return false;
+            }
+        }
+        true
+    }
+}
+impl VarChecker for Riscv {
+    #[allow(unused_variables)]
+    fn check_valid(&self, var: &Var) -> bool {
+        true
+    }
+}
+impl FuncChecker for Riscv {
+    fn check_valid(&self, func: &Func) -> bool {
+        for bb in func.iter_bbs() {
+            if !BBChecker::check_valid(self, bb) {
+                return false;
+            }
+        }
         true
     }
 }
 
-pub mod riscv {
-    use super::*;
-    impl CheckValidInst for Inst {
-        fn check_valid(&self) -> bool {
-            match self {
-                Inst::Add(inst) => inst.check_valid(),
-                Inst::Sub(inst) => inst.check_valid(),
-                Inst::Mul(inst) => inst.check_valid(),
-                Inst::Rem(inst) => inst.check_valid(),
-                Inst::Neg(inst) => inst.check_valid(),
-                Inst::Div(inst) => inst.check_valid(),
-                Inst::Sll(inst) => inst.check_valid(),
-                Inst::Srl(inst) => inst.check_valid(),
-                Inst::Slt(inst) => inst.check_valid(),
-                Inst::Mv(inst) => inst.check_valid(),
-                Inst::Ld(inst) => inst.check_valid(),
-                Inst::Sd(inst) => inst.check_valid(),
-                Inst::Sw(inst) => inst.check_valid(),
-                Inst::Lw(inst) => inst.check_valid(),
-                Inst::Lla(inst) => inst.check_valid(),
-                Inst::Load(inst) => inst.check_valid(),
-                Inst::Store(inst) => inst.check_valid(),
-                Inst::Jmp(inst) => inst.check_valid(),
-                Inst::Beq(inst) => inst.check_valid(),
-                Inst::Bne(inst) => inst.check_valid(),
-                Inst::Bge(inst) => inst.check_valid(),
-                Inst::Blt(inst) => inst.check_valid(),
-                Inst::Bgt(inst) => inst.check_valid(),
-                Inst::Ble(inst) => inst.check_valid(),
-
-                Inst::F2i(inst) => inst.check_valid(),
-                Inst::I2f(inst) => inst.check_valid(),
-
-                Inst::Call(inst) => inst.check_valid(),
-                Inst::SRA(inst) => inst.check_valid(),
-                Inst::Ret => true,
-                Inst::And(inst) => inst.check_valid(),
-                Inst::Or(inst) => inst.check_valid(),
-                Inst::Xor(inst) => inst.check_valid(),
-                Inst::Tail(inst) => inst.check_valid(),
-                Inst::Li(inst) => inst.check_valid(),
-                Inst::Seqz(inst) => inst.check_valid(),
-                Inst::Snez(snez) => snez.check_valid(),
-                Inst::Not(not) => not.check_valid(),
+impl BBChecker for Riscv {
+    fn check_valid(&self, bb: &Block) -> bool {
+        for inst in bb.insts() {
+            if !InstChecker::check_valid(self, inst) {
+                return false;
             }
         }
+        true
     }
-    impl CheckValidInst for SubInst {
-        fn check_valid(&self) -> bool {
-            matches!(self.dst(), Operand::Reg(_))
-                && matches!(self.lhs(), Operand::Reg(_))
-                && matches!(self.rhs(), Operand::Reg(_))
+}
+impl InstChecker for Riscv {
+    fn check_valid(&self, inst: &Inst) -> bool {
+        match inst {
+            Inst::Add(add) => self.check_add(add),
+            Inst::Sub(sub) => self.check_sub(sub),
+            Inst::Mul(mul) => self.check_mul(mul),
+            Inst::Rem(rem) => self.check_rem(rem),
+            Inst::Div(div) => self.check_div(div),
+            Inst::Sll(_) => true,
+            Inst::Srl(_) => true,
+            Inst::SRA(_) => true,
+            Inst::And(_) => true,
+            Inst::Not(not) => self.check_not(not),
+            Inst::Or(_) => true,
+            Inst::Xor(_) => true,
+            Inst::Slt(_) => true,
+            Inst::Snez(snez) => self.check_snez(snez),
+            Inst::Seqz(seqz) => self.check_seqz(seqz),
+            Inst::Neg(_) => true,
+            Inst::Mv(_) => true,
+            Inst::Ld(_) => true,
+            Inst::Sd(_) => true,
+            Inst::Sw(_) => true,
+            Inst::Lw(_) => true,
+            Inst::Lla(_) => true,
+            // special inst to temporary express the load and store operation ,should not to keep in the final ir
+            Inst::Load(_) => false,
+            Inst::Store(_) => false,
+
+            Inst::Jmp(_) => true,
+            Inst::Beq(_) => true,
+            Inst::Bne(_) => true,
+            Inst::Bge(_) => true,
+            Inst::Blt(_) => true,
+            Inst::Bgt(_) => true,
+            Inst::Ble(_) => true,
+            Inst::Call(_) => true,
+            Inst::Tail(_) => true,
+            Inst::Li(li) => self.check_li(li),
+            Inst::F2i(f2i) => self.check_f2i(f2i),
+            Inst::I2f(i2f) => self.check_i2f(i2f),
+            Inst::Ret => true,
         }
+    }
+}
+
+impl Riscv {
+    fn check_add(&self, add: &AddInst) -> bool {
+        matches!(add.dst(), Operand::Reg(_))
+            && matches!(add.lhs(), Operand::Reg(_))
+            && matches!(add.rhs(), Operand::Reg(_))
     }
 
-    impl CheckValidInst for RemInst {
-        fn check_valid(&self) -> bool {
-            matches!(self.dst(), Operand::Reg(_))
-                && matches!(self.lhs(), Operand::Reg(_))
-                && matches!(self.rhs(), Operand::Reg(_))
-        }
+    fn check_snez(&self, snez: &SnezInst) -> bool {
+        matches!(snez.dst(), Operand::Reg(_)) && matches!(snez.src(), Operand::Reg(_))
     }
-    impl CheckValidInst for DivInst {
-        fn check_valid(&self) -> bool {
-            matches!(self.dst(), Operand::Reg(_))
-                && matches!(self.lhs(), Operand::Reg(_))
-                && matches!(self.rhs(), Operand::Reg(_))
-        }
+
+    fn check_seqz(&self, seqz: &SeqzInst) -> bool {
+        matches!(seqz.dst(), Operand::Reg(_)) && matches!(seqz.src(), Operand::Reg(_))
     }
-    impl CheckValidInst for SllInst {}
-    impl CheckValidInst for SrlInst {}
-    impl CheckValidInst for SltInst {}
-    impl CheckValidInst for MvInst {}
-    impl CheckValidInst for LdInst {}
-    impl CheckValidInst for SdInst {}
-    impl CheckValidInst for SwInst {}
-    impl CheckValidInst for LwInst {}
-    impl CheckValidInst for LlaInst {}
-    impl CheckValidInst for LoadInst {
-        /// 在riscv 阶段，不应该存在load指令
-        fn check_valid(&self) -> bool {
-            false
-        }
+
+    fn check_not(&self, not: &NotInst) -> bool {
+        matches!(not.dst(), Operand::Reg(_)) && matches!(not.src(), Operand::Reg(_))
     }
-    impl CheckValidInst for StoreInst {
-        /// 在riscv 阶段，不应该存在store指令
-        fn check_valid(&self) -> bool {
-            false
-        }
+
+    fn check_f2i(&self, f2i: &F2iInst) -> bool {
+        (match f2i.dst() {
+            Operand::Reg(r) => r.is_usual(),
+            _ => false,
+        }) && (match f2i.src() {
+            Operand::Reg(r) => r.is_float(),
+            _ => false,
+        })
     }
-    impl CheckValidInst for JmpInst {}
-    impl CheckValidInst for BeqInst {}
-    impl CheckValidInst for BneInst {}
-    impl CheckValidInst for BgeInst {}
-    impl CheckValidInst for BltInst {}
-    impl CheckValidInst for BgtInst {}
-    impl CheckValidInst for BleInst {}
-    impl CheckValidInst for CallInst {}
-    impl CheckValidInst for AndInst {}
-    impl CheckValidInst for OrInst {}
-    impl CheckValidInst for SraInst {}
-    impl CheckValidInst for XorInst {}
-    impl CheckValidInst for TailInst {}
-    impl CheckValidInst for AddInst {}
-    impl CheckValidInst for MulInst {
-        fn check_valid(&self) -> bool {
-            matches!(self.dst(), Operand::Reg(_))
-                && matches!(self.lhs(), Operand::Reg(_))
-                && matches!(self.rhs(), Operand::Reg(_))
-        }
+
+    fn check_i2f(&self, i2f: &I2fInst) -> bool {
+        (match i2f.dst() {
+            Operand::Reg(r) => r.is_float(),
+            _ => false,
+        }) && (match i2f.src() {
+            Operand::Reg(r) => r.is_usual(),
+            _ => false,
+        })
     }
-    impl CheckValidInst for NegInst {}
-    impl CheckValidInst for LiInst {
-        fn check_valid(&self) -> bool {
-            matches!(self.dst(), Operand::Reg(_)) && matches!(self.src(), Operand::Imm(_))
-        }
+
+    fn check_li(&self, li: &LiInst) -> bool {
+        matches!(li.dst(), Operand::Reg(_)) && matches!(li.src(), Operand::Imm(_))
     }
-    impl CheckValidInst for SeqzInst {
-        fn check_valid(&self) -> bool {
-            matches!(self.dst(), Operand::Reg(_)) && matches!(self.src(), Operand::Reg(_))
-        }
+
+    fn check_rem(&self, rem: &RemInst) -> bool {
+        matches!(rem.dst(), Operand::Reg(_))
+            && matches!(rem.lhs(), Operand::Reg(_))
+            && matches!(rem.rhs(), Operand::Reg(_))
     }
-    impl CheckValidInst for F2iInst {
-        fn check_valid(&self) -> bool {
-            (match self.dst() {
-                Operand::Reg(r) => r.is_usual(),
-                _ => false,
-            }) && (match self.src() {
-                Operand::Reg(r) => r.is_float(),
-                _ => false,
-            })
-        }
+
+    fn check_div(&self, div: &DivInst) -> bool {
+        matches!(div.dst(), Operand::Reg(_))
+            && matches!(div.lhs(), Operand::Reg(_))
+            && matches!(div.rhs(), Operand::Reg(_))
     }
-    impl CheckValidInst for I2fInst {
-        fn check_valid(&self) -> bool {
-            (match self.dst() {
-                Operand::Reg(r) => r.is_float(),
-                _ => false,
-            }) && (match self.src() {
-                Operand::Reg(r) => r.is_usual(),
-                _ => false,
-            })
-        }
+
+    fn check_mul(&self, mul: &MulInst) -> bool {
+        matches!(mul.dst(), Operand::Reg(_))
+            && matches!(mul.lhs(), Operand::Reg(_))
+            && matches!(mul.rhs(), Operand::Reg(_))
     }
-    impl CheckValidInst for SnezInst {
-        fn check_valid(&self) -> bool {
-            matches!(self.dst(), Operand::Reg(_)) && matches!(self.src(), Operand::Reg(_))
-        }
-    }
-    impl CheckValidInst for NotInst {
-        fn check_valid(&self) -> bool {
-            matches!(self.dst(), Operand::Reg(_)) && matches!(self.src(), Operand::Reg(_))
-        }
+
+    fn check_sub(&self, sub: &SubInst) -> bool {
+        matches!(sub.dst(), Operand::Reg(_))
+            && matches!(sub.lhs(), Operand::Reg(_))
+            && matches!(sub.rhs(), Operand::Reg(_))
     }
 }
