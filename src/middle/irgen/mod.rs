@@ -18,7 +18,6 @@ mod gen_type;
 mod gen_unary;
 mod program_kit;
 mod value;
-mod value_type;
 
 /// Generate middle IR from a frontend AST
 pub fn gen(program: &frontend::Program) -> Result<middle::Program> {

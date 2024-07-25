@@ -38,9 +38,6 @@ impl<'a> ProgramKit<'a> {
                     initializer = collapse_array(&mut VecDeque::from(arr), &value_type)?;
                 }
 
-                // Cast initializer to required type
-                initializer = initializer.cast(&value_type);
-
                 // Get global variable
                 let global_val = self.program.mem_pool.new_global_variable(
                     name.clone(),
