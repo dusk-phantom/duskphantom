@@ -8,6 +8,8 @@ use crate::middle::irgen::value::Value;
 use anyhow::{anyhow, Context};
 
 use super::constant::collapse_array;
+use super::gen_const::gen_const;
+use super::gen_type::gen_type;
 
 impl<'a> ProgramKit<'a> {
     /// Generate a global declaration into the program
@@ -16,7 +18,7 @@ impl<'a> ProgramKit<'a> {
         match decl {
             Decl::Var(ty, name, val) | Decl::Const(ty, name, val) => {
                 // Get variable type
-                let value_type = self.translate_type(ty)?;
+                let value_type = gen_type(ty)?;
 
                 // Get if value is global variable or constant
                 let is_global_variable: bool = match decl {
@@ -27,7 +29,7 @@ impl<'a> ProgramKit<'a> {
 
                 // Get initializer
                 let mut initializer = match val {
-                    Some(v) => self.gen_const_expr(v)?,
+                    Some(v) => gen_const(v)?,
                     None => value_type.default_initializer()?,
                 };
 
@@ -56,14 +58,14 @@ impl<'a> ProgramKit<'a> {
             }
             Decl::Func(Type::Function(return_ty, params), id, _) => {
                 // Get function type
-                let fty = self.translate_type(return_ty)?;
+                let fty = gen_type(return_ty)?;
 
                 // Create function
                 let mut fun_ptr = self.program.mem_pool.new_function(id.clone(), fty.clone());
 
                 // Generate parameters
                 for param in params.iter() {
-                    let value_type = self.translate_type(&param.ty)?;
+                    let value_type = gen_type(&param.ty)?;
                     let param = self
                         .program
                         .mem_pool

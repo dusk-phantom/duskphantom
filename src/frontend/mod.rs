@@ -10,8 +10,10 @@ use crate::errors::FrontendError;
 #[allow(unused)]
 pub fn parse(src: &str) -> Result<Program, FrontendError> {
     let mut program = parse::program::parse(src)?;
-    constant_fold::optimize_program(&mut program);
-    Ok(program)
+    match constant_fold::optimize_program(&mut program) {
+        Ok(_) => Ok(program),
+        Err(e) => Err(FrontendError::OptimizeError),
+    }
 }
 
 #[allow(unused)]

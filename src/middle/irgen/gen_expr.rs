@@ -5,6 +5,7 @@ use crate::middle::irgen::function_kit::FunctionKit;
 use crate::middle::irgen::value::Value;
 use anyhow::{anyhow, Context};
 
+use super::gen_const::gen_const;
 use super::gen_library_function::is_argument_const;
 
 impl<'a> FunctionKit<'a> {
@@ -64,7 +65,7 @@ impl<'a> FunctionKit<'a> {
                     for (i, arg) in args.iter().enumerate() {
                         // Support constant argument only for dynamic library functions like `putf`
                         let arg = if is_argument_const(&func_name, i) {
-                            let constant = self.gen_program_kit().gen_const_expr(arg)?;
+                            let constant = gen_const(arg)?;
                             let name = self.unique_name("format");
                             let gvar = self.program.mem_pool.new_global_variable(
                                 name,

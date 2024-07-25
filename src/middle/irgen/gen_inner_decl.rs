@@ -6,6 +6,8 @@ use crate::middle::irgen::function_kit::FunctionKit;
 use crate::{context, middle::ir::Constant};
 use anyhow::{anyhow, Context};
 
+use super::gen_const::gen_const;
+use super::gen_type::gen_type;
 use super::value::{alloc, Value};
 use super::{constant, value};
 
@@ -21,10 +23,10 @@ impl<'a> FunctionKit<'a> {
                 };
 
                 // Translate type
-                let ty = self.gen_program_kit().translate_type(raw_ty)?;
+                let ty = gen_type(raw_ty)?;
 
                 // Generate constant value
-                let val = self.gen_program_kit().gen_const_expr(expr)?;
+                let val = gen_const(expr)?;
 
                 // If constant is an array, collapse it and store into global variable
                 let val = match val {
@@ -49,7 +51,7 @@ impl<'a> FunctionKit<'a> {
             }
             Decl::Var(raw_ty, id, op) => {
                 // Allocate space for variable, add to environment
-                let ty = self.gen_program_kit().translate_type(raw_ty)?;
+                let ty = gen_type(raw_ty)?;
                 let lhs = alloc(ty.clone(), self);
                 self.insert_env(id.clone(), lhs.clone());
 
