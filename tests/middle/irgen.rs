@@ -592,7 +592,7 @@ mod tests {
     #[test]
     fn test_global_variable() {
         let code = r#"
-            int x = 4;
+            int x = -4;
             int y = 8;
             int main() {
                 x = x + y;
@@ -603,7 +603,7 @@ mod tests {
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
         assert_snapshot!(llvm_ir, @r###"
-        @x = dso_local global i32 4
+        @x = dso_local global i32 -4
         @y = dso_local global i32 8
         declare i32 @getint()
         declare i32 @getch()
