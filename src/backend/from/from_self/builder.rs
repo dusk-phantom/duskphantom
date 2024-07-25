@@ -127,6 +127,12 @@ impl IRBuilder {
     ) -> Result<Vec<Func>> {
         let mut funcs = Vec::new();
         for self_func in self_funcs {
+            // Do not build library function
+            if self_func.is_lib() {
+                continue;
+            }
+
+            // Build the function
             let fu = self_func.as_ref();
             let func = Self::build_func(fu, fmms)?;
             funcs.push(func);
