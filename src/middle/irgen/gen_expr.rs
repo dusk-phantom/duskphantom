@@ -5,6 +5,7 @@ use crate::middle::irgen::function_kit::FunctionKit;
 use crate::middle::irgen::value::Value;
 use anyhow::{anyhow, Context};
 
+use super::gen_const::gen_const;
 use super::gen_library_function::is_argument_const;
 
 impl<'a> FunctionKit<'a> {
@@ -16,19 +17,18 @@ impl<'a> FunctionKit<'a> {
         match expr {
             Expr::Var(x) => {
                 // Ensure variable is defined
-                let Some(operand) = self.get_env(x) else {
+                let Some(operand) = self.env.get(x) else {
                     return Err(anyhow!("variable not defined")).with_context(|| context!());
                 };
 
                 // Clone the operand and return, this clones the underlying value or InstPtr
                 Ok(operand.clone())
             }
-            Expr::Pack(ls) => Ok(Value::Array(
+            Expr::Array(ls) => Ok(Value::Array(
                 ls.iter()
                     .map(|x| self.gen_expr(x))
                     .collect::<anyhow::Result<_, _>>()?,
             )),
-            Expr::Map(_) => Err(anyhow!("map is not supported")).with_context(|| context!()),
             Expr::Index(x, v) => {
                 // Load index as integer
                 let ix = self.gen_expr(v)?.load(ValueType::Int, self)?;
@@ -37,19 +37,14 @@ impl<'a> FunctionKit<'a> {
                 self.gen_expr(x)?
                     .getelementptr(self, vec![Constant::Int(0).into(), ix])
             }
-            Expr::Field(_, _) => Err(anyhow!("field not supported")).with_context(|| context!()),
-            Expr::Select(_, _) => Err(anyhow!("select not supported")).with_context(|| context!()),
-            Expr::Int32(x) => Ok(Constant::Int(*x).into()),
-            Expr::Float32(x) => Ok(Constant::Float(*x).into()),
-            Expr::String(_) => Err(anyhow!("string not supported")).with_context(|| context!()),
-            Expr::Char(_) => Err(anyhow!("char not supported")).with_context(|| context!()),
-            Expr::Bool(_) => Err(anyhow!("bool not supported")).with_context(|| context!()),
+            Expr::Int(x) => Ok(Constant::Int(*x).into()),
+            Expr::Float(x) => Ok(Constant::Float(*x).into()),
             Expr::Call(func, args) => {
                 // Ensure function is a defined variable
                 let Expr::Var(func_name) = *func.clone() else {
                     return Err(anyhow!("function is not variable")).with_context(|| context!());
                 };
-                let Some(func_ptr) = self.get_fun_env(&func_name) else {
+                let Some(func_ptr) = self.fun_env.get(&func_name).copied() else {
                     return Err(anyhow!("function not defined")).with_context(|| context!());
                 };
 
@@ -64,7 +59,7 @@ impl<'a> FunctionKit<'a> {
                     for (i, arg) in args.iter().enumerate() {
                         // Support constant argument only for dynamic library functions like `putf`
                         let arg = if is_argument_const(&func_name, i) {
-                            let constant = self.gen_program_kit().gen_const_expr(arg)?;
+                            let constant = gen_const(arg)?;
                             let name = self.unique_name("format");
                             let gvar = self.program.mem_pool.new_global_variable(
                                 name,
@@ -88,9 +83,8 @@ impl<'a> FunctionKit<'a> {
             }
             Expr::Unary(op, expr) => self.gen_unary(op, expr),
             Expr::Binary(head, tail) => self.gen_binary(head, tail),
-            Expr::Conditional(_, _, _) => {
-                Err(anyhow!("conditional not supported")).with_context(|| context!())
-            }
+            _ => Err(anyhow!("expr {:?} can't be translated to middle", expr))
+                .with_context(|| context!()),
         }
     }
 }

@@ -1,13 +1,11 @@
-use std::collections::VecDeque;
-
 use crate::context;
 use crate::frontend::{Decl, Type};
-use crate::middle::ir::Constant;
 use crate::middle::irgen::program_kit::ProgramKit;
 use crate::middle::irgen::value::Value;
 use anyhow::{anyhow, Context};
 
-use super::constant::collapse_array;
+use super::gen_const::gen_const;
+use super::gen_type::gen_type;
 
 impl<'a> ProgramKit<'a> {
     /// Generate a global declaration into the program
@@ -16,7 +14,7 @@ impl<'a> ProgramKit<'a> {
         match decl {
             Decl::Var(ty, name, val) | Decl::Const(ty, name, val) => {
                 // Get variable type
-                let value_type = self.translate_type(ty)?;
+                let value_type = gen_type(ty)?;
 
                 // Get if value is global variable or constant
                 let is_global_variable: bool = match decl {
@@ -26,18 +24,10 @@ impl<'a> ProgramKit<'a> {
                 };
 
                 // Get initializer
-                let mut initializer = match val {
-                    Some(v) => self.gen_const_expr(v)?,
+                let initializer = match val {
+                    Some(v) => gen_const(v)?,
                     None => value_type.default_initializer()?,
                 };
-
-                // Collapse initializer array
-                if let Constant::Array(arr) = initializer {
-                    initializer = collapse_array(&mut VecDeque::from(arr), &value_type)?;
-                }
-
-                // Cast initializer to required type
-                initializer = initializer.cast(&value_type);
 
                 // Get global variable
                 let global_val = self.program.mem_pool.new_global_variable(
@@ -48,7 +38,8 @@ impl<'a> ProgramKit<'a> {
                 );
 
                 // Add global variable (pointer) to environment
-                self.insert_env(name.clone(), Value::ReadWrite(global_val.into()));
+                self.env
+                    .insert(name.clone(), Value::ReadWrite(global_val.into()));
 
                 // Add global variable to program
                 self.program.module.global_variables.push(global_val);
@@ -56,14 +47,14 @@ impl<'a> ProgramKit<'a> {
             }
             Decl::Func(Type::Function(return_ty, params), id, _) => {
                 // Get function type
-                let fty = self.translate_type(return_ty)?;
+                let fty = gen_type(return_ty)?;
 
                 // Create function
                 let mut fun_ptr = self.program.mem_pool.new_function(id.clone(), fty.clone());
 
                 // Generate parameters
                 for param in params.iter() {
-                    let value_type = self.translate_type(&param.ty)?;
+                    let value_type = gen_type(&param.ty)?;
                     let param = self
                         .program
                         .mem_pool
@@ -72,7 +63,7 @@ impl<'a> ProgramKit<'a> {
                 }
 
                 // Add function to environment
-                self.insert_fun_env(id.clone(), fun_ptr);
+                self.fun_env.insert(id.clone(), fun_ptr);
 
                 // Add function to program
                 self.program.module.functions.push(fun_ptr);
@@ -84,7 +75,7 @@ impl<'a> ProgramKit<'a> {
                 }
                 Ok(())
             }
-            _ => Err(anyhow!("invalid declaration")).with_context(|| context!()),
+            _ => Err(anyhow!("unrecognized declaration {:?}", decl)).with_context(|| context!()),
         }
     }
 }
