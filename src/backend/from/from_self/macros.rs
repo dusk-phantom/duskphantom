@@ -39,14 +39,19 @@ macro_rules! ssa2tac_three_usual_Itype {
 
 #[macro_export]
 macro_rules! ssa2tac_three_float {
-    ($inst:ident, $regs:ident, $reg_gener:ident, $ssa_ty:ident, $tac_enum:ident, $tac_inst:ident) => {{
-        let dinst =
-            downcast_ref::<middle::ir::instruction::binary_inst::$ssa_ty>($inst.as_ref().as_ref());
-        let lhs = Self::local_operand_from(dinst.get_lhs(), $regs).with_context(|| context!())?;
-        let rhs = Self::local_operand_from(dinst.get_rhs(), $regs).with_context(|| context!())?;
-        let dst = $reg_gener.gen_virtual_float_reg();
-        $regs.insert(dinst as *const _ as Address, dst);
-        let inst = $tac_inst::new(dst.into(), lhs, rhs);
-        Ok(vec![Inst::$tac_enum(inst)])
+    ($tac_inst_ty:ident /* AddInst */,  $ssa_inst_type:ident /* FAdd */, $inst:ident, $regs:ident, $reg_gener:ident, $fmms:ident) => {{
+        let mut insts = Vec::new();
+        let fadd = downcast_ref::<middle::ir::instruction::binary_inst::$ssa_inst_type>(
+            $inst.as_ref().as_ref(),
+        );
+        let (op0, prepare) = Self::prepare_f(fadd.get_lhs(), $reg_gener, $regs, $fmms)?;
+        insts.extend(prepare);
+        let (op1, prepare) = Self::prepare_f(fadd.get_rhs(), $reg_gener, $regs, $fmms)?;
+        insts.extend(prepare);
+        let dst0 = $reg_gener.gen_virtual_float_reg();
+        let fadd_inst = $tac_inst_ty::new(dst0.into(), op0, op1);
+        $regs.insert(fadd as *const _ as Address, dst0);
+        insts.push(fadd_inst.into());
+        Ok(insts)
     }};
 }

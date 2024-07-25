@@ -1,5 +1,7 @@
 use crate::utils::mem::ObjPtr;
-use crate::{backend::*, ssa2tac_three_usual_Itype, ssa2tac_three_usual_Rtype};
+use crate::{
+    backend::*, ssa2tac_three_float, ssa2tac_three_usual_Itype, ssa2tac_three_usual_Rtype,
+};
 use crate::{context, middle};
 
 use crate::middle::ir::instruction::binary_inst::BinaryInst;
@@ -44,20 +46,21 @@ impl IRBuilder {
                 ssa2tac_three_usual_Itype!(AddInst, Add, inst, regs, reg_gener)
             }
             middle::ir::instruction::InstType::FAdd => {
-                // ssa2tac_binary_float!(inst, regs, reg_gener, FAdd, Add, AddInst)
-                let mut insts = Vec::new();
-                let fadd = downcast_ref::<middle::ir::instruction::binary_inst::FAdd>(
-                    inst.as_ref().as_ref(),
-                );
-                let (op0, prepare) = Self::prepare_f(fadd.get_lhs(), reg_gener, regs, fmms)?;
-                insts.extend(prepare);
-                let (op1, prepare) = Self::prepare_f(fadd.get_rhs(), reg_gener, regs, fmms)?;
-                insts.extend(prepare);
-                let dst0 = reg_gener.gen_virtual_float_reg();
-                let fadd_inst = AddInst::new(dst0.into(), op0, op1);
-                regs.insert(fadd as *const _ as Address, dst0);
-                insts.push(fadd_inst.into());
-                Ok(insts)
+                // ssa2tac_three_float!(inst, regs, reg_gener, FAdd, Add, AddInst)
+                ssa2tac_three_float!(AddInst, FAdd, inst, regs, reg_gener, fmms)
+                // let mut insts = Vec::new();
+                // let fadd = downcast_ref::<middle::ir::instruction::binary_inst::FAdd>(
+                //     inst.as_ref().as_ref(),
+                // );
+                // let (op0, prepare) = Self::prepare_f(fadd.get_lhs(), reg_gener, regs, fmms)?;
+                // insts.extend(prepare);
+                // let (op1, prepare) = Self::prepare_f(fadd.get_rhs(), reg_gener, regs, fmms)?;
+                // insts.extend(prepare);
+                // let dst0 = reg_gener.gen_virtual_float_reg();
+                // let fadd_inst = AddInst::new(dst0.into(), op0, op1);
+                // regs.insert(fadd as *const _ as Address, dst0);
+                // insts.push(fadd_inst.into());
+                // Ok(insts)
             }
             middle::ir::instruction::InstType::Sub => {
                 ssa2tac_three_usual_Rtype!(SubInst, Sub, inst, regs, reg_gener)
@@ -65,14 +68,14 @@ impl IRBuilder {
             // 通过类型转换，可以做到: FAdd 的输入一定是 Float 类型的寄存器
             middle::ir::instruction::InstType::FSub => {
                 // ssa2tac_binary_float!(inst, regs, reg_gener, FSub, Sub, SubInst)
-                todo!();
+                ssa2tac_three_float!(SubInst, FSub, inst, regs, reg_gener, fmms)
             }
             middle::ir::instruction::InstType::Mul => {
                 ssa2tac_three_usual_Rtype!(MulInst, Mul, inst, regs, reg_gener)
             }
             middle::ir::instruction::InstType::FMul => {
                 // ssa2tac_binary_float!(inst, regs, reg_gener, FMul, Mul, MulInst)
-                todo!()
+                ssa2tac_three_float!(MulInst, FMul, inst, regs, reg_gener, fmms)
             }
             middle::ir::instruction::InstType::SDiv => {
                 ssa2tac_three_usual_Rtype!(DivInst, SDiv, inst, regs, reg_gener)
@@ -82,7 +85,9 @@ impl IRBuilder {
             }
             middle::ir::instruction::InstType::UDiv => todo!(), // TODO 目前还没有 udiv 和 urem
             middle::ir::instruction::InstType::URem => todo!(),
-            middle::ir::instruction::InstType::FDiv => todo!(),
+            middle::ir::instruction::InstType::FDiv => {
+                ssa2tac_three_float!(DivInst, FDiv, inst, regs, reg_gener, fmms)
+            }
             middle::ir::instruction::InstType::Shl => {
                 ssa2tac_three_usual_Itype!(SllInst, Shl, inst, regs, reg_gener)
             }
@@ -385,10 +390,11 @@ impl IRBuilder {
             middle::ir::ValueType::Void => {
                 return Err(anyhow!("it can't alloca void")).with_context(|| context!())
             }
-            middle::ir::ValueType::Array(_, _) => todo!(),
-            middle::ir::ValueType::Pointer(_) => todo!(), // 4B
-                                                          // _ => todo!(),
-                                                          // TODO 如果是其他大小的指令
+            middle::ir::ValueType::Array(_, _) | middle::ir::ValueType::Pointer(_) => {
+                let capa = Self::_cal_capas_rev(&ty);
+                let sz: usize = capa.iter().product();
+                (sz << 2/* *4 */) as u32
+            }
         };
         let ss = stack_allocator.alloc(bytes);
         stack_slots.insert(
@@ -451,12 +457,12 @@ impl IRBuilder {
         //     unimplemented!() // 已经 load 过一次了
         // }
         let dst_reg = match load.get_value_type() {
-            middle::ir::ValueType::Int => reg_gener.gen_virtual_usual_reg(),
             middle::ir::ValueType::Float => reg_gener.gen_virtual_float_reg(),
-            middle::ir::ValueType::Bool => reg_gener.gen_virtual_usual_reg(),
+            middle::ir::ValueType::Int
+            | middle::ir::ValueType::Bool
+            | middle::ir::ValueType::Pointer(_) => reg_gener.gen_virtual_usual_reg(),
             _ => {
-                return Err(anyhow!("load instruction with array/pointer/void"))
-                    .with_context(|| context!()); /* void, array, pointer */
+                return Err(anyhow!("load instruction to array/void")).with_context(|| context!());
             }
         };
         regs.insert(load as *const _ as Address, dst_reg);
