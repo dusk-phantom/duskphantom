@@ -13,13 +13,13 @@ use super::reshape_array::{reshape_array, reshape_const_array};
 pub fn optimize_program(program: &mut Program) -> Result<()> {
     let mut env = FrameMap::default();
     for decl in program.module.iter_mut() {
-        fold_decl(decl, &mut env)?;
+        fold_decl(decl, &mut env, true)?;
     }
     Ok(())
 }
 
 /// Fold constant expression in declaration into constant.
-fn fold_decl(decl: &mut Decl, env: &mut FrameMap<String, Expr>) -> Result<()> {
+fn fold_decl(decl: &mut Decl, env: &mut FrameMap<String, Expr>, is_global: bool) -> Result<()> {
     match decl {
         Decl::Const(ty, id, expr) => {
             // Fold type
@@ -53,14 +53,38 @@ fn fold_decl(decl: &mut Decl, env: &mut FrameMap<String, Expr>) -> Result<()> {
             // Fold type
             *ty = get_folded_type(ty, env)?;
 
-            // Value array can be malformed, reshape it
-            if let Some(Expr::Array(arr)) = expr {
-                *expr = Some(reshape_array(&mut VecDeque::from(arr.clone()), ty)?);
+            // If variable is global, initializer should be constant
+            if is_global {
+                // Calculate folded initializer
+                let mut folded: Expr;
+                match expr {
+                    Some(expr) => {
+                        // Calculate from given initializer
+                        folded = get_folded_expr(expr, env, ty)?;
+
+                        // Constant array can be malformed, reshape it
+                        if let Expr::Array(arr) = folded {
+                            folded = reshape_const_array(&mut VecDeque::from(arr), ty)?;
+                        }
+                    }
+                    None => {
+                        // Use default initializer
+                        folded = ty.default_initializer()?;
+                    }
+                }
+
+                // Update expression to folded
+                *expr = Some(folded.clone());
+            } else {
+                // Value array can be malformed, reshape it
+                if let Some(Expr::Array(arr)) = expr {
+                    *expr = Some(reshape_array(&mut VecDeque::from(arr.clone()), ty)?);
+                }
             }
         }
         Decl::Stack(vec) => {
             for decl in vec {
-                fold_decl(decl, env)?;
+                fold_decl(decl, env, is_global)?;
             }
         }
         Decl::Func(ty, _, Some(stmt)) => {
@@ -78,7 +102,7 @@ fn fold_decl(decl: &mut Decl, env: &mut FrameMap<String, Expr>) -> Result<()> {
 /// Fold constant expression in statement into constant.
 fn fold_stmt(stmt: &mut Stmt, env: &mut FrameMap<String, Expr>) -> Result<()> {
     match stmt {
-        Stmt::Decl(decl) => fold_decl(decl, env)?,
+        Stmt::Decl(decl) => fold_decl(decl, env, false)?,
         Stmt::Block(vec) => {
             let mut inner_env = env.branch();
             for stmt in vec {
