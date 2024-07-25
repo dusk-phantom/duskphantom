@@ -302,7 +302,7 @@ impl IRBuilder {
         }
     }
 
-    /// int arr[][5][6] ==> [ 1, 6, 5 ]
+    /// int arr[][5][6] ==> [ 6, 5 ]
     pub fn _cal_capas_rev(ty: &middle::ir::ValueType) -> Vec<usize> {
         match ty {
             middle::ir::ValueType::Float
