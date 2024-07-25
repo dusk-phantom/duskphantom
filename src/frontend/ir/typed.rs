@@ -1,3 +1,7 @@
+use anyhow::{anyhow, Context, Result};
+
+use crate::context;
+
 use super::*;
 
 /// A type.
@@ -51,6 +55,27 @@ pub enum Type {
     /// Example:
     /// `struct numbers` is `Struct("numbers")`
     Struct(String),
+}
+
+/// Default initializers for types.
+impl Type {
+    pub fn default_initializer(&self) -> Result<Expr> {
+        match self {
+            Type::Int => Ok(Expr::Int(0)),
+            Type::Float => Ok(Expr::Float(0.0)),
+            Type::Bool => Ok(Expr::Bool(false)),
+            Type::Array(element_type, size) => {
+                let Expr::Int(size) = **size else {
+                    return Err(anyhow!("Array size must be integer")).with_context(|| context!());
+                };
+                Ok(Expr::Array(vec![
+                    element_type.default_initializer()?;
+                    size as usize
+                ]))
+            }
+            _ => Err(anyhow!("Cannot initialize type {:?}", self)).with_context(|| context!()),
+        }
+    }
 }
 
 /// A left value is an identifier with usage of its type.
