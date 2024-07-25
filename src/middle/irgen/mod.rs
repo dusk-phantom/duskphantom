@@ -1,6 +1,4 @@
-use std::collections::HashMap;
-
-use crate::{frontend, middle};
+use crate::{frontend, middle, utils::frame_map::FrameMap};
 use anyhow::Result;
 use program_kit::ProgramKit;
 
@@ -23,8 +21,8 @@ pub fn gen(program: &frontend::Program) -> Result<middle::Program> {
     let mut result = middle::Program::new();
     ProgramKit {
         program: &mut result,
-        env: &mut vec![HashMap::new()],
-        fun_env: &mut vec![HashMap::new()],
+        env: FrameMap::default(),
+        fun_env: FrameMap::default(),
     }
     .gen(program)?;
     Ok(result)

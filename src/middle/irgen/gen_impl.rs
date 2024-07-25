@@ -13,7 +13,7 @@ impl<'a> ProgramKit<'a> {
         match decl {
             Decl::Func(_, id, Some(stmt)) => {
                 // Get function and its type
-                let mut fun_ptr = self.get_fun_env(id).ok_or(MiddleError::GenError)?;
+                let mut fun_ptr = self.fun_env.get(id).copied().ok_or(MiddleError::GenError)?;
                 let fty = fun_ptr.return_type.clone();
 
                 // Create basic block
@@ -44,8 +44,8 @@ impl<'a> ProgramKit<'a> {
                 let mut counter: usize = 0;
                 let mut kit = FunctionKit::new(
                     FunctionContext {
-                        env: self.env,
-                        fun_env: self.fun_env,
+                        env: self.env.branch(),
+                        fun_env: self.fun_env.branch(),
                         program: self.program,
                         counter: &mut counter,
                     },
@@ -70,7 +70,8 @@ impl<'a> ProgramKit<'a> {
                     entry.push_back(store);
 
                     // Add parameter to function env
-                    kit.insert_env(param.name.clone(), Value::ReadWrite(alloc.into()));
+                    kit.env
+                        .insert(param.name.clone(), Value::ReadWrite(alloc.into()));
                 }
 
                 // Generate statements

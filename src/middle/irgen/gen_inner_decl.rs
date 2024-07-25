@@ -42,14 +42,14 @@ impl<'a> FunctionKit<'a> {
                 };
 
                 // Add value to environment
-                self.insert_env(id.clone(), val);
+                self.env.insert(id.clone(), val);
                 Ok(())
             }
             Decl::Var(raw_ty, id, op) => {
                 // Allocate space for variable, add to environment
                 let ty = gen_type(raw_ty)?;
                 let lhs = alloc(ty.clone(), self);
-                self.insert_env(id.clone(), lhs.clone());
+                self.env.insert(id.clone(), lhs.clone());
 
                 // Assign to the variable if it is defined
                 if let Some(expr) = op {
@@ -59,7 +59,11 @@ impl<'a> FunctionKit<'a> {
                     // Memset 0 if `rhs` is array
                     if let Value::Array(_) = rhs {
                         let ptr = lhs.clone().load_uncast(self)?.0;
-                        let memset_func = self.get_fun_env("llvm.memset.p0.i32").unwrap();
+                        let memset_func = self
+                            .fun_env
+                            .get(&"llvm.memset.p0.i32".to_string())
+                            .copied()
+                            .unwrap();
                         let memset_call = self.program.mem_pool.get_call(
                             memset_func,
                             vec![
@@ -84,7 +88,7 @@ impl<'a> FunctionKit<'a> {
                 }
                 Ok(())
             }
-            _ => Err(anyhow!("unrecognized declaration")).with_context(|| context!()),
+            _ => Err(anyhow!("unrecognized declaration {:?}", decl)).with_context(|| context!()),
         }
     }
 }

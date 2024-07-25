@@ -1,12 +1,12 @@
 use crate::middle;
 use crate::middle::ir::{BBPtr, FunPtr, ValueType};
 use crate::middle::irgen::value::Value;
-use std::collections::HashMap;
+use crate::utils::frame_map::FrameMap;
 
 /// Kit for translating a function to middle IR
 pub struct FunctionKit<'a> {
-    pub env: &'a mut Vec<HashMap<String, Value>>,
-    pub fun_env: &'a mut Vec<HashMap<String, FunPtr>>,
+    pub env: FrameMap<'a, String, Value>,
+    pub fun_env: FrameMap<'a, String, FunPtr>,
     pub program: &'a mut middle::Program,
     pub exit: Option<BBPtr>,
     pub break_to: Option<BBPtr>,
@@ -19,8 +19,8 @@ pub struct FunctionKit<'a> {
 
 /// Context for FunctionKit
 pub struct FunctionContext<'a> {
-    pub env: &'a mut Vec<HashMap<String, Value>>,
-    pub fun_env: &'a mut Vec<HashMap<String, FunPtr>>,
+    pub env: FrameMap<'a, String, Value>,
+    pub fun_env: FrameMap<'a, String, FunPtr>,
     pub program: &'a mut middle::Program,
     pub counter: &'a mut usize,
 }
@@ -40,10 +40,6 @@ impl<'a> FunctionKit<'a> {
     /// Create a new function kit
     /// Environment will remain the same after drop
     pub fn new(ctx: FunctionContext<'a>, routing: FunctionRouting) -> Self {
-        // Initialize a new frame of environment
-        ctx.env.push(HashMap::new());
-        ctx.fun_env.push(HashMap::new());
-
         // Create function kit
         FunctionKit {
             env: ctx.env,
@@ -68,8 +64,8 @@ impl<'a> FunctionKit<'a> {
     ) -> FunctionKit {
         FunctionKit::new(
             FunctionContext {
-                env: self.env,
-                fun_env: self.fun_env,
+                env: self.env.branch(),
+                fun_env: self.fun_env.branch(),
                 program: self.program,
                 counter: self.counter,
             },
@@ -84,43 +80,10 @@ impl<'a> FunctionKit<'a> {
         )
     }
 
-    /// Get from environment
-    pub fn get_env(&self, name: &str) -> Option<Value> {
-        for frame in self.env.iter().rev() {
-            if let Some(val) = frame.get(name) {
-                return Some(val.clone());
-            }
-        }
-        None
-    }
-
-    /// Insert to environment
-    pub fn insert_env(&mut self, name: String, value: Value) {
-        self.env.last_mut().unwrap().insert(name, value);
-    }
-
-    /// Get from func environment
-    pub fn get_fun_env(&self, name: &str) -> Option<FunPtr> {
-        for frame in self.fun_env.iter().rev() {
-            if let Some(val) = frame.get(name) {
-                return Some(*val);
-            }
-        }
-        None
-    }
-
     /// Generate a unique basic block name
     pub fn unique_name(&mut self, base: &str) -> String {
         let name = format!("{}{}", base, self.counter);
         *self.counter += 1;
         name
-    }
-}
-
-/// Delete current environment frame when the function kit is dropped
-impl<'a> Drop for FunctionKit<'a> {
-    fn drop(&mut self) {
-        self.env.pop();
-        self.fun_env.pop();
     }
 }
