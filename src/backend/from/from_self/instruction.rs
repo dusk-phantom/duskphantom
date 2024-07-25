@@ -184,7 +184,6 @@ impl IRBuilder {
     //     todo!()
     // }
 
-    #[allow(unused)]
     fn build_gep_inst(
         gep: &middle::ir::instruction::memory_op_inst::GetElementPtr,
         reg_gener: &mut RegGenerator,
@@ -193,55 +192,28 @@ impl IRBuilder {
     ) -> Result<Vec<Inst>> {
         let mut ret = Vec::new();
 
-        // 比方说 int arr[100][100], 我要访问 int[7][11]
-        // 是 idxes[0] 表示 7 还是 11 ?
-        // 然后我这里是需要计算偏移
+        /* ---------- 计算 offset ---------- */
 
         let idxes = gep.get_index();
-        let ptr = gep.get_ptr();
-
-        let ofst = match ptr {
-            middle::ir::Operand::Constant(_) => todo!(),
-            middle::ir::Operand::Global(glo) => {
-                let capas = {
-                    let mut v = Self::_cal_capas_rev(&glo.value_type);
-                    v.reverse();
-                    v
-                };
-                let (ofst, prepare) = Self::_cal_offset(&capas, idxes, reg_gener, regs)
-                    .with_context(|| context!())?;
-                ret.extend(prepare);
-                ofst
-            }
-            middle::ir::Operand::Parameter(_) => todo!(),
-            middle::ir::Operand::Instruction(instr) => {
-                Self::local_var_except_param_from(instr, regs).with_context(|| context!())?
-            }
+        let capas = {
+            let mut v = Self::_cal_capas_rev(&gep.element_type);
+            v.reverse();
+            v
         };
-
-        // let ofst = match gep.element_type {
-        //     middle::ir::ValueType::SignedChar
-        //     | middle::ir::ValueType::Int
-        //     | middle::ir::ValueType::Float
-        //     | middle::ir::ValueType::Bool => {
-        //         let dst = reg_gener.gen_virtual_usual_reg();
-        //         let slli = SllInst::new(dst.into(), ofst.into(), (2).into());
-        //         ret.push(slli.into());
-        //         dst
-        //     }
-        //     middle::ir::ValueType::Void => todo!(),
-        //     middle::ir::ValueType::Array(_, _) => todo!(),
-        //     middle::ir::ValueType::Pointer(_) => todo!(), // _ => return Err(anyhow!("it can't be void/array/pointer")).with_context(|| context!()), /* void/array/pointer */
-        // };
-
+        let (ofst, prepare) =
+            Self::_cal_offset(&capas, idxes, reg_gener, regs).with_context(|| context!())?;
+        ret.extend(prepare);
         let _mid = reg_gener.gen_virtual_usual_reg();
-        let slli = SllInst::new(_mid.into(), ofst.into(), (2).into());
+        let slli = SllInst::new(_mid.into(), ofst.into(), (2).into()); // FIXME sysy 的数据都是 4Byte, 但是我感觉我这里不严谨
         ret.push(slli.into());
 
+        /* ---------- base ---------- */
+
+        let ptr = gep.get_ptr();
         let base: Operand =
             match Self::address_from(ptr, regs, stack_slots).with_context(|| context!())? {
-                Operand::Reg(_) => todo!(),
-                Operand::StackSlot(_) => todo!(),
+                Operand::Reg(reg) => reg.into(),
+                Operand::StackSlot(slot) => Operand::StackSlot(slot),
                 Operand::Label(label) => {
                     let dst = reg_gener.gen_virtual_usual_reg();
                     let lla = LlaInst::new(dst, label);
