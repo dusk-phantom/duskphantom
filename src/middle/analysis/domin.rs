@@ -1,12 +1,15 @@
+use std::collections::hash_map::Entry;
+
 use super::*;
 
 #[allow(dead_code)]
 pub struct Domin {
     checker: HashMap<BBPtr, HashSet<BBPtr>>,
+    idom_set: HashMap<BBPtr, Option<BBPtr>>,
 }
 
+#[allow(dead_code)]
 impl Domin {
-    #[allow(dead_code)]
     pub fn is_dominate(&self, dominator: BBPtr, dominatee: BBPtr) -> bool {
         if let Some(dom) = self.checker.get(&dominatee) {
             dom.contains(&dominator)
@@ -15,14 +18,12 @@ impl Domin {
         }
     }
 
-    #[allow(dead_code)]
     pub fn get_dominator(&self, dominatee: BBPtr) -> Vec<BBPtr> {
         self.checker
             .get(&dominatee)
             .map_or(vec![], |x| x.iter().copied().collect())
     }
 
-    #[allow(dead_code)]
     pub fn get_dominatee(&self, dominator: BBPtr) -> Vec<BBPtr> {
         self.checker
             .iter()
@@ -35,9 +36,29 @@ impl Domin {
             })
             .collect()
     }
+
+    pub fn get_idom(&mut self, bb: BBPtr) -> Option<BBPtr> {
+        fn caculate_idom(dom: &mut Domin, bb: BBPtr) {
+            if dom.idom_set.contains_key(&bb) {
+                return;
+            }
+            let dominators = dom.get_dominator(bb);
+            dominators.iter().for_each(|doi| {
+                caculate_idom(dom, *doi);
+                if dom.get_dominator(*doi).len() + 1 == dominators.len() {
+                    dom.idom_set.insert(bb, Some(*doi));
+                }
+            });
+            if let Entry::Vacant(e) = dom.idom_set.entry(bb) {
+                e.insert(None);
+            }
+        }
+
+        caculate_idom(self, bb);
+        *self.idom_set.get(&bb).unwrap()
+    }
 }
 
-#[allow(dead_code)]
 pub fn make_domin(func: FunPtr) -> Domin {
     let mut checker = HashMap::new();
     func.bfs_iter().for_each(|bb| {
@@ -50,7 +71,10 @@ pub fn make_domin(func: FunPtr) -> Domin {
                 .map_or(HashSet::from([bb]), |acc| &acc | &(HashSet::from([bb]))),
         );
     });
-    Domin { checker }
+    Domin {
+        checker,
+        idom_set: HashMap::new(),
+    }
 }
 
 #[cfg(test)]
