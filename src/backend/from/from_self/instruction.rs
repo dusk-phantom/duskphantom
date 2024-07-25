@@ -214,7 +214,9 @@ impl IRBuilder {
                 ofst
             }
             middle::ir::Operand::Parameter(_) => todo!(),
-            middle::ir::Operand::Instruction(_) => todo!(),
+            middle::ir::Operand::Instruction(instr) => {
+                Self::local_var_except_param_from(instr, regs).with_context(|| context!())?
+            }
         };
 
         let ofst = match gep.element_type {
@@ -550,18 +552,20 @@ impl IRBuilder {
                     }
                 },
                 middle::ir::Operand::Instruction(instr) => {
-                    let addr = instr.as_ref().as_ref() as *const dyn middle::ir::Instruction
-                        as *const () as Address;
-                    let reg = regs
-                        .get(&addr)
-                        .ok_or(anyhow!("could not get {} from map", &addr).context(context!()))?; // 获取返回值对应的虚拟寄存器
+                    // let addr = instr.as_ref().as_ref() as *const dyn middle::ir::Instruction
+                    //     as *const () as Address;
+                    // let reg = regs
+                    //     .get(&addr)
+                    //     .ok_or(anyhow!("could not get {} from map", &addr).context(context!()))?; // 获取返回值对应的虚拟寄存器
+                    let reg = Self::local_var_except_param_from(instr, regs)
+                        .with_context(|| context!())?;
                     let mv_inst = match instr.get_value_type() {
                         middle::ir::ValueType::Int
                         | middle::ir::ValueType::Bool
                         | middle::ir::ValueType::SignedChar => {
-                            MvInst::new(REG_A0.into(), (*reg).into())
+                            MvInst::new(REG_A0.into(), reg.into())
                         }
-                        middle::ir::ValueType::Float => MvInst::new(REG_FA0.into(), (*reg).into()),
+                        middle::ir::ValueType::Float => MvInst::new(REG_FA0.into(), reg.into()),
                         middle::ir::ValueType::Void => {
                             return Err(anyhow!("return not is_void, but get void type"))
                                 .with_context(|| context!())
