@@ -303,7 +303,7 @@ impl IRBuilder {
     }
 
     /// int arr[][5][6] ==> [ 1, 6, 5 ]
-    fn _cal_capas_rev(ty: &middle::ir::ValueType) -> Vec<usize> {
+    pub fn _cal_capas_rev(ty: &middle::ir::ValueType) -> Vec<usize> {
         match ty {
             middle::ir::ValueType::Float
             | middle::ir::ValueType::Int
@@ -322,57 +322,37 @@ impl IRBuilder {
 
     /// 这里面不会在 regs 插入, 因此没法拿到指令的地址
     pub fn _cal_offset(
-        ptr: &middle::ir::Operand,
+        capas: &[usize],
         idxes: &[middle::ir::Operand],
         reg_gener: &mut RegGenerator,
         regs: &HashMap<Address, Reg>,
     ) -> Result<(Reg, Vec<Inst>)> {
-        match ptr {
-            middle::ir::Operand::Constant(_) => unimplemented!(),
-            middle::ir::Operand::Global(glo) => {
-                let mut insts: Vec<Inst> = Vec::new();
-                let capas = {
-                    let mut v = Self::_cal_capas_rev(&glo.value_type);
-                    v.reverse();
-                    v
-                };
-                let idxes = {
-                    let mut arr = Vec::new();
-                    for idx in idxes.iter().skip(1) {
-                        let (op, prepare) = Self::prepare_rs1_i(idx, reg_gener, regs)
-                            .with_context(|| context!())?;
-                        insts.extend(prepare);
-                        arr.push(op);
-                    }
-                    arr
-                };
-                let mut factor: usize = capas[idxes.len()..].iter().product();
-                let mut acc: Reg = REG_ZERO;
-                for (idx, capa) in idxes.iter().zip(capas.iter()).rev() {
-                    let rs2 = reg_gener.gen_virtual_usual_reg();
-                    let li = LiInst::new(rs2.into(), (factor as i64).into());
-                    insts.push(li.into());
-                    let prdct = reg_gener.gen_virtual_usual_reg();
-                    let mul = MulInst::new(prdct.into(), idx.clone(), rs2.into());
-                    insts.push(mul.into());
-                    let _acc = reg_gener.gen_virtual_usual_reg();
-                    let add = AddInst::new(_acc.into(), prdct.into(), acc.into());
-                    insts.push(add.into());
-                    acc = _acc;
-                    factor *= capa;
-                }
-                Ok((acc, insts))
+        let mut insts = Vec::new();
+        let idxes = {
+            let mut arr = Vec::new();
+            for idx in idxes.iter().skip(1) {
+                let (op, prepare) =
+                    Self::prepare_rs1_i(idx, reg_gener, regs).with_context(|| context!())?;
+                insts.extend(prepare);
+                arr.push(op);
             }
-            middle::ir::Operand::Parameter(param) => match param.value_type {
-                middle::ir::ValueType::Array(_, _) => todo!(),
-                middle::ir::ValueType::Pointer(_) => todo!(),
-                _ => Err(anyhow!("can't gep from a non arr/pointer: {:?}", param))
-                    .with_context(|| context!()),
-            },
-            middle::ir::Operand::Instruction(instr) => match instr.get_type() {
-                middle::ir::instruction::InstType::Alloca => todo!(),
-                _ => todo!(),
-            },
+            arr
+        };
+        let mut factor: usize = capas[idxes.len()..].iter().product();
+        let mut acc: Reg = REG_ZERO;
+        for (idx, capa) in idxes.iter().zip(capas.iter()).rev() {
+            let rs2 = reg_gener.gen_virtual_usual_reg();
+            let li = LiInst::new(rs2.into(), (factor as i64).into());
+            insts.push(li.into());
+            let prdct = reg_gener.gen_virtual_usual_reg();
+            let mul = MulInst::new(prdct.into(), idx.clone(), rs2.into());
+            insts.push(mul.into());
+            let _acc = reg_gener.gen_virtual_usual_reg();
+            let add = AddInst::new(_acc.into(), prdct.into(), acc.into());
+            insts.push(add.into());
+            acc = _acc;
+            factor *= capa;
         }
+        Ok((acc, insts))
     }
 }

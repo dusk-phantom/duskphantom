@@ -199,12 +199,38 @@ impl IRBuilder {
 
         let idxes = gep.get_index();
         let ptr = gep.get_ptr();
-        let base = Self::address_from(ptr, regs, stack_slots).with_context(|| context!())?;
-        // let base = Self::no_load_from(ptr, regs).with_context(|| context!())?;
-        let (ofst, prepare) =
-            Self::_cal_offset(ptr, idxes, reg_gener, regs).with_context(|| context!())?;
-        ret.extend(prepare);
+
+        let ofst = match ptr {
+            middle::ir::Operand::Constant(_) => todo!(),
+            middle::ir::Operand::Global(glo) => {
+                let capas = {
+                    let mut v = Self::_cal_capas_rev(&glo.value_type);
+                    v.reverse();
+                    v
+                };
+                let (ofst, prepare) = Self::_cal_offset(&capas, idxes, reg_gener, regs)
+                    .with_context(|| context!())?;
+                ret.extend(prepare);
+                ofst
+            }
+            middle::ir::Operand::Parameter(_) => todo!(),
+            middle::ir::Operand::Instruction(_) => todo!(),
+        };
+
+        let ofst = match gep.element_type {
+            middle::ir::ValueType::SignedChar
+            | middle::ir::ValueType::Int
+            | middle::ir::ValueType::Float
+            | middle::ir::ValueType::Bool => {
+                let dst = reg_gener.gen_virtual_usual_reg();
+                let add = AddInst::new(dst.into(), ofst.into(), (2).into());
+                dst
+            }
+            _ => return Err(anyhow!("it can't be void/array/pointer")).with_context(|| context!()), /* void/array/pointer */
+        };
+
         let dst = reg_gener.gen_virtual_usual_reg();
+        let base = Self::address_from(ptr, regs, stack_slots).with_context(|| context!())?;
         let add = AddInst::new(dst.into(), base, ofst.into());
         regs.insert(gep as *const _ as usize, dst);
         Ok(ret)
