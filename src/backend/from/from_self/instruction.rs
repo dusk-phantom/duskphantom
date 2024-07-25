@@ -219,21 +219,40 @@ impl IRBuilder {
             }
         };
 
-        let ofst = match gep.element_type {
-            middle::ir::ValueType::SignedChar
-            | middle::ir::ValueType::Int
-            | middle::ir::ValueType::Float
-            | middle::ir::ValueType::Bool => {
-                let dst = reg_gener.gen_virtual_usual_reg();
-                let add = AddInst::new(dst.into(), ofst.into(), (2).into());
-                dst
-            }
-            _ => return Err(anyhow!("it can't be void/array/pointer")).with_context(|| context!()), /* void/array/pointer */
-        };
+        // let ofst = match gep.element_type {
+        //     middle::ir::ValueType::SignedChar
+        //     | middle::ir::ValueType::Int
+        //     | middle::ir::ValueType::Float
+        //     | middle::ir::ValueType::Bool => {
+        //         let dst = reg_gener.gen_virtual_usual_reg();
+        //         let slli = SllInst::new(dst.into(), ofst.into(), (2).into());
+        //         ret.push(slli.into());
+        //         dst
+        //     }
+        //     middle::ir::ValueType::Void => todo!(),
+        //     middle::ir::ValueType::Array(_, _) => todo!(),
+        //     middle::ir::ValueType::Pointer(_) => todo!(), // _ => return Err(anyhow!("it can't be void/array/pointer")).with_context(|| context!()), /* void/array/pointer */
+        // };
 
+        let _mid = reg_gener.gen_virtual_usual_reg();
+        let slli = SllInst::new(_mid.into(), ofst.into(), (2).into());
+        ret.push(slli.into());
+
+        let base: Operand =
+            match Self::address_from(ptr, regs, stack_slots).with_context(|| context!())? {
+                Operand::Reg(_) => todo!(),
+                Operand::StackSlot(_) => todo!(),
+                Operand::Label(label) => {
+                    let dst = reg_gener.gen_virtual_usual_reg();
+                    let lla = LlaInst::new(dst, label);
+                    ret.push(lla.into());
+                    dst.into()
+                }
+                _ => unimplemented!(), // Fmm(_) Imm(_)
+            };
         let dst = reg_gener.gen_virtual_usual_reg();
-        let base = Self::address_from(ptr, regs, stack_slots).with_context(|| context!())?;
-        let add = AddInst::new(dst.into(), base, ofst.into());
+        let add = AddInst::new(dst.into(), base, _mid.into());
+        ret.push(add.into());
         regs.insert(gep as *const _ as usize, dst);
         Ok(ret)
     }
