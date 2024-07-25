@@ -13,7 +13,7 @@ pub enum Stmt {
 
     /// A declaration as statement.
     /// Example:
-    /// `int x;` is `Decl(Var(Int32, "x"))`
+    /// `int x;` is `Decl(Var(Int, "x"))`
     Decl(Decl),
 
     /// An expression as statement.

@@ -1,32 +1,53 @@
 use std::{collections::HashMap, hash::Hash};
 
-pub struct FrameMap<K, V>(Vec<HashMap<K, V>>);
+pub enum FrameMap<'a, K, V> {
+    Root(HashMap<K, V>),
+    Leaf(HashMap<K, V>, &'a FrameMap<'a, K, V>),
+}
 
-impl<K, V> Default for FrameMap<K, V> {
+impl<K, V> Default for FrameMap<'_, K, V> {
     fn default() -> Self {
-        FrameMap(vec![HashMap::new()])
+        Self::Root(HashMap::new())
     }
 }
 
-impl<K, V> FrameMap<K, V>
+impl<'a, K, V> FrameMap<'a, K, V>
 where
     K: Eq + Hash,
 {
-    /// Insert a new element into the last frame.
-    ///
-    /// # Panics
-    /// Please make sure the map contains at least one frame.
-    pub fn insert(&mut self, k: K, v: V) {
-        self.0.last_mut().unwrap().insert(k, v);
+    /// Get the last frame.
+    pub fn last_frame(&mut self) -> &mut HashMap<K, V> {
+        match self {
+            Self::Root(map) => map,
+            Self::Leaf(map, _) => map,
+        }
     }
 
-    /// Get an element.
+    /// Insert a new element into the last frame.
+    pub fn insert(&mut self, k: K, v: V) {
+        self.last_frame().insert(k, v);
+    }
+
+    /// Get an element from all frames.
     pub fn get(&self, k: &K) -> Option<&V> {
-        for frame in self.0.iter().rev() {
-            if let Some(v) = frame.get(k) {
-                return Some(v);
+        let mut map = self;
+        loop {
+            match map {
+                Self::Root(m) => return m.get(k),
+                Self::Leaf(m, parent) => {
+                    if let Some(v) = m.get(k) {
+                        return Some(v);
+                    }
+                    map = parent;
+                }
             }
         }
-        None
+    }
+
+    /// Make a branch on the frame map.
+    /// Modifications on the new branch will not affect the original one.
+    /// This is useful when implementing scopes.
+    pub fn branch(&'a self) -> Self {
+        Self::Leaf(HashMap::new(), self)
     }
 }

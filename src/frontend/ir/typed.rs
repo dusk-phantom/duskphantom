@@ -28,17 +28,17 @@ pub enum Type {
 
     /// Pointer to given type.
     /// Example:
-    /// `int *` is `Pointer(Int32)`
+    /// `int *` is `Pointer(Int)`
     Pointer(Box<Type>),
 
     /// Array of given type.
     /// Example:
-    /// `int x[4]` is `Array(Int32, Int32(4))`
+    /// `int x[4]` is `Array(Int, Int(4))`
     Array(Box<Type>, Box<Expr>),
 
     /// Function to given type.
     /// Example:
-    /// `void (*x)(int)` is `Pointer(Function(Void, [Int32]))`
+    /// `void (*x)(int)` is `Pointer(Function(Void, [Int]))`
     Function(Box<Type>, Vec<TypedIdent>),
 
     /// Enum of given name.
@@ -108,7 +108,7 @@ pub enum LVal {
 /// A typed identifier.
 /// `ty`: type
 /// `id`: identifier name
-/// Example: `int *x` is `{ ty: Pointer(Int32), id: "x" }`
+/// Example: `int *x` is `{ ty: Pointer(Int), id: "x" }`
 #[derive(Clone, PartialEq, Debug)]
 pub struct TypedIdent {
     pub ty: Type,
