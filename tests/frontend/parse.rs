@@ -1,41 +1,9 @@
-use super::*;
-
-/// The full program.
-/// A executable program is a set of modules with an entry module.
-/// For now, only one module is supported, so the only module is entry.
-#[derive(Clone, PartialEq, Debug)]
-pub struct Program {
-    /// The module of the program.
-    /// Currently only one module is supported.
-    pub module: Module,
-}
-
-impl Program {
-    pub fn new(decls: Vec<Decl>) -> Self {
-        Self { module: decls }
-    }
-}
-
-/// A module is a single file.
-/// Only declaration can appear at top level.
-pub type Module = Vec<Decl>;
-
-pub fn parse(src: &str) -> Result<Program, FrontendError> {
-    preceded(blank, repeat(0.., decl))
-        .map(Program::new)
-        .parse(src)
-        .map_err(|err| FrontendError::ParseError(err.to_string()))
-}
-
-#[allow(unused)]
-pub fn optimize(program: &mut Program) {}
-
 // Unit tests
 #[cfg(test)]
-pub mod tests_program {
+pub mod tests_parse {
     use insta::assert_debug_snapshot;
 
-    use super::*;
+    use compiler::{errors::FrontendError, frontend::*};
 
     #[test]
     fn test_simple_main() {
@@ -53,7 +21,7 @@ pub mod tests_program {
                     module: [
                         Func(
                             Function(
-                                Int32,
+                                Int,
                                 [],
                             ),
                             "main",
@@ -62,7 +30,7 @@ pub mod tests_program {
                                     [
                                         Return(
                                             Some(
-                                                Int32(
+                                                Int(
                                                     0,
                                                 ),
                                             ),
@@ -116,7 +84,7 @@ pub mod tests_program {
                     module: [
                         Func(
                             Function(
-                                Int32,
+                                Int,
                                 [],
                             ),
                             "main",
@@ -125,10 +93,10 @@ pub mod tests_program {
                                     [
                                         Decl(
                                             Var(
-                                                Int32,
+                                                Int,
                                                 "a0",
                                                 Some(
-                                                    Int32(
+                                                    Int(
                                                         3,
                                                     ),
                                                 ),
@@ -136,10 +104,10 @@ pub mod tests_program {
                                         ),
                                         Decl(
                                             Var(
-                                                Int32,
+                                                Int,
                                                 "a1",
                                                 Some(
-                                                    Int32(
+                                                    Int(
                                                         64206,
                                                     ),
                                                 ),
@@ -147,10 +115,10 @@ pub mod tests_program {
                                         ),
                                         Decl(
                                             Var(
-                                                Int32,
+                                                Int,
                                                 "a2",
                                                 Some(
-                                                    Int32(
+                                                    Int(
                                                         47828,
                                                     ),
                                                 ),
@@ -158,10 +126,10 @@ pub mod tests_program {
                                         ),
                                         Decl(
                                             Var(
-                                                Int32,
+                                                Int,
                                                 "a3",
                                                 Some(
-                                                    Int32(
+                                                    Int(
                                                         511,
                                                     ),
                                                 ),
@@ -169,10 +137,10 @@ pub mod tests_program {
                                         ),
                                         Decl(
                                             Var(
-                                                Float32,
+                                                Float,
                                                 "b0",
                                                 Some(
-                                                    Float32(
+                                                    Float(
                                                         3.7,
                                                     ),
                                                 ),
@@ -180,10 +148,10 @@ pub mod tests_program {
                                         ),
                                         Decl(
                                             Var(
-                                                Float32,
+                                                Float,
                                                 "b1",
                                                 Some(
-                                                    Float32(
+                                                    Float(
                                                         2.0,
                                                     ),
                                                 ),
@@ -191,10 +159,10 @@ pub mod tests_program {
                                         ),
                                         Decl(
                                             Var(
-                                                Float32,
+                                                Float,
                                                 "b2",
                                                 Some(
-                                                    Float32(
+                                                    Float(
                                                         0.9,
                                                     ),
                                                 ),
@@ -202,10 +170,10 @@ pub mod tests_program {
                                         ),
                                         Decl(
                                             Var(
-                                                Float32,
+                                                Float,
                                                 "c0",
                                                 Some(
-                                                    Float32(
+                                                    Float(
                                                         23000.0,
                                                     ),
                                                 ),
@@ -213,10 +181,10 @@ pub mod tests_program {
                                         ),
                                         Decl(
                                             Var(
-                                                Float32,
+                                                Float,
                                                 "c1",
                                                 Some(
-                                                    Float32(
+                                                    Float(
                                                         5e-10,
                                                     ),
                                                 ),
@@ -224,10 +192,10 @@ pub mod tests_program {
                                         ),
                                         Decl(
                                             Var(
-                                                Float32,
+                                                Float,
                                                 "c2",
                                                 Some(
-                                                    Float32(
+                                                    Float(
                                                         1000.0,
                                                     ),
                                                 ),
@@ -235,10 +203,10 @@ pub mod tests_program {
                                         ),
                                         Decl(
                                             Var(
-                                                Float32,
+                                                Float,
                                                 "c3",
                                                 Some(
-                                                    Float32(
+                                                    Float(
                                                         20000.0,
                                                     ),
                                                 ),
@@ -246,10 +214,10 @@ pub mod tests_program {
                                         ),
                                         Decl(
                                             Var(
-                                                Float32,
+                                                Float,
                                                 "c4",
                                                 Some(
-                                                    Float32(
+                                                    Float(
                                                         5.0,
                                                     ),
                                                 ),
@@ -257,10 +225,10 @@ pub mod tests_program {
                                         ),
                                         Decl(
                                             Var(
-                                                Float32,
+                                                Float,
                                                 "d0",
                                                 Some(
-                                                    Float32(
+                                                    Float(
                                                         15.0,
                                                     ),
                                                 ),
@@ -268,10 +236,10 @@ pub mod tests_program {
                                         ),
                                         Decl(
                                             Var(
-                                                Float32,
+                                                Float,
                                                 "d1",
                                                 Some(
-                                                    Float32(
+                                                    Float(
                                                         1.078125,
                                                     ),
                                                 ),
@@ -279,10 +247,10 @@ pub mod tests_program {
                                         ),
                                         Decl(
                                             Var(
-                                                Float32,
+                                                Float,
                                                 "d2",
                                                 Some(
-                                                    Float32(
+                                                    Float(
                                                         120.0,
                                                     ),
                                                 ),
@@ -290,10 +258,10 @@ pub mod tests_program {
                                         ),
                                         Decl(
                                             Var(
-                                                Float32,
+                                                Float,
                                                 "d3",
                                                 Some(
-                                                    Float32(
+                                                    Float(
                                                         120.0,
                                                     ),
                                                 ),
@@ -301,10 +269,10 @@ pub mod tests_program {
                                         ),
                                         Decl(
                                             Var(
-                                                Float32,
+                                                Float,
                                                 "d4",
                                                 Some(
-                                                    Float32(
+                                                    Float(
                                                         96.0,
                                                     ),
                                                 ),
@@ -312,10 +280,10 @@ pub mod tests_program {
                                         ),
                                         Decl(
                                             Var(
-                                                Float32,
+                                                Float,
                                                 "d5",
                                                 Some(
-                                                    Float32(
+                                                    Float(
                                                         6.5,
                                                     ),
                                                 ),
@@ -348,10 +316,10 @@ pub mod tests_program {
                 Program {
                     module: [
                         Var(
-                            Int32,
+                            Int,
                             "n",
                             Some(
-                                Int32(
+                                Int(
                                     3,
                                 ),
                             ),
@@ -385,7 +353,7 @@ pub mod tests_program {
                     module: [
                         Func(
                             Function(
-                                Int32,
+                                Int,
                                 [],
                             ),
                             "main",
@@ -394,10 +362,10 @@ pub mod tests_program {
                                     [
                                         Decl(
                                             Var(
-                                                Int32,
+                                                Int,
                                                 "n",
                                                 Some(
-                                                    Int32(
+                                                    Int(
                                                         3,
                                                     ),
                                                 ),
@@ -451,7 +419,7 @@ pub mod tests_program {
                     module: [
                         Func(
                             Function(
-                                Int32,
+                                Int,
                                 [],
                             ),
                             "main",
@@ -460,7 +428,7 @@ pub mod tests_program {
                                     [
                                         Decl(
                                             Var(
-                                                Int32,
+                                                Int,
                                                 "a",
                                                 None,
                                             ),
@@ -471,7 +439,7 @@ pub mod tests_program {
                                                     "a",
                                                 ),
                                             ),
-                                            Int32(
+                                            Int(
                                                 5,
                                             ),
                                         ),
@@ -515,10 +483,10 @@ pub mod tests_program {
                             [],
                         ),
                         Const(
-                            Int32,
+                            Int,
                             "MAX",
                             Some(
-                                Int32(
+                                Int(
                                     100,
                                 ),
                             ),

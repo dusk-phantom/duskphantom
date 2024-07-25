@@ -59,94 +59,10 @@ int main()
     c.bench_function("parse_all", |b| b.iter(|| parse(code)));
 }
 
-#[allow(unused)]
-fn bench_select(c: &mut Criterion) {
-    c.bench_function("parse_4_select", |b| b.iter(|| expr.parse("1->x->x->x->x")));
-    c.bench_function("parse_16_select", |b| {
-        b.iter(|| expr.parse("1->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x"))
-    });
-    c.bench_function("parse_64_select", |b| {
-            b.iter(|| expr.parse("1->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x->x"))
-        });
-}
-
-#[allow(unused)]
-fn bench_rrec(c: &mut Criterion) {
-    c.bench_function("parse_4_rrec", |b| {
-        b.iter(|| expr.parse("(1==(1==(1==(1==1))))"))
-    });
-    c.bench_function("parse_16_rrec", |b| {
-        b.iter(|| {
-            expr.parse(
-                "(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==1))))))))))))))))",
-            )
-        })
-    });
-    c.bench_function("parse_64_rrec", |b| {
-            b.iter(|| expr.parse("(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==(1==1))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))"))
-        });
-}
-
-#[allow(unused)]
-fn bench_lrec(c: &mut Criterion) {
-    c.bench_function("parse_4_lrec", |b| {
-        b.iter(|| expr.parse("((((1==1)==1)==1)==1)"))
-    });
-    c.bench_function("parse_16_lrec", |b| {
-        b.iter(|| {
-            expr.parse(
-                "((((((((((((((((1==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)",
-            )
-        })
-    });
-    c.bench_function("parse_64_lrec", |b| {
-            b.iter(|| expr.parse("((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((1==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)==1)"))
-        });
-}
-
-#[allow(unused)]
-fn bench_eq(c: &mut Criterion) {
-    c.bench_function("parse_4_eq", |b| b.iter(|| expr.parse("1==1==1==1==1")));
-    c.bench_function("parse_16_eq", |b| {
-        b.iter(|| expr.parse("1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1"))
-    });
-    c.bench_function("parse_64_eq", |b| {
-            b.iter(|| expr.parse("1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1==1"))
-        });
-}
-
-#[allow(unused)]
-fn bench_add(c: &mut Criterion) {
-    c.bench_function("parse_4_add", |b| b.iter(|| expr.parse("1+1+1+1+1")));
-    c.bench_function("parse_16_add", |b| {
-        b.iter(|| expr.parse("1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1"))
-    });
-    c.bench_function("parse_64_add", |b| {
-            b.iter(|| expr.parse("1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1"))
-        });
-}
-
-#[allow(unused)]
-fn bench_prefix(c: &mut Criterion) {
-    c.bench_function("parse_4_prefix", |b| b.iter(|| expr.parse("!!!!1")));
-    c.bench_function("parse_16_prefix", |b| {
-        b.iter(|| expr.parse("!!!!!!!!!!!!!!!!1"))
-    });
-    c.bench_function("parse_64_prefix", |b| {
-        b.iter(|| expr.parse("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1"))
-    });
-}
-
 criterion_group! {
     name = benches;
     config = Criterion::default();
     targets =
         bench_all,
-        // bench_select,
-        // bench_rrec,
-        // bench_lrec,
-        // bench_eq,
-        // bench_add,
-        // bench_prefix,
 }
 criterion_main!(benches);

@@ -76,7 +76,7 @@ impl<'a> FunctionKit<'a> {
                 exit.push_back(inst);
                 Ok(Value::ReadOnly(inst.into()))
             }
-            _ => Err(anyhow!("unary operator not supported")).with_context(|| context!()),
+            _ => Err(anyhow!("unrecognized unary operator {:?}", op)).with_context(|| context!()),
         }
     }
 }
