@@ -4,7 +4,8 @@ use anyhow::{anyhow, Context, Result};
 
 use crate::backend::var::FloatVar;
 use crate::backend::{
-    Fmm, Inst, Label, LiInst, LlaInst, LwInst, Operand, Reg, RegGenerator, StackSlot,
+    AddInst, Fmm, Inst, Label, LiInst, LlaInst, LwInst, MulInst, Operand, Reg, RegGenerator,
+    StackSlot, REG_ZERO,
 };
 
 use crate::context;
@@ -223,11 +224,10 @@ impl IRBuilder {
                     Self::local_var_except_param_from(instr, regs).with_context(|| context!())?;
                 Ok(reg.into())
             }
-            middle::ir::Operand::Global(glo) => Err(anyhow!(
-                "local_operand_from operand cann't not be global:{}",
-                glo
-            ))
-            .with_context(|| context!()),
+            middle::ir::Operand::Global(glo) => {
+                Err(anyhow!("no_load_from operand cann't not be global:{}", glo))
+                    .with_context(|| context!())
+            }
         }
     }
 
@@ -303,34 +303,66 @@ impl IRBuilder {
     }
 
     /// int arr[][5][6] ==> [ 1, 6, 5 ]
-    fn _cal_dims_rev(ty: &middle::ir::ValueType) -> Vec<usize> {
+    fn _cal_capas_rev(ty: &middle::ir::ValueType) -> Vec<usize> {
         match ty {
-            middle::ir::ValueType::Void => todo!(),
-            middle::ir::ValueType::Int
+            middle::ir::ValueType::Float
+            | middle::ir::ValueType::Int
             | middle::ir::ValueType::SignedChar
-            | middle::ir::ValueType::Float
-            | middle::ir::ValueType::Bool => {
-                vec![1]
+            | middle::ir::ValueType::Bool
+            | middle::ir::ValueType::Void => Vec::new(),
+            middle::ir::ValueType::Array(_type, _size) => {
+                let _type = _type.as_ref();
+                let mut capas = Self::_cal_capas_rev(_type);
+                capas.push(*_size);
+                capas
             }
-            middle::ir::ValueType::Pointer(_) => todo!(),
-            middle::ir::ValueType::Array(ty, sz) => {
-                let mut ret = Self::_cal_dims_rev(ty);
-                ret.push(*sz);
-                ret
-            }
+            middle::ir::ValueType::Pointer(_ptr) => todo!(),
         }
     }
 
-    #[allow(unused)]
+    /// 这里面不会在 regs 插入, 因此没法拿到指令的地址
     pub fn _cal_offset(
         ptr: &middle::ir::Operand,
         idxes: &[middle::ir::Operand],
         reg_gener: &mut RegGenerator,
-        regs: &mut HashMap<Address, Reg>,
-    ) -> Result<(Operand, Vec<Inst>)> {
+        regs: &HashMap<Address, Reg>,
+    ) -> Result<(Reg, Vec<Inst>)> {
         match ptr {
             middle::ir::Operand::Constant(_) => unimplemented!(),
-            middle::ir::Operand::Global(glo) => unimplemented!(),
+            middle::ir::Operand::Global(glo) => {
+                let mut insts: Vec<Inst> = Vec::new();
+                let capas = {
+                    let mut v = Self::_cal_capas_rev(&glo.value_type);
+                    v.reverse();
+                    v
+                };
+                let idxes = {
+                    let mut arr = Vec::new();
+                    for idx in idxes.iter().skip(1) {
+                        let (op, prepare) = Self::prepare_rs1_i(idx, reg_gener, regs)
+                            .with_context(|| context!())?;
+                        insts.extend(prepare);
+                        arr.push(op);
+                    }
+                    arr
+                };
+                let mut factor: usize = capas[idxes.len()..].iter().product();
+                let mut acc: Reg = REG_ZERO;
+                for (idx, capa) in idxes.iter().zip(capas.iter()).rev() {
+                    let rs2 = reg_gener.gen_virtual_usual_reg();
+                    let li = LiInst::new(rs2.into(), (factor as i64).into());
+                    insts.push(li.into());
+                    let prdct = reg_gener.gen_virtual_usual_reg();
+                    let mul = MulInst::new(prdct.into(), idx.clone(), rs2.into());
+                    insts.push(mul.into());
+                    let _acc = reg_gener.gen_virtual_usual_reg();
+                    let add = AddInst::new(_acc.into(), prdct.into(), acc.into());
+                    insts.push(add.into());
+                    acc = _acc;
+                    factor *= capa;
+                }
+                Ok((acc, insts))
+            }
             middle::ir::Operand::Parameter(param) => match param.value_type {
                 middle::ir::ValueType::Array(_, _) => todo!(),
                 middle::ir::ValueType::Pointer(_) => todo!(),

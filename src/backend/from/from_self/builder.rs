@@ -121,7 +121,8 @@ impl IRBuilder {
         for (bb_name, insert_back) in insert_back_for_remove_phi {
             let bb = bbs_mut
                 .get_mut(&bb_name)
-                .ok_or(anyhow!("").context(context!()))?;
+                .ok_or_else(|| anyhow!("{:?} not found", &&bb_name))
+                .with_context(|| context!())?;
             for (from, phi_dst) in insert_back {
                 let from = Self::no_load_from(&from, &regs)?;
                 match from {
