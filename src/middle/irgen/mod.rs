@@ -4,7 +4,6 @@ use crate::{frontend, middle};
 use anyhow::Result;
 use program_kit::ProgramKit;
 
-mod constant;
 mod function_kit;
 mod gen_binary;
 mod gen_const;

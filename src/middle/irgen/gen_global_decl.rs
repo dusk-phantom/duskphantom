@@ -1,13 +1,9 @@
-use std::collections::VecDeque;
-
 use crate::context;
 use crate::frontend::{Decl, Type};
-use crate::middle::ir::Constant;
 use crate::middle::irgen::program_kit::ProgramKit;
 use crate::middle::irgen::value::Value;
 use anyhow::{anyhow, Context};
 
-use super::constant::collapse_array;
 use super::gen_const::gen_const;
 use super::gen_type::gen_type;
 
@@ -28,15 +24,10 @@ impl<'a> ProgramKit<'a> {
                 };
 
                 // Get initializer
-                let mut initializer = match val {
+                let initializer = match val {
                     Some(v) => gen_const(v)?,
                     None => value_type.default_initializer()?,
                 };
-
-                // Collapse initializer array
-                if let Constant::Array(arr) = initializer {
-                    initializer = collapse_array(&mut VecDeque::from(arr), &value_type)?;
-                }
 
                 // Get global variable
                 let global_val = self.program.mem_pool.new_global_variable(

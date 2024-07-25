@@ -1,5 +1,3 @@
-use std::collections::VecDeque;
-
 use crate::frontend::Decl;
 use crate::middle::ir::Operand;
 use crate::middle::irgen::function_kit::FunctionKit;
@@ -9,7 +7,6 @@ use anyhow::{anyhow, Context};
 use super::gen_const::gen_const;
 use super::gen_type::gen_type;
 use super::value::{alloc, Value};
-use super::{constant, value};
 
 impl<'a> FunctionKit<'a> {
     /// Generate a declaration as a statement into the program
@@ -23,26 +20,25 @@ impl<'a> FunctionKit<'a> {
                 };
 
                 // Translate type
-                let ty = gen_type(raw_ty)?;
+                let value_type = gen_type(raw_ty)?;
 
                 // Generate constant value
-                let val = gen_const(expr)?;
+                let initializer = gen_const(expr)?;
 
                 // If constant is an array, collapse it and store into global variable
-                let val = match val {
-                    Constant::Array(arr) => {
-                        let arr = constant::collapse_array(&mut VecDeque::from(arr), &ty)?;
+                let val = match initializer {
+                    Constant::Array(_) => {
                         let name = self.unique_name(id);
                         let gvar = self.program.mem_pool.new_global_variable(
                             name,
-                            arr.get_type(),
+                            value_type,
                             false,
-                            arr,
+                            initializer,
                         );
                         self.program.module.global_variables.push(gvar);
                         Value::ReadWrite(gvar.into())
                     }
-                    _ => Value::ReadOnly(val.into()),
+                    _ => Value::ReadOnly(initializer.into()),
                 };
 
                 // Add value to environment
@@ -58,10 +54,10 @@ impl<'a> FunctionKit<'a> {
                 // Assign to the variable if it is defined
                 if let Some(expr) = op {
                     // Generate expression as variable type
-                    let mut rhs = self.gen_expr(expr)?;
+                    let rhs = self.gen_expr(expr)?;
 
-                    // Collapse and memset 0 if `rhs` is array
-                    if let Value::Array(arr) = rhs {
+                    // Memset 0 if `rhs` is array
+                    if let Value::Array(_) = rhs {
                         let ptr = lhs.clone().load_uncast(self)?.0;
                         let memset_func = self.get_fun_env("llvm.memset.p0.i32").unwrap();
                         let memset_call = self.program.mem_pool.get_call(
@@ -74,7 +70,6 @@ impl<'a> FunctionKit<'a> {
                             ],
                         );
                         self.exit.unwrap().push_back(memset_call);
-                        rhs = value::collapse_array(&mut VecDeque::from(arr), &ty)?;
                     }
 
                     // Assign operand to value

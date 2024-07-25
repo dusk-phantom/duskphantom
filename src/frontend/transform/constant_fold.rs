@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use anyhow::{anyhow, Context, Result};
 
 use crate::{
@@ -5,6 +7,8 @@ use crate::{
     frontend::{BinaryOp, Decl, Expr, Program, Stmt, Type, TypedIdent, UnaryOp},
     utils::frame_map::FrameMap,
 };
+
+use super::reshape_array::{reshape_array, reshape_const_array};
 
 pub fn optimize_program(program: &mut Program) -> Result<()> {
     let mut env = FrameMap::default();
@@ -18,12 +22,31 @@ pub fn optimize_program(program: &mut Program) -> Result<()> {
 fn fold_decl(decl: &mut Decl, env: &mut FrameMap<String, Expr>) -> Result<()> {
     match decl {
         Decl::Const(ty, id, Some(expr)) => {
+            // Fold type
             *ty = get_folded_type(ty, env)?;
-            *expr = get_folded_expr(expr, env, ty)?;
-            env.insert(id.clone(), expr.clone());
+
+            // Calculate folded expression
+            let mut folded = get_folded_expr(expr, env, ty)?;
+
+            // Constant array can be malformed, reshape it
+            if let Expr::Array(arr) = folded {
+                folded = reshape_const_array(&mut VecDeque::from(arr), ty)?;
+            }
+
+            // Update expression to folded
+            *expr = folded.clone();
+
+            // Insert folded expression to environment
+            env.insert(id.clone(), folded);
         }
-        Decl::Var(ty, _, _) => {
+        Decl::Var(ty, _, Some(expr)) => {
+            // Fold type
             *ty = get_folded_type(ty, env)?;
+
+            // Value array can be malformed, reshape it
+            if let Expr::Array(arr) = expr {
+                *expr = reshape_array(&mut VecDeque::from(arr.clone()), ty)?;
+            }
         }
         Decl::Stack(vec) => {
             for decl in vec {
@@ -57,7 +80,7 @@ fn fold_stmt(stmt: &mut Stmt, env: &mut FrameMap<String, Expr>) -> Result<()> {
 }
 
 impl Expr {
-    fn to_i32(&self) -> Result<i32> {
+    pub fn to_i32(&self) -> Result<i32> {
         match self {
             Expr::Int(x) => Ok(*x),
             Expr::Float(x) => Ok(*x as i32),
@@ -65,7 +88,7 @@ impl Expr {
         }
     }
 
-    fn to_f32(&self) -> Result<f32> {
+    pub fn to_f32(&self) -> Result<f32> {
         match self {
             Expr::Int(x) => Ok(*x as f32),
             Expr::Float(x) => Ok(*x),
