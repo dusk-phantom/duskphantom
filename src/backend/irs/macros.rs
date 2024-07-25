@@ -30,8 +30,17 @@ macro_rules! impl_three_op_inst {
                 let dst = self.dst().gen_asm();
                 let lhs = self.lhs().gen_asm();
                 let rhs = self.rhs().gen_asm();
-                if matches!(self.rhs(), Operand::Imm(_)) {
-                    format!("{}i {},{},{}", $inst_name, dst, lhs, rhs)
+
+                if let Operand::Reg(r) = self.dst() {
+                    if r.is_usual() {
+                        if matches!(self.rhs(), Operand::Imm(_)) {
+                            format!("{}i {},{},{}", $inst_name, dst, lhs, rhs)
+                        } else {
+                            format!("{} {},{},{}", $inst_name, dst, lhs, rhs)
+                        }
+                    } else {
+                        format!("f{}.s {},{},{}", $inst_name, dst, lhs, rhs)
+                    }
                 } else {
                     format!("{} {},{},{}", $inst_name, dst, lhs, rhs)
                 }
