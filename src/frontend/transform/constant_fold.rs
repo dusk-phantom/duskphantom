@@ -21,31 +21,41 @@ pub fn optimize_program(program: &mut Program) -> Result<()> {
 /// Fold constant expression in declaration into constant.
 fn fold_decl(decl: &mut Decl, env: &mut FrameMap<String, Expr>) -> Result<()> {
     match decl {
-        Decl::Const(ty, id, Some(expr)) => {
+        Decl::Const(ty, id, expr) => {
             // Fold type
             *ty = get_folded_type(ty, env)?;
 
-            // Calculate folded expression
-            let mut folded = get_folded_expr(expr, env, ty)?;
+            // Calculate folded initializer
+            let mut folded: Expr;
+            match expr {
+                Some(expr) => {
+                    // Calculate from given initializer
+                    folded = get_folded_expr(expr, env, ty)?;
 
-            // Constant array can be malformed, reshape it
-            if let Expr::Array(arr) = folded {
-                folded = reshape_const_array(&mut VecDeque::from(arr), ty)?;
+                    // Constant array can be malformed, reshape it
+                    if let Expr::Array(arr) = folded {
+                        folded = reshape_const_array(&mut VecDeque::from(arr), ty)?;
+                    }
+                }
+                None => {
+                    // Use default initializer
+                    folded = ty.default_initializer()?;
+                }
             }
 
             // Update expression to folded
-            *expr = folded.clone();
+            *expr = Some(folded.clone());
 
             // Insert folded expression to environment
             env.insert(id.clone(), folded);
         }
-        Decl::Var(ty, _, Some(expr)) => {
+        Decl::Var(ty, _, expr) => {
             // Fold type
             *ty = get_folded_type(ty, env)?;
 
             // Value array can be malformed, reshape it
-            if let Expr::Array(arr) = expr {
-                *expr = reshape_array(&mut VecDeque::from(arr.clone()), ty)?;
+            if let Some(Expr::Array(arr)) = expr {
+                *expr = Some(reshape_array(&mut VecDeque::from(arr.clone()), ty)?);
             }
         }
         Decl::Stack(vec) => {
@@ -70,10 +80,18 @@ fn fold_stmt(stmt: &mut Stmt, env: &mut FrameMap<String, Expr>) -> Result<()> {
     match stmt {
         Stmt::Decl(decl) => fold_decl(decl, env)?,
         Stmt::Block(vec) => {
+            let mut inner_env = env.branch();
             for stmt in vec {
-                fold_stmt(stmt, env)?;
+                fold_stmt(stmt, &mut inner_env)?;
             }
         }
+        Stmt::If(_, a, b) => {
+            fold_stmt(a, env)?;
+            fold_stmt(b, env)?;
+        }
+        Stmt::While(_, a) => fold_stmt(a, env)?,
+        Stmt::DoWhile(a, _) => fold_stmt(a, env)?,
+        Stmt::For(_, _, _, a) => fold_stmt(a, env)?,
         _ => (),
     }
     Ok(())

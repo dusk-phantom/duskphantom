@@ -2106,6 +2106,118 @@ mod tests {
     }
 
     #[test]
+    fn test_inner_fold() {
+        let code = r#"
+            #define len 20
+
+            int main()
+            {
+                if (len == 20) {
+                    int a[len] = {};
+                }
+                return 0;
+            }
+        "#;
+        let program = parse(code).unwrap();
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_snapshot!(llvm_ir, @r###"
+        @len = dso_local constant i32 20
+        declare i32 @getint()
+        declare i32 @getch()
+        declare float @getfloat()
+        declare void @putint(i32 %p0)
+        declare void @putch(i32 %p0)
+        declare void @putfloat(float %p0)
+        declare i32 @getarray(i32* %p0)
+        declare i32 @getfarray(float* %p0)
+        declare void @putarray(i32 %p0, i32* %p1)
+        declare void @putfarray(i32 %p0, float* %p1)
+        declare void @starttime()
+        declare void @stoptime()
+        declare void @putf()
+        declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
+        define i32 @main() {
+        entry:
+        %alloca_2 = alloca i32
+        br label %cond0
+
+        cond0:
+        %load_10 = load i32, ptr @len
+        %icmp_11 = icmp eq i32 %load_10, 20
+        br i1 %icmp_11, label %then1, label %alt2
+
+        then1:
+        %alloca_13 = alloca [20 x i32]
+        %getelementptr_14 = getelementptr [20 x i32], ptr %alloca_13, i32 0, i32 0
+        call void @llvm.memset.p0.i32(i32* %getelementptr_14, i8 0, i32 80, i1 false)
+        %getelementptr_16 = getelementptr [20 x i32], ptr %alloca_13, i32 0, i32 0
+        br label %final3
+
+        alt2:
+        br label %final3
+
+        final3:
+        store i32 0, ptr %alloca_2
+        br label %exit
+
+        exit:
+        %load_3 = load i32, ptr %alloca_2
+        ret i32 %load_3
+
+
+        }
+        "###);
+    }
+
+    #[test]
+    fn test_decl_fold() {
+        let code = r#"
+            #include "../../lib/sylib.h"
+            #define len 20
+
+            int main()
+            {
+                int c1[len + 5];
+                return 0;
+            }
+        "#;
+        let program = parse(code).unwrap();
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_snapshot!(llvm_ir, @r###"
+        @len = dso_local constant i32 20
+        declare i32 @getint()
+        declare i32 @getch()
+        declare float @getfloat()
+        declare void @putint(i32 %p0)
+        declare void @putch(i32 %p0)
+        declare void @putfloat(float %p0)
+        declare i32 @getarray(i32* %p0)
+        declare i32 @getfarray(float* %p0)
+        declare void @putarray(i32 %p0, i32* %p1)
+        declare void @putfarray(i32 %p0, float* %p1)
+        declare void @starttime()
+        declare void @stoptime()
+        declare void @putf()
+        declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
+        define i32 @main() {
+        entry:
+        %alloca_2 = alloca i32
+        %alloca_5 = alloca [25 x i32]
+        store i32 0, ptr %alloca_2
+        br label %exit
+
+        exit:
+        %load_3 = load i32, ptr %alloca_2
+        ret i32 %load_3
+
+
+        }
+        "###);
+    }
+
+    #[test]
     fn test_stack_overflow() {
         let code = r#"
 int main() {
