@@ -155,12 +155,10 @@ pub fn compile_self_llc(
         std::fs::write(ll_path, llvm_ir.clone()).with_context(|| context!())?;
     }
     let mut builder = tempfile::Builder::new();
-    let tmp_cfile = builder.suffix(".c").tempfile().unwrap();
     let tmp_llvm_file = builder.suffix(".ll").tempfile().unwrap();
     fs::write(&tmp_llvm_file, llvm_ir.as_bytes())?;
     let llvm = llvm_ir::Module::from_ir_path(&tmp_llvm_file).expect("llvm ir file not found");
     let program = clang_frontend::Program {
-        tmp_cfile,
         tmp_llvm_file,
         llvm,
     };

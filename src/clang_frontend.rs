@@ -10,7 +10,6 @@ use tempfile::NamedTempFile;
 use crate::context;
 
 pub struct Program {
-    pub tmp_cfile: NamedTempFile,
     pub tmp_llvm_file: NamedTempFile,
     pub llvm: Module,
 }
@@ -18,21 +17,20 @@ pub struct Program {
 impl Program {
     pub fn parse(file: &str) -> Self {
         let mut builder = tempfile::Builder::new();
-        let tmp_cfile = builder.suffix(".c").tempfile().unwrap();
         let tmp_llvm_file = builder.suffix(".ll").tempfile().unwrap();
-        fs::copy(file, tmp_cfile.path()).expect("msg: copy file failed");
         let mut cmd = Command::new("clang");
-        // clang -S -emit-llvm -Xclang -disable-O0-optnone -target riscv64 1.c -o 1.ll
+        // clang -S -emit-llvm -Xclang -disable-O0-optnone -target riscv64 -x c 1.c -o 1.ll
         cmd.arg("-S")
             .arg("-emit-llvm")
             .arg("-Wno-implicit-function-declaration")
-            .arg("-Werror")
             .arg("-Xclang")
             .arg("-disable-O0-optnone")
             .arg("-target")
             .arg("riscv64")
+            .arg("-x")
+            .arg("c")
             // 制定使用非.c后缀的文件名
-            .arg(tmp_cfile.path())
+            .arg(file)
             .arg("-o")
             .arg(tmp_llvm_file.path());
         let output = cmd.output().expect("msg: exec clang failed");
@@ -45,7 +43,6 @@ impl Program {
         // 使用llvm_ir crate从.ll内容文件中读取llvm ir
         let llvm = Module::from_ir_path(tmp_llvm_file.path()).expect("msg: parse llvm ir failed");
         Self {
-            tmp_cfile,
             tmp_llvm_file,
             llvm,
         }
