@@ -11,7 +11,7 @@ use crate::{
         analysis::dominator_tree::DominatorTree,
         ir::{
             instruction::{downcast_mut, misc_inst::Phi, InstType},
-            BBPtr, IRBuilder, InstPtr, Operand, ValueType,
+            BBPtr, FunPtr, IRBuilder, InstPtr, Operand, ValueType,
         },
         Program,
     },
@@ -20,8 +20,8 @@ use crate::{
 #[allow(unused)]
 pub fn optimize_program(program: &mut Program) -> Result<()> {
     for func in &program.module.functions {
-        if let Some(entry) = func.entry {
-            mem2reg(entry, &mut program.mem_pool)?;
+        if !func.is_lib() {
+            mem2reg(*func, &mut program.mem_pool)?;
         }
     }
     Ok(())
@@ -75,9 +75,10 @@ impl PhiPack {
 
 /// The mem2reg pass
 #[allow(unused)]
-pub fn mem2reg(entry: BBPtr, mem_pool: &mut Pin<Box<IRBuilder>>) -> Result<()> {
+pub fn mem2reg(func: FunPtr, mem_pool: &mut Pin<Box<IRBuilder>>) -> Result<()> {
+    let entry = func.entry.unwrap();
     let mut variable_to_phi_insertion: BTreeMap<InstPtr, BTreeSet<BBPtr>> =
-        get_variable_to_phi_insertion(entry);
+        get_variable_to_phi_insertion(func);
     let mut block_to_phi_insertion: BTreeMap<BBPtr, Vec<PhiPack>> =
         insert_empty_phi(entry, mem_pool, variable_to_phi_insertion)?;
 
@@ -233,10 +234,11 @@ fn insert_empty_phi(
 
 /// Get places to insert "phi" instructions for each "alloca" instruction
 #[allow(unused)]
-fn get_variable_to_phi_insertion(entry: BBPtr) -> BTreeMap<InstPtr, BTreeSet<BBPtr>> {
+fn get_variable_to_phi_insertion(func: FunPtr) -> BTreeMap<InstPtr, BTreeSet<BBPtr>> {
+    let entry = func.entry.unwrap();
     let mut phi_positions: BTreeMap<InstPtr, BTreeSet<BBPtr>> = BTreeMap::new();
     let mut store_positions: BTreeMap<InstPtr, BTreeSet<BBPtr>> = BTreeMap::new();
-    let mut dom_tree = DominatorTree::new(entry);
+    let mut dom_tree = DominatorTree::new(func);
 
     /// Build a mapping from variable to store positions
     fn build_store_positions(
@@ -320,9 +322,14 @@ pub mod tests_mem2reg {
         entry.push_back(store1);
         entry.push_back(store2);
         entry.push_back(store3);
+        let mut func = program
+            .mem_pool
+            .new_function("no_name".to_string(), crate::middle::ir::ValueType::Void);
+        func.entry = Some(entry);
+        func.exit = Some(entry);
 
         // Calculate df and phi insert positions
-        let phi_positions = get_variable_to_phi_insertion(entry);
+        let phi_positions = get_variable_to_phi_insertion(func);
 
         // Check if phi insert positions are correct
         assert_eq!(phi_positions.len(), 0);
@@ -346,6 +353,11 @@ pub mod tests_mem2reg {
         then_then.set_true_bb(end);
         then_alt.set_true_bb(end);
         alt.set_true_bb(end);
+        let mut func = program
+            .mem_pool
+            .new_function("no_name".to_string(), crate::middle::ir::ValueType::Void);
+        func.entry = Some(entry);
+        func.exit = Some(end);
 
         // Construct "alloca" and "store" instructions
         let alloca1 = program.mem_pool.get_alloca(ValueType::Int, 1);
@@ -368,7 +380,7 @@ pub mod tests_mem2reg {
         alt.push_back(store3);
 
         // Calculate phi insert positions
-        let phi_positions = get_variable_to_phi_insertion(entry);
+        let phi_positions = get_variable_to_phi_insertion(func);
 
         // Check if phi insert positions are correct
         assert_eq!(phi_positions.len(), 3);

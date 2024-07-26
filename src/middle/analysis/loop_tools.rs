@@ -1,8 +1,8 @@
 use std::usize;
 
-use crate::utils::mem::{ObjPool, ObjPtr};
+use dominator_tree::DominatorTree;
 
-use self::domin::make_domin;
+use crate::utils::mem::{ObjPool, ObjPtr};
 
 use super::*;
 
@@ -38,7 +38,7 @@ pub struct LoopForest {
 impl LoopForest {
     // tarjan算法变体
     pub fn make_forest(func: FunPtr) -> Option<LoopForest> {
-        let domin = make_domin(func);
+        let mut domin = DominatorTree::new(func);
         let mut stack;
         if let Some(x) = func.entry {
             stack = vec![x];
