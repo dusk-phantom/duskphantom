@@ -97,8 +97,6 @@ impl DominatorTree {
 #[allow(unused)]
 fn get_df_map(fun: FunPtr, idoms: &HashMap<BBPtr, BBPtr>) -> HashMap<BBPtr, HashSet<BBPtr>> {
     let mut df = HashMap::new();
-
-    /// Calculate dominance frontiers
     for bb in fun.dfs_iter() {
         for pred in bb.get_pred_bb() {
             let mut runner = *pred;
@@ -118,8 +116,6 @@ fn get_df_map(fun: FunPtr, idoms: &HashMap<BBPtr, BBPtr>) -> HashMap<BBPtr, Hash
             }
         }
     }
-
-    // Return dominance frontiers
     df
 }
 
