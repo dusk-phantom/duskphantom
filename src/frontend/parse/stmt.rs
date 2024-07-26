@@ -31,8 +31,6 @@ pub fn stmt(input: &mut &str) -> PResult<Stmt> {
         'w' => (token("while"), cut_err((paren(expr), box_stmt))).map(|(_, (cond, body))| Stmt::While(cond, body)),
         'd' => (token("do"), cut_err((box_stmt, token("while"), paren(expr), token(";"))))
             .map(|(_, (body, _, cond, _))| Stmt::DoWhile(body, cond)),
-        'f' => (token("for"), cut_err((paren((decl_or_expr, expr_sc, expr)), box_stmt)))
-            .map(|(_, ((a, b, c), s))| Stmt::For(a, b, c, s)),
         'r' => (token("return"), cut_err((opt(expr), token(";"))))
             .map(|(_, (e, _))| Stmt::Return(e)),
         '{' => curly(cut_err(vec_stmt)).map(Stmt::Block),

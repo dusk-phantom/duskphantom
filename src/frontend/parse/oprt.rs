@@ -3,19 +3,8 @@ use super::*;
 pub fn unary_op(input: &mut &str) -> PResult<UnaryOp> {
     dispatch! { peek(any);
         '!' => token("!").value(UnaryOp::Not),
-        '~' => token("~").value(UnaryOp::Inv),
-        '-' => alt((
-            token("--").value(UnaryOp::Dec),
-            token("-").value(UnaryOp::Neg),
-        )),
-        '+' => alt((
-            token("++").value(UnaryOp::Inc),
-            token("+").value(UnaryOp::Pos),
-        )),
-        '*' => token("*").value(UnaryOp::Ind),
-        '&' => token("&").value(UnaryOp::Addr),
-        's' => token("sizeof").value(UnaryOp::Sizeof),
-        '(' => paren(single_type).map(UnaryOp::Cast),
+        '-' => token("-").value(UnaryOp::Neg),
+        '+' => token("+").value(UnaryOp::Pos),
         _ => fail,
     }
     .parse_next(input)

@@ -1,5 +1,3 @@
-use rayon::iter::Either;
-
 use super::*;
 
 /// A statement.
@@ -36,11 +34,6 @@ pub enum Stmt {
     /// Example:
     /// `do ... while (true)` is `DoWhile(..., True)`
     DoWhile(Box<Stmt>, Expr),
-
-    /// A for-loop.
-    /// Example:
-    /// `for (x; y; z) ...` is `For(x, y, z, ...)`
-    For(Either<Decl, Expr>, Expr, Expr, Box<Stmt>),
 
     /// A break statement.
     Break,

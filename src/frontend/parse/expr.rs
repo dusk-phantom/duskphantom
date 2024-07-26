@@ -16,14 +16,9 @@ pub fn box_expr(input: &mut &str) -> PResult<Box<Expr>> {
 /// Parse prefix expressions like `!x->y.z`.
 pub fn prefix(input: &mut &str) -> PResult<Expr> {
     let disp = dispatch! { peek(any);
-        '{' => alt((
-            // TODO memoize expr here
-            curly(separated(0.., expr, token(","))).map(Expr::Array),
-            curly(separated(0.., map_entry, token(","))).map(Expr::Map)
-        )),
+        '{' => curly(separated(0.., expr, token(","))).map(Expr::Array),
         '.' | '0'..='9' => pad(constant_number),
         '"' => pad(string_lit).map(Expr::String),
-        '\'' => pad(char_lit).map(Expr::Char),
         'f' => token("false").value(Expr::Int(0)),
         't' => token("true").value(Expr::Int(1)),
         '(' => paren(expr),
@@ -38,9 +33,7 @@ pub fn prefix(input: &mut &str) -> PResult<Expr> {
     // because all closures have unique types, making `alt` report errors.
     let postfix_tail = dispatch! { peek(any);
         '[' => bracket(box_expr).map(|x| BoxF::new(|acc| Expr::Index(acc, x))),
-        '.' => preceded(token("."), pad(ident)).map(|x| BoxF::new(|acc| Expr::Field(acc, x))),
         '(' => paren(vec_expr).map(|x| BoxF::new(|acc| Expr::Call(acc, x))),
-        '-' => preceded(token("->"), pad(ident)).map(|x| BoxF::new(|acc| Expr::Select(acc, x))),
         _ => fail,
     };
     let postfix = lrec(atom, repeat(0.., postfix_tail));
@@ -65,15 +58,5 @@ gen_lrec_binary!(binary_lv9, binary_op_lv9, binary_lv8);
 
 /// Parse a conditional expression.
 pub fn expr(input: &mut &str) -> PResult<Expr> {
-    // The first expression is memoized, so when there's no condition,
-    // there will not be re-parsing.
-    let cond = binary_lv9.parse_next(input)?;
-    match (token("?"), expr, token(":"), expr).parse_next(input) {
-        Ok((_, pass, _, fail)) => Ok(Expr::Conditional(
-            Box::new(cond),
-            Box::new(pass),
-            Box::new(fail),
-        )),
-        Err(_) => Ok(cond),
-    }
+    binary_lv9.parse_next(input)
 }

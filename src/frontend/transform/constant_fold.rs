@@ -91,9 +91,6 @@ fn fold_decl(decl: &mut Decl, env: &mut FrameMap<String, Expr>, is_global: bool)
             *ty = get_folded_type(ty, env)?;
             fold_stmt(stmt, &mut env.branch())?;
         }
-        Decl::Enum(_, _) => todo!(),
-        Decl::Union(_, _) => todo!(),
-        Decl::Struct(_, _) => todo!(),
         _ => (),
     }
     Ok(())
@@ -115,7 +112,6 @@ fn fold_stmt(stmt: &mut Stmt, env: &mut FrameMap<String, Expr>) -> Result<()> {
         }
         Stmt::While(_, a) => fold_stmt(a, env)?,
         Stmt::DoWhile(a, _) => fold_stmt(a, env)?,
-        Stmt::For(_, _, _, a) => fold_stmt(a, env)?,
         _ => (),
     }
     Ok(())
@@ -296,7 +292,6 @@ fn get_folded_i32(expr: &Expr, env: &FrameMap<String, Expr>) -> Result<i32> {
         }
         Expr::Int(x) => Ok(*x),
         Expr::Float(x) => Ok(*x as i32),
-        Expr::Char(x) => Ok(*x as i32),
         Expr::Bool(x) => Ok(*x as i32),
         Expr::Unary(op, expr) => {
             let x = get_folded_i32(expr, env)?;
@@ -304,7 +299,6 @@ fn get_folded_i32(expr: &Expr, env: &FrameMap<String, Expr>) -> Result<i32> {
                 UnaryOp::Neg => Ok(-x),
                 UnaryOp::Pos => Ok(x),
                 UnaryOp::Not => Ok(if x == 0 { 1 } else { 0 }),
-                _ => todo!(),
             }
         }
         Expr::Binary(head, tail) => {
@@ -353,7 +347,6 @@ fn get_folded_f32(expr: &Expr, env: &FrameMap<String, Expr>) -> Result<f32> {
         }
         Expr::Int(x) => Ok(*x as f32),
         Expr::Float(x) => Ok(*x),
-        Expr::Char(x) => Ok(*x as i32 as f32),
         Expr::Bool(x) => Ok(*x as i32 as f32),
         Expr::Unary(op, expr) => {
             let x = get_folded_f32(expr, env)?;
@@ -361,7 +354,6 @@ fn get_folded_f32(expr: &Expr, env: &FrameMap<String, Expr>) -> Result<f32> {
                 UnaryOp::Neg => Ok(-x),
                 UnaryOp::Pos => Ok(x),
                 UnaryOp::Not => Ok(if x == 0.0 { 1.0 } else { 0.0 }),
-                _ => todo!(),
             }
         }
         Expr::Binary(head, tail) => {
