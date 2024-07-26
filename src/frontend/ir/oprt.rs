@@ -1,5 +1,3 @@
-use super::*;
-
 /// Unary operator type.
 /// Unlike action, target of unary operator does not need to be a left value.
 /// Example: `!`, `~`
@@ -7,24 +5,10 @@ use super::*;
 pub enum UnaryOp {
     /// `!`
     Not,
-    /// `~`
-    Inv,
     /// `-`
     Neg,
     /// `+`
     Pos,
-    /// `++`
-    Inc,
-    /// `--`
-    Dec,
-    /// Indirection operator, `*`
-    Ind,
-    /// Address operator, `&`
-    Addr,
-    /// Type cast, `(int)`
-    Cast(Type),
-    /// Size-of, `sizeof`
-    Sizeof,
 }
 
 /// Binry operator type.

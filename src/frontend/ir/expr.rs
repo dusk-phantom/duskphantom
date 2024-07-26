@@ -12,21 +12,9 @@ pub enum Expr {
     /// Example: `{ 1, 2, 3 }`
     Array(Vec<Expr>),
 
-    /// A named instantiation of an union or struct.
-    /// Example: `{ x: 1, y: 2 }` or `{ .x = 1 }`
-    Map(Vec<MapEntry>),
-
     /// Array indexing.
     /// Example: `x[8]`
     Index(Box<Expr>, Box<Expr>),
-
-    /// Field of a value.
-    /// Example: `point.x`
-    Field(Box<Expr>, String),
-
-    /// Field of a pointed value.
-    /// Example: `point->x`
-    Select(Box<Expr>, String),
 
     /// A single 32-bit integer.
     /// Example: `8`
@@ -39,10 +27,6 @@ pub enum Expr {
     /// A string literal.
     /// Example: `"good"`
     String(String),
-
-    /// A character literal.
-    /// Example: `'g'`
-    Char(char),
 
     /// A boolean literal.
     /// Example: `false`
@@ -59,8 +43,4 @@ pub enum Expr {
     /// Application of binary operator.
     /// Example: `a + b`
     Binary(Box<Expr>, Vec<(BinaryOp, Expr)>),
-
-    /// Application of conditional operator.
-    /// Example: `cond ? a : b`
-    Conditional(Box<Expr>, Box<Expr>, Box<Expr>),
 }

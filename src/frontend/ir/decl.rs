@@ -26,22 +26,4 @@ pub enum Decl {
     /// `void f(int x)` is `Func(Void, "f", [(Int, (Some("x"))], None)`
     /// `void f() { ... }` is `Func(Void, "f", [], Some(...))`
     Func(Type, String, Option<Box<Stmt>>),
-
-    /// A declaration of an enum.
-    /// Example:
-    /// `enum fruit { x, y = 114 }` is
-    /// `Enum("fruit", vec![("x", None), ("y", 114)])`
-    Enum(String, Vec<(String, Option<i32>)>),
-
-    /// A declaration of an union.
-    /// Example:
-    /// `union numbers { int i; float f; }` is
-    /// `Union("numbers", vec![(Int, "i"), (Float, "f")])`
-    Union(String, Vec<TypedIdent>),
-
-    /// A declaration of a struct.
-    /// Example:
-    /// `struct numbers { int i; float f; }` is
-    /// `Struct("numbers", vec![(Int, "i"), (Float, "f")])`
-    Struct(String, Vec<TypedIdent>),
 }

@@ -145,10 +145,6 @@ impl<'a> FunctionKit<'a> {
                 // Exit is final block
                 self.exit = Some(final_entry);
             }
-            Stmt::For(_, _, _, _) => {
-                return Err(anyhow!("`for` statement can't be generated"))
-                    .with_context(|| context!());
-            }
             Stmt::Break => {
                 // Add br instruction to exit block
                 let br = self.program.mem_pool.get_br(None);
@@ -212,9 +208,7 @@ impl<'a> FunctionKit<'a> {
                 }
 
                 // Rewire exit
-                let exit = kit.exit;
-                drop(kit);
-                self.exit = exit;
+                self.exit = kit.exit;
             }
         }
         Ok(self)
