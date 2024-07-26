@@ -21,8 +21,8 @@ pub fn gen(program: &frontend::Program) -> Result<middle::Program> {
     let mut result = middle::Program::new();
     ProgramKit {
         program: &mut result,
-        env: FrameMap::default(),
-        fun_env: FrameMap::default(),
+        env: FrameMap::new(),
+        fun_env: FrameMap::new(),
     }
     .gen(program)?;
     Ok(result)

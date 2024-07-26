@@ -15,6 +15,7 @@ use crate::{
         },
         Program,
     },
+    utils::frame_map::FrameMap,
 };
 
 #[allow(unused)]
@@ -86,12 +87,10 @@ pub fn mem2reg(func: FunPtr, mem_pool: &mut Pin<Box<IRBuilder>>) -> Result<()> {
     /// Errors when variable is not found in current_variable_value
     fn decide_variable_value(
         variable: InstPtr,
-        current_variable_value: &[BTreeMap<InstPtr, Operand>],
+        current_variable_value: &FrameMap<InstPtr, Operand>,
     ) -> Result<Operand> {
-        for frame in current_variable_value.iter().rev() {
-            if let Some(value) = frame.get(&variable) {
-                return Ok(value.clone());
-            }
+        if let Some(value) = current_variable_value.get(&variable) {
+            return Ok(value.clone());
         }
         let ValueType::Pointer(ptr) = variable.get_value_type() else {
             return Err(anyhow::anyhow!("variable type is not pointer"))
@@ -109,7 +108,7 @@ pub fn mem2reg(func: FunPtr, mem_pool: &mut Pin<Box<IRBuilder>>) -> Result<()> {
         parent_bb: Option<BBPtr>,
         current_bb: BBPtr,
         visited: &mut BTreeSet<BBPtr>,
-        current_variable_value: &mut Vec<BTreeMap<InstPtr, Operand>>,
+        current_variable_value: &mut FrameMap<InstPtr, Operand>,
         block_to_phi_insertion: &mut BTreeMap<BBPtr, Vec<PhiPack>>,
     ) -> Result<()> {
         // Decide value for each "phi" instruction to add
@@ -120,10 +119,7 @@ pub fn mem2reg(func: FunPtr, mem_pool: &mut Pin<Box<IRBuilder>>) -> Result<()> {
         {
             let value = decide_variable_value(phi.variable, current_variable_value)?;
             phi.add_argument((parent_bb.unwrap(), value));
-            current_variable_value
-                .last_mut()
-                .unwrap()
-                .insert(phi.variable, Operand::Instruction(phi.inst));
+            current_variable_value.insert(phi.variable, Operand::Instruction(phi.inst));
         }
 
         // Do not continue if visited
@@ -151,10 +147,7 @@ pub fn mem2reg(func: FunPtr, mem_pool: &mut Pin<Box<IRBuilder>>) -> Result<()> {
                     // Update only when store destination is a constant pointer
                     if let Operand::Instruction(variable) = store_ptr {
                         if variable.get_type() == InstType::Alloca {
-                            current_variable_value
-                                .last_mut()
-                                .unwrap()
-                                .insert(*variable, store_value.clone());
+                            current_variable_value.insert(*variable, store_value.clone());
                             inst.remove_self();
                         }
                     }
@@ -178,22 +171,14 @@ pub fn mem2reg(func: FunPtr, mem_pool: &mut Pin<Box<IRBuilder>>) -> Result<()> {
 
         // Visit all successors
         let successors = current_bb.get_succ_bb();
-        let need_new_frame = successors.len() > 1;
         for succ in successors {
-            // Only add new frame if there is more than one successors
-            if need_new_frame {
-                current_variable_value.push(BTreeMap::new());
-            }
             decide_values_start_from(
                 Some(current_bb),
                 *succ,
                 visited,
-                current_variable_value,
+                &mut current_variable_value.branch(),
                 block_to_phi_insertion,
             )?;
-            if need_new_frame {
-                current_variable_value.pop();
-            }
         }
         Ok(())
     }
@@ -203,7 +188,7 @@ pub fn mem2reg(func: FunPtr, mem_pool: &mut Pin<Box<IRBuilder>>) -> Result<()> {
         None,
         entry,
         &mut BTreeSet::new(),
-        &mut vec![BTreeMap::new()],
+        &mut FrameMap::new(),
         &mut block_to_phi_insertion,
     )
 }

@@ -11,7 +11,7 @@ use crate::{
 use super::reshape_array::{reshape_array, reshape_const_array};
 
 pub fn optimize_program(program: &mut Program) -> Result<()> {
-    let mut env = FrameMap::default();
+    let mut env = FrameMap::new();
     for decl in program.module.iter_mut() {
         fold_decl(decl, &mut env, true)?;
     }

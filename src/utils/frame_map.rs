@@ -15,6 +15,11 @@ impl<'a, K, V> FrameMap<'a, K, V>
 where
     K: Eq + Hash,
 {
+    /// Create a new FrameMap.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     /// Get the last frame.
     pub fn last_frame(&mut self) -> &mut HashMap<K, V> {
         match self {
