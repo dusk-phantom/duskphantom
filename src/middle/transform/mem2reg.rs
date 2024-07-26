@@ -8,6 +8,7 @@ use anyhow::{Context, Result};
 use crate::{
     context,
     middle::{
+        analysis::dominator_tree::DominatorTree,
         ir::{
             instruction::{downcast_mut, misc_inst::Phi, InstType},
             BBPtr, IRBuilder, InstPtr, Operand, ValueType,
@@ -235,7 +236,7 @@ fn insert_empty_phi(
 fn get_variable_to_phi_insertion(entry: BBPtr) -> BTreeMap<InstPtr, BTreeSet<BBPtr>> {
     let mut phi_positions: BTreeMap<InstPtr, BTreeSet<BBPtr>> = BTreeMap::new();
     let mut store_positions: BTreeMap<InstPtr, BTreeSet<BBPtr>> = BTreeMap::new();
-    let dominance_frontiers: BTreeMap<BBPtr, BTreeSet<BBPtr>> = get_dominance_frontiers(entry);
+    let mut dom_tree = DominatorTree::new(entry);
 
     /// Build a mapping from variable to store positions
     fn build_store_positions(
@@ -273,16 +274,14 @@ fn get_variable_to_phi_insertion(entry: BBPtr) -> BTreeMap<InstPtr, BTreeSet<BBP
         let mut positions = vis.clone();
         while !positions.is_empty() {
             let position = positions.pop_first().unwrap();
-            let Some(dfs) = dominance_frontiers.get(&position) else {
-                continue;
-            };
-            for df in dfs {
-                phi_positions.entry(*variable).or_default().insert(*df);
+            let df = dom_tree.get_df(position);
+            for bb in df {
+                phi_positions.entry(*variable).or_default().insert(bb);
 
                 // Only insert positions never considered before
-                if (!vis.contains(df)) {
-                    vis.insert(*df);
-                    positions.insert(*df);
+                if (!vis.contains(&bb)) {
+                    vis.insert(bb);
+                    positions.insert(bb);
                 }
             }
         }
@@ -292,179 +291,10 @@ fn get_variable_to_phi_insertion(entry: BBPtr) -> BTreeMap<InstPtr, BTreeSet<BBP
     phi_positions
 }
 
-/// Get dominance frontiers of each basic block in the function
-#[allow(unused)]
-fn get_dominance_frontiers(entry: BBPtr) -> BTreeMap<BBPtr, BTreeSet<BBPtr>> {
-    let idoms = get_immediate_dominators(entry);
-    let mut df = BTreeMap::new();
-
-    /// Calculate dominance frontiers
-    for (bb, idom) in idoms.iter() {
-        if bb == idom {
-            continue;
-        }
-        for pred in bb.get_pred_bb() {
-            let mut runner = *pred;
-            while runner != idoms[bb] {
-                df.entry(runner).or_insert(BTreeSet::new()).insert(*bb);
-
-                // Only update runner if it's not dead block
-                if let Some(new_runner) = idoms.get(&runner) {
-                    runner = *new_runner;
-                } else {
-                    break;
-                }
-            }
-        }
-    }
-
-    // Return dominance frontiers
-    df
-}
-
-/// Get immediate dominators of each basic block in the function
-#[allow(unused)]
-fn get_immediate_dominators(entry: BBPtr) -> BTreeMap<BBPtr, BBPtr> {
-    let mut idoms = BTreeMap::new();
-    idoms.insert(entry, entry);
-
-    /// Calculate postorder with dfs
-    fn dfs_postorder(
-        current_bb: BBPtr,
-        visited: &mut BTreeSet<BBPtr>,
-        postorder_map: &mut BTreeMap<BBPtr, i32>,
-        postorder_array: &mut Vec<BBPtr>,
-    ) {
-        if visited.contains(&current_bb) {
-            return;
-        }
-        visited.insert(current_bb);
-        for succ in current_bb.get_succ_bb() {
-            dfs_postorder(*succ, visited, postorder_map, postorder_array);
-        }
-        postorder_map.insert(current_bb, postorder_map.len() as i32);
-        postorder_array.push(current_bb);
-    }
-    let mut postorder_map = BTreeMap::new();
-    let mut postorder_array = Vec::new();
-    dfs_postorder(
-        entry,
-        &mut BTreeSet::new(),
-        &mut postorder_map,
-        &mut postorder_array,
-    );
-
-    /// Function to get lowest common ancestor of two basic blocks in the dominator tree
-    fn intersect(
-        mut n: BBPtr,
-        mut m: BBPtr,
-        postorder_map: &BTreeMap<BBPtr, i32>,
-        idoms: &BTreeMap<BBPtr, BBPtr>,
-    ) -> BBPtr {
-        while n != m {
-            while postorder_map[&n] < postorder_map[&m] {
-                n = idoms[&n];
-            }
-            while postorder_map[&m] < postorder_map[&n] {
-                m = idoms[&m];
-            }
-        }
-        n
-    }
-
-    // Calculate idom with reverse postorder
-    for current_bb in postorder_array.iter().rev() {
-        if *current_bb == entry {
-            continue;
-        }
-        let mut new_idom = None;
-        for pred in current_bb.get_pred_bb() {
-            if idoms.contains_key(pred) {
-                if let Some(idom) = new_idom {
-                    new_idom = Some(intersect(*pred, idom, &postorder_map, &idoms));
-                } else {
-                    new_idom = Some(*pred);
-                }
-            }
-        }
-        idoms.insert(*current_bb, new_idom.unwrap());
-    }
-
-    // Return idoms
-    idoms
-}
-
 #[cfg(test)]
 pub mod tests_mem2reg {
     use super::*;
     use crate::middle::{ir::ValueType, Program};
-
-    #[test]
-    fn test_get_idoms() {
-        let mut program = Program::new();
-
-        // Construct a nested if-else graph
-        let mut entry = program.mem_pool.new_basicblock("entry".to_string());
-        let mut then = program.mem_pool.new_basicblock("then".to_string());
-        let mut then_then = program.mem_pool.new_basicblock("then_then".to_string());
-        let mut then_alt = program.mem_pool.new_basicblock("then_alt".to_string());
-        let mut alt = program.mem_pool.new_basicblock("alt".to_string());
-        let end = program.mem_pool.new_basicblock("end".to_string());
-        entry.set_true_bb(then);
-        entry.set_false_bb(alt);
-        then.set_true_bb(then_then);
-        then.set_false_bb(then_alt);
-        then_then.set_true_bb(end);
-        then_alt.set_true_bb(end);
-        alt.set_true_bb(end);
-
-        // Calculate idoms
-        let idoms = get_immediate_dominators(entry);
-
-        // Check if idoms are correct
-        assert_eq!(idoms[&entry].name, entry.name);
-        assert_eq!(idoms[&then].name, entry.name);
-        assert_eq!(idoms[&then_then].name, then.name);
-        assert_eq!(idoms[&then_alt].name, then.name);
-        assert_eq!(idoms[&alt].name, entry.name);
-        assert_eq!(idoms[&end].name, entry.name);
-    }
-
-    #[test]
-    fn test_get_df() {
-        let mut program = Program::new();
-
-        // Construct a nested if-else graph
-        let mut entry = program.mem_pool.new_basicblock("entry".to_string());
-        let mut then = program.mem_pool.new_basicblock("then".to_string());
-        let mut then_then = program.mem_pool.new_basicblock("then_then".to_string());
-        let mut then_alt = program.mem_pool.new_basicblock("then_alt".to_string());
-        let mut alt = program.mem_pool.new_basicblock("alt".to_string());
-        let end = program.mem_pool.new_basicblock("end".to_string());
-        entry.set_true_bb(then);
-        entry.set_false_bb(alt);
-        then.set_true_bb(then_then);
-        then.set_false_bb(then_alt);
-        then_then.set_true_bb(end);
-        then_alt.set_true_bb(end);
-        alt.set_true_bb(end);
-
-        // Calculate df
-        let df = get_dominance_frontiers(entry);
-
-        // Check if df lengths are correct
-        assert_eq!(df.len(), 4);
-        assert_eq!(df[&then].len(), 1);
-        assert_eq!(df[&then_then].len(), 1);
-        assert_eq!(df[&then_alt].len(), 1);
-        assert_eq!(df[&alt].len(), 1);
-
-        // Check if df contents are correct
-        assert!(df[&then].contains(&end));
-        assert!(df[&then_then].contains(&end));
-        assert!(df[&then_alt].contains(&end));
-        assert!(df[&alt].contains(&end));
-    }
 
     #[test]
     fn test_phi_insert_positions_single() {
