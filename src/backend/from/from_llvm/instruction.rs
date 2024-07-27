@@ -26,6 +26,15 @@ impl IRBuilder {
             llvm_ir::Instruction::Mul(mul) => {
                 llvm2tac_three_op_usual!(MulInst, mul, reg_gener, regs)
             }
+            llvm_ir::Instruction::FAdd(fadd) => {
+                dbg!(fadd);
+                unimplemented!();
+            }
+            llvm_ir::Instruction::FSub(_) => todo!(),
+            llvm_ir::Instruction::FMul(_) => todo!(),
+            llvm_ir::Instruction::FDiv(_) => todo!(),
+            llvm_ir::Instruction::FRem(_) => todo!(),
+            llvm_ir::Instruction::FNeg(_) => todo!(),
             llvm_ir::Instruction::And(and) => {
                 llvm2tac_three_op_usual!(AndInst, and, reg_gener, regs)
             }
@@ -51,12 +60,6 @@ impl IRBuilder {
             llvm_ir::Instruction::UDiv(_) => todo!(),
             llvm_ir::Instruction::SDiv(_) => todo!(),
             llvm_ir::Instruction::URem(_) => todo!(),
-            llvm_ir::Instruction::FAdd(_) => todo!(),
-            llvm_ir::Instruction::FSub(_) => todo!(),
-            llvm_ir::Instruction::FMul(_) => todo!(),
-            llvm_ir::Instruction::FDiv(_) => todo!(),
-            llvm_ir::Instruction::FRem(_) => todo!(),
-            llvm_ir::Instruction::FNeg(_) => todo!(),
             llvm_ir::Instruction::ExtractElement(_) => todo!(),
             llvm_ir::Instruction::InsertElement(_) => todo!(),
             llvm_ir::Instruction::ShuffleVector(_) => todo!(),
