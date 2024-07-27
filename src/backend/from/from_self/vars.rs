@@ -1,3 +1,4 @@
+use super::builder::IRBuilder;
 use irs::var::ArrVar;
 use middle::ir::Constant;
 
