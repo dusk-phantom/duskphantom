@@ -37,7 +37,7 @@ pub fn compile(
     if let Some(ll_path) = ll_path {
         std::fs::write(ll_path, program.module.gen_llvm_ir()).with_context(|| context!())?;
     }
-    let mut program = backend::gen_from_self(&program)?;
+    let mut program = backend::from_self::gen_from_self(&program)?;
 
     if opt_flag {
         backend::optimize(&mut program);
@@ -71,7 +71,7 @@ pub fn compile_clang(
         std::fs::write(ll_path, program.gen_ll().with_context(|| context!())?)
             .map_err(CompilerError::IOError)?;
     }
-    let mut program = backend::gen_from_clang(&program)
+    let mut program = backend::from_llvm::gen_from_clang(&program)
         .map_err(|e| BackendError::GenFromLlvmError(format!("{e:?}")))?;
     if opt_flag {
         backend::optimize(&mut program);

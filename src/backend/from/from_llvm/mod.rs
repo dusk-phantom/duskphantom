@@ -1,7 +1,9 @@
 mod builder;
+#[allow(hidden_glob_reexports)]
 mod instruction;
 #[macro_use]
 mod macros;
+#[allow(hidden_glob_reexports)]
 mod operand;
 mod vars;
 
