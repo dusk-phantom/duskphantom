@@ -101,10 +101,10 @@ impl InstChecker for Riscv {
             Inst::Seqz(seqz) => self.check_seqz(seqz),
             Inst::Neg(_) => true,
             Inst::Mv(_) => true,
-            Inst::Ld(_) => true,
-            Inst::Sd(_) => true,
-            Inst::Sw(_) => true,
-            Inst::Lw(_) => true,
+            Inst::Ld(ld) => self.check_ld(ld),
+            Inst::Sd(sd) => self.check_sd(sd),
+            Inst::Sw(sw) => self.check_sw(sw),
+            Inst::Lw(lw) => self.check_lw(lw),
             Inst::Lla(_) => true,
             // special inst to temporary express the load and store operation ,should not to keep in the final ir
             Inst::Load(_) => false,
@@ -131,7 +131,8 @@ impl Riscv {
     fn check_add(&self, add: &AddInst) -> bool {
         matches!(add.dst(), Operand::Reg(_))
             && matches!(add.lhs(), Operand::Reg(_))
-            && matches!(add.rhs(), Operand::Reg(_))
+            && (matches!(add.rhs(), Operand::Reg(_))
+                || Self::check_imm_op_in_i_type_inst(add.rhs()))
     }
 
     fn check_snez(&self, snez: &SnezInst) -> bool {
@@ -185,12 +186,35 @@ impl Riscv {
     fn check_mul(&self, mul: &MulInst) -> bool {
         matches!(mul.dst(), Operand::Reg(_))
             && matches!(mul.lhs(), Operand::Reg(_))
-            && matches!(mul.rhs(), Operand::Reg(_))
+            && (matches!(mul.rhs(), Operand::Reg(_))
+                || Self::check_imm_op_in_i_type_inst(mul.rhs()))
     }
 
     fn check_sub(&self, sub: &SubInst) -> bool {
         matches!(sub.dst(), Operand::Reg(_))
             && matches!(sub.lhs(), Operand::Reg(_))
             && matches!(sub.rhs(), Operand::Reg(_))
+    }
+    fn check_ld(&self, ld: &LdInst) -> bool {
+        Self::check_imm_in_i_type_inst(ld.offset())
+    }
+    fn check_sd(&self, sd: &SdInst) -> bool {
+        Self::check_imm_in_i_type_inst(sd.offset())
+    }
+    fn check_lw(&self, lw: &LwInst) -> bool {
+        Self::check_imm_in_i_type_inst(lw.offset())
+    }
+    fn check_sw(&self, sw: &SwInst) -> bool {
+        Self::check_imm_in_i_type_inst(sw.offset())
+    }
+    fn check_imm_in_i_type_inst(imm: &Imm) -> bool {
+        imm.in_limit(12)
+    }
+    fn check_imm_op_in_i_type_inst(op: &Operand) -> bool {
+        if let Operand::Imm(imm) = op {
+            imm.in_limit(12)
+        } else {
+            false
+        }
     }
 }
