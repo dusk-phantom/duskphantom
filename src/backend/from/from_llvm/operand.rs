@@ -5,6 +5,7 @@ use super::*;
 use builder::IRBuilder;
 
 use llvm_ir::{Constant, Name};
+use var::FloatVar;
 
 impl TryFrom<&llvm_ir::constant::Float> for Fmm {
     type Error = anyhow::Error;
@@ -163,7 +164,7 @@ impl IRBuilder {
 
     #[inline]
     #[allow(unused)]
-    pub fn address_from(
+    pub fn prepare_address(
         operand: &llvm_ir::Operand,
         reg_gener: &mut RegGenerator,
         stack_slots: &HashMap<Name, StackSlot>,
@@ -276,6 +277,38 @@ impl IRBuilder {
         Ok((addr, pre_insert))
     }
 
+    pub fn fmm_from<'a>(
+        constant: &llvm_ir::constant::Constant,
+        fmms: &'a mut HashMap<Fmm, FloatVar>,
+    ) -> Result<&'a FloatVar> {
+        match constant {
+            Constant::Float(f) => match f {
+                llvm_ir::constant::Float::Single(f) => {
+                    let fmm: Fmm = f.into();
+                    let new_f_var = || -> FloatVar {
+                        let name = format!("_fc_{:X}", fmm.to_bits());
+                        FloatVar {
+                            name: name.clone(),
+                            init: Some(*f),
+                            is_const: true,
+                        }
+                    };
+                    fmms.entry(fmm.clone()).or_insert_with(new_f_var);
+                    fmms.get(&fmm)
+                        .ok_or(anyhow!(""))
+                        .with_context(|| context!())
+                }
+                llvm_ir::constant::Float::Double(_) => {
+                    unimplemented!("double float");
+                }
+                _ => {
+                    unreachable!();
+                }
+            },
+            _ => todo!(),
+        }
+    }
+
     #[inline]
     pub fn dimensions_from_array(arr_ty: &llvm_ir::Type) -> Result<Vec<usize>> {
         match arr_ty {
@@ -293,6 +326,7 @@ impl IRBuilder {
             _ => unimplemented!(),
         }
     }
+
     #[inline]
     pub fn indices_from_gep(gep: &llvm_ir::constant::GetElementPtr) -> Result<Vec<usize>> {
         let mut indices = Vec::new();

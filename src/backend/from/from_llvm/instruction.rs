@@ -13,6 +13,7 @@ impl IRBuilder {
         stack_slots: &mut HashMap<Name, StackSlot>,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
+        #[allow(unused)] fmms: &mut HashMap<Fmm, FloatVar>,
         insert_back_for_remove_phi: &mut HashMap<String, Vec<(llvm_ir::operand::Operand, Reg)>>,
     ) -> Result<Vec<Inst>> {
         // dbg!(&inst);
@@ -348,7 +349,7 @@ impl IRBuilder {
     ) -> Result<Vec<Inst>> {
         let mut ret: Vec<Inst> = Vec::new();
 
-        let (address, pre_insert) = Self::address_from(&store.address, reg_gener, stack_slots)?;
+        let (address, pre_insert) = Self::prepare_address(&store.address, reg_gener, stack_slots)?;
         ret.extend(pre_insert);
 
         let (value, pre_insts) = Self::prepare_lhs(&store.value, reg_gener, regs)?;
@@ -401,7 +402,7 @@ impl IRBuilder {
         let dst_size = Self::mem_size_from(&load.loaded_ty)?;
         regs.insert(load.dest.clone(), dst_reg);
 
-        let (address, pre_insert) = Self::address_from(&load.address, reg_gener, stack_slots)?;
+        let (address, pre_insert) = Self::prepare_address(&load.address, reg_gener, stack_slots)?;
         ret.extend(pre_insert);
 
         match address {
@@ -444,6 +445,7 @@ impl IRBuilder {
         let ret_v = ((imm as i64) % 256 + 256) % 256;
         ret_v.into()
     }
+
     pub fn build_term_inst(
         term: &llvm_ir::Terminator,
         reg_gener: &mut RegGenerator,
@@ -475,21 +477,7 @@ impl IRBuilder {
                                 ret_insts.push(addi.into());
                             }
                             Constant::Float(f) => {
-                                let fmm: Fmm = f.try_into()?;
-                                let n = if let Some(f_var) = fmms.get(&fmm) {
-                                    f_var.name.clone()
-                                } else {
-                                    let name = format!("_fc_{:X}", fmm.to_bits());
-                                    fmms.insert(
-                                        fmm.clone(),
-                                        FloatVar {
-                                            name: name.clone(),
-                                            init: Some(fmm.try_into()?),
-                                            is_const: true,
-                                        },
-                                    );
-                                    name
-                                };
+                                let n = Self::fmm_from(c, fmms)?.name.clone();
                                 let addr = reg_gener.gen_virtual_usual_reg();
                                 let la = LlaInst::new(addr, n.into());
                                 ret_insts.push(la.into());

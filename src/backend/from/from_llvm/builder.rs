@@ -299,6 +299,7 @@ impl IRBuilder {
                 stack_slots,
                 reg_gener,
                 regs,
+                fmms,
                 insert_back_for_remove_phi,
             )
             .with_context(|| context!())?;
@@ -355,6 +356,7 @@ impl IRBuilder {
                 stack_slots,
                 reg_gener,
                 regs,
+                fmms,
                 insert_back_for_remove_phi,
             )
             .with_context(|| context!())?;
