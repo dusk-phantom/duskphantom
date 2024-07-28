@@ -82,6 +82,13 @@ pub struct Fmm(f64);
 impl TryInto<f32> for Fmm {
     type Error = BackendError;
     fn try_into(self) -> Result<f32, Self::Error> {
+        (&self).try_into()
+    }
+}
+
+impl TryInto<f32> for &Fmm {
+    type Error = BackendError;
+    fn try_into(self) -> Result<f32, Self::Error> {
         if f64::is_nan(self.0) {
             Ok(f32::NAN)
         } else if self.0 < f32::MAX as f64 && self.0 > f32::MIN as f64 {

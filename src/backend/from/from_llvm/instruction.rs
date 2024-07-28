@@ -13,23 +13,36 @@ impl IRBuilder {
         stack_slots: &mut HashMap<Name, StackSlot>,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
-        #[allow(unused)] fmms: &mut HashMap<Fmm, FloatVar>,
+        fmms: &mut HashMap<Fmm, FloatVar>,
         insert_back_for_remove_phi: &mut HashMap<String, Vec<(llvm_ir::operand::Operand, Reg)>>,
     ) -> Result<Vec<Inst>> {
         // dbg!(&inst);
         match inst {
             llvm_ir::Instruction::Add(add) => {
-                llvm2tac_three_op_usual!(AddInst, add, reg_gener, regs)
+                llvm2tac_three_op_usual!(AllowSwap; AddInst, add, reg_gener, regs)
             }
             llvm_ir::Instruction::Sub(sub) => {
-                llvm2tac_three_op_usual!(SubInst, sub, reg_gener, regs)
+                llvm2tac_three_op_usual!(DenySwap; SubInst, sub, reg_gener, regs)
             }
             llvm_ir::Instruction::Mul(mul) => {
-                llvm2tac_three_op_usual!(MulInst, mul, reg_gener, regs)
+                llvm2tac_three_op_usual!(AllowSwap; MulInst, mul, reg_gener, regs)
             }
             llvm_ir::Instruction::FAdd(fadd) => {
-                dbg!(fadd);
-                unimplemented!();
+                let mut build_fadd = |inst: &llvm_ir::instruction::FAdd| -> Result<Vec<Inst>> {
+                    let mut ret: Vec<Inst> = Vec::new();
+                    let dst = reg_gener.gen_virtual_float_reg();
+                    regs.insert(inst.dest.clone(), dst);
+                    let (lhs, pre_insert) = Self::prepare_lhs(&inst.operand0, reg_gener, regs)?;
+                    ret.extend(pre_insert);
+                    let (rhs, pre_insert) =
+                        Self::prepare_float_rhs(&inst.operand1, reg_gener, regs, fmms)?;
+                    ret.extend(pre_insert);
+                    let fadd = AddInst::new(dst.into(), lhs, rhs);
+                    ret.push(fadd.into());
+                    // unimplemented!();
+                    Ok(ret)
+                };
+                build_fadd(fadd)
             }
             llvm_ir::Instruction::FSub(_) => todo!(),
             llvm_ir::Instruction::FMul(_) => todo!(),
@@ -37,26 +50,28 @@ impl IRBuilder {
             llvm_ir::Instruction::FRem(_) => todo!(),
             llvm_ir::Instruction::FNeg(_) => todo!(),
             llvm_ir::Instruction::And(and) => {
-                llvm2tac_three_op_usual!(AndInst, and, reg_gener, regs)
+                llvm2tac_three_op_usual!(AllowSwap;AndInst, and, reg_gener, regs)
             }
-            llvm_ir::Instruction::Or(or) => llvm2tac_three_op_usual!(OrInst, or, reg_gener, regs),
+            llvm_ir::Instruction::Or(or) => {
+                llvm2tac_three_op_usual!(AllowSwap;OrInst, or, reg_gener, regs)
+            }
             llvm_ir::Instruction::Xor(xor) => {
-                llvm2tac_three_op_usual!(XorInst, xor, reg_gener, regs)
+                llvm2tac_three_op_usual!(AllowSwap;XorInst, xor, reg_gener, regs)
             }
             llvm_ir::Instruction::SRem(srem) => {
-                llvm2tac_three_op_usual!(RemInst, srem, reg_gener, regs)
+                llvm2tac_three_op_usual!(DenySwap;RemInst, srem, reg_gener, regs)
             }
             // process logical shift right
             llvm_ir::Instruction::LShr(lshr) => {
-                llvm2tac_three_op_usual!(SrlInst, lshr, reg_gener, regs)
+                llvm2tac_three_op_usual!(DenySwap;SrlInst, lshr, reg_gener, regs)
             }
             // process logical shift left
             llvm_ir::Instruction::Shl(shl) => {
-                llvm2tac_three_op_usual!(SllInst, shl, reg_gener, regs)
+                llvm2tac_three_op_usual!(DenySwap;SllInst, shl, reg_gener, regs)
             }
             // process arithmetic shift right
             llvm_ir::Instruction::AShr(ashr) => {
-                llvm2tac_three_op_usual!(SraInst, ashr, reg_gener, regs)
+                llvm2tac_three_op_usual!(DenySwap;SraInst, ashr, reg_gener, regs)
             }
             llvm_ir::Instruction::UDiv(_) => todo!(),
             llvm_ir::Instruction::SDiv(_) => todo!(),
@@ -84,7 +99,7 @@ impl IRBuilder {
             llvm_ir::Instruction::ZExt(zext) => Self::build_zext_inst(zext, reg_gener, regs),
             llvm_ir::Instruction::SExt(sext) => Self::build_sext_inst(sext, reg_gener, regs),
             llvm_ir::Instruction::FPTrunc(_) => todo!(),
-            llvm_ir::Instruction::FPExt(_) => todo!(),
+            llvm_ir::Instruction::FPExt(fpext) => Self::build_fpext(fpext, regs),
             llvm_ir::Instruction::FPToUI(_) => todo!(),
             llvm_ir::Instruction::FPToSI(_) => todo!(),
             llvm_ir::Instruction::UIToFP(_) => todo!(),
@@ -98,7 +113,7 @@ impl IRBuilder {
                 Self::build_phi_inst(phi, reg_gener, regs, insert_back_for_remove_phi)
             }
             llvm_ir::Instruction::Select(select) => {
-                Self::build_select_inst(select, reg_gener, regs)
+                Self::build_select_inst(select, reg_gener, regs, fmms)
             }
             llvm_ir::Instruction::Freeze(_) => todo!(),
             llvm_ir::Instruction::Call(call) => {
@@ -109,6 +124,18 @@ impl IRBuilder {
             llvm_ir::Instruction::CatchPad(_) => todo!(),
             llvm_ir::Instruction::CleanupPad(_) => todo!(),
         }
+    }
+
+    fn build_fpext(
+        fpext: &llvm_ir::instruction::FPExt,
+        regs: &mut HashMap<Name, Reg>,
+    ) -> Result<Vec<Inst>> {
+        let src = Self::local_var_from(&fpext.operand, regs)?;
+        regs.insert(
+            fpext.dest.clone(),
+            src.try_into().with_context(|| context!())?,
+        );
+        Ok(vec![])
     }
 
     fn build_phi_inst(
@@ -136,6 +163,7 @@ impl IRBuilder {
         select: &llvm_ir::instruction::Select,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
+        fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<Vec<Inst>> {
         fn build_and_op(
             cond: &llvm_ir::operand::Operand,
@@ -161,9 +189,10 @@ impl IRBuilder {
         let not = NotInst::new(and_op1.clone(), and_op0.clone());
         ret.push(not.into());
 
-        let (true_value, pre_insts) = Self::prepare_rhs(&select.true_value, reg_gener, regs)?;
+        let (true_value, pre_insts) = Self::prepare_rhs(&select.true_value, reg_gener, regs, fmms)?;
         ret.extend(pre_insts);
-        let (false_value, pre_insts) = Self::prepare_rhs(&select.false_value, reg_gener, regs)?;
+        let (false_value, pre_insts) =
+            Self::prepare_rhs(&select.false_value, reg_gener, regs, fmms)?;
         ret.extend(pre_insts);
 
         let and_op0_true = reg_gener.gen_virtual_usual_reg();
@@ -229,7 +258,7 @@ impl IRBuilder {
         ) -> Result<(Operand, Operand)> {
             let (op0, prepare) = IRBuilder::prepare_lhs(&icmp.operand0, reg_gener, regs)?;
             insts.extend(prepare);
-            let (op1, prepare) = IRBuilder::prepare_rhs(&icmp.operand1, reg_gener, regs)?;
+            let (op1, prepare) = IRBuilder::prepare_usual_rhs(&icmp.operand1, reg_gener, regs)?;
             insts.extend(prepare);
             Ok((op0, op1))
         }
@@ -241,7 +270,7 @@ impl IRBuilder {
         ) -> Result<(Operand, Operand)> {
             let (op1, prepare) = IRBuilder::prepare_lhs(&icmp.operand1, reg_gener, regs)?;
             insts.extend(prepare);
-            let (op0, prepare) = IRBuilder::prepare_rhs(&icmp.operand0, reg_gener, regs)?;
+            let (op0, prepare) = IRBuilder::prepare_usual_rhs(&icmp.operand0, reg_gener, regs)?;
             insts.extend(prepare);
             Ok((op0, op1))
         }
@@ -477,7 +506,7 @@ impl IRBuilder {
                                 ret_insts.push(addi.into());
                             }
                             Constant::Float(f) => {
-                                let n = Self::fmm_from(c, fmms)?.name.clone();
+                                let n = Self::fmm_from_constant(c, fmms)?.name.clone();
                                 let addr = reg_gener.gen_virtual_usual_reg();
                                 let la = LlaInst::new(addr, n.into());
                                 ret_insts.push(la.into());
