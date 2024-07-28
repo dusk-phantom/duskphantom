@@ -241,3 +241,15 @@ impl RegReplace for LlaInst {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_gem_asm_mv() {
+        let mv = MvInst::new(REG_A0.into(), REG_A1.into());
+        assert_eq!(mv.gen_asm(), "mv a0,a1");
+        let mv = MvInst::new(REG_FA0.into(), REG_FA1.into());
+        assert_eq!(mv.gen_asm(), "fmv.s fa0,fa1");
+    }
+}
