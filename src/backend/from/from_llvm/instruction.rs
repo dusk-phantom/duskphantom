@@ -21,9 +21,7 @@ impl IRBuilder {
             llvm_ir::Instruction::Add(add) => {
                 llvm2tac_three_op_usual!(AllowSwap; AddInst, add, reg_gener, regs)
             }
-            llvm_ir::Instruction::Sub(sub) => {
-                llvm2tac_three_op_usual!(DenySwap; SubInst, sub, reg_gener, regs)
-            }
+            llvm_ir::Instruction::Sub(sub) => Self::build_sub(sub, reg_gener, regs),
             llvm_ir::Instruction::Mul(mul) => {
                 llvm2tac_three_op_usual!(AllowSwap; MulInst, mul, reg_gener, regs)
             }
@@ -134,6 +132,41 @@ impl IRBuilder {
             src.try_into().with_context(|| context!())?,
         );
         Ok(vec![])
+    }
+
+    /// 翻译llvm ir的sub为riscv的sub 指令需要特别处理,因为 riscv的 sub指令不接受rhs为立即数
+    fn build_sub(
+        sub: &llvm_ir::instruction::Sub,
+        reg_gener: &mut RegGenerator,
+        regs: &mut HashMap<Name, Reg>,
+    ) -> Result<Vec<Inst>> {
+        let mut ret: Vec<Inst> = Vec::new();
+        let (lhs, pre_insert) = Self::prepare_lhs(&sub.operand0, reg_gener, regs)?;
+        ret.extend(pre_insert);
+        let dst = reg_gener.gen_virtual_usual_reg();
+        regs.insert(sub.dest.clone(), dst);
+
+        let rhs = Self::value_from(&sub.operand1, regs)?;
+        if let Operand::Imm(imm) = rhs {
+            let neg_imm = -imm;
+            if neg_imm.in_limit(12) {
+                let add = AddInst::new(dst.into(), lhs, neg_imm.into());
+                ret.push(add.into());
+            } else {
+                let mid_var = reg_gener.gen_virtual_usual_reg();
+                let li = LiInst::new(mid_var.into(), neg_imm.into());
+                let add = AddInst::new(dst.into(), lhs, mid_var.into());
+                ret.push(li.into());
+                ret.push(add.into());
+            }
+        } else if let Operand::Reg(rhs) = rhs {
+            let sub = SubInst::new(dst.into(), lhs, rhs.into());
+            ret.push(sub.into());
+        } else {
+            return Err(anyhow!("operand type not supported")).with_context(|| context!());
+        }
+
+        Ok(ret)
     }
 
     fn build_phi_inst(
