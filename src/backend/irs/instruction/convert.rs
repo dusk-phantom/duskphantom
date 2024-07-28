@@ -1,7 +1,7 @@
 use super::*;
 
-impl_two_op_inst!(I2fInst, "fcvt.s.w");
-impl_two_op_inst!(F2iInst, "fcvt.w.s", "rtz");
+impl_conversion_inst!(I2fInst, "fcvt.s.w");
+impl_conversion_inst!(F2iInst, "fcvt.w.s", "rtz");
 
 #[cfg(test)]
 mod tests {

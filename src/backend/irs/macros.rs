@@ -198,6 +198,81 @@ macro_rules! impl_two_op_inst {
             pub fn gen_asm(&self) -> String {
                 let dst = self.dst().gen_asm();
                 let src = self.src().gen_asm();
+                if let Operand::Reg(r) = self.dst() {
+                    if r.is_usual() {
+                        format!("{} {},{}", $inst_name, dst, src)
+                    } else {
+                        format!("f{}.s {},{}", $inst_name, dst, src)
+                    }
+                } else {
+                    unreachable!()
+                }
+            }
+        }
+        impl RegDefs for $ty_name {
+            fn defs(&self) -> Vec<&Reg> {
+                if let Operand::Reg(reg) = self.dst() {
+                    vec![reg]
+                } else {
+                    vec![]
+                }
+            }
+        }
+        impl RegUses for $ty_name {
+            fn uses(&self) -> Vec<&Reg> {
+                if let Operand::Reg(reg) = self.src() {
+                    vec![reg]
+                } else {
+                    vec![]
+                }
+            }
+        }
+        impl RegReplace for $ty_name {
+            fn replace_use(&mut self, from: Reg, to: Reg) -> Result<()> {
+                if let Operand::Reg(reg) = self.src_mut() {
+                    if *reg == from {
+                        *reg = to;
+                    }
+                }
+                Ok(())
+            }
+            fn replace_def(&mut self, from: Reg, to: Reg) -> Result<()> {
+                if let Operand::Reg(reg) = self.dst_mut() {
+                    if *reg == from {
+                        *reg = to;
+                    }
+                }
+                Ok(())
+            }
+        }
+    };
+}
+
+#[macro_export]
+/// create a new instruction type with two operands for conversion inst like fcvt.s.w and fcvt.w.s
+macro_rules! impl_conversion_inst {
+    ($ty_name:ident,$inst_name:expr) => {
+        #[derive(Clone, Debug)]
+        pub struct $ty_name(Operand, Operand);
+        impl $ty_name {
+            pub fn new(dst: Operand, src: Operand) -> Self {
+                Self(dst, src)
+            }
+            pub fn dst(&self) -> &Operand {
+                &self.0
+            }
+            pub fn src(&self) -> &Operand {
+                &self.1
+            }
+            pub fn dst_mut(&mut self) -> &mut Operand {
+                &mut self.0
+            }
+            pub fn src_mut(&mut self) -> &mut Operand {
+                &mut self.1
+            }
+            pub fn gen_asm(&self) -> String {
+                let dst = self.dst().gen_asm();
+                let src = self.src().gen_asm();
                 format!("{} {},{}", $inst_name, dst, src)
             }
         }
@@ -387,6 +462,7 @@ macro_rules! impl_unary_inst {
 }
 
 #[macro_export]
+/// Implement the conversion between the instruction type and the enum variant.
 macro_rules! impl_inst_convert {
     ($inst_type:ident,$enumerator:ident) => {
         impl From<$inst_type> for Inst {
