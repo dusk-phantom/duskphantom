@@ -308,7 +308,7 @@ impl IRBuilder {
 
         insts.extend(Self::build_term_inst(&bb.term, reg_gener, regs, fmms)?);
 
-        let mut entry = Block::new("entry".to_string());
+        let mut entry = Block::new(Self::label_name_from(&bb.name).with_context(|| context!())?);
         entry.extend_insts(insts);
         let caller_regs_stack = usize::try_from(caller_regs_stack)?; // 这是将 i64 转换为 usize
         Ok((entry, caller_regs_stack))
