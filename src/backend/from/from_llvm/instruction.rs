@@ -1,4 +1,4 @@
-use crate::llvm2tac_three_op_usual;
+use crate::{llvm2tac_binary_float, llvm2tac_three_op_float, llvm2tac_three_op_usual};
 
 use super::*;
 use builder::IRBuilder;
@@ -28,26 +28,20 @@ impl IRBuilder {
                 llvm2tac_three_op_usual!(AllowSwap; MulInst, mul, reg_gener, regs)
             }
             llvm_ir::Instruction::FAdd(fadd) => {
-                let mut build_fadd = |inst: &llvm_ir::instruction::FAdd| -> Result<Vec<Inst>> {
-                    let mut ret: Vec<Inst> = Vec::new();
-                    let dst = reg_gener.gen_virtual_float_reg();
-                    regs.insert(inst.dest.clone(), dst);
-                    let (lhs, pre_insert) = Self::prepare_lhs(&inst.operand0, reg_gener, regs)?;
-                    ret.extend(pre_insert);
-                    let (rhs, pre_insert) =
-                        Self::prepare_float_rhs(&inst.operand1, reg_gener, regs, fmms)?;
-                    ret.extend(pre_insert);
-                    let fadd = AddInst::new(dst.into(), lhs, rhs);
-                    ret.push(fadd.into());
-                    // unimplemented!();
-                    Ok(ret)
-                };
-                build_fadd(fadd)
+                llvm2tac_three_op_float!(AddInst, fadd, reg_gener, regs, fmms)
             }
-            llvm_ir::Instruction::FSub(_) => todo!(),
-            llvm_ir::Instruction::FMul(_) => todo!(),
-            llvm_ir::Instruction::FDiv(_) => todo!(),
-            llvm_ir::Instruction::FRem(_) => todo!(),
+            llvm_ir::Instruction::FSub(fsub) => {
+                llvm2tac_three_op_float!(SubInst, fsub, reg_gener, regs, fmms)
+            }
+            llvm_ir::Instruction::FMul(fmul) => {
+                llvm2tac_three_op_float!(MulInst, fmul, reg_gener, regs, fmms)
+            }
+            llvm_ir::Instruction::FDiv(fdiv) => {
+                llvm2tac_three_op_float!(DivInst, fdiv, reg_gener, regs, fmms)
+            }
+            llvm_ir::Instruction::FRem(frem) => {
+                llvm2tac_three_op_float!(RemInst, frem, reg_gener, regs, fmms)
+            }
             llvm_ir::Instruction::FNeg(_) => todo!(),
             llvm_ir::Instruction::And(and) => {
                 llvm2tac_three_op_usual!(AllowSwap;AndInst, and, reg_gener, regs)
@@ -98,7 +92,9 @@ impl IRBuilder {
             llvm_ir::Instruction::Trunc(_) => todo!(),
             llvm_ir::Instruction::ZExt(zext) => Self::build_zext_inst(zext, reg_gener, regs),
             llvm_ir::Instruction::SExt(sext) => Self::build_sext_inst(sext, reg_gener, regs),
-            llvm_ir::Instruction::FPTrunc(_) => todo!(),
+            llvm_ir::Instruction::FPTrunc(fptrunc) => {
+                llvm2tac_binary_float!(MvInst, fptrunc, reg_gener, regs, fmms)
+            }
             llvm_ir::Instruction::FPExt(fpext) => Self::build_fpext(fpext, regs),
             llvm_ir::Instruction::FPToUI(_) => todo!(),
             llvm_ir::Instruction::FPToSI(_) => todo!(),
