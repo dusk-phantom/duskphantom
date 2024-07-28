@@ -22,12 +22,15 @@ impl IRBuilder {
     pub fn is_ty_int(ty: &llvm_ir::Type) -> bool {
         matches!(ty, llvm_ir::Type::IntegerType { bits: _ })
     }
+
     pub fn is_ty_float(ty: &llvm_ir::Type) -> bool {
         matches!(ty, llvm_ir::Type::FPType(_))
     }
+
     pub fn is_ty_void(ty: &llvm_ir::Type) -> bool {
         matches!(ty, llvm_ir::Type::VoidType)
     }
+
     pub fn new_var(ty: &llvm_ir::Type, reg_gener: &mut RegGenerator) -> Result<Reg> {
         let dst_reg = if Self::is_ty_int(ty) {
             reg_gener.gen_virtual_usual_reg()
@@ -55,6 +58,7 @@ impl IRBuilder {
             }
         })
     }
+
     pub fn local_var_from(
         operand: &llvm_ir::Operand,
         regs: &HashMap<Name, Reg>,
@@ -73,6 +77,7 @@ impl IRBuilder {
             }
         })
     }
+
     pub fn label_name_from(name: &llvm_ir::Name) -> Result<String> {
         let name = name.to_string();
         let name = &name
@@ -87,9 +92,7 @@ impl IRBuilder {
                 Constant::Int { bits: _bits, value } => Operand::Imm((*value as i64).into()),
                 Constant::Float(f) => match f {
                     llvm_ir::constant::Float::Single(f) => Operand::Fmm((*f as f64).into()),
-                    llvm_ir::constant::Float::Double(_) => {
-                        unimplemented!("double float");
-                    }
+                    llvm_ir::constant::Float::Double(d) => Operand::Fmm(d.into()),
                     _ => {
                         unreachable!();
                     }
@@ -103,6 +106,9 @@ impl IRBuilder {
         })
     }
 
+    /// if operand is Imm imm ,return Operand::Imm(imm)
+    /// if operand is Reg reg ,return Operand::Reg(reg)
+    /// if operand is Fmm fmm ,return Operand::Fmm(fmm)
     pub fn value_from(operand: &llvm_ir::Operand, regs: &HashMap<Name, Reg>) -> Result<Operand> {
         if let Ok(c) = Self::const_from(operand) {
             Ok(c)
@@ -139,7 +145,43 @@ impl IRBuilder {
     /// 如果value是个寄存器,直接返回,
     /// 如果是个常数,如果超出范围,则需要用一个寄存器来存储,并且需要生成一条指令
     /// 如果是不超出范围的常数,则直接返回
+    /// this function is used to prepare the rhs of a usual or float operand
     pub fn prepare_rhs(
+        value: &llvm_ir::operand::Operand,
+        reg_gener: &mut RegGenerator,
+        regs: &HashMap<Name, Reg>,
+        fmms: &mut HashMap<Fmm, FloatVar>,
+    ) -> Result<(Operand, Vec<Inst>)> {
+        let mut insts: Vec<Inst> = Vec::new();
+        let value = IRBuilder::value_from(value, regs)?;
+        match &value {
+            Operand::Imm(imm) => {
+                if imm.in_limit(12) {
+                    Ok((value, insts))
+                } else {
+                    let dst = reg_gener.gen_virtual_usual_reg();
+                    let li = LiInst::new(dst.into(), imm.into());
+                    insts.push(li.into());
+                    Ok((dst.into(), insts))
+                }
+            }
+            Operand::Reg(_) => Ok((value, insts)),
+            Operand::Fmm(fmm) => {
+                let f_var = Self::fmm_from(fmm, fmms)?;
+                let addr = reg_gener.gen_virtual_usual_reg();
+                let lla = LlaInst::new(addr, f_var.name.clone().into());
+                insts.push(lla.into());
+                let fmm = reg_gener.gen_virtual_float_reg();
+                let lf = LwInst::new(fmm, 0.into(), addr);
+                insts.push(lf.into());
+                Ok((fmm.into(), insts))
+            }
+            _ => unimplemented!(),
+        }
+    }
+
+    /// this function is used to prepare the rhs of a usual operand
+    pub fn prepare_usual_rhs(
         value: &llvm_ir::operand::Operand,
         reg_gener: &mut RegGenerator,
         regs: &HashMap<Name, Reg>,
@@ -158,6 +200,31 @@ impl IRBuilder {
                 }
             }
             Operand::Reg(_) => Ok((value, insts)),
+            _ => unimplemented!(),
+        }
+    }
+
+    /// this function is used to prepare the rhs of a float operand
+    pub fn prepare_float_rhs(
+        value: &llvm_ir::operand::Operand,
+        reg_gener: &mut RegGenerator,
+        regs: &HashMap<Name, Reg>,
+        fmms: &mut HashMap<Fmm, FloatVar>,
+    ) -> Result<(Operand, Vec<Inst>)> {
+        let mut insts: Vec<Inst> = Vec::new();
+        let value = IRBuilder::value_from(value, regs)?;
+        match &value {
+            Operand::Reg(_) => Ok((value, insts)),
+            Operand::Fmm(fmm) => {
+                let f_var = Self::fmm_from(fmm, fmms)?;
+                let addr = reg_gener.gen_virtual_usual_reg();
+                let lla = LlaInst::new(addr, f_var.name.clone().into());
+                insts.push(lla.into());
+                let fmm = reg_gener.gen_virtual_float_reg();
+                let lf = LwInst::new(fmm, 0.into(), addr);
+                insts.push(lf.into());
+                Ok((fmm.into(), insts))
+            }
             _ => unimplemented!(),
         }
     }
@@ -277,7 +344,8 @@ impl IRBuilder {
         Ok((addr, pre_insert))
     }
 
-    pub fn fmm_from<'a>(
+    #[inline]
+    pub fn fmm_from_constant<'a>(
         constant: &llvm_ir::constant::Constant,
         fmms: &'a mut HashMap<Fmm, FloatVar>,
     ) -> Result<&'a FloatVar> {
@@ -285,18 +353,7 @@ impl IRBuilder {
             Constant::Float(f) => match f {
                 llvm_ir::constant::Float::Single(f) => {
                     let fmm: Fmm = f.into();
-                    let new_f_var = || -> FloatVar {
-                        let name = format!("_fc_{:X}", fmm.to_bits());
-                        FloatVar {
-                            name: name.clone(),
-                            init: Some(*f),
-                            is_const: true,
-                        }
-                    };
-                    fmms.entry(fmm.clone()).or_insert_with(new_f_var);
-                    fmms.get(&fmm)
-                        .ok_or(anyhow!(""))
-                        .with_context(|| context!())
+                    Self::fmm_from(&fmm, fmms)
                 }
                 llvm_ir::constant::Float::Double(_) => {
                     unimplemented!("double float");
@@ -307,6 +364,21 @@ impl IRBuilder {
             },
             _ => todo!(),
         }
+    }
+
+    #[inline]
+    pub fn fmm_from<'a>(fmm: &Fmm, fmms: &'a mut HashMap<Fmm, FloatVar>) -> Result<&'a FloatVar> {
+        let init = fmm.try_into()?;
+        let new_f_var = || -> FloatVar {
+            let name = format!("_fc_{:X}", fmm.to_bits());
+            FloatVar {
+                name: name.clone(),
+                init: Some(init),
+                is_const: true,
+            }
+        };
+        fmms.entry(fmm.clone()).or_insert_with(new_f_var);
+        fmms.get(fmm).ok_or(anyhow!("")).with_context(|| context!())
     }
 
     #[inline]
