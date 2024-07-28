@@ -42,7 +42,9 @@ impl IRBuilder {
             llvm_ir::Instruction::FRem(frem) => {
                 llvm2tac_three_op_float!(RemInst, frem, reg_gener, regs, fmms)
             }
-            llvm_ir::Instruction::FNeg(_) => todo!(),
+            llvm_ir::Instruction::FNeg(fneg) => {
+                llvm2tac_binary_float!(NegInst, fneg, reg_gener, regs, fmms)
+            }
             llvm_ir::Instruction::And(and) => {
                 llvm2tac_three_op_usual!(AllowSwap;AndInst, and, reg_gener, regs)
             }
