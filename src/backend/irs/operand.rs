@@ -107,6 +107,13 @@ impl From<Imm> for i64 {
     }
 }
 
+impl std::ops::Neg for Imm {
+    type Output = Self;
+    fn neg(self) -> Self::Output {
+        Self(-self.0)
+    }
+}
+
 impl PartialEq for Fmm {
     fn eq(&self, other: &Self) -> bool {
         if f64::is_nan(self.0) && f64::is_nan(other.0) {
@@ -468,9 +475,20 @@ impl Reg {
     pub fn is_physical(&self) -> bool {
         (0..=31).contains(&self.id)
     }
+
     #[inline]
     pub fn is_virtual(&self) -> bool {
         !self.is_physical()
+    }
+
+    #[inline]
+    pub fn is_caller_save(&self) -> bool {
+        Self::caller_save_regs().contains(self)
+    }
+
+    #[inline]
+    pub fn is_callee_save(&self) -> bool {
+        Self::callee_save_regs().contains(self)
     }
 }
 impl Imm {
