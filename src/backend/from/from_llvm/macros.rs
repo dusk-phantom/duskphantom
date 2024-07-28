@@ -43,7 +43,32 @@ macro_rules! llvm2tac_three_op_usual {
 
 #[macro_export]
 macro_rules! llvm2tac_three_op_float {
-    () => {
-        unimplemented!()
-    };
+    ($tac_inst_ty:ident,$inst:ident,$reg_gener:ident,$regs:ident,$fmms:ident) => {{
+        let mut ret: Vec<Inst> = vec![];
+        let (lhs, pre_insert) = Self::prepare_lhs(&$inst.operand0, $reg_gener, $regs)?;
+        ret.extend(pre_insert);
+        let (rhs, pre_insert) = Self::prepare_float_rhs(&$inst.operand1, $reg_gener, $regs, $fmms)?;
+        ret.extend(pre_insert);
+        let dest = $inst.dest.clone();
+        let dst = $reg_gener.gen_virtual_reg(false);
+        $regs.insert(dest, dst);
+        let tac_inst = $tac_inst_ty::new(dst.into(), lhs, rhs);
+        ret.push(tac_inst.into());
+        Ok(ret)
+    }};
+}
+
+#[macro_export]
+macro_rules! llvm2tac_binary_float {
+    ($tac_inst_ty:ident,$inst:ident,$reg_gener:ident,$regs:ident,$fmms:ident) => {{
+        let mut ret: Vec<Inst> = vec![];
+        let (rhs, pre_insert) = Self::prepare_float_rhs(&$inst.operand, $reg_gener, $regs, $fmms)?;
+        ret.extend(pre_insert);
+        let dest = $inst.dest.clone();
+        let dst = $reg_gener.gen_virtual_reg(false);
+        $regs.insert(dest, dst);
+        let tac_inst = $tac_inst_ty::new(dst.into(), rhs);
+        ret.push(tac_inst.into());
+        Ok(ret)
+    }};
 }
