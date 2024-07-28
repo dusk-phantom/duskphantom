@@ -9,6 +9,8 @@ pub struct BasicBlock {
 
     pub name: String,
 
+    pub id: usize,
+
     /// The head instruction of the `BasicBlock`,
     /// which is used to unify the insertion operation and has no actual meaning.
     /// Logical structure of the `BasicBlock` is a two-way non-circular linked list,
@@ -37,6 +39,7 @@ impl BasicBlock {
         Self {
             ir_builder,
             name,
+            id: 0,
             head_inst,
             pred_bbs: Vec::new(),
             succ_bbs: Vec::new(),
@@ -48,11 +51,12 @@ impl BasicBlock {
     /// Inits `BasicBlock` after memory allocation.
     ///
     /// This is an ugly code that is a compromise in design. You should not call this function.
-    pub unsafe fn init_bb(mut bb: BBPtr) {
+    pub unsafe fn init_bb(mut bb: BBPtr, id: usize) {
         let mut head = bb.head_inst;
         bb.head_inst.set_prev(head);
         bb.head_inst.set_next(head);
         head.set_parent_bb(bb);
+        bb.id = id;
     }
 
     /// Returns `True` if the `BasicBlock` is empty.
