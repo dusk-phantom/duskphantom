@@ -51,6 +51,7 @@ hexf-parse = "0.2.1"
 insta = "1.39.0"
 bitvec = "1.0.1"
 
+
 [dev-dependencies]
 criterion = "0.3.0"
 
@@ -63,9 +64,11 @@ harness = false
 default = [
     "clang_enabled",   # 解除该行注释获取基于clang的前后端, 比赛提交的时候该行需要注释掉
     "gen_virtual_asm", # 解除该行注释获取生成虚拟汇编的功能
+    # "opt_address_computation", # 解除该行注释获取优化地址计算的功能, load store的时候会根据地址大小使用s0或者sp来相对寻址
 ]
 clang_enabled = ["llvm-ir"]
 gen_virtual_asm = []
+opt_address_computation = []
 
 [profile.release]
 lto = true

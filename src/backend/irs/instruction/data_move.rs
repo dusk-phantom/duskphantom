@@ -16,11 +16,18 @@ impl MemSize {
     }
 }
 
-fn new_addr(ss: &StackSlot, stack_size: u32) -> (Imm, Reg) {
-    if ss.start() > stack_size >> 1 {
+fn new_addr(ss: &StackSlot, #[allow(unused)] stack_size: u32) -> (Imm, Reg) {
+    #[cfg(feature = "opt_address_computation")]
+    {
+        if ss.start() > stack_size >> 1 {
+            (ss.start().into(), REG_SP)
+        } else {
+            (((ss.start() as i64) - (stack_size as i64)).into(), REG_S0)
+        }
+    }
+    #[cfg(not(feature = "opt_address_computation"))]
+    {
         (ss.start().into(), REG_SP)
-    } else {
-        (((ss.start() as i64) - (stack_size as i64)).into(), REG_S0)
     }
 }
 
