@@ -25,13 +25,10 @@ impl IRBuilder {
                         elements,
                     } => Self::build_array_var(name, &element_type, &elements)?,
                     Constant::Struct {
-                        name,
+                        name: _,
                         values,
-                        is_packed,
-                    } => {
-                        dbg!(name, values, is_packed);
-                        unimplemented!();
-                    }
+                        is_packed: _,
+                    } => Self::build_array_from_struct(name, &values)?,
                     _ => {
                         // dbg!(&global_var);
                         unimplemented!()
@@ -71,6 +68,66 @@ impl IRBuilder {
                 unreachable!();
             }
         }
+    }
+
+    pub fn build_array_from_struct(name: &str, values: &[ConstantRef]) -> Result<Var> {
+        let mut init: Vec<(usize, u32)> = Vec::new();
+        let mut capacity = 0;
+        for value in values.iter() {
+            match value.as_ref() {
+                Constant::Int { bits: _, value } => {
+                    init.push((capacity, *value as u32));
+                    capacity += 1;
+                }
+                Constant::Float(f) => {
+                    if let llvm_ir::constant::Float::Single(f) = f {
+                        init.push((capacity, f.to_bits()));
+                        capacity += 1;
+                    } else {
+                        unimplemented!();
+                    }
+                }
+                Constant::AggregateZero(arr) => {
+                    let arr = Self::build_aggregate_zero_var(name, arr)?;
+                    match arr {
+                        Var::IntArr(arr) => {
+                            for (idx, v) in arr.init {
+                                let new_idx = idx + capacity;
+                                init.push((new_idx, v));
+                            }
+                            capacity += arr.capacity;
+                        }
+                        Var::FloatArr(arr) => {
+                            for (idx, v) in arr.init {
+                                let new_idx = idx + capacity;
+                                init.push((new_idx, v.to_bits()));
+                            }
+                            capacity += arr.capacity;
+                        }
+                        _ => todo!(),
+                    }
+                }
+                Constant::Array {
+                    element_type,
+                    elements,
+                } => {
+                    let (cap, inits) = Self::cap_inits_from_array(element_type, elements)?;
+                    for (idx, v) in inits {
+                        let new_idx = idx + capacity;
+                        init.push((new_idx, v));
+                    }
+                    capacity += cap;
+                }
+                _ => {
+                    dbg!(value);
+                    unimplemented!();
+                }
+            }
+        }
+        let var = ArrVar::<u32>::new(name.to_string(), capacity, init, false);
+
+        dbg!(&var);
+        Ok(var.into())
     }
 
     /// 处理0初始化的数组
