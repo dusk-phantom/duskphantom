@@ -71,6 +71,13 @@ impl IRBuilder {
     }
 
     pub fn build_array_from_struct(name: &str, values: &[ConstantRef]) -> Result<Var> {
+        dbg!(values);
+        let (capacity, init) = Self::cap_inits_from_struct(values)?;
+        let var = ArrVar::<u32>::new(name.to_string(), capacity, init, false);
+        dbg!(&var);
+        Ok(var.into())
+    }
+    pub fn cap_inits_from_struct(values: &[ConstantRef]) -> Result<(usize, Vec<(usize, u32)>)> {
         let mut init: Vec<(usize, u32)> = Vec::new();
         let mut capacity = 0;
         for value in values.iter() {
@@ -88,24 +95,8 @@ impl IRBuilder {
                     }
                 }
                 Constant::AggregateZero(arr) => {
-                    let arr = Self::build_aggregate_zero_var(name, arr)?;
-                    match arr {
-                        Var::IntArr(arr) => {
-                            for (idx, v) in arr.init {
-                                let new_idx = idx + capacity;
-                                init.push((new_idx, v));
-                            }
-                            capacity += arr.capacity;
-                        }
-                        Var::FloatArr(arr) => {
-                            for (idx, v) in arr.init {
-                                let new_idx = idx + capacity;
-                                init.push((new_idx, v.to_bits()));
-                            }
-                            capacity += arr.capacity;
-                        }
-                        _ => todo!(),
-                    }
+                    let cap = Self::cap_from_empty_array(arr);
+                    capacity += cap;
                 }
                 Constant::Array {
                     element_type,
@@ -118,16 +109,26 @@ impl IRBuilder {
                     }
                     capacity += cap;
                 }
+                Constant::Struct {
+                    name: _,
+                    values,
+                    is_packed: _,
+                } => {
+                    let (cap, inits) = Self::cap_inits_from_struct(values)?;
+                    for (idx, v) in inits {
+                        let new_idx = idx + capacity;
+                        init.push((new_idx, v));
+                    }
+                    capacity += cap;
+                }
                 _ => {
                     dbg!(value);
                     unimplemented!();
                 }
             }
         }
-        let var = ArrVar::<u32>::new(name.to_string(), capacity, init, false);
 
-        dbg!(&var);
-        Ok(var.into())
+        Ok((capacity, init))
     }
 
     /// 处理0初始化的数组
@@ -164,19 +165,30 @@ impl IRBuilder {
                 element_type,
                 num_elements,
             } => {
-                if Self::is_ty_int(element_type) {
-                    *num_elements
-                } else if Self::is_ty_float(element_type) {
-                    *num_elements
+                let e_cap = if Self::is_ty_int(element_type) || Self::is_ty_float(element_type) {
+                    1
                 } else if Self::is_ty_array_type(element_type) {
-                    let sub = Self::cap_from_empty_array(element_type);
-                    *num_elements * sub
+                    Self::cap_from_empty_array(element_type)
+                } else if let llvm_ir::types::Type::StructType {
+                    element_types,
+                    is_packed: _,
+                } = element_type.as_ref()
+                {
+                    element_types
+                        .iter()
+                        .map(|t| Self::cap_from_empty_array(t))
+                        .sum()
                 } else {
                     dbg!(ty);
                     unimplemented!();
-                }
+                };
+                *num_elements * e_cap
             }
-            _ => unimplemented!(),
+            llvm_ir::Type::IntegerType { .. } => 1,
+            _ => {
+                dbg!(ty);
+                unimplemented!();
+            }
         }
     }
 
