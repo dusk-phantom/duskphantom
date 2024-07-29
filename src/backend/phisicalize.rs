@@ -11,7 +11,9 @@ pub fn phisicalize(program: &mut Program) -> Result<(), BackendError> {
             phisicalize_reg(func)?;
 
             // 为函数开头和结尾插入callee-save regs的保存和恢复
+            println!("{}\n\n", func.gen_asm());
             handle_callee_save(func)?;
+            println!("{}", func.gen_asm());
 
             // 为call指令前后插入caller-save regs的保存和恢复
             handle_caller_save(func)?;
@@ -24,6 +26,9 @@ pub fn phisicalize(program: &mut Program) -> Result<(), BackendError> {
 
             // 替换所有使用的内存操作伪指令 为 实际的内存操作指令,比如load a0,[0-8] 修改为ld a0,0(sp)
             handle_mem(func)?;
+
+            // 处理load和store类型指令 使用的 地址偏移 超出范围的情况
+            handle_offset_overflows(func)?;
         }
     }
     Ok(())
@@ -177,6 +182,10 @@ fn handle_callee_save(func: &mut Func) -> Result<()> {
     }
     regs.retain(|r| Reg::callee_save_regs().contains(r));
 
+    // 额外加入s1寄存器,因为在计算地址的时候会额外使用s1寄存器存储临时值
+    assert!(REG_S1.is_callee_save());
+    regs.insert(REG_S1);
+
     // 为这些物理寄存器分配栈上空间
     let mut stack_allocator = func
         .stack_allocator_mut()
@@ -193,15 +202,17 @@ fn handle_callee_save(func: &mut Func) -> Result<()> {
     let entry = func.entry_mut().insts_mut();
     reg_ss
         .iter()
-        .map(|(r, ss)| StoreInst::new(*ss, *r))
-        .for_each(|i| entry.push(i.into()));
+        .map(|(r, ss)| StoreInst::new(*ss, *r).with_8byte())
+        .for_each(|i| entry.insert(0, i.into()));
 
     let exit_bbs = func.exit_bbs_mut();
-    let mut load_back = reg_ss.iter().map(|(r, ss)| LoadInst::new(*r, *ss));
+
+    let mut load_back = reg_ss
+        .iter()
+        .map(|(r, ss)| LoadInst::new(*r, *ss).with_8byte());
     for bb in exit_bbs {
         load_back.clone().for_each(|i| {
-            let n = bb.insts().len();
-            bb.insts_mut().insert(n - 1, i.into());
+            bb.insert_before_term(i.into());
         });
     }
 
@@ -273,6 +284,24 @@ fn handle_mem(func: &mut Func) -> Result<()> {
                 Inst::Store(store) => *inst = store.phisicalize(stack_size)?,
                 _ => {}
             };
+        }
+    }
+    Ok(())
+}
+
+#[allow(unused)]
+fn handle_offset_overflows(func: &mut Func) -> Result<()> {
+    let stack_size = final_stack_size(func)?;
+    for bb in func.iter_bbs_mut() {
+        let mut to_insert: Vec<(usize, Inst)> = Vec::new();
+        for inst in bb.insts_mut() {
+            match inst {
+                Inst::Ld(ld) => {}
+                Inst::Sd(sd) => {}
+                Inst::Lw(lw) => {}
+                Inst::Sw(sw) => {}
+                _ => {}
+            }
         }
     }
     Ok(())

@@ -24,6 +24,11 @@ impl Block {
     pub fn label(&self) -> &str {
         self.label.as_str()
     }
+
+    pub fn set_label(&mut self, label: &str) {
+        self.label = label.to_string();
+    }
+
     pub fn new(label: String) -> Block {
         Block {
             label,
@@ -31,12 +36,15 @@ impl Block {
             to_bbs: Vec::new(),
         }
     }
+
     pub fn push_inst(&mut self, inst: Inst) {
         self.insts.push(inst);
     }
+
     pub fn extend_insts(&mut self, insts: Vec<Inst>) {
         self.insts.extend(insts);
     }
+
     pub fn gen_asm(&self) -> String {
         let label = self.label.as_str();
         let thread_pool = rayon::ThreadPoolBuilder::new()
@@ -56,6 +64,7 @@ impl Block {
     pub fn insts(&self) -> &Vec<Inst> {
         &self.insts
     }
+
     pub fn insts_mut(&mut self) -> &mut Vec<Inst> {
         &mut self.insts
     }
