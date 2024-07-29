@@ -9,24 +9,31 @@ pub fn phisicalize(program: &mut Program) -> Result<(), BackendError> {
     for module in program.modules.iter_mut() {
         for func in module.funcs.iter_mut() {
             phisicalize_reg(func)?;
+            // println!("\n\nafter phisicalize reg :\n{}", func.gen_asm());
 
             // 为函数开头和结尾插入callee-save regs的保存和恢复
             handle_callee_save(func)?;
+            // println!("\n\nhandle callee save:\n{}", func.gen_asm());
 
             // 为call指令前后插入caller-save regs的保存和恢复
             handle_caller_save(func)?;
+            // println!("\n\nhandle caller save:\n{}", func.gen_asm());
 
             // entry和exit插入ra寄存器的保存和恢复
             handle_ra(func)?;
+            // println!("\n\nhandle ra:\n{}", func.gen_asm());
 
             // 为entry和exit插入栈的开辟和关闭(通过sp的减少和增加实现),s0寄存器的保存和恢复
             handle_stack(func)?;
+            // println!("\n\nhandle stack:\n{}", func.gen_asm());
 
             // 替换所有使用的内存操作伪指令 为 实际的内存操作指令,比如load a0,[0-8] 修改为ld a0,0(sp)
             handle_mem(func)?;
+            // println!("\n\nhandle mem:\n{}", func.gen_asm());
 
             // 处理load和store类型指令 使用的 地址偏移 超出范围的情况
             handle_offset_overflows(func)?;
+            // println!("\n\nhandle offset overflow:\n{}", func.gen_asm());
         }
     }
     Ok(())
@@ -125,7 +132,7 @@ fn handle_caller_save(func: &mut Func) -> Result<()> {
             regs.extend(defs.iter().filter(|r| r.is_physical()).cloned());
         }
     }
-    regs.retain(|r| Reg::callee_save_regs().contains(r));
+    regs.retain(|r| Reg::caller_save_regs().contains(r));
 
     // 为这些物理寄存器分配栈上空间,并在函数调用前后保存和恢复这些寄存器
     let mut stack_allocator = func
@@ -146,12 +153,12 @@ fn handle_caller_save(func: &mut Func) -> Result<()> {
             match inst {
                 Inst::Call(call) => {
                     for (r, ss) in reg_ss.iter() {
-                        let sd = SdInst::new(*r, ss.start().into(), REG_SP);
+                        let sd = StoreInst::new(*ss, *r).with_8byte();
                         new_insts.push(sd.into());
                     }
                     new_insts.push(inst.clone());
                     for (r, ss) in reg_ss.iter() {
-                        let ld = LdInst::new(*r, ss.start().into(), REG_SP);
+                        let ld = LoadInst::new(*r, *ss).with_8byte();
                         new_insts.push(ld.into());
                     }
                 }
@@ -222,8 +229,12 @@ fn handle_ra(func: &mut Func) -> Result<()> {
     if !func.is_caller() {
         return Ok(());
     }
+
     // insert store ra
-    _ = func.stack_allocator_mut().iter_mut().map(|sa| sa.alloc(8));
+    func.stack_allocator_mut().iter_mut().for_each(|sa| {
+        sa.alloc(8);
+    });
+
     let sd_ra = SdInst::new(REG_RA, (-8).into(), REG_S0);
     func.entry_mut().insts_mut().insert(0, sd_ra.into());
 
@@ -251,8 +262,10 @@ fn handle_stack(func: &mut Func) -> Result<()> {
         sa.alloc(8);
     });
 
+    let offset = if func.is_caller() { -16 } else { -8 };
+
     let stack_size = final_stack_size(func)? as i64;
-    let record_s0 = SdInst::new(REG_S0, (-16).into(), REG_SP);
+    let record_s0 = SdInst::new(REG_S0, offset.into(), REG_SP);
     let update_s0 = MvInst::new(REG_S0.into(), REG_SP.into());
     let open_stack = AddInst::new(REG_SP.into(), REG_SP.into(), (-stack_size).into());
 
@@ -265,7 +278,7 @@ fn handle_stack(func: &mut Func) -> Result<()> {
         });
 
     let close_stack: Inst = AddInst::new(REG_SP.into(), REG_SP.into(), stack_size.into()).into();
-    let restore_s0: Inst = LdInst::new(REG_S0, (-16).into(), REG_S0).into();
+    let restore_s0: Inst = LdInst::new(REG_S0, offset.into(), REG_S0).into();
     func.exit_bbs_mut().for_each(|bb| {
         let n = bb.insts().len();
         bb.insts_mut().insert(n - 1, close_stack.clone());
