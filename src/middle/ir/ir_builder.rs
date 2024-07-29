@@ -7,6 +7,7 @@ pub struct IRBuilder {
     gvar_pool: ObjPool<GlobalVariable>,
     param_pool: ObjPool<Parameter>,
     inst_id: usize,
+    block_id: usize,
 }
 
 impl Default for IRBuilder {
@@ -24,6 +25,7 @@ impl IRBuilder {
             gvar_pool: ObjPool::new(),
             param_pool: ObjPool::new(),
             inst_id: 0,
+            block_id: 1,
         }
     }
 
@@ -71,16 +73,23 @@ impl IRBuilder {
         let ptr = self.into();
         let bb = self.bb_pool.alloc(BasicBlock::new(name, ptr));
         unsafe {
-            BasicBlock::init_bb(bb);
+            BasicBlock::init_bb(bb, self.new_block_id());
         }
         bb
     }
 
     /// Gets a new id for instruction.
     #[inline]
-    pub fn new_inst_id(&mut self) -> usize {
+    fn new_inst_id(&mut self) -> usize {
         let old = self.inst_id;
         self.inst_id += 1;
+        old
+    }
+
+    #[inline]
+    fn new_block_id(&mut self) -> usize {
+        let old = self.block_id;
+        self.block_id += 1;
         old
     }
 
