@@ -173,16 +173,25 @@ impl From<&f64> for Fmm {
         Self(*value)
     }
 }
+
 impl From<String> for Label {
     fn from(val: String) -> Self {
         Self(val)
     }
 }
+
+impl From<&String> for Label {
+    fn from(val: &String) -> Self {
+        Self(val.clone())
+    }
+}
+
 impl From<&str> for Label {
     fn from(val: &str) -> Self {
         Self(val.to_string())
     }
 }
+
 impl From<Reg> for Operand {
     fn from(val: Reg) -> Self {
         Self::Reg(val)

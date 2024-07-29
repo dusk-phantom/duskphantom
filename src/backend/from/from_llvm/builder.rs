@@ -50,8 +50,12 @@ impl IRBuilder {
         // count max_callee_regs_stack
         let max_callee_regs_stacks =
             Self::prepare_max_callee_regs_stack(&mut funcs, &caller_regs_stacks)?;
+
         // realloc stack slots considering max_callee_regs_stack
         Self::realloc_stack_slots(&mut funcs, &max_callee_regs_stacks)?;
+
+        // rename basic block label
+        Self::rename_bb_label(&mut funcs)?;
 
         Ok(funcs)
     }
@@ -242,6 +246,45 @@ impl IRBuilder {
             }
 
             f.stack_allocator_mut().replace(new_stack_allocator);
+        }
+        Ok(())
+    }
+
+    fn rename_bb_label(func: &mut [Func]) -> Result<()> {
+        macro_rules! replace_bb_label {
+            ($inst:ident,$bb_labels:ident) => {{
+                let new_label = $bb_labels.get($inst.label().as_str()).unwrap();
+                *$inst.label_mut() = new_label.into();
+            }};
+        }
+        for f in func {
+            let mut bb_labels: HashMap<String, String> = HashMap::new();
+            for bb in f.iter_bbs() {
+                let new_label = format!("{}_{}", f.name(), bb.label());
+                bb_labels.insert(bb.label().to_string(), new_label);
+            }
+            for bb in f.iter_bbs_mut() {
+                let new_label = bb_labels.get(bb.label()).unwrap();
+                bb.set_label(new_label);
+                for inst in bb.insts_mut() {
+                    match inst {
+                        Inst::Beq(beq) => replace_bb_label!(beq, bb_labels),
+                        Inst::Bne(bne) => replace_bb_label!(bne, bb_labels),
+                        Inst::Blt(blt) => replace_bb_label!(blt, bb_labels),
+                        Inst::Ble(ble) => replace_bb_label!(ble, bb_labels),
+                        Inst::Bgt(bgt) => replace_bb_label!(bgt, bb_labels),
+                        Inst::Bge(bge) => replace_bb_label!(bge, bb_labels),
+                        Inst::Jmp(jmp) => {
+                            let old_label: &Label = jmp.dst().try_into()?;
+                            let new_label = bb_labels.get(old_label.as_str()).unwrap();
+                            *jmp.dst_mut() = new_label.clone().into();
+                        }
+                        _ => {
+                            continue;
+                        }
+                    }
+                }
+            }
         }
         Ok(())
     }
