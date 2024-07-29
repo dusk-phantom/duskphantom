@@ -292,17 +292,34 @@ fn handle_mem(func: &mut Func) -> Result<()> {
 #[allow(unused)]
 fn handle_offset_overflows(func: &mut Func) -> Result<()> {
     let stack_size = final_stack_size(func)?;
+    macro_rules! handle_offset_overflow {
+        ($inst:ident,$inst_ty:ident,$new_insts:ident) => {
+            if !$inst.offset().in_limit(12) {
+                let li = LiInst::new(REG_S1.into(), $inst.offset().into());
+                let add = AddInst::new(REG_S1.into(), REG_S1.into(), REG_SP.into());
+                let new_ld = $inst_ty::new(REG_S1, 0.into(), REG_S1);
+                $new_insts.push(li.into());
+                $new_insts.push(add.into());
+                $new_insts.push(new_ld.into());
+            } else {
+                $new_insts.push($inst.clone().into());
+            }
+        };
+    }
     for bb in func.iter_bbs_mut() {
-        let mut to_insert: Vec<(usize, Inst)> = Vec::new();
-        for inst in bb.insts_mut() {
+        let mut new_insts: Vec<Inst> = Vec::new();
+        for inst in bb.insts() {
             match inst {
-                Inst::Ld(ld) => {}
-                Inst::Sd(sd) => {}
-                Inst::Lw(lw) => {}
-                Inst::Sw(sw) => {}
-                _ => {}
+                Inst::Ld(inst) => handle_offset_overflow!(inst, LdInst, new_insts),
+                Inst::Sd(sd) => handle_offset_overflow!(sd, SdInst, new_insts),
+                Inst::Lw(lw) => handle_offset_overflow!(lw, LwInst, new_insts),
+                Inst::Sw(sw) => handle_offset_overflow!(sw, SwInst, new_insts),
+                _ => {
+                    new_insts.push(inst.clone());
+                }
             }
         }
+        *bb.insts_mut() = new_insts;
     }
     Ok(())
 }
