@@ -37,6 +37,7 @@ impl StackAllocator {
     pub fn new() -> StackAllocator {
         StackAllocator { alloc_from: 0 }
     }
+
     // alloc num byte size memory
     pub fn alloc(&mut self, num_byte: u32) -> StackSlot {
         let ret = StackSlot {
@@ -46,6 +47,7 @@ impl StackAllocator {
         self.alloc_from += num_byte;
         ret
     }
+
     // return how many byte had been allocated
     pub fn allocated(&self) -> u32 {
         self.alloc_from

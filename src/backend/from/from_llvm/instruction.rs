@@ -394,8 +394,23 @@ impl IRBuilder {
                 llvm_ir::types::FPType::X86_FP80 => todo!(),
                 llvm_ir::types::FPType::PPC_FP128 => todo!(),
             },
-            _ => todo!(),
+            llvm_ir::Type::ArrayType {
+                element_type: _,
+                num_elements: _,
+            } => {
+                let e_ty = Self::basic_element_type(&ty);
+                let dims = Self::dimensions_from_array(&ty)?;
+                let cap: usize = dims.into_iter().product();
+                let cap: u32 = cap.try_into().with_context(|| context!())?;
+                let e_size = Self::mem_size_from(e_ty)?.num_byte();
+                cap * e_size
+            }
+            _ => {
+                dbg!(ty);
+                unimplemented!();
+            }
         };
+        dbg!(name.clone(), num_byte);
         let ss = stack_allocator.alloc(num_byte);
         stack_slots.insert(name.clone(), ss);
         Ok(vec![])
