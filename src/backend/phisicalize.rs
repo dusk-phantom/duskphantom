@@ -11,9 +11,7 @@ pub fn phisicalize(program: &mut Program) -> Result<(), BackendError> {
             phisicalize_reg(func)?;
 
             // 为函数开头和结尾插入callee-save regs的保存和恢复
-            println!("{}\n\n", func.gen_asm());
             handle_callee_save(func)?;
-            println!("{}", func.gen_asm());
 
             // 为call指令前后插入caller-save regs的保存和恢复
             handle_caller_save(func)?;
@@ -21,7 +19,7 @@ pub fn phisicalize(program: &mut Program) -> Result<(), BackendError> {
             // entry和exit插入ra寄存器的保存和恢复
             handle_ra(func)?;
 
-            // 为entry和exit插入栈的开辟和关闭,s0寄存器的保存和恢复
+            // 为entry和exit插入栈的开辟和关闭(通过sp的减少和增加实现),s0寄存器的保存和恢复
             handle_stack(func)?;
 
             // 替换所有使用的内存操作伪指令 为 实际的内存操作指令,比如load a0,[0-8] 修改为ld a0,0(sp)
@@ -249,7 +247,9 @@ fn final_stack_size(func: &Func) -> Result<u32> {
 
 fn handle_stack(func: &mut Func) -> Result<()> {
     // alloc stack for s0, in fact, we could choose not to store-restore s0
-    _ = func.stack_allocator_mut().iter_mut().map(|sa| sa.alloc(8));
+    func.stack_allocator_mut().iter_mut().for_each(|sa| {
+        sa.alloc(8);
+    });
 
     let stack_size = final_stack_size(func)? as i64;
     let record_s0 = SdInst::new(REG_S0, (-16).into(), REG_SP);
