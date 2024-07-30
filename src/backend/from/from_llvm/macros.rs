@@ -28,7 +28,7 @@ macro_rules! llvm2tac_three_op_usual {
     }};
     (DenySwap; $tac_inst_ty:ident,$inst:ident, $reg_gener:ident,$regs:ident) => {{
         let mut ret: Vec<Inst> = vec![];
-        let (lhs, pre_insert) = Self::prepare_lhs(&$inst.operand0, $reg_gener, $regs)?;
+        let (lhs, pre_insert) = Self::prepare_usual_lhs(&$inst.operand0, $reg_gener, $regs)?;
         ret.extend(pre_insert);
         let (rhs, pre_insert) = Self::prepare_usual_rhs(&$inst.operand1, $reg_gener, $regs)?;
         ret.extend(pre_insert);
@@ -45,7 +45,7 @@ macro_rules! llvm2tac_three_op_usual {
 macro_rules! llvm2tac_three_op_float {
     ($tac_inst_ty:ident,$inst:ident,$reg_gener:ident,$regs:ident,$fmms:ident) => {{
         let mut ret: Vec<Inst> = vec![];
-        let (lhs, pre_insert) = Self::prepare_lhs(&$inst.operand0, $reg_gener, $regs)?;
+        let (lhs, pre_insert) = Self::prepare_float_lhs(&$inst.operand0, $reg_gener, $regs, $fmms)?;
         ret.extend(pre_insert);
         let (rhs, pre_insert) = Self::prepare_float_rhs(&$inst.operand1, $reg_gener, $regs, $fmms)?;
         ret.extend(pre_insert);

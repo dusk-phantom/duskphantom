@@ -82,7 +82,7 @@ impl IRBuilder {
                 Self::build_load_inst(load, stack_slots, reg_gener, regs)
             }
             llvm_ir::Instruction::Store(store) => {
-                Self::build_store_inst(store, stack_slots, reg_gener, regs)
+                Self::build_store_inst(store, stack_slots, reg_gener, regs, fmms)
             }
             llvm_ir::Instruction::SIToFP(si2f) => Self::build_si2f_inst(si2f, reg_gener, regs),
             llvm_ir::Instruction::Fence(_) => todo!(),
@@ -141,7 +141,7 @@ impl IRBuilder {
         regs: &mut HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
         let mut ret: Vec<Inst> = Vec::new();
-        let (lhs, pre_insert) = Self::prepare_lhs(&sub.operand0, reg_gener, regs)?;
+        let (lhs, pre_insert) = Self::prepare_usual_lhs(&sub.operand0, reg_gener, regs)?;
         ret.extend(pre_insert);
         let dst = reg_gener.gen_virtual_usual_reg();
         regs.insert(sub.dest.clone(), dst);
@@ -287,7 +287,7 @@ impl IRBuilder {
             regs: &HashMap<Name, Reg>,
             insts: &mut Vec<Inst>,
         ) -> Result<(Operand, Operand)> {
-            let (op0, prepare) = IRBuilder::prepare_lhs(&icmp.operand0, reg_gener, regs)?;
+            let (op0, prepare) = IRBuilder::prepare_usual_lhs(&icmp.operand0, reg_gener, regs)?;
             insts.extend(prepare);
             let (op1, prepare) = IRBuilder::prepare_usual_rhs(&icmp.operand1, reg_gener, regs)?;
             insts.extend(prepare);
@@ -299,7 +299,7 @@ impl IRBuilder {
             regs: &HashMap<Name, Reg>,
             insts: &mut Vec<Inst>,
         ) -> Result<(Operand, Operand)> {
-            let (op1, prepare) = IRBuilder::prepare_lhs(&icmp.operand1, reg_gener, regs)?;
+            let (op1, prepare) = IRBuilder::prepare_usual_lhs(&icmp.operand1, reg_gener, regs)?;
             insts.extend(prepare);
             let (op0, prepare) = IRBuilder::prepare_usual_rhs(&icmp.operand0, reg_gener, regs)?;
             insts.extend(prepare);
@@ -421,13 +421,15 @@ impl IRBuilder {
         stack_slots: &mut HashMap<Name, StackSlot>,
         reg_gener: &mut RegGenerator,
         regs: &HashMap<Name, Reg>,
+        fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<Vec<Inst>> {
+        // dbg!(store);
         let mut ret: Vec<Inst> = Vec::new();
 
         let (address, pre_insert) = Self::prepare_address(&store.address, reg_gener, stack_slots)?;
         ret.extend(pre_insert);
 
-        let (value, pre_insts) = Self::prepare_lhs(&store.value, reg_gener, regs)?;
+        let (value, pre_insts) = Self::prepare_lhs(&store.value, reg_gener, regs, fmms)?;
         ret.extend(pre_insts);
 
         match address {

@@ -17,7 +17,7 @@ pub fn phisicalize(program: &mut Program) -> Result<(), BackendError> {
 
             // 为call指令前后插入caller-save regs的保存和恢复
             handle_caller_save(func)?;
-            println!("\n\nhandle caller save:\n{}", func.gen_asm());
+            // println!("\n\nhandle caller save:\n{}", func.gen_asm());
 
             // entry和exit插入ra寄存器的保存和恢复
             handle_ra(func)?;
