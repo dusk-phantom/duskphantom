@@ -71,10 +71,8 @@ impl IRBuilder {
     }
 
     pub fn build_array_from_struct(name: &str, values: &[ConstantRef]) -> Result<Var> {
-        dbg!(values);
         let (capacity, init) = Self::cap_inits_from_struct(values)?;
         let var = ArrVar::<u32>::new(name.to_string(), capacity, init, false);
-        dbg!(&var);
         Ok(var.into())
     }
     pub fn cap_inits_from_struct(values: &[ConstantRef]) -> Result<(usize, Vec<(usize, u32)>)> {
@@ -127,7 +125,7 @@ impl IRBuilder {
                 }
             }
         }
-
+        init.retain(|(_, f)| *f != 0);
         Ok((capacity, init))
     }
 

@@ -410,7 +410,7 @@ impl IRBuilder {
                 unimplemented!();
             }
         };
-        dbg!(name.clone(), num_byte);
+        // dbg!(name.clone(), num_byte);
         let ss = stack_allocator.alloc(num_byte);
         stack_slots.insert(name.clone(), ss);
         Ok(vec![])
