@@ -75,7 +75,6 @@ impl Block {
                 inst,
                 Inst::Jmp(_)
                     | Inst::Tail(_)
-                    | Inst::Call(_)
                     | Inst::Ret
                     | Inst::Beq(_)
                     | Inst::Bne(_)
