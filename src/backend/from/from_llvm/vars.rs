@@ -2,6 +2,7 @@ use super::*;
 use builder::IRBuilder;
 use llvm_ir::{constant::Float, Constant, ConstantRef, Type};
 
+use rayon::iter::Either;
 use var::{ArrVar, Var};
 
 impl IRBuilder {
@@ -72,8 +73,20 @@ impl IRBuilder {
 
     pub fn build_array_from_struct(name: &str, values: &[ConstantRef]) -> Result<Var> {
         let (capacity, init) = Self::cap_inits_from_struct(values)?;
-        let var = ArrVar::<u32>::new(name.to_string(), capacity, init, false);
-        Ok(var.into())
+        let e_ty = Self::elem_ty_from_struct(values);
+        let var: Var = match e_ty {
+            Ok(Either::Left(_)) | Err(_) => {
+                ArrVar::<u32>::new(name.to_string(), capacity, init, false).into()
+            }
+            Ok(Either::Right(_)) => {
+                let init = init
+                    .into_iter()
+                    .map(|(i, f)| (i, f32::from_bits(f)))
+                    .collect();
+                ArrVar::<f32>::new(name.to_string(), capacity, init, false).into()
+            }
+        };
+        Ok(var)
     }
     pub fn cap_inits_from_struct(values: &[ConstantRef]) -> Result<(usize, Vec<(usize, u32)>)> {
         let mut init: Vec<(usize, u32)> = Vec::new();
@@ -127,6 +140,57 @@ impl IRBuilder {
         }
         init.retain(|(_, f)| *f != 0);
         Ok((capacity, init))
+    }
+
+    pub fn elem_ty_from_struct(values: &[ConstantRef]) -> Result<Either<i32, f32>> {
+        macro_rules! from_e_ty {
+            ($e_ty:expr) => {
+                if Self::is_ty_int($e_ty) {
+                    return Ok(Either::Left(0));
+                } else if Self::is_ty_float($e_ty) {
+                    return Ok(Either::Right(0.0));
+                } else {
+                    continue;
+                }
+            };
+        }
+        #[allow(clippy::never_loop)]
+        for value in values.iter() {
+            match value.as_ref() {
+                Constant::Int { bits: _, value: _ } => {
+                    return Ok(Either::Left(0));
+                }
+                Constant::Float(_) => {
+                    return Ok(Either::Right(0.0));
+                }
+                Constant::AggregateZero(arr) => {
+                    let e_ty = Self::basic_element_type(arr);
+                    from_e_ty!(e_ty);
+                }
+                Constant::Array {
+                    element_type,
+                    elements: _,
+                } => {
+                    let e_ty = Self::basic_element_type(element_type);
+                    from_e_ty!(e_ty);
+                }
+                Constant::Struct {
+                    name: _,
+                    values,
+                    is_packed: _,
+                } => {
+                    let e_ty = Self::elem_ty_from_struct(values);
+                    if e_ty.is_ok() {
+                        return e_ty;
+                    }
+                }
+                _ => {
+                    dbg!(value);
+                    unimplemented!();
+                }
+            }
+        }
+        Err(anyhow!("no element type found"))
     }
 
     /// 处理0初始化的数组
