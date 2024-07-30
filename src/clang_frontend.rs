@@ -1,13 +1,14 @@
+use crate::context;
 use anyhow::anyhow;
 use anyhow::Context;
+use anyhow::Result;
 use llvm_ir::Module;
 use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fs;
+use std::path::Path;
 use std::process::Command;
 use tempfile::NamedTempFile;
-
-use crate::context;
 
 pub struct Program {
     pub tmp_llvm_file: NamedTempFile,
@@ -15,7 +16,12 @@ pub struct Program {
 }
 
 impl Program {
-    pub fn parse(file: &str) -> Self {
+    pub fn parse_file<P: AsRef<Path>>(file: P) -> Result<Self> {
+        let file = file
+            .as_ref()
+            .to_str()
+            .ok_or(anyhow!("msg: file path error"))
+            .with_context(|| context!())?;
         let mut builder = tempfile::Builder::new();
         let tmp_llvm_file = builder.suffix(".ll").tempfile().unwrap();
         let mut cmd = Command::new("clang");
@@ -42,11 +48,12 @@ impl Program {
         }
         // 使用llvm_ir crate从.ll内容文件中读取llvm ir
         let llvm = Module::from_ir_path(tmp_llvm_file.path()).expect("msg: parse llvm ir failed");
-        Self {
+        Ok(Self {
             tmp_llvm_file,
             llvm,
-        }
+        })
     }
+
     pub fn gen_ll(&self) -> anyhow::Result<String> {
         fs::read_to_string(self.tmp_llvm_file.path())
             .map_err(|e| anyhow!("{e}"))

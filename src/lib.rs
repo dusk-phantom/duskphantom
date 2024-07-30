@@ -14,6 +14,8 @@ pub mod errors;
 pub mod frontend;
 pub mod middle;
 pub mod utils;
+#[cfg(not(feature = "gen_virtual_asm"))]
+use backend::checker;
 
 use clap::{arg, App};
 
@@ -63,7 +65,7 @@ pub fn compile_clang(
 ) -> Result<(), CompilerError> {
     use errors::BackendError;
 
-    let mut program = clang_frontend::Program::parse(sy_path);
+    let mut program = clang_frontend::Program::parse_file(sy_path)?;
     if opt_flag {
         clang_frontend::optimize(&mut program)?;
     }
@@ -94,7 +96,7 @@ pub fn compile_clang_llc(
     asm_flag: bool,
     ll_path: Option<String>,
 ) -> Result<(), CompilerError> {
-    let mut program = clang_frontend::Program::parse(sy_path);
+    let mut program = clang_frontend::Program::parse_file(sy_path)?;
     if opt_flag {
         clang_frontend::optimize(&mut program)?;
     }

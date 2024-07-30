@@ -10,13 +10,15 @@ use var::FloatVar;
 pub struct IRBuilder;
 
 impl IRBuilder {
-    #[cfg(feature = "clang_enabled")]
-    #[allow(unused)]
     pub fn gen_from_clang(program: &clang_frontend::Program) -> Result<Program> {
         let llvm_module = &program.llvm;
-        let mut global_vars = Self::build_global_var(&llvm_module.global_vars)?;
+        Self::gen_from_llvm_ir(llvm_module)
+    }
+
+    pub fn gen_from_llvm_ir(llvm_ir: &llvm_ir::Module) -> Result<Program> {
+        let mut global_vars = Self::build_global_var(&llvm_ir.global_vars)?;
         let mut fmms: HashMap<Fmm, FloatVar> = HashMap::new();
-        let funcs = Self::build_funcs(&llvm_module.functions, &mut fmms)?;
+        let funcs = Self::build_funcs(&llvm_ir.functions, &mut fmms)?;
         for (_, float_var) in fmms {
             global_vars.push(float_var.into());
         }
