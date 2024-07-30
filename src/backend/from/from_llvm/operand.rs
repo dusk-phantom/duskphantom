@@ -127,6 +127,7 @@ impl IRBuilder {
         value: &llvm_ir::operand::Operand,
         reg_gener: &mut RegGenerator,
         regs: &HashMap<Name, Reg>,
+        fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<(Operand, Vec<Inst>)> {
         let mut insts = Vec::new();
         let value = IRBuilder::value_from(value, regs)?;
@@ -138,7 +139,66 @@ impl IRBuilder {
                 Ok((dst.into(), insts))
             }
             Operand::Reg(_) => Ok((value, insts)),
-            _ => unimplemented!(),
+            Operand::Fmm(fmm) => {
+                let f_var = Self::fmm_from(fmm, fmms)?;
+                let addr = reg_gener.gen_virtual_usual_reg();
+                let lla = LlaInst::new(addr, f_var.name.clone().into());
+                insts.push(lla.into());
+                let fmm = reg_gener.gen_virtual_float_reg();
+                let lf = LwInst::new(fmm, 0.into(), addr);
+                insts.push(lf.into());
+                Ok((fmm.into(), insts))
+            }
+            _ => {
+                dbg!(value);
+                unimplemented!();
+            }
+        }
+    }
+
+    // this function is used to prepare the lhs of a usual operand
+    #[allow(unused)]
+    pub fn prepare_usual_lhs(
+        value: &llvm_ir::operand::Operand,
+        reg_gener: &mut RegGenerator,
+        regs: &HashMap<Name, Reg>,
+    ) -> Result<(Operand, Vec<Inst>)> {
+        let mut insts = Vec::new();
+        let value = IRBuilder::value_from(value, regs)?;
+        match &value {
+            Operand::Imm(imm) => {
+                let dst = reg_gener.gen_virtual_usual_reg();
+                let li = LiInst::new(dst.into(), imm.into());
+                insts.push(li.into());
+                Ok((dst.into(), insts))
+            }
+            Operand::Reg(_) => Ok((value, insts)),
+            _ => Err(anyhow!("value is not usual operand:{:?}", value)).with_context(|| context!()),
+        }
+    }
+
+    #[allow(unused)]
+    pub fn prepare_float_lhs(
+        value: &llvm_ir::operand::Operand,
+        reg_gener: &mut RegGenerator,
+        regs: &HashMap<Name, Reg>,
+        fmms: &mut HashMap<Fmm, FloatVar>,
+    ) -> Result<(Operand, Vec<Inst>)> {
+        let mut insts = Vec::new();
+        let value = IRBuilder::value_from(value, regs)?;
+        match &value {
+            Operand::Reg(_) => Ok((value, insts)),
+            Operand::Fmm(fmm) => {
+                let f_var = Self::fmm_from(fmm, fmms)?;
+                let addr = reg_gener.gen_virtual_usual_reg();
+                let lla = LlaInst::new(addr, f_var.name.clone().into());
+                insts.push(lla.into());
+                let fmm = reg_gener.gen_virtual_float_reg();
+                let lf = LwInst::new(fmm, 0.into(), addr);
+                insts.push(lf.into());
+                Ok((fmm.into(), insts))
+            }
+            _ => Err(anyhow!("value is not float operand:{:?}", value)).with_context(|| context!()),
         }
     }
 
