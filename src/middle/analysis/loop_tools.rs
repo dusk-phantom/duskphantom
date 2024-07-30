@@ -1,5 +1,3 @@
-use std::usize;
-
 use dominator_tree::DominatorTree;
 
 use crate::utils::mem::{ObjPool, ObjPtr};
