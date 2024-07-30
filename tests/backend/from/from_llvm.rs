@@ -67,6 +67,8 @@ mod from_llvm_tests {
         let code = r#"
             int arr2[200] = {1, 2, 3};
             int arr3[33][44]={{1},{0,3}};
+            float arr4[20][30] = {{1.0,0.0},{},{ 0.0, 3.0}};
+            float arr5[150]={1.0, 0.0, 3.0};
         "#;
         let program = parse_to_backend(code).unwrap();
         let m = &program.modules[0];
@@ -106,6 +108,40 @@ mod from_llvm_tests {
                         (
                             45,
                             3,
+                        ),
+                    ],
+                    is_const: false,
+                },
+            ),
+            FloatArr(
+                ArrVar {
+                    name: "arr4",
+                    capacity: 600,
+                    init: [
+                        (
+                            0,
+                            1.0,
+                        ),
+                        (
+                            61,
+                            3.0,
+                        ),
+                    ],
+                    is_const: false,
+                },
+            ),
+            FloatArr(
+                ArrVar {
+                    name: "arr5",
+                    capacity: 150,
+                    init: [
+                        (
+                            0,
+                            1.0,
+                        ),
+                        (
+                            2,
+                            3.0,
                         ),
                     ],
                     is_const: false,
