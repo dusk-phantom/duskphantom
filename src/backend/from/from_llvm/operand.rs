@@ -326,6 +326,11 @@ impl IRBuilder {
                             let addr = reg_gener.gen_virtual_usual_reg();
                             let add = AddInst::new(addr.into(), base_reg.into(), offset.into());
                             pre_insert.push(add.into());
+
+                            let addr = reg_gener.gen_virtual_usual_reg();
+                            let slli = SllInst::new(addr.into(), addr.into(), 2.into());
+                            pre_insert.push(slli.into());
+
                             addr.into()
                         }
                         _ => unimplemented!(),
