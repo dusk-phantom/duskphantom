@@ -62,6 +62,7 @@ harness = false
 # 特性管理
 [features]
 default = [
+    # "backend_opt",     # 用来指定是否开启后端优化,提交的时候应该开启
     "clang_enabled",   # 解除该行注释获取基于clang的前后端, 比赛提交的时候该行需要注释掉
     "gen_virtual_asm", # 解除该行注释获取生成虚拟汇编的功能
     # "opt_address_computation", # 解除该行注释获取优化地址计算的功能, load store的时候会根据地址大小使用s0或者sp来相对寻址
@@ -69,6 +70,7 @@ default = [
 clang_enabled = ["llvm-ir"]
 gen_virtual_asm = []
 opt_address_computation = []
+backend_opt = []
 
 [profile.release]
 lto = true
