@@ -17,7 +17,7 @@ pub fn phisicalize(program: &mut Program) -> Result<(), BackendError> {
 
             // 为call指令前后插入caller-save regs的保存和恢复
             handle_caller_save(func)?;
-            // println!("\n\nhandle caller save:\n{}", func.gen_asm());
+            println!("\n\nhandle caller save:\n{}", func.gen_asm());
 
             // entry和exit插入ra寄存器的保存和恢复
             handle_ra(func)?;
@@ -152,12 +152,18 @@ fn handle_caller_save(func: &mut Func) -> Result<()> {
         for inst in bb.insts() {
             match inst {
                 Inst::Call(call) => {
-                    for (r, ss) in reg_ss.iter() {
+                    // 计算要在函数调用前后保护(保存和恢复)的寄存器
+                    let mut to_protect = reg_ss.clone();
+                    let mut call_defs = call.defs();
+                    to_protect.retain(|r, _| !call_defs.contains(&r));
+
+                    // 为这些寄存器在call指令前后插入保存和恢复指令
+                    for (r, ss) in to_protect.iter() {
                         let sd = StoreInst::new(*ss, *r).with_8byte();
                         new_insts.push(sd.into());
                     }
                     new_insts.push(inst.clone());
-                    for (r, ss) in reg_ss.iter() {
+                    for (r, ss) in to_protect.iter() {
                         let ld = LoadInst::new(*r, *ss).with_8byte();
                         new_insts.push(ld.into());
                     }
