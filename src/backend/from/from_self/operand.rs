@@ -109,18 +109,70 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &HashMap<Address, Reg>,
     ) -> Result<(Operand, Vec<Inst>)> {
-        let mut insts = Vec::new();
         let value = IRBuilder::no_load_from(value, regs)?;
         match &value {
             Operand::Imm(imm) => {
                 let dst = reg_gener.gen_virtual_usual_reg();
                 let li = LiInst::new(dst.into(), imm.into());
-                insts.push(li.into());
-                Ok((dst.into(), insts))
+                Ok((dst.into(), vec![li.into()]))
             }
-            Operand::Reg(_) => Ok((value, insts)),
+            Operand::Reg(_) => Ok((value, vec![])),
             _ => unimplemented!(),
         }
+    }
+
+    pub fn prepare_store_rs2(
+        value: &middle::ir::Operand,
+        reg_gener: &mut RegGenerator,
+        regs: &HashMap<Address, Reg>,
+        fmms: &mut HashMap<Fmm, FloatVar>,
+    ) -> Result<(Operand, Vec<Inst>)> {
+        let value = IRBuilder::no_load_from(value, regs)?;
+        match &value {
+            Operand::Imm(imm) => {
+                let dst = reg_gener.gen_virtual_usual_reg();
+                let li = LiInst::new(dst.into(), imm.into());
+                Ok((dst.into(), vec![li.into()]))
+            }
+            Operand::Reg(_) => Ok((value, vec![])),
+            Operand::Fmm(fmm) => {
+                let (dst, insts) =
+                    Self::_prepare_fmm(fmm, reg_gener, fmms).with_context(|| context!())?;
+                Ok((dst.into(), insts))
+            }
+
+            _ => unimplemented!(), /* StackSlot(_) Label(_) */
+        }
+    }
+
+    #[inline]
+    pub fn _prepare_fmm(
+        fmm: &Fmm,
+        reg_gener: &mut RegGenerator,
+        fmms: &mut HashMap<Fmm, FloatVar>,
+    ) -> Result<(Reg, Vec<Inst>)> {
+        let mut insts = Vec::new();
+        let lit = if let Some(f_var) = fmms.get(fmm) {
+            f_var.name.clone()
+        } else {
+            let name = Self::fmm_lit_label_from(fmm);
+            fmms.insert(
+                fmm.clone(),
+                FloatVar {
+                    name: name.clone(),
+                    init: Some(fmm.clone().try_into()?),
+                    is_const: true,
+                },
+            );
+            name
+        };
+        let addr = reg_gener.gen_virtual_usual_reg();
+        let lla = LlaInst::new(addr, lit.into());
+        insts.push(lla.into());
+        let dst = reg_gener.gen_virtual_float_reg();
+        let loadf = LwInst::new(dst, 0.into(), addr);
+        insts.push(loadf.into());
+        Ok((dst, insts))
     }
 
     /// 如果value是个寄存器,直接返回,
@@ -156,31 +208,12 @@ impl IRBuilder {
         regs: &HashMap<Address, Reg>,
         fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<(Operand, Vec<Inst>)> {
-        let mut insts: Vec<Inst> = Vec::new();
         let value = IRBuilder::no_load_from(value, regs)?;
         match value {
-            Operand::Reg(_) => Ok((value, insts)),
+            Operand::Reg(_) => Ok((value, vec![])),
             Operand::Fmm(fmm) => {
-                let lit = if let Some(f_var) = fmms.get(&fmm) {
-                    f_var.name.clone()
-                } else {
-                    let name = Self::fmm_lit_label_from(&fmm);
-                    fmms.insert(
-                        fmm.clone(),
-                        FloatVar {
-                            name: name.clone(),
-                            init: Some(fmm.clone().try_into()?),
-                            is_const: true,
-                        },
-                    );
-                    name
-                };
-                let addr = reg_gener.gen_virtual_usual_reg();
-                let lla = LlaInst::new(addr, lit.into());
-                insts.push(lla.into());
-                let dst = reg_gener.gen_virtual_float_reg();
-                let loadf = LwInst::new(dst, 0.into(), addr);
-                insts.push(loadf.into());
+                let (dst, insts) =
+                    Self::_prepare_fmm(&fmm, reg_gener, fmms).with_context(|| context!())?;
                 Ok((dst.into(), insts))
             }
             _ => unimplemented!(),

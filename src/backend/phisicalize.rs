@@ -8,6 +8,8 @@ pub fn phisicalize(program: &mut Program) -> Result<(), BackendError> {
     // return Ok(()); // debug
     for module in program.modules.iter_mut() {
         for func in module.funcs.iter_mut() {
+            println!("{}", func.gen_asm());
+
             phisicalize_reg(func)?;
             // println!("\n\nafter phisicalize reg :\n{}", func.gen_asm());
 
