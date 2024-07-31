@@ -338,6 +338,7 @@ impl IRBuilder {
         }
 
         for inst in &bb.instrs {
+            // dbg!(inst.to_string());
             let gen_insts = Self::build_instruction(
                 inst,
                 stack_allocator,

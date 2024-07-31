@@ -46,16 +46,15 @@ impl IRBuilder {
         Ok(dst_reg)
     }
 
-    pub fn stack_slot_from(
-        operand: &llvm_ir::Operand,
-        stack_slots: &HashMap<Name, StackSlot>,
-    ) -> Result<Operand> {
+    pub fn reg_from(operand: &llvm_ir::Operand, regs: &HashMap<Name, Reg>) -> Result<Operand> {
         Ok(match operand {
-            llvm_ir::Operand::LocalOperand { name, ty: _ } => stack_slots
-                .get(name)
-                .ok_or(anyhow!("stack slot not found {}", name))
-                .with_context(|| context!())?
-                .into(),
+            llvm_ir::Operand::LocalOperand { name, ty: _ } => {
+                let reg = regs
+                    .get(name)
+                    .ok_or(anyhow!("local var not found {}", name))
+                    .with_context(|| context!())?;
+                reg.into()
+            }
             _ => {
                 return Err(anyhow!("operand is not local var:{}", operand))
                     .with_context(|| context!());
@@ -65,15 +64,20 @@ impl IRBuilder {
 
     pub fn local_var_from(
         operand: &llvm_ir::Operand,
+        stack_slots: &HashMap<Name, StackSlot>,
         regs: &HashMap<Name, Reg>,
     ) -> Result<Operand> {
         Ok(match operand {
             llvm_ir::Operand::LocalOperand { name, ty: _ } => {
-                let reg = regs
-                    .get(name)
-                    .ok_or(anyhow!("local var not found {}", name))
-                    .with_context(|| context!())?;
-                reg.into()
+                if let Some(ss) = stack_slots.get(name) {
+                    ss.into()
+                } else {
+                    let reg = regs
+                        .get(name)
+                        .ok_or(anyhow!("local var not found {}", name))
+                        .with_context(|| context!())?;
+                    reg.into()
+                }
             }
             _ => {
                 return Err(anyhow!("operand is not local var:{}", operand))
@@ -116,14 +120,17 @@ impl IRBuilder {
     pub fn value_from(operand: &llvm_ir::Operand, regs: &HashMap<Name, Reg>) -> Result<Operand> {
         if let Ok(c) = Self::const_from(operand) {
             Ok(c)
-        } else if let Ok(c) = Self::local_var_from(operand, regs) {
+        } else if let Ok(c) = Self::reg_from(operand, regs) {
             Ok(c)
         } else {
             Err(anyhow!("value neither is reg or const:{}", operand)).with_context(|| context!())
         }
     }
 
-    pub fn prepare_imm(imm: &Imm, reg_gener: &mut RegGenerator) -> Result<(Operand, Option<Inst>)> {
+    pub fn prepare_imm_rhs(
+        imm: &Imm,
+        reg_gener: &mut RegGenerator,
+    ) -> Result<(Operand, Option<Inst>)> {
         if imm.in_limit(12) {
             Ok((Operand::Imm(imm.clone()), None))
         } else {
@@ -131,6 +138,15 @@ impl IRBuilder {
             let li = LiInst::new(dst.into(), imm.into());
             Ok((dst.into(), Some(li.into())))
         }
+    }
+
+    pub fn prepare_imm_lhs(
+        imm: &Imm,
+        reg_gener: &mut RegGenerator,
+    ) -> Result<(Operand, Option<Inst>)> {
+        let dst = reg_gener.gen_virtual_usual_reg();
+        let li = LiInst::new(dst.into(), imm.into());
+        Ok((dst.into(), Some(li.into())))
     }
 
     /// 需要注意的是 指令的 lvalue 只能是寄存器,所以如果value是个常数,则需要用一个寄存器来存储,并且需要生成一条指令
@@ -309,11 +325,12 @@ impl IRBuilder {
         operand: &llvm_ir::Operand,
         reg_gener: &mut RegGenerator,
         stack_slots: &HashMap<Name, StackSlot>,
+        regs: &HashMap<Name, Reg>,
     ) -> Result<(Operand, Vec<Inst>)> {
         let mut pre_insert = Vec::new();
         let addr: Operand = match operand {
-            llvm_ir::Operand::LocalOperand { name: _, ty: _ } => {
-                Self::stack_slot_from(operand, stack_slots)?
+            llvm_ir::Operand::LocalOperand { name, ty: _ } => {
+                Self::local_var_from(operand, stack_slots, regs)?
             }
             llvm_ir::Operand::ConstantOperand(c) => match c.as_ref() {
                 Constant::GlobalReference { name: _, ty: _ } => {

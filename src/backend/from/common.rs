@@ -47,7 +47,8 @@ impl Dimension {
             Dimension::Mixture(dims) => {
                 let mut it = dims.iter();
                 if let Some(first) = it.next() {
-                    it.all(|dim| dim == first)
+                    let first = first.size();
+                    it.all(|dim| dim.size() == first)
                 } else {
                     true
                 }

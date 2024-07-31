@@ -330,8 +330,11 @@ impl IRBuilder {
                 element_type,
                 num_elements,
             } => {
-                let suf_dims = Self::dims_from_ty(element_type)?;
-                let dims = Dimension::Mixture(vec![suf_dims; *num_elements]);
+                let suf_dim = Self::dims_from_ty(element_type)?;
+                if suf_dim == Dimension::One(1) {
+                    return Ok(Dimension::One(*num_elements));
+                }
+                let dims = Dimension::Mixture(vec![suf_dim; *num_elements]);
                 Ok(dims)
             }
             llvm_ir::Type::StructType {
@@ -340,10 +343,14 @@ impl IRBuilder {
             } => {
                 let mut dims = Vec::new();
                 for e_ty in element_types.iter() {
-                    let suf_dims = Self::dims_from_ty(e_ty)?;
-                    dims.push(suf_dims);
+                    let suf_dim = Self::dims_from_ty(e_ty)?;
+                    dims.push(suf_dim);
                 }
-                Ok(Dimension::Mixture(dims))
+                if dims.iter().all(|dim| *dim == Dimension::One(1)) {
+                    Ok(Dimension::One(dims.len()))
+                } else {
+                    Ok(Dimension::Mixture(dims))
+                }
             }
             llvm_ir::Type::IntegerType { bits: _ } => Ok(Dimension::One(1)),
             llvm_ir::Type::FPType(_) => Ok(Dimension::One(1)),
