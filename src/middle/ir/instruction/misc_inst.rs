@@ -292,6 +292,14 @@ impl Display for Phi {
 
 impl Instruction for Phi {
     gen_common_code!(Phi, Phi);
+
+    fn set_operand(&mut self, index: usize, operand: Operand) {
+        unsafe {
+            self.get_manager_mut().set_operand(index, operand.clone());
+        }
+        self.incoming_values[index].0 = operand;
+    }
+
     fn gen_llvm_ir(&self) -> String {
         let mut res = format!("{} = phi {} ", self, self.get_value_type());
         for (op, bb) in self.get_incoming_values() {
