@@ -2,7 +2,6 @@ use crate::{llvm2tac_binary_float, llvm2tac_three_op_float, llvm2tac_three_op_us
 
 use super::*;
 use builder::IRBuilder;
-use common::Dimension;
 use llvm_ir::{Constant, Name};
 use std::collections::HashMap;
 use var::FloatVar;
@@ -125,120 +124,11 @@ impl IRBuilder {
         }
     }
 
-    #[allow(unreachable_code)]
-    #[allow(unused)]
-    fn build_gep_inst(
-        gep: &llvm_ir::instruction::GetElementPtr,
-        stack_slots: &mut HashMap<Name, StackSlot>,
-        reg_gener: &mut RegGenerator,
-        regs: &mut HashMap<Name, Reg>,
-    ) -> Result<Vec<Inst>> {
-        dbg!(gep);
-        let mut ret: Vec<Inst> = Vec::new();
-        let (addr, pre_insert) = Self::prepare_address(&gep.address, reg_gener, stack_slots)?;
-        ret.extend(pre_insert);
-
-        // prepare base address
-        let base = match addr {
-            Operand::StackSlot(stack_slot) => {
-                let addr = reg_gener.gen_virtual_usual_reg();
-                let laddr = LocalAddr::new(addr, stack_slot);
-                ret.push(laddr.into());
-                dbg!(stack_slot);
-                todo!();
-                addr
-            }
-            Operand::Label(var) => {
-                let addr = reg_gener.gen_virtual_usual_reg();
-                let lla = LlaInst::new(addr, var);
-                ret.push(lla.into());
-                addr
-            }
-            _ => {
-                dbg!(addr);
-                unimplemented!();
-            }
-        };
-        let dims = Self::dims_from_gep_inst(gep)?;
-        let mut offset = reg_gener.gen_virtual_usual_reg();
-        assert!(dims.is_array_like());
-        let mut dims = Some(&dims);
-
-        // case 1: valid indices could last with only one local var idx, if there is a var idx, it must be the first one
-        // case 2: valid indices could only contains imm.
-        // FIXME: update dims to sub item
-        let mut first_var_idx_occur = false;
-        for idx in &gep.indices {
-            let Some(cur_dims) = dims else {
-                break;
-            };
-
-            let factor: Imm = cur_dims.size().try_into().with_context(|| context!())?;
-            let (factor, pre_insert) = Self::prepare_imm(&factor, reg_gener)?;
-            ret.extend(pre_insert);
-
-            let v = Self::value_from(idx, regs)?;
-            let idx = match v {
-                Operand::Imm(imm) => {
-                    dims = cur_dims.iter_subs().nth(imm.clone().try_into()?);
-
-                    let idx = reg_gener.gen_virtual_usual_reg();
-                    let li = LiInst::new(idx.into(), imm.into());
-                    ret.push(li.into());
-
-                    idx
-                }
-                Operand::Reg(idx) => {
-                    assert!(!first_var_idx_occur);
-                    first_var_idx_occur = true;
-                    idx
-                }
-                _ => {
-                    dbg!(v);
-                    unimplemented!();
-                }
-            };
-
-            let mut to_add = reg_gener.gen_virtual_usual_reg();
-
-            let mul = MulInst::new(to_add.into(), idx.into(), factor);
-            ret.push(mul.into());
-
-            let new_offset = reg_gener.gen_virtual_usual_reg();
-            let add = AddInst::new(new_offset.into(), offset.into(), to_add.into());
-            ret.push(add.into());
-            offset = new_offset;
-        }
-
-        let addr = reg_gener.gen_virtual_usual_reg();
-        let add = AddInst::new(addr.into(), base.into(), offset.into());
-        ret.push(add.into());
-
-        let addr = reg_gener.gen_virtual_usual_reg();
-        let slli = SllInst::new(addr.into(), addr.into(), 2.into());
-        ret.push(slli.into());
-
-        regs.insert(gep.dest.clone(), addr);
-
-        Ok(ret)
-    }
-
-    fn dims_from_gep_inst(gep: &llvm_ir::instruction::GetElementPtr) -> Result<Dimension> {
-        match &gep.address {
-            llvm_ir::Operand::LocalOperand { name: _, ty } => Self::dims_from_ty(ty),
-            llvm_ir::Operand::ConstantOperand(c) => match c.as_ref() {
-                Constant::GlobalReference { name: _, ty } => Self::dims_from_ty(ty),
-                _ => unimplemented!(),
-            },
-            llvm_ir::Operand::MetadataOperand => Err(anyhow!("").context(context!())),
-        }
-    }
-
     fn build_fpext(
         fpext: &llvm_ir::instruction::FPExt,
         regs: &mut HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
-        let src = Self::local_var_from(&fpext.operand, regs)?;
+        let src = Self::reg_from(&fpext.operand, regs)?;
         regs.insert(
             fpext.dest.clone(),
             src.try_into().with_context(|| context!())?,
@@ -314,7 +204,7 @@ impl IRBuilder {
             regs: &HashMap<Name, Reg>,
             insts: &mut Vec<Inst>,
         ) -> Result<Operand> {
-            let cond = IRBuilder::local_var_from(cond, regs)?;
+            let cond = IRBuilder::reg_from(cond, regs)?;
             let mid_var = reg_gener.gen_virtual_usual_reg();
             let seqz = SeqzInst::new(mid_var.into(), cond);
             insts.push(seqz.into());
@@ -360,7 +250,7 @@ impl IRBuilder {
         regs: &mut HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
         if Self::is_ty_int(&zext.to_type) {
-            let src = Self::local_var_from(&zext.operand, regs)?;
+            let src = Self::reg_from(&zext.operand, regs)?;
             let src: Reg = src.try_into().with_context(|| context!())?;
             regs.insert(zext.dest.clone(), src);
             Ok(vec![])
@@ -375,7 +265,7 @@ impl IRBuilder {
         regs: &mut HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
         if Self::is_ty_int(&sext.to_type) {
-            let src = Self::local_var_from(&sext.operand, regs)?;
+            let src = Self::reg_from(&sext.operand, regs)?;
             let src: Reg = src.try_into().with_context(|| context!())?;
             regs.insert(sext.dest.clone(), src);
         } else {
@@ -476,7 +366,7 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
-        let op = Self::local_var_from(&si2f.operand, regs)?;
+        let op = Self::reg_from(&si2f.operand, regs)?;
         let dst = Self::new_var(&si2f.to_type, reg_gener)?;
         regs.insert(si2f.dest.clone(), dst);
         let inst: Inst = if dst.is_usual() {
@@ -535,10 +425,11 @@ impl IRBuilder {
         regs: &HashMap<Name, Reg>,
         fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<Vec<Inst>> {
-        // dbg!(store);
+        dbg!(store);
         let mut ret: Vec<Inst> = Vec::new();
 
-        let (address, pre_insert) = Self::prepare_address(&store.address, reg_gener, stack_slots)?;
+        let (address, pre_insert) =
+            Self::prepare_address(&store.address, reg_gener, stack_slots, regs)?;
         ret.extend(pre_insert);
 
         let (value, pre_insts) = Self::prepare_lhs(&store.value, reg_gener, regs, fmms)?;
@@ -564,6 +455,13 @@ impl IRBuilder {
                     _ => unimplemented!("store instruction with other value"),
                 }
             }
+            Operand::Reg(addr) => match value {
+                Operand::Reg(val) => {
+                    let sw = SwInst::new(val, 0.into(), addr);
+                    ret.push(sw.into());
+                }
+                _ => unimplemented!("store instruction with other value"),
+            },
             _ => {
                 return Err(anyhow!(
                     "store instruction with invalid address {:?}",
@@ -591,7 +489,8 @@ impl IRBuilder {
         let dst_size = Self::mem_size_from(&load.loaded_ty)?;
         regs.insert(load.dest.clone(), dst_reg);
 
-        let (address, pre_insert) = Self::prepare_address(&load.address, reg_gener, stack_slots)?;
+        let (address, pre_insert) =
+            Self::prepare_address(&load.address, reg_gener, stack_slots, regs)?;
         ret.extend(pre_insert);
 
         match address {
@@ -688,7 +587,7 @@ impl IRBuilder {
                 ret_insts.push(Inst::Ret);
             }
             llvm_ir::Terminator::CondBr(cond_br) => {
-                let cond = Self::local_var_from(&cond_br.condition, regs)?;
+                let cond = Self::reg_from(&cond_br.condition, regs)?;
                 let true_label = Self::label_name_from(&cond_br.true_dest)?;
                 let false_label = Self::label_name_from(&cond_br.false_dest)?;
                 let beq = BeqInst::new(cond.try_into()?, REG_ZERO, false_label.into());
@@ -732,7 +631,7 @@ impl IRBuilder {
         let mut extra_arg_stack: i64 = 0;
         let mut phisic_arg_regs: Vec<Reg> = Vec::new();
         for (arg, _) in &call.arguments {
-            if let Ok(r) = Self::local_var_from(arg, regs) {
+            if let Ok(r) = Self::reg_from(arg, regs) {
                 let r: Reg = r.try_into()?;
                 if r.is_usual() && i_arg < 8 {
                     let reg = Reg::new(REG_A0.id() + i_arg, true);
