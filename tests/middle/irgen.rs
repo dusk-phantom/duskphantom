@@ -1083,7 +1083,7 @@ mod tests {
         let result = gen(&program).unwrap();
         let llvm_ir = result.module.gen_llvm_ir();
         assert_snapshot!(llvm_ir, @r###"
-        @A = dso_local constant [3 x [2 x [2 x float]]] [[2 x [2 x float]] [[2 x float] [float 0x3ff0000000000000, float 0x0000000000000000], [2 x float] [float 0x0000000000000000, float 0x0000000000000000]], [2 x [2 x float]] [[2 x float] [float 0x3ff0000000000000, float 0x4010000000000000], [2 x float] [float 0x4014000000000000, float 0x3ff0000000000000]], [2 x [2 x float]] [[2 x float] [float 0x4010000000000000, float 0x0000000000000000], [2 x float] [float 0x0000000000000000, float 0x0000000000000000]]]
+        @A = dso_local constant [3 x [2 x [2 x float]]] [[2 x [2 x float]] [[2 x float] [float 0x3ff0000000000000, float 0x0000000000000000], [2 x float] zeroinitializer], [2 x [2 x float]] [[2 x float] [float 0x3ff0000000000000, float 0x4010000000000000], [2 x float] [float 0x4014000000000000, float 0x3ff0000000000000]], [2 x [2 x float]] [[2 x float] [float 0x4010000000000000, float 0x0000000000000000], [2 x float] zeroinitializer]]
         declare i32 @getint()
         declare i32 @getch()
         declare float @getfloat()

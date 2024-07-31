@@ -16,15 +16,41 @@ impl IRBuilder {
             // dbg!(&global_var);
             let name = &global_var.name;
             let new_var = match &global_var.initializer {
-                middle::ir::Constant::SignedChar(_) => todo!(),
+                middle::ir::Constant::SignedChar(_) => unimplemented!(),
                 middle::ir::Constant::Int(i) => Self::build_int_var(name, *i)?,
                 middle::ir::Constant::Float(f) => Self::build_float_var(name, *f)?,
                 middle::ir::Constant::Bool(b) => Self::build_bool_var(name, *b)?,
                 middle::ir::Constant::Array(arr) => Self::build_arr_var(name, arr)?,
+                middle::ir::Constant::Zero(ty) => Self::build_zero_initializer(name, ty)?,
             };
             global_vars.push(new_var);
         }
         Ok(global_vars)
+    }
+
+    #[allow(unused)]
+    fn build_zero_initializer(name: &str, ty: &middle::ir::ValueType) -> Result<Var> {
+        match ty.get_base_type() {
+            middle::ir::ValueType::Int => {
+                let var: ArrVar<u32> = ArrVar {
+                    name: name.to_string(),
+                    capacity: ty.size(),
+                    init: vec![],
+                    is_const: false,
+                };
+                Ok(var.into())
+            }
+            middle::ir::ValueType::Float => {
+                let var: ArrVar<f32> = ArrVar {
+                    name: name.to_string(),
+                    capacity: ty.size(),
+                    init: vec![],
+                    is_const: false,
+                };
+                Ok(var.into())
+            }
+            _ => Err(anyhow!("can't zero init for type {:?}", ty)).with_context(|| context!()),
+        }
     }
 
     #[allow(unused)]
@@ -68,7 +94,7 @@ impl IRBuilder {
                 }
                 Constant::SignedChar(_) => unimplemented!(),
                 Constant::Bool(_) => unimplemented!(),
-                Constant::Array(_) => {
+                Constant::Array(_) | Constant::Zero(_) => {
                     Err(anyhow!("arr has been flattened: {:?}", first)).with_context(|| context!())
                 } // Cons
             }

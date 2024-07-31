@@ -7,6 +7,7 @@ pub enum Constant {
     Float(f32),
     Bool(bool),
     Array(Vec<Constant>),
+    Zero(ValueType),
 }
 
 impl std::fmt::Display for Constant {
@@ -34,6 +35,7 @@ impl std::fmt::Display for Constant {
                 }
                 write!(f, "]")
             }
+            Constant::Zero(_) => write!(f, "zeroinitializer"),
         }
     }
 }
@@ -49,6 +51,7 @@ impl Constant {
                 let sub_type = arr.first().unwrap().get_type();
                 ValueType::Array(Box::new(sub_type), arr.len())
             }
+            Constant::Zero(t) => t.clone(),
         }
     }
 }

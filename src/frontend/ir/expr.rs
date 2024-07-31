@@ -43,4 +43,8 @@ pub enum Expr {
     /// Application of binary operator.
     /// Example: `a + b`
     Binary(Box<Expr>, Vec<(BinaryOp, Expr)>),
+
+    /// Zero initializer.
+    /// Example: `zeroinitializer`
+    Zero(Box<Type>),
 }
