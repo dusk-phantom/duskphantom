@@ -197,23 +197,32 @@ impl IRBuilder {
     ) -> Result<Vec<Inst>> {
         let mut ret = Vec::new();
 
-        /* ---------- 计算 offset ---------- */
-
         let idxes = gep.get_index();
-        let capas = {
-            let mut v = Self::_cal_capas_rev(&gep.element_type);
-            v.reverse();
-            v
-        };
-        let (ofst, prepare) =
-            Self::_cal_offset(&capas, idxes, reg_gener, regs).with_context(|| context!())?;
+        let ty = gep.get_ptr().get_type();
+        // println!("{}", gep);
+        // dbg!(&ty);
+        let (_, ofst, prepare) =
+            Self::__cal_offset(&ty, idxes, reg_gener, regs).with_context(|| context!())?;
         ret.extend(prepare);
+        regs.insert(gep as *const _ as usize, ofst);
+
+        // // println!("gep: {}", gep);
+
+        // /* ---------- 计算 offset ---------- */
+        // let idxes = gep.get_index();
+        // let capas = {
+        //     let mut v = Self::_cal_capas_rev(&gep.element_type);
+        //     v.reverse();
+        //     v
+        // };
+        // let (ofst, prepare) =
+        //     Self::_cal_offset(&capas, idxes, reg_gener, regs).with_context(|| context!())?;
+        // ret.extend(prepare);
         let _mid = reg_gener.gen_virtual_usual_reg();
         let slli = SllInst::new(_mid.into(), ofst.into(), (2).into()); // FIXME sysy 的数据都是 4Byte, 但是我感觉我这里不严谨
         ret.push(slli.into());
 
-        /* ---------- base ---------- */
-
+        // /* ---------- base ---------- */
         let ptr = gep.get_ptr();
         let base: Operand =
             match Self::address_from(ptr, regs, stack_slots).with_context(|| context!())? {
@@ -386,14 +395,16 @@ impl IRBuilder {
             middle::ir::ValueType::Int
             | middle::ir::ValueType::Float
             | middle::ir::ValueType::Bool
-            | middle::ir::ValueType::SignedChar => 8,
+            | middle::ir::ValueType::SignedChar
+            | middle::ir::ValueType::Pointer(_) => 8,
             middle::ir::ValueType::Void => {
                 return Err(anyhow!("it can't alloca void")).with_context(|| context!())
             }
-            middle::ir::ValueType::Array(_, _) | middle::ir::ValueType::Pointer(_) => {
-                let capa = Self::_cal_capas_rev(&ty);
-                let sz: usize = capa.iter().product();
-                (sz << 2/* *4 */) as u32
+            middle::ir::ValueType::Array(_, _) => {
+                // let capa = Self::_cal_capas_rev(&ty);
+                // let sz: usize = capa.iter().product();
+                // (sz << 2/* *4 */) as u32
+                todo!()
             }
         };
         let ss = stack_allocator.alloc(bytes);
