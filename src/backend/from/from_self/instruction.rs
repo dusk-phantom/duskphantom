@@ -155,7 +155,7 @@ impl IRBuilder {
                 );
                 let src = Self::no_load_from(fptoi.get_src(), regs).with_context(|| context!())?;
                 let dst = reg_gener.gen_virtual_usual_reg();
-                let fcvtws = I2fInst::new(dst.into(), src); //
+                let fcvtws = F2iInst::new(dst.into(), src);
                 regs.insert(fptoi as *const _ as Address, dst);
                 Ok(vec![fcvtws.into()])
             }
