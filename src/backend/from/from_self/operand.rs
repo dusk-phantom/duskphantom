@@ -368,9 +368,10 @@ impl IRBuilder {
             middle::ir::ValueType::Void => {
                 Err(anyhow!("gep cann't be void: {}", ty)).with_context(|| context!())
             }
-            middle::ir::ValueType::SignedChar | middle::ir::ValueType::Int => todo!(),
+            middle::ir::ValueType::SignedChar
+            | middle::ir::ValueType::Int
+            | middle::ir::ValueType::Bool => todo!(),
             middle::ir::ValueType::Float => todo!(),
-            middle::ir::ValueType::Bool => todo!(),
             middle::ir::ValueType::Array(ty, sz) => {
                 let (idx, prepare) =
                     Self::prepare_rs1_i(&idxes[0], reg_gener, regs).with_context(|| context!())?;
@@ -406,14 +407,12 @@ impl IRBuilder {
                 let (idx, prepare) =
                     Self::prepare_rs1_i(&idxes[0], reg_gener, regs).with_context(|| context!())?;
                 ret.extend(prepare);
+                // dbg!(poi);
                 if idxes.len() > 1 {
-                    dbg!(poi);
-                    let (factor, acc, prepare) =
-                        Self::__cal_offset(ty, &idxes[1..], reg_gener, regs)
+                    let (factor /* 指向的数组的大小 */, acc, prepare) =
+                        Self::__cal_offset(poi, &idxes[1..], reg_gener, regs)
                             .with_context(|| context!())?;
                     ret.extend(prepare);
-                    // let factor = sz * factor;
-                    // TODO 这里是有问题的，我需要拿到大小
                     let dst0 = reg_gener.gen_virtual_usual_reg();
                     let li = LiInst::new(dst0.into(), (factor as i64).into());
                     ret.push(li.into());
