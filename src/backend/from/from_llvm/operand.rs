@@ -140,6 +140,7 @@ impl IRBuilder {
         }
     }
 
+    #[inline]
     pub fn prepare_imm_lhs(
         imm: &Imm,
         reg_gener: &mut RegGenerator,
