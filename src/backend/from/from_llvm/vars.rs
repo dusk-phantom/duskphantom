@@ -1,5 +1,6 @@
 use super::*;
 use builder::IRBuilder;
+use common::Dimension;
 use llvm_ir::{constant::Float, Constant, ConstantRef, Type};
 
 use rayon::iter::Either;
@@ -88,6 +89,7 @@ impl IRBuilder {
         };
         Ok(var)
     }
+
     pub fn cap_inits_from_struct(values: &[ConstantRef]) -> Result<(usize, Vec<(usize, u32)>)> {
         let mut init: Vec<(usize, u32)> = Vec::new();
         let mut capacity = 0;
@@ -106,7 +108,7 @@ impl IRBuilder {
                     }
                 }
                 Constant::AggregateZero(arr) => {
-                    let cap = Self::cap_from_empty_array(arr);
+                    let cap = Self::dims_from_ty(arr)?.size();
                     capacity += cap;
                 }
                 Constant::Array {
@@ -154,7 +156,7 @@ impl IRBuilder {
                 }
             };
         }
-        #[allow(clippy::never_loop)]
+
         for value in values.iter() {
             match value.as_ref() {
                 Constant::Int { bits: _, value: _ } => {
@@ -196,7 +198,7 @@ impl IRBuilder {
     /// 处理0初始化的数组
     #[inline]
     pub fn build_aggregate_zero_var(name: &str, arr: &Type) -> Result<Var> {
-        let capacity = Self::cap_from_empty_array(arr);
+        let capacity = Self::dims_from_ty(arr)?.size();
         let base_ty = Self::basic_element_type(arr);
         if Self::is_ty_int(base_ty) {
             let var = ArrVar::<u32> {
@@ -217,40 +219,6 @@ impl IRBuilder {
         } else {
             dbg!(base_ty);
             unimplemented!();
-        }
-    }
-
-    #[allow(clippy::if_same_then_else)]
-    pub fn cap_from_empty_array(ty: &llvm_ir::Type) -> usize {
-        match ty {
-            llvm_ir::Type::ArrayType {
-                element_type,
-                num_elements,
-            } => {
-                let e_cap = if Self::is_ty_int(element_type) || Self::is_ty_float(element_type) {
-                    1
-                } else if Self::is_ty_array_type(element_type) {
-                    Self::cap_from_empty_array(element_type)
-                } else if let llvm_ir::types::Type::StructType {
-                    element_types,
-                    is_packed: _,
-                } = element_type.as_ref()
-                {
-                    element_types
-                        .iter()
-                        .map(|t| Self::cap_from_empty_array(t))
-                        .sum()
-                } else {
-                    dbg!(ty);
-                    unimplemented!();
-                };
-                *num_elements * e_cap
-            }
-            llvm_ir::Type::IntegerType { .. } => 1,
-            _ => {
-                dbg!(ty);
-                unimplemented!();
-            }
         }
     }
 
@@ -289,7 +257,6 @@ impl IRBuilder {
     }
 
     /// 处理有初始值的数组,返回(数组容量,数组初始值)
-    #[allow(unused)]
     pub fn cap_inits_from_array(
         e_ty: &Type,
         elems: &[ConstantRef],
@@ -297,7 +264,7 @@ impl IRBuilder {
         // 首先处理递归基线 process recursive base line
         // 递归基线1: 空数组 base line 1: empty array
         if elems.is_empty() {
-            let capacity = Self::cap_from_empty_array(e_ty);
+            let capacity = Self::dims_from_ty(e_ty)?.size();
             return Ok((capacity, vec![]));
         }
         // 递归基线2: 数组元素为常量 base line 2: array elements are constants
@@ -332,7 +299,7 @@ impl IRBuilder {
                 total_inits.extend(inits.into_iter().map(|(i, f)| (i + total_capacity, f)));
                 total_capacity += cap;
             } else if let Constant::AggregateZero(arr) = elem.as_ref() {
-                let cap = Self::cap_from_empty_array(arr);
+                let cap = Self::dims_from_ty(arr)?.size();
                 total_capacity += cap;
             } else {
                 unimplemented!();
@@ -353,6 +320,35 @@ impl IRBuilder {
             llvm_ir::Type::IntegerType { .. } => ty,
             llvm_ir::Type::FPType { .. } => ty,
             _ => unimplemented!("basic_element_type"),
+        }
+    }
+
+    #[inline]
+    pub fn dims_from_ty(ty: &llvm_ir::Type) -> Result<Dimension> {
+        match ty {
+            llvm_ir::Type::ArrayType {
+                element_type,
+                num_elements,
+            } => {
+                let suf_dims = Self::dims_from_ty(element_type)?;
+                let dims = Dimension::Mixture(vec![suf_dims; *num_elements]);
+                Ok(dims)
+            }
+            llvm_ir::Type::StructType {
+                element_types,
+                is_packed: _,
+            } => {
+                let mut dims = Vec::new();
+                for e_ty in element_types.iter() {
+                    let suf_dims = Self::dims_from_ty(e_ty)?;
+                    dims.push(suf_dims);
+                }
+                Ok(Dimension::Mixture(dims))
+            }
+            llvm_ir::Type::IntegerType { bits: _ } => Ok(Dimension::One(1)),
+            llvm_ir::Type::FPType(_) => Ok(Dimension::One(1)),
+            Type::PointerType { addr_space: _ } => Ok(Dimension::One(1)),
+            _ => unimplemented!(),
         }
     }
 }

@@ -1,4 +1,4 @@
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Dimension {
     One(usize),
     Mixture(Vec<Dimension>),
@@ -38,5 +38,20 @@ impl Dimension {
             }
         }
         ret
+    }
+
+    // check if each dimension in the same layer has the same type,thus is a array like [0;n] or [[0;n];m]
+    pub fn is_array_like(&self) -> bool {
+        match self {
+            Dimension::One(_) => true,
+            Dimension::Mixture(dims) => {
+                let mut it = dims.iter();
+                if let Some(first) = it.next() {
+                    it.all(|dim| dim == first)
+                } else {
+                    true
+                }
+            }
+        }
     }
 }

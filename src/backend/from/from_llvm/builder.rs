@@ -310,7 +310,7 @@ impl IRBuilder {
         let mut float_idx = 0;
         let mut usual_idx = 0;
         for param in f.parameters.iter() {
-            let is_usual = if Self::is_ty_int(&param.ty) {
+            let is_usual = if Self::is_ty_int(&param.ty) || Self::is_ty_ptr(&param.ty) {
                 true
             } else {
                 assert!(Self::is_ty_float(&param.ty));
