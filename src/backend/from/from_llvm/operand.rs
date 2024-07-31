@@ -23,6 +23,10 @@ impl IRBuilder {
         matches!(ty, llvm_ir::Type::IntegerType { bits: _ })
     }
 
+    pub fn is_ty_ptr(ty: &llvm_ir::Type) -> bool {
+        matches!(ty, llvm_ir::Type::PointerType { addr_space: _ })
+    }
+
     pub fn is_ty_float(ty: &llvm_ir::Type) -> bool {
         matches!(ty, llvm_ir::Type::FPType(_))
     }
@@ -116,6 +120,16 @@ impl IRBuilder {
             Ok(c)
         } else {
             Err(anyhow!("value neither is reg or const:{}", operand)).with_context(|| context!())
+        }
+    }
+
+    pub fn prepare_imm(imm: &Imm, reg_gener: &mut RegGenerator) -> Result<(Operand, Option<Inst>)> {
+        if imm.in_limit(12) {
+            Ok((Operand::Imm(imm.clone()), None))
+        } else {
+            let dst = reg_gener.gen_virtual_usual_reg();
+            let li = LiInst::new(dst.into(), imm.into());
+            Ok((dst.into(), Some(li.into())))
         }
     }
 
@@ -309,88 +323,17 @@ impl IRBuilder {
                     dbg!(gep);
                     match gep.address.as_ref() {
                         Constant::GlobalReference { name: _, ty } => {
+                            let dims = Self::dims_from_ty(ty)?;
                             let arr_label = Self::globalname_from_operand(operand)?;
                             // dbg!(gep);
                             // lla base <arr_label>; mul of0 <index[0]> <size[0]>; add base base of0
-                            let dims = Self::dimensions_from_array(ty)?;
                             let idxs = Self::indices_from_gep(gep)?;
-                            assert!(idxs.len() == dims.len());
                             let base_reg = reg_gener.gen_virtual_usual_reg();
                             let lla = LlaInst::new(base_reg, arr_label.into());
                             pre_insert.push(lla.into());
+                            unimplemented!();
 
-                            let mut sizes = {
-                                let mut sizes = Vec::new();
-                                let mut size = 1;
-                                for dim in dims.iter().rev() {
-                                    sizes.push(size);
-                                    size *= dim;
-                                }
-                                sizes.reverse();
-                                sizes
-                            };
-                            assert!(sizes.len() == idxs.len());
-
-                            let mut offset = REG_ZERO;
-                            for (idx, factor) in idxs.iter().zip(sizes.iter()) {
-                                if factor == &1 {
-                                    let to_add: Imm = (*idx as i64).into();
-                                    let rhs: Operand = if to_add.in_limit(12) {
-                                        to_add.clone().into()
-                                    } else {
-                                        let rhs = reg_gener.gen_virtual_usual_reg();
-                                        let li = LiInst::new(rhs.into(), to_add.clone().into());
-                                        pre_insert.push(li.into());
-                                        rhs.into()
-                                    };
-
-                                    let new_offset = reg_gener.gen_virtual_usual_reg();
-                                    let add = AddInst::new(
-                                        new_offset.into(),
-                                        offset.into(),
-                                        to_add.into(),
-                                    );
-                                    offset = new_offset;
-                                    pre_insert.push(add.into());
-                                    continue;
-                                }
-
-                                // Note!!! the factor is a usize, so such conversion is not always safe
-                                let factor: Imm = (*factor as i64).into();
-                                let to_add = reg_gener.gen_virtual_usual_reg();
-                                let lhs = reg_gener.gen_virtual_usual_reg();
-
-                                // Note!!! the idx is a usize, so it is not always save to convert it to i64
-                                let li = LiInst::new(lhs.into(), (*idx as i64).into());
-                                pre_insert.push(li.into());
-
-                                let rhs = if factor.in_limit(12) {
-                                    factor.into()
-                                } else {
-                                    let rhs = reg_gener.gen_virtual_usual_reg();
-                                    let li = LiInst::new(rhs.into(), factor.into());
-                                    pre_insert.push(li.into());
-                                    rhs.into()
-                                };
-
-                                let mul = MulInst::new(to_add.into(), lhs.into(), rhs);
-                                pre_insert.push(mul.into());
-
-                                let new_offset = reg_gener.gen_virtual_usual_reg();
-                                let add =
-                                    AddInst::new(new_offset.into(), offset.into(), to_add.into());
-                                offset = new_offset;
-                                pre_insert.push(add.into());
-                            }
-
-                            let addr = reg_gener.gen_virtual_usual_reg();
-                            let add = AddInst::new(addr.into(), base_reg.into(), offset.into());
-                            pre_insert.push(add.into());
-
-                            let addr = reg_gener.gen_virtual_usual_reg();
-                            let slli = SllInst::new(addr.into(), addr.into(), 2.into());
-                            pre_insert.push(slli.into());
-
+                            let mut addr = reg_gener.gen_virtual_usual_reg();
                             addr.into()
                         }
                         _ => unimplemented!(),
@@ -444,24 +387,6 @@ impl IRBuilder {
         };
         fmms.entry(fmm.clone()).or_insert_with(new_f_var);
         fmms.get(fmm).ok_or(anyhow!("")).with_context(|| context!())
-    }
-
-    #[inline]
-    pub fn dimensions_from_array(arr_ty: &llvm_ir::Type) -> Result<Vec<usize>> {
-        match arr_ty {
-            llvm_ir::Type::ArrayType {
-                element_type,
-                num_elements,
-            } => {
-                let mut dims = vec![*num_elements];
-                let suf_dims = Self::dimensions_from_array(element_type)?;
-                dims.extend(suf_dims);
-                Ok(dims)
-            }
-            llvm_ir::Type::IntegerType { bits: _ } => Ok(vec![]),
-            llvm_ir::Type::FPType(_) => Ok(vec![]),
-            _ => unimplemented!(),
-        }
     }
 
     #[inline]

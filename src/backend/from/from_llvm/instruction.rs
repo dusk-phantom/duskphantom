@@ -2,6 +2,7 @@ use crate::{llvm2tac_binary_float, llvm2tac_three_op_float, llvm2tac_three_op_us
 
 use super::*;
 use builder::IRBuilder;
+use common::Dimension;
 use llvm_ir::{Constant, Name};
 use std::collections::HashMap;
 use var::FloatVar;
@@ -88,7 +89,9 @@ impl IRBuilder {
             llvm_ir::Instruction::Fence(_) => todo!(),
             llvm_ir::Instruction::CmpXchg(_) => todo!(),
             llvm_ir::Instruction::AtomicRMW(_) => todo!(),
-            llvm_ir::Instruction::GetElementPtr(_) => todo!(),
+            llvm_ir::Instruction::GetElementPtr(gep) => {
+                Self::build_gep_inst(gep, stack_slots, reg_gener, regs)
+            }
             llvm_ir::Instruction::Trunc(_) => todo!(),
             llvm_ir::Instruction::ZExt(zext) => Self::build_zext_inst(zext, reg_gener, regs),
             llvm_ir::Instruction::SExt(sext) => Self::build_sext_inst(sext, reg_gener, regs),
@@ -119,6 +122,115 @@ impl IRBuilder {
             llvm_ir::Instruction::LandingPad(_) => todo!(),
             llvm_ir::Instruction::CatchPad(_) => todo!(),
             llvm_ir::Instruction::CleanupPad(_) => todo!(),
+        }
+    }
+
+    #[allow(unreachable_code)]
+    #[allow(unused)]
+    fn build_gep_inst(
+        gep: &llvm_ir::instruction::GetElementPtr,
+        stack_slots: &mut HashMap<Name, StackSlot>,
+        reg_gener: &mut RegGenerator,
+        regs: &mut HashMap<Name, Reg>,
+    ) -> Result<Vec<Inst>> {
+        dbg!(gep);
+        let mut ret: Vec<Inst> = Vec::new();
+        let (addr, pre_insert) = Self::prepare_address(&gep.address, reg_gener, stack_slots)?;
+        ret.extend(pre_insert);
+
+        // prepare base address
+        let base = match addr {
+            Operand::StackSlot(stack_slot) => {
+                let addr = reg_gener.gen_virtual_usual_reg();
+                let laddr = LocalAddr::new(addr, stack_slot);
+                ret.push(laddr.into());
+                dbg!(stack_slot);
+                todo!();
+                addr
+            }
+            Operand::Label(var) => {
+                let addr = reg_gener.gen_virtual_usual_reg();
+                let lla = LlaInst::new(addr, var);
+                ret.push(lla.into());
+                addr
+            }
+            _ => {
+                dbg!(addr);
+                unimplemented!();
+            }
+        };
+        let dims = Self::dims_from_gep_inst(gep)?;
+        let mut offset = reg_gener.gen_virtual_usual_reg();
+        assert!(dims.is_array_like());
+        let mut dims = Some(&dims);
+
+        // case 1: valid indices could last with only one local var idx, if there is a var idx, it must be the first one
+        // case 2: valid indices could only contains imm.
+        // FIXME: update dims to sub item
+        let mut first_var_idx_occur = false;
+        for idx in &gep.indices {
+            let Some(cur_dims) = dims else {
+                break;
+            };
+
+            let factor: Imm = cur_dims.size().try_into().with_context(|| context!())?;
+            let (factor, pre_insert) = Self::prepare_imm(&factor, reg_gener)?;
+            ret.extend(pre_insert);
+
+            let v = Self::value_from(idx, regs)?;
+            let idx = match v {
+                Operand::Imm(imm) => {
+                    dims = cur_dims.iter_subs().nth(imm.clone().try_into()?);
+
+                    let idx = reg_gener.gen_virtual_usual_reg();
+                    let li = LiInst::new(idx.into(), imm.into());
+                    ret.push(li.into());
+
+                    idx
+                }
+                Operand::Reg(idx) => {
+                    assert!(!first_var_idx_occur);
+                    first_var_idx_occur = true;
+                    idx
+                }
+                _ => {
+                    dbg!(v);
+                    unimplemented!();
+                }
+            };
+
+            let mut to_add = reg_gener.gen_virtual_usual_reg();
+
+            let mul = MulInst::new(to_add.into(), idx.into(), factor);
+            ret.push(mul.into());
+
+            let new_offset = reg_gener.gen_virtual_usual_reg();
+            let add = AddInst::new(new_offset.into(), offset.into(), to_add.into());
+            ret.push(add.into());
+            offset = new_offset;
+        }
+
+        let addr = reg_gener.gen_virtual_usual_reg();
+        let add = AddInst::new(addr.into(), base.into(), offset.into());
+        ret.push(add.into());
+
+        let addr = reg_gener.gen_virtual_usual_reg();
+        let slli = SllInst::new(addr.into(), addr.into(), 2.into());
+        ret.push(slli.into());
+
+        regs.insert(gep.dest.clone(), addr);
+
+        Ok(ret)
+    }
+
+    fn dims_from_gep_inst(gep: &llvm_ir::instruction::GetElementPtr) -> Result<Dimension> {
+        match &gep.address {
+            llvm_ir::Operand::LocalOperand { name: _, ty } => Self::dims_from_ty(ty),
+            llvm_ir::Operand::ConstantOperand(c) => match c.as_ref() {
+                Constant::GlobalReference { name: _, ty } => Self::dims_from_ty(ty),
+                _ => unimplemented!(),
+            },
+            llvm_ir::Operand::MetadataOperand => Err(anyhow!("").context(context!())),
         }
     }
 
@@ -399,8 +511,8 @@ impl IRBuilder {
                 num_elements: _,
             } => {
                 let e_ty = Self::basic_element_type(&ty);
-                let dims = Self::dimensions_from_array(&ty)?;
-                let cap: usize = dims.into_iter().product();
+                let dims = Self::dims_from_ty(&ty)?;
+                let cap: usize = dims.size();
                 let cap: u32 = cap.try_into().with_context(|| context!())?;
                 let e_size = Self::mem_size_from(e_ty)?.num_byte();
                 cap * e_size

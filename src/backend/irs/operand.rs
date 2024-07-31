@@ -583,6 +583,30 @@ impl TryInto<Reg> for Operand {
         }
     }
 }
+impl TryInto<Imm> for usize {
+    type Error = BackendError;
+    fn try_into(self) -> Result<Imm, Self::Error> {
+        if self > i64::MAX as usize {
+            Err(BackendError::InternalConsistencyError(
+                "usize is too large to convert to Imm".to_string(),
+            ))
+        } else {
+            Ok(Imm(self as i64))
+        }
+    }
+}
+impl TryInto<usize> for Imm {
+    type Error = BackendError;
+    fn try_into(self) -> Result<usize, Self::Error> {
+        if (i64::MAX as u128) < (usize::MAX as u128) && self.0 >= 0 {
+            Ok(self.0 as usize)
+        } else {
+            Err(BackendError::InternalConsistencyError(
+                "Imm is invalid  to convert to usize".to_string(),
+            ))
+        }
+    }
+}
 
 impl TryInto<Imm> for Operand {
     type Error = BackendError;
