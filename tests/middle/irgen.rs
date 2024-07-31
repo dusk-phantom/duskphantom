@@ -29,8 +29,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -86,8 +86,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -152,8 +152,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -213,8 +213,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -275,8 +275,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -337,8 +337,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -403,8 +403,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -478,8 +478,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -560,8 +560,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -615,8 +615,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -663,8 +663,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -715,8 +715,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -760,8 +760,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main(i32 %arg) {
@@ -807,8 +807,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -874,8 +874,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @func(i32 %p) {
@@ -942,8 +942,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1003,8 +1003,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1050,8 +1050,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1094,8 +1094,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1144,8 +1144,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @f([1 x [1 x i32]]* %x) {
@@ -1194,8 +1194,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1238,8 +1238,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1319,8 +1319,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1379,8 +1379,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1458,8 +1458,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1536,8 +1536,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1585,8 +1585,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1646,8 +1646,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1691,8 +1691,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1744,8 +1744,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1820,8 +1820,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1891,8 +1891,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1949,8 +1949,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -2016,8 +2016,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @select_sort(i32* %A, i32 %n) {
@@ -2076,8 +2076,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define void @f() {
@@ -2133,8 +2133,8 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -2197,14 +2197,59 @@ mod tests {
         declare i32 @getfarray(float* %p0)
         declare void @putarray(i32 %p0, i32* %p1)
         declare void @putfarray(i32 %p0, float* %p1)
-        declare void @starttime()
-        declare void @stoptime()
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
         entry:
         %alloca_2 = alloca i32
         %alloca_5 = alloca [25 x i32]
+        store i32 0, ptr %alloca_2
+        br label %exit
+
+        exit:
+        %load_3 = load i32, ptr %alloca_2
+        ret i32 %load_3
+
+
+        }
+        "###);
+    }
+
+    #[test]
+    fn test_timing() {
+        let code = r#"
+        int main()
+        {
+            starttime();
+            stoptime();
+            return 0;
+        }
+        "#;
+        let program = parse(code).unwrap();
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_snapshot!(llvm_ir, @r###"
+        declare i32 @getint()
+        declare i32 @getch()
+        declare float @getfloat()
+        declare void @putint(i32 %p0)
+        declare void @putch(i32 %p0)
+        declare void @putfloat(float %p0)
+        declare i32 @getarray(i32* %p0)
+        declare i32 @getfarray(float* %p0)
+        declare void @putarray(i32 %p0, i32* %p1)
+        declare void @putfarray(i32 %p0, float* %p1)
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
+        declare void @putf()
+        declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
+        define i32 @main() {
+        entry:
+        %alloca_2 = alloca i32
+        call void @_sysy_starttime(i32 4)
+        call void @_sysy_stoptime(i32 5)
         store i32 0, ptr %alloca_2
         br label %exit
 
