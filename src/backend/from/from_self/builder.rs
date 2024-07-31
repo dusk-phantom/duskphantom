@@ -352,7 +352,7 @@ impl IRBuilder {
             } else if !is_usual && float_idx <= 7 {
                 let a_reg = Reg::new(REG_FA0.id() + float_idx, is_usual);
                 let mv = MvInst::new(v_reg.into(), a_reg.into());
-                insts.push(mv.into()); // TODO 但是 mv 指令可能有点问题, mv 是伪指令, 能不能 mv float, float ?
+                insts.push(mv.into());
                 float_idx += 1;
             } else if (is_usual && usual_idx > 7) || (!is_usual && float_idx > 7) {
                 let ld_inst = LdInst::new(v_reg, caller_regs_stack.into(), REG_S0);
