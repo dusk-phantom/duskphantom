@@ -5,7 +5,7 @@ use anyhow::{anyhow, Context, Result};
 use crate::backend::var::FloatVar;
 use crate::backend::{
     AddInst, Fmm, Inst, Label, LiInst, LlaInst, LwInst, MulInst, Operand, Reg, RegGenerator,
-    StackSlot, REG_ZERO,
+    StackSlot,
 };
 
 use crate::context;
@@ -336,59 +336,142 @@ impl IRBuilder {
     }
 
     /// int arr[][5][6] ==> [ 6, 5 ]
-    pub fn _cal_capas_rev(ty: &middle::ir::ValueType) -> Vec<usize> {
+    pub fn _cal_capas_factor(ty: &middle::ir::ValueType) -> Result<usize> {
         match ty {
-            middle::ir::ValueType::Float
-            | middle::ir::ValueType::Int
-            | middle::ir::ValueType::SignedChar
-            | middle::ir::ValueType::Bool
-            | middle::ir::ValueType::Void => Vec::new(),
-            middle::ir::ValueType::Array(_type, _size) => {
-                let _type = _type.as_ref();
-                let mut capas = Self::_cal_capas_rev(_type);
-                capas.push(*_size);
-                capas
+            middle::ir::ValueType::Void => {
+                Err(anyhow!("gep cann't be void: {}", ty)).with_context(|| context!())
             }
-            middle::ir::ValueType::Pointer(_ptr) => {
-                let _type = _ptr.as_ref();
-                Self::_cal_capas_rev(_type)
+            middle::ir::ValueType::Pointer(_) => todo!(),
+            middle::ir::ValueType::SignedChar
+            | middle::ir::ValueType::Int
+            | middle::ir::ValueType::Float
+            | middle::ir::ValueType::Bool => Ok(1),
+            middle::ir::ValueType::Array(ty, sz) => {
+                let ty = ty.as_ref();
+                Ok(sz * Self::_cal_capas_factor(ty).with_context(|| context!())?)
             }
         }
     }
 
-    /// 这里面不会在 regs 插入, 因此没法拿到指令的地址
-    pub fn _cal_offset(
-        capas: &[usize],
+    pub fn __cal_offset(
+        ty: &middle::ir::ValueType,
         idxes: &[middle::ir::Operand],
         reg_gener: &mut RegGenerator,
         regs: &HashMap<Address, Reg>,
-    ) -> Result<(Reg, Vec<Inst>)> {
-        let mut insts = Vec::new();
-        let idxes = {
-            let mut arr = Vec::new();
-            for idx in idxes.iter().skip(1) {
-                let (op, prepare) =
-                    Self::prepare_rs1_i(idx, reg_gener, regs).with_context(|| context!())?;
-                insts.extend(prepare);
-                arr.push(op);
+    ) -> Result<(
+        usize, /* 部分阶乘 */
+        Reg,   /* 部分结果 */
+        Vec<Inst>,
+    )> {
+        let mut ret = Vec::new();
+        match ty {
+            middle::ir::ValueType::Void => {
+                Err(anyhow!("gep cann't be void: {}", ty)).with_context(|| context!())
             }
-            arr
-        };
-        let mut factor: usize = capas[idxes.len()..].iter().product();
-        let mut acc: Reg = REG_ZERO;
-        for (idx, capa) in idxes.iter().zip(capas.iter()).rev() {
-            let rs2 = reg_gener.gen_virtual_usual_reg();
-            let li = LiInst::new(rs2.into(), (factor as i64).into());
-            insts.push(li.into());
-            let prdct = reg_gener.gen_virtual_usual_reg();
-            let mul = MulInst::new(prdct.into(), idx.clone(), rs2.into());
-            insts.push(mul.into());
-            let _acc = reg_gener.gen_virtual_usual_reg();
-            let add = AddInst::new(_acc.into(), prdct.into(), acc.into());
-            insts.push(add.into());
-            acc = _acc;
-            factor *= capa;
+            middle::ir::ValueType::SignedChar | middle::ir::ValueType::Int => todo!(),
+            middle::ir::ValueType::Float => todo!(),
+            middle::ir::ValueType::Bool => todo!(),
+            middle::ir::ValueType::Array(ty, sz) => {
+                let (idx, prepare) =
+                    Self::prepare_rs1_i(&idxes[0], reg_gener, regs).with_context(|| context!())?;
+                ret.extend(prepare);
+                if idxes.len() > 1 {
+                    let (factor, acc, prepare) =
+                        Self::__cal_offset(ty, &idxes[1..], reg_gener, regs)
+                            .with_context(|| context!())?;
+                    ret.extend(prepare);
+                    let factor = sz * factor;
+                    let dst0 = reg_gener.gen_virtual_usual_reg();
+                    let li = LiInst::new(dst0.into(), (factor as i64).into());
+                    ret.push(li.into());
+                    let dst1 = reg_gener.gen_virtual_usual_reg();
+                    let mul = MulInst::new(dst1.into(), idx.clone(), dst0.into());
+                    ret.push(mul.into());
+                    let _acc = reg_gener.gen_virtual_usual_reg();
+                    let add = AddInst::new(_acc.into(), acc.into(), dst1.into());
+                    ret.push(add.into());
+                    Ok((factor, _acc, ret))
+                } else {
+                    let factor = Self::_cal_capas_factor(ty).with_context(|| context!())?;
+                    let dst0 = reg_gener.gen_virtual_usual_reg();
+                    let li = LiInst::new(dst0.into(), (factor as i64).into());
+                    ret.push(li.into());
+                    let dst1 = reg_gener.gen_virtual_usual_reg();
+                    let mul = MulInst::new(dst1.into(), idx.clone(), dst0.into());
+                    ret.push(mul.into());
+                    Ok((factor, dst1, ret))
+                }
+            }
+            middle::ir::ValueType::Pointer(poi) => {
+                let (idx, prepare) =
+                    Self::prepare_rs1_i(&idxes[0], reg_gener, regs).with_context(|| context!())?;
+                ret.extend(prepare);
+                if idxes.len() > 1 {
+                    dbg!(poi);
+                    let (factor, acc, prepare) =
+                        Self::__cal_offset(ty, &idxes[1..], reg_gener, regs)
+                            .with_context(|| context!())?;
+                    ret.extend(prepare);
+                    // let factor = sz * factor;
+                    // TODO 这里是有问题的，我需要拿到大小
+                    let dst0 = reg_gener.gen_virtual_usual_reg();
+                    let li = LiInst::new(dst0.into(), (factor as i64).into());
+                    ret.push(li.into());
+                    let dst1 = reg_gener.gen_virtual_usual_reg();
+                    let mul = MulInst::new(dst1.into(), idx.clone(), dst0.into());
+                    ret.push(mul.into());
+                    let _acc = reg_gener.gen_virtual_usual_reg();
+                    let add = AddInst::new(_acc.into(), acc.into(), dst1.into());
+                    ret.push(add.into());
+                    Ok((factor, _acc, ret))
+                } else {
+                    let factor = Self::_cal_capas_factor(poi).with_context(|| context!())?;
+                    let dst0 = reg_gener.gen_virtual_usual_reg();
+                    let li = LiInst::new(dst0.into(), (factor as i64).into());
+                    ret.push(li.into());
+                    let dst1 = reg_gener.gen_virtual_usual_reg();
+                    let mul = MulInst::new(dst1.into(), idx.clone(), dst0.into());
+                    ret.push(mul.into());
+                    Ok((factor, dst1, ret))
+                }
+                // 判断下面有没有了,
+            }
         }
-        Ok((acc, insts))
     }
+
+    // /// 这里面不会在 regs 插入, 因此没法拿到指令的地址
+    // pub fn _cal_offset(
+    //     capas: &[usize],
+    //     idxes: &[middle::ir::Operand],
+    //     reg_gener: &mut RegGenerator,
+    //     regs: &HashMap<Address, Reg>,
+    // ) -> Result<(Reg, Vec<Inst>)> {
+    //     let mut insts = Vec::new();
+    //     let idxes = {
+    //         let mut arr = Vec::new();
+    //         for idx in idxes.iter() {
+    //             let (op, prepare) =
+    //                 Self::prepare_rs1_i(idx, reg_gener, regs).with_context(|| context!())?;
+    //             insts.extend(prepare);
+    //             arr.push(op);
+    //         }
+    //         arr
+    //     };
+    //     let mut factor: usize = capas[idxes.len()..].iter().product();
+    //     let mut acc: Reg = REG_ZERO;
+    //     for (idx, capa) in idxes.iter().zip(capas.iter()).rev() {
+    //         let rs2 = reg_gener.gen_virtual_usual_reg();
+    //         let li = LiInst::new(rs2.into(), (factor as i64).into());
+    //         insts.push(li.into());
+    //         let prdct = reg_gener.gen_virtual_usual_reg();
+    //         let mul = MulInst::new(prdct.into(), idx.clone(), rs2.into());
+    //         insts.push(mul.into());
+    //         let _acc = reg_gener.gen_virtual_usual_reg();
+    //         let add = AddInst::new(_acc.into(), prdct.into(), acc.into());
+    //         insts.push(add.into());
+    //         acc = _acc;
+    //         factor *= capa;
+    //     }
+    //     Ok((acc, insts))
+    // }
 }
