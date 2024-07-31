@@ -543,7 +543,7 @@ impl IRBuilder {
                         let loadf = LwInst::new(REG_FA0, 0.into(), addr);
                         ret_insts.push(loadf.into());
                     }
-                    middle::ir::Constant::Array(_) => {
+                    middle::ir::Constant::Array(_) | middle::ir::Constant::Zero(_) => {
                         return Err(anyhow!("return array is not allow:{}", op))
                             .with_context(|| context!())
                     }

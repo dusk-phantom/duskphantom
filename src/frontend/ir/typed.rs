@@ -64,15 +64,7 @@ impl Type {
             Type::Int => Ok(Expr::Int(0)),
             Type::Float => Ok(Expr::Float(0.0)),
             Type::Bool => Ok(Expr::Bool(false)),
-            Type::Array(element_type, size) => {
-                let Expr::Int(size) = **size else {
-                    return Err(anyhow!("Array size must be integer")).with_context(|| context!());
-                };
-                Ok(Expr::Array(vec![
-                    element_type.default_initializer()?;
-                    size as usize
-                ]))
-            }
+            Type::Array(_, _) => Ok(Expr::Zero(self.clone().into())),
             _ => Err(anyhow!("Cannot initialize type {:?}", self)).with_context(|| context!()),
         }
     }

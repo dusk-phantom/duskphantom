@@ -3,12 +3,15 @@ use crate::frontend::Expr;
 use crate::middle::ir::Constant;
 use anyhow::{anyhow, Context, Result};
 
+use super::gen_type::gen_type;
+
 /// Generate constant expression
 pub fn gen_const(expr: &Expr) -> Result<Constant> {
     match expr {
         Expr::Array(ls) => Ok(Constant::Array(
             ls.iter().map(gen_const).collect::<anyhow::Result<_, _>>()?,
         )),
+        Expr::Zero(ty) => Ok(Constant::Zero(gen_type(ty)?)),
         Expr::Int(x) => Ok(Constant::Int(*x)),
         Expr::Float(x) => Ok(Constant::Float(*x)),
         Expr::String(str) => {
