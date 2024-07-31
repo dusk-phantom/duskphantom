@@ -40,7 +40,7 @@ impl IRBuilder {
                 let store = downcast_ref::<middle::ir::instruction::memory_op_inst::Store>(
                     inst.as_ref().as_ref(),
                 );
-                Self::build_store_inst(store, stack_slots, reg_gener, regs)
+                Self::build_store_inst(store, stack_slots, reg_gener, regs, fmms)
             }
             middle::ir::instruction::InstType::Add => {
                 ssa2tac_three_usual_Itype!(AddInst, Add, inst, regs, reg_gener)
@@ -176,7 +176,7 @@ impl IRBuilder {
                     inst.as_ref().as_ref(),
                 );
                 // Self::build_call_inst(call, stack_allocator, stack_slots, reg_gener, regs)
-                Self::build_call_inst(call, reg_gener, regs)
+                Self::build_call_inst(call, reg_gener, regs, fmms)
             }
         }
     }
@@ -405,17 +405,19 @@ impl IRBuilder {
     }
 
     /// store 指令，有几种可能: 指针/数组、全局变量、栈
+    /// 要存的数据可能是: fmm/reg/imm
     pub fn build_store_inst(
         store: &middle::ir::instruction::memory_op_inst::Store,
         stack_slots: &HashMap<Address, StackSlot>,
         reg_gener: &mut RegGenerator,
         regs: &HashMap<Address, Reg>,
+        fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<Vec<Inst>> {
         let mut ret: Vec<Inst> = Vec::new();
         let addr =
             Self::address_from(store.get_ptr(), regs, stack_slots).with_context(|| context!())?;
-        let (val, prepare) =
-            Self::prepare_rs1_i(store.get_value(), reg_gener, regs).with_context(|| context!())?;
+        let (val, prepare) = Self::prepare_store_rs2(store.get_value(), reg_gener, regs, fmms)
+            .with_context(|| context!())?;
         let Operand::Reg(val) = val else {
             // 注意, 这里可能会出现 fmm 的情况
             return Err(anyhow!("store value is not reg")).with_context(|| context!());
@@ -666,6 +668,7 @@ impl IRBuilder {
         // stack_slots: &HashMap<Address, StackSlot>,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
+        fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<Vec<Inst>> {
         let mut call_insts: Vec<Inst> = Vec::new(); // build_call_inst 的返回值
 
@@ -681,18 +684,21 @@ impl IRBuilder {
             match ope {
                 Operand::Reg(r) => {
                     if r.is_usual() && i_arg_num < 8 {
+                        // i reg
                         let reg = Reg::new(REG_A0.id() + i_arg_num, true);
                         phisic_arg_regs.push(reg);
                         let mv = MvInst::new(reg.into(), ope);
                         call_insts.push(mv.into());
                         i_arg_num += 1;
                     } else if (!r.is_usual()) && f_arg_num < 8 {
+                        // f reg
                         let reg = Reg::new(REG_FA0.id() + f_arg_num, false);
                         phisic_arg_regs.push(reg);
                         let mv = MvInst::new(reg.into(), ope);
                         call_insts.push(mv.into());
                         f_arg_num += 1;
                     } else {
+                        // 额外参数 reg
                         let sd = SdInst::new(r, extra_arg_stack.into(), REG_SP);
                         extra_arg_stack += 8;
                         call_insts.push(sd.into());
@@ -700,13 +706,15 @@ impl IRBuilder {
                 }
                 Operand::Imm(imm) => {
                     if i_arg_num < 8 {
+                        // imm
                         let reg = Reg::new(REG_A0.id() + i_arg_num, true);
                         let li = LiInst::new(reg.into(), imm.into());
                         phisic_arg_regs.push(reg);
                         call_insts.push(li.into());
                         i_arg_num += 1;
                     } else {
-                        let reg = Reg::new(REG_A0.id() + i_arg_num, true);
+                        // imm 额外参数
+                        let reg = reg_gener.gen_virtual_usual_reg();
                         let li = LiInst::new(reg.into(), imm.into());
                         call_insts.push(li.into());
                         let sd = SdInst::new(reg, extra_arg_stack.into(), REG_SP);
@@ -716,17 +724,21 @@ impl IRBuilder {
                 }
                 Operand::Fmm(fmm) => {
                     if f_arg_num < 8 {
-                        // TODO 不一定是 li, 这里可能有问题, 可能是 flw/fld 之类的
-                        let reg = Reg::new(REG_FA0.id() + f_arg_num, false);
-                        let li = LiInst::new(reg.into(), fmm.into());
-                        phisic_arg_regs.push(reg);
-                        call_insts.push(li.into());
+                        // fmm
+                        let p_reg = Reg::new(REG_FA0.id() + f_arg_num, false);
+                        phisic_arg_regs.push(p_reg);
+                        let (v_reg, prepare) = Self::_prepare_fmm(&fmm, reg_gener, fmms)
+                            .with_context(|| context!())?;
+                        call_insts.extend(prepare);
+                        let mv = MvInst::new(p_reg.into(), v_reg.into());
+                        call_insts.push(mv.into());
                         f_arg_num += 1;
                     } else {
-                        let reg = Reg::new(REG_FA0.id() + f_arg_num, false);
-                        let li = LiInst::new(reg.into(), fmm.into());
-                        call_insts.push(li.into());
-                        let sd = SdInst::new(reg, extra_arg_stack.into(), REG_SP);
+                        // fmm 额外参数
+                        let (v_reg, prepare) = Self::_prepare_fmm(&fmm, reg_gener, fmms)
+                            .with_context(|| context!())?;
+                        call_insts.extend(prepare);
+                        let sd = SdInst::new(v_reg, extra_arg_stack.into(), REG_SP);
                         extra_arg_stack += 8;
                         call_insts.push(sd.into());
                     }
@@ -743,6 +755,7 @@ impl IRBuilder {
 
         // 函数是全局的，因此用的是名字
         let mut call_inst: CallInst = CallInst::new(call.func.name.to_string().into()); // call <一个全局的 name >
+        call_inst.add_uses(&phisic_arg_regs); // set reg uses for call_inst
 
         let dest_name = call as *const _ as Address;
 
