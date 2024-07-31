@@ -337,24 +337,7 @@ impl IRBuilder {
                     Self::globalname_from_operand(operand).map(|s| s.into())?
                 }
                 Constant::GetElementPtr(gep) => {
-                    dbg!(gep);
-                    match gep.address.as_ref() {
-                        Constant::GlobalReference { name: _, ty } => {
-                            let dims = Self::dims_from_ty(ty)?;
-                            let arr_label = Self::globalname_from_operand(operand)?;
-                            // dbg!(gep);
-                            // lla base <arr_label>; mul of0 <index[0]> <size[0]>; add base base of0
-                            let idxs = Self::indices_from_gep(gep)?;
-                            let base_reg = reg_gener.gen_virtual_usual_reg();
-                            let lla = LlaInst::new(base_reg, arr_label.into());
-                            pre_insert.push(lla.into());
-                            unimplemented!();
-
-                            let mut addr = reg_gener.gen_virtual_usual_reg();
-                            addr.into()
-                        }
-                        _ => unimplemented!(),
-                    }
+                    return Self::prepare_gep_address(gep, reg_gener, stack_slots, regs);
                 }
                 _ => {
                     dbg!(c);
@@ -367,6 +350,41 @@ impl IRBuilder {
             }
         };
         Ok((addr, pre_insert))
+    }
+
+    #[allow(unused)]
+    #[allow(clippy::diverging_sub_expression)]
+    fn prepare_gep_address(
+        gep: &llvm_ir::constant::GetElementPtr,
+        _reg_gener: &mut RegGenerator,
+        _stack_slots: &HashMap<Name, StackSlot>,
+        _regs: &HashMap<Name, Reg>,
+    ) -> Result<(Operand, Vec<Inst>)> {
+        let mut pre_insert: Vec<Inst> = Vec::new();
+        dbg!(gep);
+        let base: Operand = match gep.address.as_ref() {
+            Constant::AggregateZero(_) => todo!(),
+            Constant::Struct {
+                name,
+                values,
+                is_packed,
+            } => todo!(),
+            Constant::Array {
+                element_type,
+                elements,
+            } => todo!(),
+            Constant::GlobalReference { name, ty } => todo!(),
+            Constant::GetElementPtr(gep) => {
+                let (addr, sub_pre_insert) =
+                    Self::prepare_gep_address(gep, _reg_gener, _stack_slots, _regs)?;
+                pre_insert.extend(sub_pre_insert);
+                addr
+            }
+            _ => todo!(),
+        };
+        let final_addr = todo!();
+        unimplemented!();
+        Ok((final_addr, pre_insert))
     }
 
     #[inline]
