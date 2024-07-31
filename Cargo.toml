@@ -50,6 +50,7 @@ anyhow = "1.0.86"
 hexf-parse = "0.2.1"
 insta = "1.39.0"
 bitvec = "1.0.1"
+regex = "1.10.5"
 
 
 [dev-dependencies]

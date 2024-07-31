@@ -1,5 +1,6 @@
 pub mod ir;
 pub mod parse;
+pub mod preprocess;
 pub mod transform;
 
 pub use ir::*;

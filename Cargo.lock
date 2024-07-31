@@ -310,6 +310,7 @@ dependencies = [
  "once_cell",
  "rand",
  "rayon",
+ "regex",
  "serde",
  "serde_yaml",
  "tempfile",
