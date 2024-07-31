@@ -68,8 +68,11 @@ pub enum Inst {
     Lw(LwInst),
     Sw(SwInst),
     Lla(LlaInst),
+    // special load and store
     Load(LoadInst),
     Store(StoreInst),
+    // special load address of local var
+    LocalAddr(LocalAddr),
 
     // conversion operation
     I2f(I2fInst),
@@ -158,6 +161,7 @@ impl Inst {
             Inst::F2i(f2i) => f2i.gen_asm(),
             Inst::Snez(snez) => snez.gen_asm(),
             Inst::Not(not) => not.gen_asm(),
+            Inst::LocalAddr(local_addr) => local_addr.gen_asm(),
         }
     }
 }
@@ -217,6 +221,7 @@ impl RegReplace for Inst {
             Inst::Seqz(inst) => inst.replace_use(from, to),
             Inst::Snez(snez) => snez.replace_use(from, to),
             Inst::Not(not) => not.replace_use(from, to),
+            Inst::LocalAddr(laddr) => laddr.replace_use(from, to),
         }
     }
 
@@ -259,6 +264,7 @@ impl RegReplace for Inst {
             Inst::Seqz(inst) => inst.replace_def(from, to),
             Inst::Snez(snez) => snez.replace_def(from, to),
             Inst::Not(not) => not.replace_def(from, to),
+            Inst::LocalAddr(laddr) => laddr.replace_def(from, to),
         }
     }
 }
@@ -301,6 +307,7 @@ impl_inst_convert!(SwInst, Sw);
 impl_inst_convert!(LiInst, Li);
 impl_inst_convert!(LoadInst, Load);
 impl_inst_convert!(StoreInst, Store);
+impl_inst_convert!(LocalAddr, LocalAddr);
 
 // inst for conversion
 impl_inst_convert!(I2fInst, I2f);
