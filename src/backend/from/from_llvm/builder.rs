@@ -305,7 +305,7 @@ impl IRBuilder {
             .first()
             .ok_or(anyhow!("no basic block"))
             .with_context(|| context!())?;
-        let mut insts = Vec::new();
+        let mut insts: Vec<Inst> = Vec::new();
         let mut caller_regs_stack = 0;
         let mut float_idx = 0;
         let mut usual_idx = 0;
@@ -323,17 +323,17 @@ impl IRBuilder {
                 let mv = MvInst::new(v_reg.into(), a_reg.into());
                 insts.push(mv.into());
                 usual_idx += 1;
-            }
-            if !is_usual && float_idx <= 7 {
+            } else if !is_usual && float_idx <= 7 {
                 let a_reg = Reg::new(REG_FA0.id() + float_idx, is_usual);
                 let mv = MvInst::new(v_reg.into(), a_reg.into());
                 insts.push(mv.into());
                 float_idx += 1;
-            }
-            if (is_usual && usual_idx > 7) || (!is_usual && float_idx > 7) {
+            } else if (is_usual && usual_idx > 7) || (!is_usual && float_idx > 7) {
                 let ld_inst = LdInst::new(v_reg, caller_regs_stack.into(), REG_S0);
                 insts.push(ld_inst.into());
                 caller_regs_stack += 8;
+            } else {
+                unimplemented!();
             }
         }
 
