@@ -74,6 +74,15 @@ impl ValueType {
         }
     }
 
+    /// Get base type of the value type.
+    /// Base type is i32 / f32 for array.
+    pub fn get_base_type(&self) -> ValueType {
+        match self {
+            ValueType::Array(sub_type, _) => sub_type.get_base_type(),
+            _ => self.clone(),
+        }
+    }
+
     /// Get default initializer of this type.
     pub fn default_initializer(&self) -> Result<Constant> {
         match self {
@@ -87,10 +96,7 @@ impl ValueType {
             ValueType::Pointer(_) => {
                 Err(anyhow!("Cannot convert pointer type to constant")).with_context(|| context!())
             }
-            ValueType::Array(ty, num) => {
-                let inner_const = ty.default_initializer()?;
-                Ok(Constant::Array(vec![inner_const; *num]))
-            }
+            ValueType::Array(ty, _) => Ok(Constant::Zero(*ty.clone())),
         }
     }
 
