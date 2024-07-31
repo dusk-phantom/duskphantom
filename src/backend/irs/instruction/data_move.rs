@@ -169,6 +169,33 @@ impl LlaInst {
     }
 }
 
+// load_addr inst : a special inst use to get start addr of local var ,especaily those of type array
+#[derive(Debug, Clone)]
+pub struct LocalAddr {
+    dst: Reg,
+    src: StackSlot,
+}
+impl LocalAddr {
+    pub fn new(dst: Reg, src: StackSlot) -> Self {
+        Self { dst, src }
+    }
+    pub fn dst(&self) -> &Reg {
+        &self.dst
+    }
+    pub fn stack_slot(&self) -> &StackSlot {
+        &self.src
+    }
+    pub fn dst_mut(&mut self) -> &mut Reg {
+        &mut self.dst
+    }
+    pub fn stack_slot_mut(&mut self) -> &mut StackSlot {
+        &mut self.src
+    }
+    pub fn gen_asm(&self) -> String {
+        format!("load_addr {},{}", self.dst.gen_asm(), self.src.gen_asm())
+    }
+}
+
 //*********************************************************************************
 // impl RegReplace for data move inst
 //*********************************************************************************
@@ -244,6 +271,15 @@ impl RegReplace for LlaInst {
     fn replace_def(&mut self, from: Reg, to: Reg) -> Result<()> {
         if self.0 == from {
             self.0 = to;
+        }
+        Ok(())
+    }
+}
+
+impl RegReplace for LocalAddr {
+    fn replace_def(&mut self, from: Reg, to: Reg) -> Result<()> {
+        if self.dst == from {
+            self.dst = to;
         }
         Ok(())
     }

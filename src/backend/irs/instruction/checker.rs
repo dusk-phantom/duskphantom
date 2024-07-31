@@ -109,6 +109,8 @@ impl InstChecker for Riscv {
             // special inst to temporary express the load and store operation ,should not to keep in the final ir
             Inst::Load(_) => false,
             Inst::Store(_) => false,
+            // special inst to temporary express the local address ,should not to keep in the final ir
+            Inst::LocalAddr(_) => false,
 
             Inst::Jmp(_) => true,
             Inst::Beq(_) => true,

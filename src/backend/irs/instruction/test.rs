@@ -29,11 +29,18 @@ mod test_reg_def_use {
         assert_eq!(mv.uses(), vec![&REG_A1]);
         assert_eq!(mv.defs(), vec![&REG_A0]);
     }
+    #[test]
+    fn test_local_addr() {
+        let mut ssa = StackAllocator::new();
+        let l = LocalAddr::new(REG_A0, ssa.alloc(80));
+        assert!(l.uses().is_empty());
+        assert_eq!(l.defs(), vec![&REG_A0]);
+    }
 }
 
 #[cfg(test)]
 mod test_reg_replace {
-    use crate::backend::{RegDefs, RegUses, REG_A0};
+    use crate::backend::{LocalAddr, RegDefs, RegUses, StackAllocator, REG_A0};
 
     use super::irs::{NotInst, Reg, RegGenerator, RegReplace, REG_A1};
 
@@ -48,6 +55,7 @@ mod test_reg_replace {
         not.replace_def(r1, REG_A0).unwrap();
         assert_eq!(not.defs(), vec![&REG_A0]);
     }
+
     #[test]
     fn test_not_2() {
         let dst = Reg::new(40, true);
@@ -56,5 +64,14 @@ mod test_reg_replace {
         dbg!(&not);
         not.replace_def(dst, Reg::new(6, true)).unwrap();
         dbg!(&not);
+    }
+
+    #[test]
+    fn test_local_addr() {
+        let mut ssa = StackAllocator::new();
+        let mut l = LocalAddr::new(REG_A0, ssa.alloc(80));
+        assert_eq!(l.defs(), vec![&REG_A0]);
+        l.replace_def(REG_A0, REG_A1).unwrap();
+        assert_eq!(l.defs(), vec![&REG_A1]);
     }
 }

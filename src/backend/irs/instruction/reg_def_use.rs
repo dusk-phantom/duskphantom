@@ -52,6 +52,7 @@ impl RegUses for Inst {
             Inst::F2i(f2i) => f2i.uses(),
             Inst::Snez(snez) => snez.uses(),
             Inst::Not(not) => not.uses(),
+            Inst::LocalAddr(laddr) => laddr.uses(),
         }
     }
 }
@@ -95,6 +96,7 @@ impl RegDefs for Inst {
             Inst::F2i(f2i) => f2i.defs(),
             Inst::Snez(snez) => snez.defs(),
             Inst::Not(not) => not.defs(),
+            Inst::LocalAddr(laddr) => laddr.defs(),
         }
     }
 }
@@ -157,3 +159,10 @@ impl RegUses for StoreInst {
 }
 impl RegDefs for TailInst {}
 impl RegUses for TailInst {}
+
+impl RegDefs for LocalAddr {
+    fn defs(&self) -> Vec<&Reg> {
+        vec![self.dst()]
+    }
+}
+impl RegUses for LocalAddr {}
