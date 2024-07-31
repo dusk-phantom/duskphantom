@@ -1,3 +1,4 @@
+pub mod common;
 #[cfg(feature = "clang_enabled")]
 pub mod from_llvm;
 #[allow(deprecated)]
