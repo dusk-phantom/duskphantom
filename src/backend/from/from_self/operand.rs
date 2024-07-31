@@ -60,7 +60,7 @@ impl IRBuilder {
             middle::ir::Constant::Float(fla) => Operand::Fmm((*fla as f64).into()),
             middle::ir::Constant::Bool(boo) => Operand::Imm((*boo as i64).into()),
             middle::ir::Constant::SignedChar(sig) => Operand::Imm((*sig as i64).into()),
-            middle::ir::Constant::Array(_) => {
+            middle::ir::Constant::Array(_) | middle::ir::Constant::Zero(_) => {
                 return Err(anyhow!("const_from operand cann't not be array:{}", con))
                     .with_context(|| context!())
             }

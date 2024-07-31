@@ -14,8 +14,7 @@ pub fn reshape_const_array(arr: &mut VecDeque<Expr>, ty: &Type) -> Result<Expr> 
         let mut new_arr: Vec<Expr> = vec![];
         for _ in 0..size {
             let Some(first_item) = arr.pop_front() else {
-                // TODO use zero initializer
-                new_arr.push(reshape_const_array(arr, element_ty)?);
+                new_arr.push(element_ty.default_initializer()?);
                 continue;
             };
             if let Expr::Array(arr) = first_item {
@@ -28,11 +27,8 @@ pub fn reshape_const_array(arr: &mut VecDeque<Expr>, ty: &Type) -> Result<Expr> 
             }
         }
         Ok(Expr::Array(new_arr))
-    } else if let Some(val) = arr.pop_front() {
-        Ok(val)
     } else {
-        // TODO use zero initializer
-        ty.default_initializer()
+        Ok(arr.pop_front().unwrap())
     }
 }
 
