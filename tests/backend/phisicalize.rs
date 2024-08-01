@@ -26,7 +26,7 @@ fn test_handle_offset_overflow() {
         max_callee_regs_stack: None,
         stack_allocator: Some(
             StackAllocator {
-                alloc_from: 2440,
+                alloc_from: 2432,
             },
         ),
         entry: Block {
@@ -73,7 +73,7 @@ fn test_handle_offset_overflow() {
                         ),
                         Imm(
                             Imm(
-                                -2448,
+                                -2432,
                             ),
                         ),
                     ),

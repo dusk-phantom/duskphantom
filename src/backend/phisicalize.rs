@@ -140,6 +140,7 @@ fn handle_caller_save(func: &mut Func) -> Result<()> {
         }
     }
     regs.retain(|r| Reg::caller_save_regs().contains(r));
+    regs.retain(|r| !tmp_i_regs().contains(r) && !tmp_f_regs().contains(r));
 
     // 为这些物理寄存器分配栈上空间,并在函数调用前后保存和恢复这些寄存器
     let mut stack_allocator = func
