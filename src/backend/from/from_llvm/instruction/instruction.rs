@@ -687,6 +687,22 @@ impl IRBuilder {
                     dbg!(v);
                     unimplemented!();
                 }
+            } else if let Ok(ss) = Self::stack_slot_from(arg, stack_slots) {
+                // this case if for pass ptr of local var to function
+                if i_arg < 8 {
+                    let reg = Reg::new(REG_A0.id() + i_arg, true);
+                    phisic_arg_regs.push(reg);
+                    let laddr = LocalAddr::new(reg, ss);
+                    ret.push(laddr.into());
+                    i_arg += 1;
+                } else {
+                    let reg = reg_gener.gen_virtual_usual_reg();
+                    let laddr = LocalAddr::new(reg, ss);
+                    ret.push(laddr.into());
+
+                    let sd = SdInst::new(reg, extra_arg_stack.into(), REG_SP);
+                    extra_arg_stack += 8;
+                }
             } else {
                 dbg!(arg);
                 unimplemented!();

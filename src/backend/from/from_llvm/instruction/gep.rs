@@ -61,8 +61,6 @@ impl IRBuilder {
                 let addr = reg_gener.gen_virtual_usual_reg();
                 let laddr = LocalAddr::new(addr, stack_slot);
                 ret.push(laddr.into());
-                dbg!(stack_slot);
-                todo!();
                 addr
             }
             Operand::Label(var) => {

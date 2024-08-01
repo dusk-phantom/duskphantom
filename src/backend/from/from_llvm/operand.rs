@@ -86,6 +86,22 @@ impl IRBuilder {
         })
     }
 
+    pub fn stack_slot_from(
+        operand: &llvm_ir::Operand,
+        stack_slots: &HashMap<Name, StackSlot>,
+    ) -> Result<StackSlot> {
+        Ok(match operand {
+            llvm_ir::Operand::LocalOperand { name, ty: _ } => stack_slots
+                .get(name)
+                .cloned()
+                .ok_or(anyhow!("stack slot not found {}", name))?,
+            _ => {
+                return Err(anyhow!("operand is not local var:{}", operand))
+                    .with_context(|| context!());
+            }
+        })
+    }
+
     pub fn label_name_from(name: &llvm_ir::Name) -> Result<String> {
         let name = name.to_string();
         let name = &name
