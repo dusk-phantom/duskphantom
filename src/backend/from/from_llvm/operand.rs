@@ -362,7 +362,7 @@ impl IRBuilder {
         _regs: &HashMap<Name, Reg>,
     ) -> Result<(Operand, Vec<Inst>)> {
         let mut pre_insert: Vec<Inst> = Vec::new();
-        dbg!(gep);
+
         let base: Operand = match gep.address.as_ref() {
             Constant::AggregateZero(_) => todo!(),
             Constant::Struct {
@@ -423,24 +423,6 @@ impl IRBuilder {
         };
         fmms.entry(fmm.clone()).or_insert_with(new_f_var);
         fmms.get(fmm).ok_or(anyhow!("")).with_context(|| context!())
-    }
-
-    #[inline]
-    pub fn indices_from_gep(gep: &llvm_ir::constant::GetElementPtr) -> Result<Vec<usize>> {
-        let mut indices = Vec::new();
-        fn idx_from(c: &Constant) -> Result<usize> {
-            match c {
-                Constant::Int { bits: _, value } => Ok(*value as usize),
-                _ => {
-                    dbg!(c);
-                    unimplemented!();
-                }
-            }
-        }
-        for idx in &gep.indices {
-            indices.push(idx_from(idx)?);
-        }
-        Ok(indices)
     }
 
     #[inline]
