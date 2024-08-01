@@ -67,7 +67,7 @@ fn test_handle_offset_overflow() {
                     LiInst(
                         Reg(
                             Reg {
-                                id: 9,
+                                id: 5,
                                 is_usual: true,
                             },
                         ),
@@ -94,7 +94,7 @@ fn test_handle_offset_overflow() {
                         ),
                         Reg(
                             Reg {
-                                id: 9,
+                                id: 5,
                                 is_usual: true,
                             },
                         ),
@@ -308,23 +308,8 @@ fn test_handle_offset_overflow() {
                         },
                     ),
                 ),
-                Li(
-                    LiInst(
-                        Reg(
-                            Reg {
-                                id: 9,
-                                is_usual: true,
-                            },
-                        ),
-                        Imm(
-                            Imm(
-                                2448,
-                            ),
-                        ),
-                    ),
-                ),
-                Add(
-                    AddInst(
+                Mv(
+                    MvInst(
                         Reg(
                             Reg {
                                 id: 2,
@@ -333,13 +318,7 @@ fn test_handle_offset_overflow() {
                         ),
                         Reg(
                             Reg {
-                                id: 2,
-                                is_usual: true,
-                            },
-                        ),
-                        Reg(
-                            Reg {
-                                id: 9,
+                                id: 8,
                                 is_usual: true,
                             },
                         ),
