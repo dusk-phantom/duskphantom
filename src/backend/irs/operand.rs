@@ -506,18 +506,17 @@ impl Imm {
         format!("{}", self.0)
     }
     pub fn in_limit(&self, bits: usize) -> bool {
-        if bits <= 64 {
-            if bits == 0 {
-                return false;
-            }
-            let max = (1 << bits) - 1;
-            let min = -(1 << bits);
+        if (1..=64).contains(&bits) {
+            let max = (1 << (bits - 1)) - 1;
+            let min = -(1 << (bits - 1));
             self.0 <= max && self.0 >= min
         } else {
-            true
+            // if bits is 0, then no limit; else bits is greater than 64, then return false
+            bits != 0
         }
     }
 }
+
 impl Fmm {
     #[inline]
     pub fn gen_asm(&self) -> String {
