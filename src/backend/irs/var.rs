@@ -113,18 +113,3 @@ impl From<ArrVar<f32>> for Var {
         Var::FloatArr(value)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn test_gen_asm() {
-        let var = Var::IntArr(ArrVar {
-            name: "arr".to_string(),
-            capacity: 2,
-            init: vec![],
-            is_const: false,
-        });
-        dbg!(var.gen_asm());
-    }
-}

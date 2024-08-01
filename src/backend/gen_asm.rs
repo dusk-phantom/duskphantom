@@ -251,6 +251,7 @@ impl GenTool {
                     ret.push_str(&Self::gen_zero_fill(
                         (idx - prev_idx - 1) * size_elem as usize,
                     ));
+                    ret.push('\n');
                 }
             }
             ret.push_str(format!("{}\n", val.to_str()).as_str());
