@@ -14,6 +14,41 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
+        #[inline]
+        fn prepare_rhs_op(
+            op: &Operand,
+            reg_gener: &mut RegGenerator,
+        ) -> Result<(Operand, Vec<Inst>)> {
+            match &op {
+                Operand::Imm(imm) => {
+                    if imm.in_limit(12) {
+                        Ok((op.clone(), vec![]))
+                    } else {
+                        let r = reg_gener.gen_virtual_usual_reg();
+                        let li = LiInst::new(r.into(), op.clone());
+                        Ok((r.into(), vec![li.into()]))
+                    }
+                }
+                Operand::Reg(reg) => Ok((op.clone(), vec![])),
+                _ => unreachable!(),
+            }
+        }
+        #[inline]
+        fn prepare_lhs_reg(
+            op: &Operand,
+            reg_gener: &mut RegGenerator,
+        ) -> Result<(Operand, Vec<Inst>)> {
+            match op {
+                Operand::Imm(imm) => {
+                    let r = reg_gener.gen_virtual_usual_reg();
+                    let li = LiInst::new(r.into(), imm.into());
+                    Ok((r.into(), vec![li.into()]))
+                }
+                Operand::Reg(reg) => Ok((op.clone(), vec![])),
+                _ => unreachable!(),
+            }
+        }
+
         dbg!(gep);
         let mut ret: Vec<Inst> = Vec::new();
         let (addr, pre_insert) = Self::prepare_address(&gep.address, reg_gener, stack_slots, regs)
@@ -51,15 +86,31 @@ impl IRBuilder {
         let (offset, insts) = Self::process_first_idx(first_idx, &dims, reg_gener, regs)?;
         ret.extend(insts);
 
-        let mut offset = offset.unwrap_or(reg_gener.gen_virtual_usual_reg());
+        let mut offset = offset.map(Operand::from);
 
         let mut dims = Some(&dims);
         for idx in gep.indices.iter().skip(1) {
             if let Some(d) = dims {
-                let (new_offset, new_dims, insts) =
-                    Self::process_sub_idx(offset, idx, d, reg_gener, regs)?;
+                let (to_add, new_dims, insts) = Self::process_sub_idx(idx, d, reg_gener, regs)?;
                 ret.extend(insts);
-                offset = new_offset;
+
+                if let Some(off) = offset {
+                    let new_offset = reg_gener.gen_virtual_usual_reg();
+
+                    let (to_add, pre_insert) = prepare_rhs_op(&to_add, reg_gener)?;
+                    ret.extend(pre_insert);
+
+                    let (off, pre_insert) = prepare_lhs_reg(&off, reg_gener)?;
+                    ret.extend(pre_insert);
+
+                    let add = AddInst::new(new_offset.into(), off, to_add);
+                    ret.push(add.into());
+
+                    offset = Some(new_offset.into());
+                } else {
+                    offset = Some(to_add);
+                }
+
                 dims = new_dims;
             } else {
                 break;
@@ -67,7 +118,10 @@ impl IRBuilder {
         }
 
         let final_offset = reg_gener.gen_virtual_usual_reg();
-        let slli = SllInst::new(final_offset.into(), offset.into(), 2.into());
+        let (offset, pre_insert) = prepare_lhs_reg(&offset.unwrap(), reg_gener)?;
+        ret.extend(pre_insert);
+
+        let slli = SllInst::new(final_offset.into(), offset, 2.into());
         ret.push(slli.into());
 
         let final_addr = reg_gener.gen_virtual_usual_reg();
@@ -149,29 +203,25 @@ impl IRBuilder {
     }
 
     #[allow(unused)]
+    /// return (to_add, new_dims, insts)
     fn process_sub_idx<'a>(
-        offset: Reg,
         idx: &llvm_ir::Operand,
         dims: &'a Dimension,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
-    ) -> Result<(Reg, Option<&'a Dimension>, Vec<Inst>)> {
+    ) -> Result<(Operand, Option<&'a Dimension>, Vec<Inst>)> {
         let mut ret_insts: Vec<Inst> = Vec::new();
-        let mut offset = offset;
         let mut ret_dims = None;
 
         let idx = Self::value_from(idx, regs)?;
-        match idx {
+        let to_add: Operand = match idx {
             Operand::Imm(idx_imm) => {
                 // 根据idx_imm的值,计算offset的增量
                 let idx_u: usize = idx_imm.try_into()?;
                 let factor: usize = dims.iter_subs().take(idx_u).map(|d| d.size()).sum();
                 let factor: Imm = factor.try_into()?;
-                let new_offset = reg_gener.gen_virtual_usual_reg();
-                let add = AddInst::new(new_offset.into(), offset.into(), factor.into());
-                ret_insts.push(add.into());
-                offset = new_offset;
                 ret_dims = dims.iter_subs().nth(idx_u);
+                factor.into()
             }
             Operand::Reg(idx) => {
                 dbg!(dims);
@@ -187,24 +237,19 @@ impl IRBuilder {
                 ret_insts.extend(pre_insert);
 
                 let to_add = reg_gener.gen_virtual_usual_reg();
-                let new_offset = reg_gener.gen_virtual_usual_reg();
 
                 let mul = MulInst::new(to_add.into(), idx.into(), factor);
                 ret_insts.push(mul.into());
 
-                let add = AddInst::new(new_offset.into(), offset.into(), to_add.into());
-                ret_insts.push(add.into());
-
-                offset = new_offset;
-
                 ret_dims = dims.iter_subs().nth(0);
+                to_add.into()
             }
             _ => {
                 return Err(anyhow!("").context(context!()));
             }
-        }
+        };
 
-        Ok((offset, ret_dims, ret_insts))
+        Ok((to_add, ret_dims, ret_insts))
     }
 
     fn dims_from_gep_inst(gep: &llvm_ir::instruction::GetElementPtr) -> Result<Dimension> {
