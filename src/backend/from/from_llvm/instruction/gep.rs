@@ -1,9 +1,5 @@
-use builder::IRBuilder;
-
 use super::*;
 use common::Dimension;
-use llvm_ir::Name;
-use std::collections::HashMap;
 
 impl IRBuilder {
     #[allow(unreachable_code)]
@@ -49,7 +45,7 @@ impl IRBuilder {
             }
         }
 
-        dbg!(gep);
+        // dbg!(gep);
         let mut ret: Vec<Inst> = Vec::new();
         let (addr, pre_insert) = Self::prepare_address(&gep.address, reg_gener, stack_slots, regs)
             .with_context(|| context!())?;
@@ -222,7 +218,7 @@ impl IRBuilder {
                 factor.into()
             }
             Operand::Reg(idx) => {
-                dbg!(dims);
+                // dbg!(dims);
                 assert!(dims.is_array_like());
                 let e_dim = dims.iter_subs().next();
                 let factor = if let Some(e_dim) = e_dim {
