@@ -79,7 +79,7 @@ impl IRBuilder {
                     let mut arr: Vec<(usize, f32)> = Vec::new();
                     for (index, item) in flattened.iter().enumerate() {
                         let Constant::Float(f) = item else {
-                            return Err(anyhow!("can't not reveive a mixed arr: {:?}", first))
+                            return Err(anyhow!("can't not receive a mixed arr: {:?}", first))
                                 .with_context(|| context!());
                         };
                         arr.push((index, *f)); // 这个应该是位模式的转换
