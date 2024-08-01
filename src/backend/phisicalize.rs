@@ -275,28 +275,55 @@ fn handle_stack(func: &mut Func) -> Result<()> {
         sa.alloc(8);
     });
 
+    let mut to_insert_front: Vec<Inst> = vec![];
+
     let offset = if func.is_caller() { -16 } else { -8 };
 
     let stack_size = final_stack_size(func)? as i64;
     let record_s0 = SdInst::new(REG_S0, offset.into(), REG_SP);
+    to_insert_front.push(record_s0.into());
     let update_s0 = MvInst::new(REG_S0.into(), REG_SP.into());
-    let open_stack = AddInst::new(REG_SP.into(), REG_SP.into(), (-stack_size).into());
+    to_insert_front.push(update_s0.into());
+
+    let to_minus: Imm = (-stack_size).into();
+    let to_minus = if to_minus.in_limit(12) {
+        to_minus.into()
+    } else {
+        let li = LiInst::new(REG_T0.into(), to_minus.into());
+        to_insert_front.push(li.into());
+        REG_T0.into()
+    };
+    let open_stack = AddInst::new(REG_SP.into(), REG_SP.into(), to_minus);
+    to_insert_front.push(open_stack.into());
 
     let entry = func.entry_mut().insts_mut();
-    [record_s0.into(), update_s0.into(), open_stack.into()]
-        .into_iter()
-        .rev()
-        .for_each(|i| {
-            entry.insert(0, i);
-        });
-
-    let close_stack: Inst = AddInst::new(REG_SP.into(), REG_SP.into(), stack_size.into()).into();
-    let restore_s0: Inst = LdInst::new(REG_S0, offset.into(), REG_S0).into();
-    func.exit_bbs_mut().for_each(|bb| {
-        let n = bb.insts().len();
-        bb.insts_mut().insert(n - 1, close_stack.clone());
-        bb.insts_mut().insert(n, restore_s0.clone());
+    to_insert_front.into_iter().rev().for_each(|i| {
+        entry.insert(0, i);
     });
+
+    let mut insert_before_ret: Vec<Inst> = vec![];
+
+    let close_stack: Inst = MvInst::new(REG_SP.into(), REG_S0.into()).into();
+    insert_before_ret.push(close_stack);
+
+    let offset: Imm = offset.into();
+    if offset.in_limit(12) {
+        let restore_s0: Inst = LdInst::new(REG_S0, offset, REG_S0).into();
+        insert_before_ret.push(restore_s0);
+    } else {
+        let li = LiInst::new(REG_T0.into(), offset.into());
+        insert_before_ret.push(li.into());
+        let add = AddInst::new(REG_T1.into(), REG_S0.into(), REG_T0.into());
+        insert_before_ret.push(add.into());
+        let ld = LdInst::new(REG_S0, 0.into(), REG_T1);
+        insert_before_ret.push(ld.into());
+    }
+
+    for exit_bb in func.exit_bbs_mut() {
+        for i in insert_before_ret.iter() {
+            exit_bb.insert_before_term(i.clone())?;
+        }
+    }
 
     Ok(())
 }
