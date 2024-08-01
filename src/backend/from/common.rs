@@ -5,12 +5,6 @@ pub enum Dimension {
 }
 
 impl Dimension {
-    pub fn new(size: usize) -> Self {
-        Dimension::One(size)
-    }
-    pub fn new_mixture(dims: Vec<Dimension>) -> Self {
-        Dimension::Mixture(dims)
-    }
     pub fn size(&self) -> usize {
         match self {
             Dimension::One(size) => *size,
@@ -21,7 +15,7 @@ impl Dimension {
         let mut subs = vec![];
         match self {
             Dimension::One(_) => {}
-            Dimension::Mixture(dims) => dims.iter().for_each(|dim| subs.extend(dim.iter_subs())),
+            Dimension::Mixture(dims) => dims.iter().for_each(|dim| subs.push(dim)),
         }
         subs.into_iter()
     }
@@ -54,5 +48,29 @@ impl Dimension {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_size() {
+        let l3 = Dimension::One(3);
+        assert_eq!(l3.size(), 3);
+        let l2 = Dimension::Mixture(vec![Dimension::One(2), Dimension::One(3)]);
+        assert_eq!(l2.size(), 5);
+    }
+
+    #[test]
+    fn test_iter_subs() {
+        let l3 = Dimension::One(3);
+        let mut it = l3.iter_subs();
+        assert_eq!(it.next(), None);
+        let l2 = Dimension::Mixture(vec![Dimension::One(2), Dimension::One(3)]);
+        let mut it = l2.iter_subs();
+        assert_eq!(it.next(), Some(&Dimension::One(2)));
+        assert_eq!(it.next(), Some(&Dimension::One(3)));
+        assert_eq!(it.next(), None);
     }
 }
