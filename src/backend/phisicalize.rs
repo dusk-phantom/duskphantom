@@ -308,6 +308,7 @@ fn handle_mem(func: &mut Func) -> Result<()> {
             match inst {
                 Inst::Load(load) => *inst = load.phisicalize(stack_size)?,
                 Inst::Store(store) => *inst = store.phisicalize(stack_size)?,
+                Inst::LocalAddr(local_addr) => *inst = local_addr.phisicalize(stack_size)?,
                 _ => {}
             };
         }
@@ -340,6 +341,22 @@ fn handle_offset_overflows(func: &mut Func) -> Result<()> {
                 Inst::Sd(sd) => handle_offset_overflow!(sd, SdInst, new_insts),
                 Inst::Lw(lw) => handle_offset_overflow!(lw, LwInst, new_insts),
                 Inst::Sw(sw) => handle_offset_overflow!(sw, SwInst, new_insts),
+                Inst::Add(add) => {
+                    let rhs = add.rhs();
+                    if let Operand::Imm(imm) = rhs {
+                        if imm.in_limit(12) {
+                            new_insts.push(inst.clone());
+                        } else {
+                            let li = LiInst::new(REG_S1.into(), imm.into());
+                            let new_add =
+                                AddInst::new(add.dst().clone(), add.lhs().clone(), REG_S1.into());
+                            new_insts.push(li.into());
+                            new_insts.push(new_add.into());
+                        }
+                    } else {
+                        new_insts.push(inst.clone());
+                    }
+                }
                 _ => {
                     new_insts.push(inst.clone());
                 }

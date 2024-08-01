@@ -16,7 +16,7 @@ impl MemSize {
     }
 }
 
-fn new_addr(ss: &StackSlot, #[allow(unused)] stack_size: u32) -> (Imm, Reg) {
+pub fn phisicalize_addr(ss: &StackSlot, #[allow(unused)] stack_size: u32) -> (Imm, Reg) {
     #[cfg(feature = "opt_address_computation")]
     {
         if ss.start() > stack_size >> 1 {
@@ -78,11 +78,11 @@ impl StoreInst {
     pub fn phisicalize(&self, stack_size: u32) -> Result<Inst> {
         match self.mode {
             MemSize::FourByte => {
-                let (off, base) = new_addr(&self.dst, stack_size);
+                let (off, base) = phisicalize_addr(&self.dst, stack_size);
                 Ok(SwInst::new(self.src, off, base).into())
             }
             MemSize::EightByte => {
-                let (off, base) = new_addr(&self.dst, stack_size);
+                let (off, base) = phisicalize_addr(&self.dst, stack_size);
                 Ok(SdInst::new(self.src, off, base).into())
             }
         }
@@ -128,11 +128,11 @@ impl LoadInst {
     pub fn phisicalize(&self, stack_size: u32) -> Result<Inst> {
         match self.mem_size {
             MemSize::FourByte => {
-                let (off, base) = new_addr(&self.src, stack_size);
+                let (off, base) = phisicalize_addr(&self.src, stack_size);
                 Ok(LwInst::new(self.dst, off, base).into())
             }
             MemSize::EightByte => {
-                let (off, base) = new_addr(&self.src, stack_size);
+                let (off, base) = phisicalize_addr(&self.src, stack_size);
                 Ok(LdInst::new(self.dst, off, base).into())
             }
         }
@@ -193,6 +193,10 @@ impl LocalAddr {
     }
     pub fn gen_asm(&self) -> String {
         format!("load_addr {},{}", self.dst.gen_asm(), self.src.gen_asm())
+    }
+    pub fn phisicalize(&self, stack_size: u32) -> Result<Inst> {
+        let (off, base) = phisicalize_addr(&self.src, stack_size);
+        Ok(AddInst::new(self.dst.into(), base.into(), off.into()).into())
     }
 }
 
