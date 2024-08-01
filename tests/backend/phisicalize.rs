@@ -192,7 +192,7 @@ fn test_handle_offset_overflow() {
                 Lw(
                     LwInst(
                         Reg {
-                            id: 9,
+                            id: 5,
                             is_usual: true,
                         },
                         Imm(
@@ -244,7 +244,7 @@ fn test_handle_offset_overflow() {
                 Sd(
                     SdInst(
                         Reg {
-                            id: 9,
+                            id: 5,
                             is_usual: true,
                         },
                         Imm(
