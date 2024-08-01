@@ -63,6 +63,21 @@ fn test_handle_offset_overflow() {
                         ),
                     ),
                 ),
+                Li(
+                    LiInst(
+                        Reg(
+                            Reg {
+                                id: 9,
+                                is_usual: true,
+                            },
+                        ),
+                        Imm(
+                            Imm(
+                                -2448,
+                            ),
+                        ),
+                    ),
+                ),
                 Add(
                     AddInst(
                         Reg(
@@ -77,10 +92,11 @@ fn test_handle_offset_overflow() {
                                 is_usual: true,
                             },
                         ),
-                        Imm(
-                            Imm(
-                                -2448,
-                            ),
+                        Reg(
+                            Reg {
+                                id: 9,
+                                is_usual: true,
+                            },
                         ),
                     ),
                 ),
@@ -292,6 +308,21 @@ fn test_handle_offset_overflow() {
                         },
                     ),
                 ),
+                Li(
+                    LiInst(
+                        Reg(
+                            Reg {
+                                id: 9,
+                                is_usual: true,
+                            },
+                        ),
+                        Imm(
+                            Imm(
+                                2448,
+                            ),
+                        ),
+                    ),
+                ),
                 Add(
                     AddInst(
                         Reg(
@@ -306,10 +337,11 @@ fn test_handle_offset_overflow() {
                                 is_usual: true,
                             },
                         ),
-                        Imm(
-                            Imm(
-                                2448,
-                            ),
+                        Reg(
+                            Reg {
+                                id: 9,
+                                is_usual: true,
+                            },
                         ),
                     ),
                 ),
