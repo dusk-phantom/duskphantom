@@ -351,7 +351,7 @@ fn handle_offset_overflows(func: &mut Func) -> Result<()> {
             if !$inst.offset().in_limit(12) {
                 let li = LiInst::new(REG_S1.into(), $inst.offset().into());
                 let add = AddInst::new(REG_S1.into(), REG_S1.into(), REG_SP.into());
-                let new_ld = $inst_ty::new(REG_S1, 0.into(), REG_S1);
+                let new_ld = $inst_ty::new(*$inst.dst(), 0.into(), REG_S1);
                 $new_insts.push(li.into());
                 $new_insts.push(add.into());
                 $new_insts.push(new_ld.into());
