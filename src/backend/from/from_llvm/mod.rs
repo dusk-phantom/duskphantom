@@ -11,6 +11,7 @@ pub use super::irs::*;
 pub use crate::clang_frontend;
 pub use crate::context;
 pub use anyhow::{anyhow, Context, Result};
+pub use builder::IRBuilder;
 
 #[cfg(feature = "clang_enabled")]
 #[allow(unused)]

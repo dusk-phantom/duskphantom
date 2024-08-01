@@ -60,10 +60,11 @@ impl IRBuilder {
             middle::ir::Constant::Float(fla) => Operand::Fmm((*fla as f64).into()),
             middle::ir::Constant::Bool(boo) => Operand::Imm((*boo as i64).into()),
             middle::ir::Constant::SignedChar(sig) => Operand::Imm((*sig as i64).into()),
-            middle::ir::Constant::Array(_) | middle::ir::Constant::Zero(_) => {
-                return Err(anyhow!("const_from operand cann't not be array:{}", con))
+            middle::ir::Constant::Array(_) => {
+                return Err(anyhow!("const_from operand can't not be array:{}", con))
                     .with_context(|| context!())
             }
+            middle::ir::Constant::Zero(_) => todo!(),
         })
     }
 
@@ -258,7 +259,7 @@ impl IRBuilder {
                 Ok(reg.into())
             }
             middle::ir::Operand::Global(glo) => {
-                Err(anyhow!("no_load_from operand cann't not be global:{}", glo))
+                Err(anyhow!("no_load_from operand can't not be global:{}", glo))
                     .with_context(|| context!())
             }
         }
@@ -277,7 +278,7 @@ impl IRBuilder {
                         Self::param_from(param, regs)
                     }
                     _ => Err(anyhow!(
-                        "it is impossible to load from a void/bool/int/float paramter: {}",
+                        "it is impossible to load from a void/bool/int/float parameter: {}",
                         operand
                     ))
                     .with_context(|| context!()),
@@ -301,7 +302,7 @@ impl IRBuilder {
 
     /// 我们的 global/函数名 都是来自于中端的 name 的, 其他的 id 来自于中端的地址
     #[inline]
-    pub fn global_lable_from(operand: &middle::ir::Operand) -> Result<Label> {
+    pub fn global_label_from(operand: &middle::ir::Operand) -> Result<Label> {
         match operand {
             middle::ir::Operand::Global(glo) => {
                 let glo = glo.as_ref();
@@ -326,7 +327,7 @@ impl IRBuilder {
     ) -> Result<Operand> {
         if let Ok(slot) = Self::stack_slot_from(operand, stack_slots) {
             Ok(slot)
-        } else if let Ok(label) = Self::global_lable_from(operand) {
+        } else if let Ok(label) = Self::global_label_from(operand) {
             Ok(label.into())
         } else if let Ok(reg) = Self::pointer_from(operand, regs) {
             Ok(reg.into())
@@ -339,7 +340,7 @@ impl IRBuilder {
     pub fn _cal_capas_factor(ty: &middle::ir::ValueType) -> Result<usize> {
         match ty {
             middle::ir::ValueType::Void => {
-                Err(anyhow!("gep cann't be void: {}", ty)).with_context(|| context!())
+                Err(anyhow!("gep can't be void: {}", ty)).with_context(|| context!())
             }
             middle::ir::ValueType::Pointer(_) => todo!(),
             middle::ir::ValueType::SignedChar
@@ -366,7 +367,7 @@ impl IRBuilder {
         let mut ret = Vec::new();
         match ty {
             middle::ir::ValueType::Void => {
-                Err(anyhow!("gep cann't be void: {}", ty)).with_context(|| context!())
+                Err(anyhow!("gep can't be void: {}", ty)).with_context(|| context!())
             }
             middle::ir::ValueType::SignedChar
             | middle::ir::ValueType::Int
