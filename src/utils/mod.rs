@@ -6,3 +6,4 @@ pub mod mem;
 pub mod error;
 
 pub mod frame_map;
+pub mod log;
