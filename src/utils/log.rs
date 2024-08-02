@@ -8,7 +8,7 @@ macro_rules! fprint {
             $crate::utils::log::must_write($file, &s,false);
         }
     };
-    ($file:expr,$mode:literal,$($arg:tt)*) => {
+    ($file:expr;$mode:literal;$($arg:tt)*) => {
         #[cfg(feature = "log_enabled")]
         {
             let s=format!($($arg)*);
@@ -27,7 +27,7 @@ macro_rules! fprintln {
             $crate::utils::log::must_write($file, &s,false);
         }
     };
-    ($file:expr,$mode:literal,$($arg:tt)*) => {
+    ($file:expr;$mode:literal;$($arg:tt)*) => {
         #[cfg(feature = "log_enabled")]
         {
             let mut s=format!($($arg)*);
