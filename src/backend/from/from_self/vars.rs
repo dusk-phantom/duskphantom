@@ -119,6 +119,18 @@ impl IRBuilder {
         Ok(flattened)
     }
 
+    // pub fn basic_element_type(ty: &middle::ir::ValueType) -> middle::ir::ValueType {
+    //     match ty {
+    //         middle::ir::ValueType::Array(ty, _) => Self::basic_element_type(ty),
+    //         middle::ir::ValueType::Void => todo!(),
+    //         ty => ty.clone(), // middle::ir::ValueType::Float
+    //                           // | middle::ir::ValueType::SignedChar
+    //                           // | middle::ir::ValueType::Bool
+    //                           // | middle::ir::ValueType::Pointer(_)
+    //                           // | middle::ir::ValueType::Int => ty.clone(),
+    //     }
+    // }
+
     fn build_int_var(name: &str, value: i32) -> Result<Var> {
         let var = var::Var::Prim(var::PrimVar::IntVar(var::IntVar {
             name: name.to_string(),
