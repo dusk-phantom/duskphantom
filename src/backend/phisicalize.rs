@@ -17,7 +17,7 @@ pub fn phisicalize(program: &mut Program) -> Result<(), BackendError> {
 }
 
 pub fn phisicalize_func(func: &mut Func) -> Result<()> {
-    // println!("{}", func.gen_asm());
+    println!("{}", func.gen_asm());
 
     fprintln!("log/before_phisicalize.log", "{}", func.gen_asm());
 

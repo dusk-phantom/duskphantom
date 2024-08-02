@@ -36,20 +36,25 @@ impl IRBuilder {
 
         // /* ---------- base ---------- */
         let ptr = gep.get_ptr();
-        let base: Operand =
+        let base: Reg =
             match Self::address_from(ptr, regs, stack_slots).with_context(|| context!())? {
-                Operand::Reg(reg) => reg.into(),
-                Operand::StackSlot(slot) => Operand::StackSlot(slot),
+                Operand::Reg(reg) => reg,
+                Operand::StackSlot(slot) => {
+                    let addr = reg_gener.gen_virtual_usual_reg();
+                    let laddr = LocalAddr::new(addr, slot);
+                    ret.push(laddr.into());
+                    addr
+                }
                 Operand::Label(label) => {
                     let dst = reg_gener.gen_virtual_usual_reg();
                     let lla = LlaInst::new(dst, label);
                     ret.push(lla.into());
-                    dst.into()
+                    dst
                 }
                 _ => unimplemented!(), // Fmm(_) Imm(_)
             };
         let dst = reg_gener.gen_virtual_usual_reg();
-        let add = AddInst::new(dst.into(), base, _mid.into());
+        let add = AddInst::new(dst.into(), base.into(), _mid.into());
         ret.push(add.into());
         regs.insert(gep as *const _ as usize, dst);
         Ok(ret)
