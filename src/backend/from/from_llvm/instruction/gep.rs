@@ -1,3 +1,5 @@
+use crate::fprintln;
+
 use super::*;
 use common::Dimension;
 
@@ -10,48 +12,47 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
-        #[inline]
-        fn prepare_rhs_op(
-            op: &Operand,
-            reg_gener: &mut RegGenerator,
-        ) -> Result<(Operand, Vec<Inst>)> {
-            match &op {
-                Operand::Imm(imm) => {
-                    if imm.in_limit(12) {
-                        Ok((op.clone(), vec![]))
-                    } else {
-                        let r = reg_gener.gen_virtual_usual_reg();
-                        let li = LiInst::new(r.into(), op.clone());
-                        Ok((r.into(), vec![li.into()]))
-                    }
-                }
-                Operand::Reg(reg) => Ok((op.clone(), vec![])),
-                _ => unreachable!(),
-            }
-        }
-        #[inline]
-        fn prepare_lhs_reg(
-            op: &Operand,
-            reg_gener: &mut RegGenerator,
-        ) -> Result<(Operand, Vec<Inst>)> {
-            match op {
-                Operand::Imm(imm) => {
-                    let r = reg_gener.gen_virtual_usual_reg();
-                    let li = LiInst::new(r.into(), imm.into());
-                    Ok((r.into(), vec![li.into()]))
-                }
-                Operand::Reg(reg) => Ok((op.clone(), vec![])),
-                _ => unreachable!(),
-            }
-        }
-
         // dbg!(gep);
         let mut ret: Vec<Inst> = Vec::new();
+
+        let (base, pre_insert) = Self::prepare_base(gep, stack_slots, reg_gener, regs)?;
+        ret.extend(pre_insert);
+
+        let (offset, pre_insert) = Self::prepare_offset(gep, reg_gener, regs)?;
+        ret.extend(pre_insert);
+
+        let final_addr = reg_gener.gen_virtual_usual_reg();
+        let add = AddInst::new(final_addr.into(), base.into(), offset.into());
+        ret.push(add.into());
+
+        regs.insert(gep.dest.clone(), final_addr);
+
+        fprintln!(
+            "log/build_gep_inst.log";
+            'a' // a for append
+            ;
+            "gep:\n{}\ngen:{}",
+            gep,
+            ret.iter()
+                .map(|i| i.gen_asm())
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+        Ok(ret)
+    }
+
+    fn prepare_base(
+        gep: &llvm_ir::instruction::GetElementPtr,
+        stack_slots: &mut HashMap<Name, StackSlot>,
+        reg_gener: &mut RegGenerator,
+        regs: &mut HashMap<Name, Reg>,
+    ) -> Result<(Reg, Vec<Inst>)> {
+        let mut ret: Vec<Inst> = Vec::new();
+
         let (addr, pre_insert) = Self::prepare_address(&gep.address, reg_gener, stack_slots, regs)
             .with_context(|| context!())?;
         ret.extend(pre_insert);
 
-        // prepare base address
         let base = match addr {
             Operand::StackSlot(stack_slot) => {
                 let addr = reg_gener.gen_virtual_usual_reg();
@@ -71,6 +72,16 @@ impl IRBuilder {
                 unimplemented!();
             }
         };
+        Ok((base, ret))
+    }
+
+    fn prepare_offset(
+        gep: &llvm_ir::instruction::GetElementPtr,
+        reg_gener: &mut RegGenerator,
+        regs: &mut HashMap<Name, Reg>,
+    ) -> Result<(Reg, Vec<Inst>)> {
+        let mut ret: Vec<Inst> = Vec::new();
+
         let dims = Self::dims_from_gep_inst(gep)?;
 
         // process first index
@@ -118,20 +129,7 @@ impl IRBuilder {
         let slli = SllInst::new(final_offset.into(), offset, 2.into());
         ret.push(slli.into());
 
-        let final_addr = reg_gener.gen_virtual_usual_reg();
-        let add = AddInst::new(final_addr.into(), base.into(), final_offset.into());
-        ret.push(add.into());
-
-        regs.insert(gep.dest.clone(), final_addr);
-
-        println!(
-            "{}",
-            &ret.iter()
-                .map(|i| i.gen_asm())
-                .collect::<Vec<_>>()
-                .join("\n")
-        );
-        Ok(ret)
+        Ok((final_offset, ret))
     }
 
     fn process_first_idx(
@@ -248,5 +246,35 @@ impl IRBuilder {
 
     fn dims_from_gep_inst(gep: &llvm_ir::instruction::GetElementPtr) -> Result<Dimension> {
         Self::dims_from_ty(&gep.source_element_type)
+    }
+}
+
+#[inline]
+fn prepare_rhs_op(op: &Operand, reg_gener: &mut RegGenerator) -> Result<(Operand, Vec<Inst>)> {
+    match &op {
+        Operand::Imm(imm) => {
+            if imm.in_limit(12) {
+                Ok((op.clone(), vec![]))
+            } else {
+                let r = reg_gener.gen_virtual_usual_reg();
+                let li = LiInst::new(r.into(), op.clone());
+                Ok((r.into(), vec![li.into()]))
+            }
+        }
+        Operand::Reg(_) => Ok((op.clone(), vec![])),
+        _ => unreachable!(),
+    }
+}
+
+#[inline]
+fn prepare_lhs_reg(op: &Operand, reg_gener: &mut RegGenerator) -> Result<(Operand, Vec<Inst>)> {
+    match op {
+        Operand::Imm(imm) => {
+            let r = reg_gener.gen_virtual_usual_reg();
+            let li = LiInst::new(r.into(), imm.into());
+            Ok((r.into(), vec![li.into()]))
+        }
+        Operand::Reg(_) => Ok((op.clone(), vec![])),
+        _ => unreachable!(),
     }
 }
