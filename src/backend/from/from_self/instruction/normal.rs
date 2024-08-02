@@ -323,10 +323,15 @@ impl IRBuilder {
                 return Err(anyhow!("it can't alloca void")).with_context(|| context!())
             }
             middle::ir::ValueType::Array(_, _) => {
+                let cap = Self::_cal_capas_factor(&ty).with_context(|| context!())?;
+                // let
+                // let dims =
+                // let e_ty = Self::
                 // let capa = Self::_cal_capas_rev(&ty);
                 // let sz: usize = capa.iter().product();
                 // (sz << 2/* *4 */) as u32
-                todo!()
+                // todo!()
+                (cap << 2) as u32
             }
         };
         let ss = stack_allocator.alloc(bytes);

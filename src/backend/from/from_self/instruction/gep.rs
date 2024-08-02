@@ -140,7 +140,7 @@ impl IRBuilder {
         }
     }
 
-    fn _cal_capas_factor(ty: &middle::ir::ValueType) -> Result<usize> {
+    pub fn _cal_capas_factor(ty: &middle::ir::ValueType) -> Result<usize> {
         match ty {
             middle::ir::ValueType::Void => {
                 Err(anyhow!("gep can't be void: {}", ty)).with_context(|| context!())
