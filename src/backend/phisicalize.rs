@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
+use crate::fprintln;
+
 use super::*;
 
 // turn virtual backend module to phisic backend module
@@ -17,32 +19,36 @@ pub fn phisicalize(program: &mut Program) -> Result<(), BackendError> {
 pub fn phisicalize_func(func: &mut Func) -> Result<()> {
     // println!("{}", func.gen_asm());
 
+    fprintln!("log/before_phisicalize.log", "{}", func.gen_asm());
+
     phisicalize_reg(func)?;
-    // println!("\n\nafter phisicalize reg :\n{}", func.gen_asm());
+
+    fprintln!("log/phisicalize_func.log", "{}", func.gen_asm());
 
     // 为函数开头和结尾插入callee-save regs的保存和恢复
     handle_callee_save(func)?;
-    // println!("\n\nhandle callee save:\n{}", func.gen_asm());
+    fprintln!("log/handle_callee_save.log", "{}", func.gen_asm());
 
     // 为call指令前后插入caller-save regs的保存和恢复
     handle_caller_save(func)?;
-    // println!("\n\nhandle caller save:\n{}", func.gen_asm());
+    fprintln!("log/handle_caller_save.log", "{}", func.gen_asm());
 
     // entry和exit插入ra寄存器的保存和恢复
     handle_ra(func)?;
-    // println!("\n\nhandle ra:\n{}", func.gen_asm());
+    fprintln!("log/handle_ra.log", "{}", func.gen_asm());
 
     // 为entry和exit插入栈的开辟和关闭(通过sp的减少和增加实现),s0寄存器的保存和恢复
     handle_stack(func)?;
-    // println!("\n\nhandle stack:\n{}", func.gen_asm());
+    fprintln!("log/handle_stack.log", "{}", func.gen_asm());
 
     // 替换所有使用的内存操作伪指令 为 实际的内存操作指令,比如load a0,[0-8] 修改为ld a0,0(sp)
     handle_mem(func)?;
-    // println!("\n\nhandle mem:\n{}", func.gen_asm());
+    fprintln!("log/handle_mem.log", "{}", func.gen_asm());
 
     // 处理load和store类型指令 使用的 地址偏移 超出范围的情况
     handle_offset_overflows(func)?;
-    // println!("\n\nhandle offset overflow:\n{}", func.gen_asm());
+    fprintln!("log/handle_offset_overflows.log", "{}", func.gen_asm());
+
     Ok(())
 }
 
