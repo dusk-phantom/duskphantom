@@ -9,7 +9,7 @@ impl IRBuilder {
         regs: &mut HashMap<Address, Reg>,
         fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<Vec<Inst>> {
-        if call.func.name == "llvm.memset.p0.i64" {
+        if call.func.name.contains("llvm.memset") {
             return Self::build_memset_inst(call, regs);
         }
 
@@ -141,9 +141,7 @@ impl IRBuilder {
         call: &middle::ir::instruction::misc_inst::Call,
         regs: &mut HashMap<Address, Reg>,
     ) -> Result<Vec<Inst>> {
-        let f_name = call.func.name.clone();
-        assert!(f_name == "llvm.memset.p0.i64");
-        let f_name = "memset".to_string();
+        assert!(call.func.name.contains("llvm.memset"));
         let mut ret: Vec<Inst> = Vec::new();
         let args = call.get_operand(); // 实参
         assert!(args.len() == 4);
@@ -168,7 +166,7 @@ impl IRBuilder {
                 _ => unimplemented!(), /* Operand::Fmm(_) Operand::StackSlot(_) Operand::Label(_) */
             }
         }
-        let mut call_inst = CallInst::new(f_name.to_string().into());
+        let mut call_inst = CallInst::new("memset".to_string().into());
         call_inst.add_uses(&phisic_arg_regs); // set reg uses for call_inst
         call_inst.add_def(REG_A0);
         // assert!(call.dest.is_none());
