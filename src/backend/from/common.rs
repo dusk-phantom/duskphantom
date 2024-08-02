@@ -1,3 +1,5 @@
+use super::irs::Inst;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Dimension {
     One(usize),
@@ -11,27 +13,17 @@ impl Dimension {
             Dimension::Mixture(dims) => dims.iter().map(|dim| dim.size()).sum(),
         }
     }
-    pub fn iter_subs(&self) -> std::vec::IntoIter<&Dimension> {
+    pub fn iter_subs(&self) -> std::vec::IntoIter<Dimension> {
         let mut subs = vec![];
         match self {
-            Dimension::One(_) => {}
-            Dimension::Mixture(dims) => dims.iter().for_each(|dim| subs.push(dim)),
+            Dimension::One(size) => {
+                if *size > 1 {
+                    subs.push(Dimension::One(1));
+                }
+            }
+            Dimension::Mixture(dims) => dims.iter().for_each(|dim| subs.push(dim.clone())),
         }
         subs.into_iter()
-    }
-
-    pub fn count_idx(&self, idxs: &[usize]) -> usize {
-        let mut ret = 0;
-        let mut it = vec![self].into_iter();
-        for idx in idxs {
-            if let Some(dim) = it.next() {
-                ret += dim.size() * idx;
-                it = dim.iter_subs();
-            } else {
-                break;
-            }
-        }
-        ret
     }
 
     // check if each dimension in the same layer has the same type,thus is a array like [0;n] or [[0;n];m]
@@ -51,6 +43,14 @@ impl Dimension {
     }
 }
 
+pub fn asm_of_insts(insts: &[Inst]) -> String {
+    insts
+        .iter()
+        .map(|i| i.gen_asm())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -66,11 +66,15 @@ mod tests {
     fn test_iter_subs() {
         let l3 = Dimension::One(3);
         let mut it = l3.iter_subs();
-        assert_eq!(it.next(), None);
+        assert_eq!(it.next(), Some(Dimension::One(1)));
+
+        let l1 = Dimension::One(1);
+        assert!(l1.iter_subs().next().is_none());
+
         let l2 = Dimension::Mixture(vec![Dimension::One(2), Dimension::One(3)]);
         let mut it = l2.iter_subs();
-        assert_eq!(it.next(), Some(&Dimension::One(2)));
-        assert_eq!(it.next(), Some(&Dimension::One(3)));
+        assert_eq!(it.next(), Some(Dimension::One(2)));
+        assert_eq!(it.next(), Some(Dimension::One(3)));
         assert_eq!(it.next(), None);
     }
 }

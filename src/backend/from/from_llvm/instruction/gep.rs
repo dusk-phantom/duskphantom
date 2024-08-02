@@ -1,7 +1,8 @@
 use crate::fprintln;
 
 use super::*;
-use common::Dimension;
+#[allow(unused)]
+use common::{asm_of_insts, Dimension};
 
 impl IRBuilder {
     #[allow(unreachable_code)]
@@ -13,13 +14,18 @@ impl IRBuilder {
         regs: &mut HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
         // dbg!(gep);
+        fprintln!("log/build_gep_inst.log";'a';"gep:{}",gep.to_string());
         let mut ret: Vec<Inst> = Vec::new();
 
         let (base, pre_insert) = Self::prepare_base(gep, stack_slots, reg_gener, regs)?;
         ret.extend(pre_insert);
 
+        fprintln!("log/build_gep_inst.log";'a';"\nafter prepare base:\n{}",asm_of_insts(&ret));
+
         let (offset, pre_insert) = Self::prepare_offset(gep, reg_gener, regs)?;
         ret.extend(pre_insert);
+
+        fprintln!("log/build_gep_inst.log";'a';"\nafter prepare offset:\n{}",asm_of_insts(&ret));
 
         let final_addr = reg_gener.gen_virtual_usual_reg();
         let add = AddInst::new(final_addr.into(), base.into(), offset.into());
@@ -27,17 +33,7 @@ impl IRBuilder {
 
         regs.insert(gep.dest.clone(), final_addr);
 
-        fprintln!(
-            "log/build_gep_inst.log";
-            'a' // a for append
-            ;
-            "gep:\n{}\ngen:{}",
-            gep,
-            ret.iter()
-                .map(|i| i.gen_asm())
-                .collect::<Vec<_>>()
-                .join("\n")
-        );
+        fprintln!("log/build_gep_inst.log";'a';"\ngen:\n{}\n",asm_of_insts(&ret));
         Ok(ret)
     }
 
@@ -93,9 +89,10 @@ impl IRBuilder {
 
         let mut offset = offset.map(Operand::from);
 
-        let mut dims = Some(&dims);
+        let mut dims = Some(dims);
         for idx in gep.indices.iter().skip(1) {
-            if let Some(d) = dims {
+            dbg!(&dims);
+            if let Some(d) = &dims {
                 let (to_add, new_dims, insts) = Self::process_sub_idx(idx, d, reg_gener, regs)?;
                 ret.extend(insts);
 
@@ -196,12 +193,12 @@ impl IRBuilder {
 
     #[allow(unused)]
     /// return (to_add, new_dims, insts)
-    fn process_sub_idx<'a>(
+    fn process_sub_idx(
         idx: &llvm_ir::Operand,
-        dims: &'a Dimension,
+        dims: &Dimension,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
-    ) -> Result<(Operand, Option<&'a Dimension>, Vec<Inst>)> {
+    ) -> Result<(Operand, Option<Dimension>, Vec<Inst>)> {
         let mut ret_insts: Vec<Inst> = Vec::new();
         let mut ret_dims = None;
 
