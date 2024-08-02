@@ -16,7 +16,7 @@ impl IRBuilder {
         let (_, ofst, prepare) =
             Self::__cal_offset(&ty, idxes, reg_gener, regs).with_context(|| context!())?;
         ret.extend(prepare);
-        regs.insert(gep as *const _ as usize, ofst);
+        // regs.insert(gep as *const _ as usize, ofst);
 
         // // println!("gep: {}", gep);
 
