@@ -1,20 +1,4 @@
-use crate::utils::mem::ObjPtr;
-use crate::{
-    backend::*, ssa2tac_three_float, ssa2tac_three_usual_Itype, ssa2tac_three_usual_Rtype,
-};
-use crate::{context, middle};
-
-use crate::middle::ir::instruction::binary_inst::BinaryInst;
-use crate::middle::ir::instruction::downcast_ref;
-use crate::middle::ir::Instruction;
-
 use super::*;
-
-use anyhow::{Context, Result};
-
-use builder::IRBuilder;
-use std::collections::HashMap;
-use var::FloatVar;
 
 impl IRBuilder {
     pub fn build_instruction(
@@ -145,7 +129,7 @@ impl IRBuilder {
                 );
                 let src = Self::no_load_from(itofp.get_src(), regs).with_context(|| context!())?;
                 let dst = reg_gener.gen_virtual_float_reg();
-                let fcvtsw = I2fInst::new(dst.into(), src); // FIXME 不过我对这里有点疑惑: 中端会不会给浮点型立即数, 然后浮点型立即数实际上也需要特殊处理
+                let fcvtsw = I2fInst::new(dst.into(), src);
                 regs.insert(itofp as *const _ as Address, dst);
                 Ok(vec![fcvtsw.into()])
             }
@@ -179,68 +163,6 @@ impl IRBuilder {
                 Self::build_call_inst(call, reg_gener, regs, fmms)
             }
         }
-    }
-
-    // fn build_select_inst(  // 我们中端没有 Select
-    //     select: &middle::ir::instruction,
-    //     reg_gener: &mut RegGenerator,
-    //     regs: &mut HashMap<Address, Reg>,
-    // ) -> Result<Vec<Inst>> {
-    //     todo!()
-    // }
-
-    fn build_gep_inst(
-        gep: &middle::ir::instruction::memory_op_inst::GetElementPtr,
-        reg_gener: &mut RegGenerator,
-        regs: &mut HashMap<Address, Reg>,
-        stack_slots: &HashMap<Address, StackSlot>,
-    ) -> Result<Vec<Inst>> {
-        let mut ret = Vec::new();
-
-        let idxes = gep.get_index();
-        let ty = gep.get_ptr().get_type();
-        // println!("{}", gep);
-        // dbg!(&ty);
-        let (_, ofst, prepare) =
-            Self::__cal_offset(&ty, idxes, reg_gener, regs).with_context(|| context!())?;
-        ret.extend(prepare);
-        regs.insert(gep as *const _ as usize, ofst);
-
-        // // println!("gep: {}", gep);
-
-        // /* ---------- 计算 offset ---------- */
-        // let idxes = gep.get_index();
-        // let capas = {
-        //     let mut v = Self::_cal_capas_rev(&gep.element_type);
-        //     v.reverse();
-        //     v
-        // };
-        // let (ofst, prepare) =
-        //     Self::_cal_offset(&capas, idxes, reg_gener, regs).with_context(|| context!())?;
-        // ret.extend(prepare);
-        let _mid = reg_gener.gen_virtual_usual_reg();
-        let slli = SllInst::new(_mid.into(), ofst.into(), (2).into()); // FIXME sysy 的数据都是 4Byte, 但是我感觉我这里不严谨
-        ret.push(slli.into());
-
-        // /* ---------- base ---------- */
-        let ptr = gep.get_ptr();
-        let base: Operand =
-            match Self::address_from(ptr, regs, stack_slots).with_context(|| context!())? {
-                Operand::Reg(reg) => reg.into(),
-                Operand::StackSlot(slot) => Operand::StackSlot(slot),
-                Operand::Label(label) => {
-                    let dst = reg_gener.gen_virtual_usual_reg();
-                    let lla = LlaInst::new(dst, label);
-                    ret.push(lla.into());
-                    dst.into()
-                }
-                _ => unimplemented!(), // Fmm(_) Imm(_)
-            };
-        let dst = reg_gener.gen_virtual_usual_reg();
-        let add = AddInst::new(dst.into(), base, _mid.into());
-        ret.push(add.into());
-        regs.insert(gep as *const _ as usize, dst);
-        Ok(ret)
     }
 
     fn build_phi_inst(
@@ -630,6 +552,7 @@ impl IRBuilder {
         Ok(ret_insts)
     }
 
+    /// 既包含: 条件跳转, 也包含: 无条件跳转
     pub fn build_br_inst(
         br: &middle::ir::instruction::terminator_inst::Br,
         regs: &mut HashMap<Address, Reg>,
@@ -671,176 +594,5 @@ impl IRBuilder {
         }
 
         Ok(br_insts)
-    }
-
-    pub fn build_call_inst(
-        call: &middle::ir::instruction::misc_inst::Call,
-        // stack_allocator: &mut StackAllocator,
-        // stack_slots: &HashMap<Address, StackSlot>,
-        reg_gener: &mut RegGenerator,
-        regs: &mut HashMap<Address, Reg>,
-        fmms: &mut HashMap<Fmm, FloatVar>,
-    ) -> Result<Vec<Inst>> {
-        let mut call_insts: Vec<Inst> = Vec::new(); // build_call_inst 的返回值
-
-        /* ---------- 参数 ---------- */
-
-        let mut i_arg_num: u32 = 0;
-        let mut f_arg_num: u32 = 0;
-        let mut extra_arg_stack: i64 = 0;
-        let mut phisic_arg_regs: Vec<Reg> = Vec::new();
-        let arguments = call.get_operand(); // 参数列表, 这个可以类比成 llvm_ir::call::arguments
-        for arg in arguments {
-            let ope = Self::no_load_from(arg, regs).context(context!())?;
-            match ope {
-                Operand::Reg(r) => {
-                    if r.is_usual() && i_arg_num < 8 {
-                        // i reg
-                        let reg = Reg::new(REG_A0.id() + i_arg_num, true);
-                        phisic_arg_regs.push(reg);
-                        let mv = MvInst::new(reg.into(), ope);
-                        call_insts.push(mv.into());
-                        i_arg_num += 1;
-                    } else if (!r.is_usual()) && f_arg_num < 8 {
-                        // f reg
-                        let reg = Reg::new(REG_FA0.id() + f_arg_num, false);
-                        phisic_arg_regs.push(reg);
-                        let mv = MvInst::new(reg.into(), ope);
-                        call_insts.push(mv.into());
-                        f_arg_num += 1;
-                    } else {
-                        // 额外参数 reg
-                        let sd = SdInst::new(r, extra_arg_stack.into(), REG_SP);
-                        extra_arg_stack += 8;
-                        call_insts.push(sd.into());
-                    }
-                }
-                Operand::Imm(imm) => {
-                    if i_arg_num < 8 {
-                        // imm
-                        let reg = Reg::new(REG_A0.id() + i_arg_num, true);
-                        let li = LiInst::new(reg.into(), imm.into());
-                        phisic_arg_regs.push(reg);
-                        call_insts.push(li.into());
-                        i_arg_num += 1;
-                    } else {
-                        // imm 额外参数
-                        let reg = reg_gener.gen_virtual_usual_reg();
-                        let li = LiInst::new(reg.into(), imm.into());
-                        call_insts.push(li.into());
-                        let sd = SdInst::new(reg, extra_arg_stack.into(), REG_SP);
-                        extra_arg_stack += 8;
-                        call_insts.push(sd.into());
-                    }
-                }
-                Operand::Fmm(fmm) => {
-                    if f_arg_num < 8 {
-                        // fmm
-                        let p_reg = Reg::new(REG_FA0.id() + f_arg_num, false);
-                        phisic_arg_regs.push(p_reg);
-                        let (v_reg, prepare) = Self::_prepare_fmm(&fmm, reg_gener, fmms)
-                            .with_context(|| context!())?;
-                        call_insts.extend(prepare);
-                        let mv = MvInst::new(p_reg.into(), v_reg.into());
-                        call_insts.push(mv.into());
-                        f_arg_num += 1;
-                    } else {
-                        // fmm 额外参数
-                        let (v_reg, prepare) = Self::_prepare_fmm(&fmm, reg_gener, fmms)
-                            .with_context(|| context!())?;
-                        call_insts.extend(prepare);
-                        let sd = SdInst::new(v_reg, extra_arg_stack.into(), REG_SP);
-                        extra_arg_stack += 8;
-                        call_insts.push(sd.into());
-                    }
-                }
-                Operand::StackSlot(_) => todo!(), // TODO 这个有待商榷
-                Operand::Label(_) => {
-                    return Err(anyhow!("argument can't be a label".to_string()))
-                        .with_context(|| context!())
-                }
-            }
-        }
-
-        /* ---------- call 指令本身 ---------- */
-
-        // 函数是全局的，因此用的是名字
-        let mut call_inst: CallInst = CallInst::new(call.func.name.to_string().into()); // call <一个全局的 name >
-        call_inst.add_uses(&phisic_arg_regs); // set reg uses for call_inst
-
-        let dest_name = call as *const _ as Address;
-
-        let func = call.func;
-
-        /* ---------- 返回值 ---------- */
-
-        // call 返回之后，将返回值放到一个虚拟寄存器中
-        match func.return_type {
-            middle::ir::ValueType::Void => {
-                call_insts.push(call_inst.into());
-            }
-            middle::ir::ValueType::Int
-            | middle::ir::ValueType::Float
-            | middle::ir::ValueType::Bool => {
-                let is_usual = func.return_type == middle::ir::ValueType::Int
-                    || func.return_type == middle::ir::ValueType::Bool;
-                let dst = if is_usual {
-                    reg_gener.gen_virtual_usual_reg()
-                } else {
-                    reg_gener.gen_virtual_float_reg()
-                }; // 分配一个虚拟寄存器
-                let ret_reg = if is_usual { REG_A0 } else { REG_FA0 };
-                let mv = MvInst::new(dst.into(), ret_reg.into());
-                regs.insert(dest_name, dst); // 绑定中端的 id 和 虚拟寄存器
-
-                // 有返回值的情况下,传递返回值的ret_reg寄存器被认为被这条call指令
-                // 定义了,需要加入到该指令的defs列表中
-                call_inst.add_def(ret_reg);
-                call_insts.push(call_inst.into());
-                call_insts.push(mv.into());
-            }
-            _ => {
-                return Err(anyhow!("sysy only return: void | float | int".to_string()))
-                    .with_context(|| context!())
-            }
-        };
-
-        Ok(call_insts)
-    }
-}
-
-mod tests {
-    #[allow(unused)]
-    use crate::{
-        backend::from::from_self::Address,
-        middle::{
-            self,
-            ir::{instruction::downcast_ref, IRBuilder, Instruction, ValueType},
-        },
-    };
-
-    /// 测试地址是否改变
-    #[test]
-    fn test_address() {
-        let mut ir_builder = IRBuilder::new();
-        let ptr = ir_builder.get_alloca(ValueType::Int, 1);
-        let load_0 = ir_builder.get_load(ValueType::Int, middle::ir::Operand::Instruction(ptr));
-
-        let ss = load_0.as_ref().as_ref() as *const dyn Instruction as *const () as Address;
-        dbg!(&ss);
-
-        let inst: &middle::ir::instruction::memory_op_inst::Load =
-            downcast_ref::<middle::ir::instruction::memory_op_inst::Load>(load_0.as_ref().as_ref());
-
-        let address = inst as *const middle::ir::instruction::memory_op_inst::Load as Address;
-        dbg!(&address);
-
-        after_downcast(inst);
-    }
-
-    #[allow(dead_code)]
-    fn after_downcast(inst: &middle::ir::instruction::memory_op_inst::Load) {
-        let address = inst as *const middle::ir::instruction::memory_op_inst::Load as Address;
-        dbg!(&address);
     }
 }
