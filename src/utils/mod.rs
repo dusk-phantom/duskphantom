@@ -6,4 +6,5 @@ pub mod mem;
 pub mod error;
 
 pub mod frame_map;
+#[macro_use]
 pub mod log;
