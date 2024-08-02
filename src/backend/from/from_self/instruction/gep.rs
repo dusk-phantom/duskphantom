@@ -1,5 +1,7 @@
 use super::*;
 
+/** @brief GetElementPtrInst
+ */
 impl IRBuilder {
     pub fn build_gep_inst(
         gep: &middle::ir::instruction::memory_op_inst::GetElementPtr,
@@ -11,27 +13,11 @@ impl IRBuilder {
 
         let idxes = gep.get_index();
         let ty = gep.get_ptr().get_type();
-        // println!("{}", gep);
-        // dbg!(&ty);
         let (_, ofst, prepare) =
             Self::__cal_offset(&ty, idxes, reg_gener, regs).with_context(|| context!())?;
         ret.extend(prepare);
-        // regs.insert(gep as *const _ as usize, ofst);
-
-        // // println!("gep: {}", gep);
-
-        // /* ---------- 计算 offset ---------- */
-        // let idxes = gep.get_index();
-        // let capas = {
-        //     let mut v = Self::_cal_capas_rev(&gep.element_type);
-        //     v.reverse();
-        //     v
-        // };
-        // let (ofst, prepare) =
-        //     Self::_cal_offset(&capas, idxes, reg_gener, regs).with_context(|| context!())?;
-        // ret.extend(prepare);
         let _mid = reg_gener.gen_virtual_usual_reg();
-        let slli = SllInst::new(_mid.into(), ofst.into(), (2).into()); // FIXME sysy 的数据都是 4Byte, 但是我感觉我这里不严谨
+        let slli = SllInst::new(_mid.into(), ofst.into(), (2).into()); // sysy 的数据都是 4Byte
         ret.push(slli.into());
 
         // /* ---------- base ---------- */
@@ -79,6 +65,7 @@ impl IRBuilder {
             | middle::ir::ValueType::Int
             | middle::ir::ValueType::Bool => todo!(),
             middle::ir::ValueType::Float => todo!(),
+            // %77 = getelementptr [3 x [2 x [4 x [8 x [7 x i32]]]]], ptr @arr2, i64 0, i64 %5, i64 %8, i64 %11, i64 %27, i64 0
             middle::ir::ValueType::Array(ty, sz) => {
                 let (idx, prepare) =
                     Self::prepare_rs1_i(&idxes[0], reg_gener, regs).with_context(|| context!())?;
@@ -110,13 +97,17 @@ impl IRBuilder {
                     Ok((factor, dst1, ret))
                 }
             }
+            // %getelementptr_85 = getelementptr i32, ptr %getelementptr_84, i32 0
+            // %getelementptr_57 = getelementptr [2 x i32], ptr %getelementptr_38, i32 3
+            // %getelementptr_58 = getelementptr [2 x i32], ptr %getelementptr_57, i32 0, i32 0
+            // 应该这么说, gep 的第一层永远是 ptr
             middle::ir::ValueType::Pointer(poi) => {
                 let (idx, prepare) =
                     Self::prepare_rs1_i(&idxes[0], reg_gener, regs).with_context(|| context!())?;
                 ret.extend(prepare);
                 // dbg!(poi);
                 if idxes.len() > 1 {
-                    let (factor /* 指向的数组的大小 */, acc, prepare) =
+                    let (factor, acc, prepare) =
                         Self::__cal_offset(poi, &idxes[1..], reg_gener, regs)
                             .with_context(|| context!())?;
                     ret.extend(prepare);
@@ -144,7 +135,11 @@ impl IRBuilder {
             }
         }
     }
+}
 
+/** @brief 一些针对数组的 辅助函数
+ */
+impl IRBuilder {
     pub fn _cal_capas_factor(ty: &middle::ir::ValueType) -> Result<usize> {
         match ty {
             middle::ir::ValueType::Void => {
