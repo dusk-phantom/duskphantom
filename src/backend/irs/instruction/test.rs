@@ -40,7 +40,7 @@ mod test_reg_def_use {
 
 #[cfg(test)]
 mod test_reg_replace {
-    use crate::backend::{LocalAddr, RegDefs, RegUses, StackAllocator, REG_A0};
+    use super::*;
 
     use super::irs::{NotInst, Reg, RegGenerator, RegReplace, REG_A1};
 

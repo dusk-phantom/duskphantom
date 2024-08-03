@@ -1,4 +1,4 @@
-use compiler::backend::var::{ArrVar, Var};
+use super::*;
 use insta::assert_debug_snapshot;
 
 #[test]

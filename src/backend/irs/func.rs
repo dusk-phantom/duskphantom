@@ -439,7 +439,7 @@ impl<'a> Iterator for BBIter<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::backend::{Block, Func};
+    use super::*;
 
     #[test]
     fn test_iter_bb_order() {

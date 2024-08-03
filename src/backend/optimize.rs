@@ -1,6 +1,5 @@
+use super::irs::*;
 use std::collections::{HashMap, HashSet, VecDeque};
-
-use super::*;
 
 #[allow(unused)]
 pub fn optimize(program: &mut prog::Program) -> Result<()> {
