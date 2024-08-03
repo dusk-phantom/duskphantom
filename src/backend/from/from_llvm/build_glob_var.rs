@@ -39,7 +39,6 @@ impl IRBuilder {
                 global_vars.push(new_var);
             }
         }
-        dbg!(&global_vars);
         Ok(global_vars)
     }
 

@@ -205,32 +205,59 @@ impl IRBuilder {
         Ok(vec![])
     }
 
+    /// return (and_op, pre_insert)
+    /// and_op is the operand prepared for and operation
+    /// pre_insert is the instruction list for preparing and_op
+    /// if flag not eq 0, and_op=(-1),which means and_op is all 1
+    /// if flag eq 0, and_op=0,which means and_op is all 0
+    pub fn build_and_op(
+        flag: &Operand,
+        reg_gener: &mut RegGenerator,
+    ) -> Result<(Operand, Vec<Inst>)> {
+        if let Operand::Imm(imm) = flag {
+            if imm == &(0.into()) {
+                return Ok((0.into(), vec![]));
+            } else {
+                return Ok(((-1).into(), vec![]));
+            }
+        }
+        // 如果flag eq 0, then mid_var is 1, then and_op is 0
+        // if flag not eq 0, then mid_var is 0, then and_op is -1,means all 1
+        let mut insts = Vec::new();
+        let mid_var = reg_gener.gen_virtual_usual_reg();
+        let seqz = SeqzInst::new(mid_var.into(), flag.clone());
+        insts.push(seqz.into());
+        let and_op = reg_gener.gen_virtual_usual_reg();
+        let add = AddInst::new(and_op.into(), mid_var.into(), (-1).into());
+        insts.push(add.into());
+
+        Ok((and_op.into(), insts))
+    }
+
     fn build_select_inst(
         select: &llvm_ir::instruction::Select,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
         fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<Vec<Inst>> {
-        fn build_and_op(
+        fn build_and_op_from_llvm_op(
             cond: &llvm_ir::operand::Operand,
             reg_gener: &mut RegGenerator,
             regs: &HashMap<Name, Reg>,
             insts: &mut Vec<Inst>,
         ) -> Result<Operand> {
             let cond = IRBuilder::reg_from(cond, regs)?;
-            let mid_var = reg_gener.gen_virtual_usual_reg();
-            let seqz = SeqzInst::new(mid_var.into(), cond);
-            insts.push(seqz.into());
-            let and_op = reg_gener.gen_virtual_usual_reg();
-            let add = AddInst::new(and_op.into(), mid_var.into(), (-1).into());
-            insts.push(add.into());
-            Ok(and_op.into())
+
+            let (and_op, pre_insert) = IRBuilder::build_and_op(&cond, reg_gener)?;
+            insts.extend(pre_insert);
+
+            Ok(and_op)
         }
 
         dbg!(select);
         // unimplemented!();
         let mut ret: Vec<Inst> = Vec::new();
-        let and_op0 = build_and_op(&select.condition, reg_gener, regs, &mut ret)?;
+        let and_op0 = build_and_op_from_llvm_op(&select.condition, reg_gener, regs, &mut ret)?;
         let and_op1: Operand = reg_gener.gen_virtual_usual_reg().into();
         let not = NotInst::new(and_op1.clone(), and_op0.clone());
         ret.push(not.into());
