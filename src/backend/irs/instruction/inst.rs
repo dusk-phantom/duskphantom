@@ -62,6 +62,9 @@ pub enum Inst {
     Sgtu(SgtuInst),
     Seqz(SeqzInst),
     Snez(SnezInst),
+    Feqs(FeqsInst),
+    Fles(FlesInst),
+    Flts(FltsInst),
 
     // data transfer operation
     Mv(MvInst),
@@ -168,6 +171,9 @@ impl Inst {
             Inst::Sltu(sltu) => sltu.gen_asm(),
             Inst::Sgtu(sgtu) => sgtu.gen_asm(),
             Inst::UDiv(udiv) => udiv.gen_asm(),
+            Inst::Feqs(feqs) => feqs.gen_asm(),
+            Inst::Fles(fles) => fles.gen_asm(),
+            Inst::Flts(flts) => flts.gen_asm(),
         }
     }
 }
@@ -231,6 +237,9 @@ impl RegReplace for Inst {
             Inst::Sltu(sltu) => sltu.replace_use(from, to),
             Inst::Sgtu(sgtu) => sgtu.replace_use(from, to),
             Inst::UDiv(udiv) => udiv.replace_use(from, to),
+            Inst::Feqs(feqs) => feqs.replace_use(from, to),
+            Inst::Fles(fles) => fles.replace_use(from, to),
+            Inst::Flts(flts) => flts.replace_use(from, to),
         }
     }
 
@@ -277,6 +286,9 @@ impl RegReplace for Inst {
             Inst::Sltu(sltu) => sltu.replace_def(from, to),
             Inst::Sgtu(sgtu) => sgtu.replace_def(from, to),
             Inst::UDiv(udiv) => udiv.replace_def(from, to),
+            Inst::Feqs(feqs) => feqs.replace_def(from, to),
+            Inst::Fles(fles) => fles.replace_def(from, to),
+            Inst::Flts(flts) => flts.replace_def(from, to),
         }
     }
 }

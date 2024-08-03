@@ -128,11 +128,32 @@ impl InstChecker for Riscv {
             Inst::Sltu(sltu) => self.check_sltu(sltu),
             Inst::Sgtu(sgut) => self.check_sgtu(sgut),
             Inst::UDiv(udiv) => self.check_udiv(udiv),
+            Inst::Feqs(feqs) => self.check_feqs(feqs),
+            Inst::Fles(fles) => self.check_fles(fles),
+            Inst::Flts(flts) => self.check_flts(flts),
         }
     }
 }
 
 impl Riscv {
+    fn check_feqs(&self, feqs: &FeqsInst) -> bool {
+        matches!(feqs.dst(), Operand::Reg(_))
+            && matches!(feqs.lhs(), Operand::Reg(_))
+            && matches!(feqs.rhs(), Operand::Reg(_))
+    }
+
+    fn check_fles(&self, fles: &FlesInst) -> bool {
+        matches!(fles.dst(), Operand::Reg(_))
+            && matches!(fles.lhs(), Operand::Reg(_))
+            && matches!(fles.rhs(), Operand::Reg(_))
+    }
+
+    fn check_flts(&self, flts: &FltsInst) -> bool {
+        matches!(flts.dst(), Operand::Reg(_))
+            && matches!(flts.lhs(), Operand::Reg(_))
+            && matches!(flts.rhs(), Operand::Reg(_))
+    }
+
     fn check_udiv(&self, udiv: &UdivInst) -> bool {
         matches!(udiv.dst(), Operand::Reg(_))
             && matches!(udiv.lhs(), Operand::Reg(_))
