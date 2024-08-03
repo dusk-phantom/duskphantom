@@ -314,6 +314,9 @@ impl IRBuilder {
         }
     }
 
+    /// 1. stack_slot 来源于 alloca, alloca 我们都是分配了 8Byte
+    /// 2. global_label_from 只能是全局变量/全局数组, sysy 代码只有 float/int -> 4Byte
+    /// 3. pointer_from 只能来源于 gep, gep 通常是对数组操作(局部数组/全局数组), 都是 4Byte
     pub fn address_from(
         operand: &middle::ir::Operand,
         regs: &HashMap<Address, Reg>,
