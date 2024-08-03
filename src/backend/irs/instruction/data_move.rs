@@ -1,5 +1,3 @@
-use anyhow::Ok;
-
 use super::*;
 
 #[derive(Clone, Debug)]
@@ -287,6 +285,24 @@ impl RegReplace for LocalAddr {
         }
         Ok(())
     }
+}
+
+////////////////////////////////////////////////////////////////////
+/// impl conversion to Inst for data move inst
+///////
+mod c {
+    use super::*;
+    // inst for data transfer
+    impl_inst_convert!(MvInst, Mv);
+    impl_inst_convert!(LlaInst, Lla);
+    impl_inst_convert!(SdInst, Sd);
+    impl_inst_convert!(LdInst, Ld);
+    impl_inst_convert!(LwInst, Lw);
+    impl_inst_convert!(SwInst, Sw);
+    impl_inst_convert!(LiInst, Li);
+    impl_inst_convert!(LoadInst, Load);
+    impl_inst_convert!(StoreInst, Store);
+    impl_inst_convert!(LocalAddr, LocalAddr);
 }
 
 #[cfg(test)]

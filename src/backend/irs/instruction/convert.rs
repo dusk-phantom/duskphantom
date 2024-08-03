@@ -3,6 +3,10 @@ use super::*;
 impl_conversion_inst!(I2fInst, "fcvt.s.w");
 impl_conversion_inst!(F2iInst, "fcvt.w.s", "rtz");
 
+// impl conversion to Inst
+impl_inst_convert!(I2fInst, I2f);
+impl_inst_convert!(F2iInst, F2i);
+
 #[cfg(test)]
 mod tests {
     use super::*;
