@@ -24,6 +24,36 @@ impl_two_op_inst!(SeqzInst, "seqz");
 impl_two_op_inst!(NegInst, "neg");
 impl_two_op_inst!(MvInst, "mv");
 
+////////////////////////////////////////////////////////////////////////
+/// 以下是具体指令类型 与 Inst 的转换
+////////////////////////////////////////////////////////////////////////
+mod c {
+    use super::*;
+    // for algebraic operation
+    impl_inst_convert!(AddInst, Add);
+    impl_inst_convert!(SubInst, Sub);
+    impl_inst_convert!(MulInst, Mul);
+    impl_inst_convert!(RemInst, Rem);
+    impl_inst_convert!(DivInst, Div);
+    impl_inst_convert!(NegInst, Neg);
+
+    // for bit count operation
+    impl_inst_convert!(AndInst, And);
+    impl_inst_convert!(OrInst, Or);
+    impl_inst_convert!(XorInst, Xor);
+    impl_inst_convert!(SllInst, Sll);
+    impl_inst_convert!(SrlInst, Srl);
+    impl_inst_convert!(SraInst, SRA);
+    impl_inst_convert!(NotInst, Not);
+
+    // for comparison
+    impl_inst_convert!(SltInst, Slt);
+    impl_inst_convert!(SltuInst, Sltu);
+    impl_inst_convert!(SgtuInst, Sgtu);
+    impl_inst_convert!(SeqzInst, Seqz);
+    impl_inst_convert!(SnezInst, Snez);
+}
+
 #[cfg(test)]
 mod tests {
 

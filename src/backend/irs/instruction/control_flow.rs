@@ -71,3 +71,17 @@ impl ToBB for TailInst {
 }
 
 impl RegReplace for CallInst {}
+
+mod convert_to_inst {
+    use super::*;
+    // inst for control flow
+    impl_inst_convert!(JmpInst, Jmp);
+    impl_inst_convert!(CallInst, Call);
+    impl_inst_convert!(TailInst, Tail);
+    impl_inst_convert!(BeqInst, Beq);
+    impl_inst_convert!(BneInst, Bne);
+    impl_inst_convert!(BltInst, Blt);
+    impl_inst_convert!(BleInst, Ble);
+    impl_inst_convert!(BgtInst, Bgt);
+    impl_inst_convert!(BgeInst, Bge);
+}
