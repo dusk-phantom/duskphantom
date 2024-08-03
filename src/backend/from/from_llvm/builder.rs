@@ -184,6 +184,7 @@ impl IRBuilder {
                     let stack_slot = match inst {
                         Inst::Load(load) => *load.src(),
                         Inst::Store(store) => *store.dst(),
+                        Inst::LocalAddr(local_addr) => *local_addr.stack_slot(),
                         _ => {
                             continue;
                         }
