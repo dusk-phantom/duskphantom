@@ -42,7 +42,7 @@ pub fn compile(
     let mut program = backend::from_self::gen_from_self(&program)?;
 
     if opt_flag {
-        backend::optimize(&mut program);
+        backend::optimize(&mut program)?;
     } else {
         backend::phisicalize(&mut program)?;
     }
@@ -76,7 +76,7 @@ pub fn compile_clang(
     let mut program = backend::from_llvm::gen_from_clang(&program)
         .map_err(|e| BackendError::GenFromLlvmError(format!("{e:?}")))?;
     if opt_flag {
-        backend::optimize(&mut program);
+        backend::optimize(&mut program)?;
     } else {
         backend::phisicalize(&mut program)?;
     }
