@@ -119,7 +119,15 @@ impl IRBuilder {
                         unreachable!();
                     }
                 },
-                _ => todo!(),
+                Constant::GlobalReference { name: _, ty: _ } => {
+                    // unimplemented!();
+                    let name = Self::globalname_from_constant(c)?;
+                    name.into()
+                }
+                _ => {
+                    dbg!(c);
+                    unimplemented!();
+                }
             },
             _ => {
                 return Err(anyhow!("operand is not constant:{}", operand))
