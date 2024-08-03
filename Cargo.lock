@@ -263,6 +263,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "graph"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+]
+
+[[package]]
 name = "half"
 version = "1.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -303,6 +310,7 @@ dependencies = [
  "bitvec",
  "clap 3.2.25",
  "criterion",
+ "graph",
  "hexf-parse",
  "indoc",
  "insta",
