@@ -141,6 +141,8 @@ impl IRBuilder {
 
         /* ---------- stack allocator, 后面物理化也会用到 ---------- */
         *m_f.stack_allocator_mut() = Some(stack_allocator);
+        *m_f.reg_gener_mut() = Some(reg_gener);
+
         Ok((m_f, caller_reg_stack.try_into()?))
     }
 
