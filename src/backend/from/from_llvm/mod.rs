@@ -1,11 +1,10 @@
 mod builder;
-#[allow(hidden_glob_reexports)]
-mod instruction;
+
+mod build_inst;
 #[macro_use]
 mod macros;
-#[allow(hidden_glob_reexports)]
-mod operand;
-mod vars;
+mod build_glob_var;
+mod build_op;
 
 pub use super::irs::*;
 pub use crate::clang_frontend;

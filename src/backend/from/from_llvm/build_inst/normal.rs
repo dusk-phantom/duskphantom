@@ -3,7 +3,6 @@ use crate::{llvm2tac_binary_float, llvm2tac_three_op_float, llvm2tac_three_op_us
 use super::*;
 use llvm_ir::{Constant, Name};
 use std::collections::HashMap;
-use var::FloatVar;
 
 impl IRBuilder {
     pub fn build_instruction(

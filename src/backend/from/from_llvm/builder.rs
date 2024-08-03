@@ -1,11 +1,9 @@
-use super::super::prog::Program;
 use super::*;
 
 use anyhow::{Context, Result};
 
 use llvm_ir::Name;
 use std::collections::HashMap;
-use var::FloatVar;
 
 pub struct IRBuilder;
 
@@ -23,13 +21,13 @@ impl IRBuilder {
             global_vars.push(float_var.into());
         }
 
-        let mdl = module::Module {
+        let mdl = Module {
             name: "main".to_string(),
             entry: Some("main".to_string()),
             global: global_vars,
             funcs,
         };
-        Ok(prog::Program {
+        Ok(Program {
             entry: None,
             modules: vec![mdl],
         })

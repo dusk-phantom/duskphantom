@@ -2,10 +2,8 @@ use std::collections::HashMap;
 
 use super::*;
 
-use builder::IRBuilder;
-
 use llvm_ir::{Constant, Name};
-use var::FloatVar;
+// use var::FloatVar;
 
 impl TryFrom<&llvm_ir::constant::Float> for Fmm {
     type Error = anyhow::Error;
