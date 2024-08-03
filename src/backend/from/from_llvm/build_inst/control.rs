@@ -8,7 +8,6 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
-        dbg!(call);
         let f_name = match &call.function {
             rayon::iter::Either::Left(_) => todo!(),
             rayon::iter::Either::Right(op) => {
@@ -77,6 +76,31 @@ impl IRBuilder {
                         extra_arg_stack += 8;
                         ret.push(sd.into());
                     };
+                } else if let Some(label) = v.label() {
+                    let dst: Operand = if i_arg < 8 {
+                        let reg = Reg::new(REG_A0.id() + i_arg, true);
+                        phisic_arg_regs.push(reg);
+                        i_arg += 1;
+                        reg.into()
+                    } else {
+                        let off = extra_arg_stack.into();
+                        extra_arg_stack += 8;
+                        off
+                    };
+                    match dst {
+                        Operand::Reg(reg) => {
+                            let lla = LlaInst::new(reg, label);
+                            ret.push(lla.into());
+                        }
+                        Operand::Imm(off) => {
+                            let r = reg_gener.gen_virtual_usual_reg();
+                            let lla = LlaInst::new(r, label);
+                            ret.push(lla.into());
+                            let sd = SdInst::new(r, off, REG_SP);
+                            ret.push(sd.into());
+                        }
+                        _ => unimplemented!(),
+                    }
                 } else {
                     dbg!(v);
                     unimplemented!();
