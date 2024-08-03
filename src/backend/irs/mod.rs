@@ -21,3 +21,4 @@ pub use module::*;
 pub use operand::*;
 pub use prog::*;
 pub use stack_slot::*;
+pub use var::*;

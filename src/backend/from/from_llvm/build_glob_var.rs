@@ -4,7 +4,6 @@ use common::Dimension;
 use llvm_ir::{constant::Float, Constant, ConstantRef, Type};
 
 use rayon::iter::Either;
-use var::{ArrVar, Var};
 
 impl IRBuilder {
     pub fn build_global_var(
@@ -44,7 +43,7 @@ impl IRBuilder {
     }
 
     pub fn build_int_var(name: &str, value: u64) -> Result<Var> {
-        let var = var::Var::Prim(var::PrimVar::IntVar(var::IntVar {
+        let var = Var::Prim(PrimVar::IntVar(IntVar {
             name: name.to_string(),
             init: Some(value as i32),
             is_const: false,
@@ -55,7 +54,7 @@ impl IRBuilder {
     pub fn build_float_var(name: &str, f: Float) -> Result<Var> {
         match f {
             llvm_ir::constant::Float::Single(f) => {
-                let var = var::Var::Prim(var::PrimVar::FloatVar(var::FloatVar {
+                let var = Var::Prim(PrimVar::FloatVar(FloatVar {
                     name: name.to_string(),
                     init: Some(f),
                     is_const: false,
