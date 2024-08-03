@@ -58,7 +58,9 @@ impl IRBuilder {
     )> {
         let mut ret = Vec::new();
         if idxes.is_empty() {
-            return Ok((1, REG_ZERO, ret));
+            let factor = Self::_cal_capas_factor(ty).with_context(|| context!())?;
+            println!("ty={}, factor={}", ty, factor);
+            return Ok((factor, REG_ZERO, ret));
         }
         match ty {
             middle::ir::ValueType::Void => {
@@ -71,6 +73,7 @@ impl IRBuilder {
                 let (idx, prepare) =
                     Self::prepare_rs1_i(&idxes[0], reg_gener, regs).with_context(|| context!())?;
                 ret.extend(prepare);
+                println!("{}", ty);
                 Ok((1, idx, ret))
             }
             middle::ir::ValueType::Float => todo!(),

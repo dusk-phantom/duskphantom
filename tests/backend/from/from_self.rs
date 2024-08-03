@@ -11,8 +11,12 @@ mod test_gep_from_self {
         // Create basic block and fill instructions
         let mut entry = mem_pool.new_basicblock("entry".to_string());
         let value_type = middle::ir::ValueType::Array(
-            (middle::ir::ValueType::Array(middle::ir::ValueType::Int.into(), 3)).into(),
-            3,
+            middle::ir::ValueType::Array(
+                (middle::ir::ValueType::Array(middle::ir::ValueType::Int.into(), 6)).into(),
+                3,
+            )
+            .into(),
+            4,
         );
         let alloca = mem_pool.get_alloca(value_type.clone(), 1);
         let gep = mem_pool.get_getelementptr(
@@ -21,7 +25,7 @@ mod test_gep_from_self {
             vec![
                 middle::ir::Operand::Constant(0.into()),
                 middle::ir::Operand::Constant(1.into()),
-                middle::ir::Operand::Constant(2.into()),
+                // middle::ir::Operand::Constant(2.into()),
             ],
         );
         let ret = mem_pool.get_ret(None);
