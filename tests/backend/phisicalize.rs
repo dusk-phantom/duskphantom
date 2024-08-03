@@ -22,8 +22,7 @@ fn test_handle_offset_overflow() {
         name: "test",
         args: [],
         ret: None,
-        caller_regs_stack: None,
-        max_callee_regs_stack: None,
+        reg_gener: None,
         stack_allocator: Some(
             StackAllocator {
                 alloc_from: 2432,

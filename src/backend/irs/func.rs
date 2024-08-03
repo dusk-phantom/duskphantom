@@ -8,15 +8,12 @@ use rayon::prelude::*;
 
 #[allow(unused)]
 #[derive(Default, Debug)]
+#[non_exhaustive]
 pub struct Func {
     name: String,
     args: Vec<String>,
     ret: Option<Reg>,
-    /// the size of stack where extra args are stored
-    caller_regs_stack: Option<u32>,
-    /// the max size of stack where callee's args are stored
-    max_callee_regs_stack: Option<u32>,
-    // stack_allocator,
+    reg_gener: Option<RegGenerator>,
     stack_allocator: Option<StackAllocator>,
     // entry block
     entry: Block,
@@ -59,8 +56,7 @@ impl Func {
             name,
             args,
             ret: None,
-            caller_regs_stack: None,
-            max_callee_regs_stack: None,
+            reg_gener: None,
             stack_allocator: None,
             other_bbs: Vec::new(),
             entry,
@@ -77,15 +73,27 @@ impl Func {
     pub fn stack_allocator(&self) -> Option<&StackAllocator> {
         self.stack_allocator.as_ref()
     }
+
     pub fn stack_allocator_mut(&mut self) -> &mut Option<StackAllocator> {
         &mut self.stack_allocator
     }
+
+    pub fn reg_gener(&self) -> Option<&RegGenerator> {
+        self.reg_gener.as_ref()
+    }
+
+    pub fn reg_gener_mut(&mut self) -> &mut Option<RegGenerator> {
+        &mut self.reg_gener
+    }
+
     pub fn push_bb(&mut self, bb: Block) {
         self.other_bbs.push(bb);
     }
+
     pub fn extend_bbs(&mut self, bbs: Vec<Block>) {
         self.other_bbs.extend(bbs);
     }
+
     /// check if there is a call instruction in the function
     pub fn is_caller(&self) -> bool {
         for bb in self.iter_bbs() {
