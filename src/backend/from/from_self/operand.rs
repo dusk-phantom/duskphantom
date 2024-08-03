@@ -108,15 +108,15 @@ impl IRBuilder {
         value: &middle::ir::Operand,
         reg_gener: &mut RegGenerator,
         regs: &HashMap<Address, Reg>,
-    ) -> Result<(Operand, Vec<Inst>)> {
+    ) -> Result<(Reg, Vec<Inst>)> {
         let value = IRBuilder::no_load_from(value, regs)?;
         match &value {
             Operand::Imm(imm) => {
                 let dst = reg_gener.gen_virtual_usual_reg();
                 let li = LiInst::new(dst.into(), imm.into());
-                Ok((dst.into(), vec![li.into()]))
+                Ok((dst, vec![li.into()]))
             }
-            Operand::Reg(_) => Ok((value, vec![])),
+            Operand::Reg(reg) => Ok((*reg, vec![])),
             _ => unimplemented!(),
         }
     }

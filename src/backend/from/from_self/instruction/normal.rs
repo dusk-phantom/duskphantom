@@ -224,7 +224,7 @@ impl IRBuilder {
             insts.extend(prepare);
             let (op1, prepare) = IRBuilder::prepare_rs2_i(rhs, reg_gener, regs)?;
             insts.extend(prepare);
-            Ok((op0, op1))
+            Ok((op0.into(), op1))
         }
         fn prepare_rev_op0_op1(
             icmp: &middle::ir::instruction::misc_inst::ICmp,
@@ -238,7 +238,7 @@ impl IRBuilder {
             insts.extend(prepare);
             let (op1, prepare) = IRBuilder::prepare_rs2_i(lhs, reg_gener, regs)?;
             insts.extend(prepare);
-            Ok((op0, op1))
+            Ok((op0.into(), op1))
         }
 
         /* ----------  ---------- */
