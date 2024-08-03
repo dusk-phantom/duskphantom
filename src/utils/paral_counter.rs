@@ -2,7 +2,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 // 能够高并发地管理一定 数据范围内的id分配
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct ParalCounter {
     end: usize,
     counter: Arc<AtomicUsize>,

@@ -347,6 +347,7 @@ pub const REG_FT9: Reg = Reg::new(29, false);
 pub const REG_FT10: Reg = Reg::new(30, false);
 pub const REG_FT11: Reg = Reg::new(31, false);
 
+#[derive(Debug, Clone)]
 pub struct RegGenerator {
     usual_counter: ParalCounter,
     float_counter: ParalCounter,
