@@ -55,6 +55,7 @@ impl RegUses for Inst {
             Inst::LocalAddr(laddr) => laddr.uses(),
             Inst::Sltu(sltu) => sltu.uses(),
             Inst::Sgtu(sgtu) => sgtu.uses(),
+            Inst::UDiv(udiv) => udiv.uses(),
         }
     }
 }
@@ -101,6 +102,7 @@ impl RegDefs for Inst {
             Inst::LocalAddr(laddr) => laddr.defs(),
             Inst::Sltu(sltu) => sltu.defs(),
             Inst::Sgtu(sgtu) => sgtu.defs(),
+            Inst::UDiv(udiv) => udiv.defs(),
         }
     }
 }

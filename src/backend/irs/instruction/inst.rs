@@ -40,6 +40,7 @@ pub enum Inst {
     Sub(SubInst),
     Mul(MulInst),
     Div(DivInst),
+    UDiv(UdivInst),
     Rem(RemInst),
 
     // bit count operation
@@ -166,6 +167,7 @@ impl Inst {
             Inst::LocalAddr(local_addr) => local_addr.gen_asm(),
             Inst::Sltu(sltu) => sltu.gen_asm(),
             Inst::Sgtu(sgtu) => sgtu.gen_asm(),
+            Inst::UDiv(udiv) => udiv.gen_asm(),
         }
     }
 }
@@ -228,6 +230,7 @@ impl RegReplace for Inst {
             Inst::LocalAddr(laddr) => laddr.replace_use(from, to),
             Inst::Sltu(sltu) => sltu.replace_use(from, to),
             Inst::Sgtu(sgtu) => sgtu.replace_use(from, to),
+            Inst::UDiv(udiv) => udiv.replace_use(from, to),
         }
     }
 
@@ -273,6 +276,7 @@ impl RegReplace for Inst {
             Inst::LocalAddr(laddr) => laddr.replace_def(from, to),
             Inst::Sltu(sltu) => sltu.replace_def(from, to),
             Inst::Sgtu(sgtu) => sgtu.replace_def(from, to),
+            Inst::UDiv(udiv) => udiv.replace_def(from, to),
         }
     }
 }
