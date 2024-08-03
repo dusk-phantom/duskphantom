@@ -338,13 +338,6 @@ impl IRBuilder {
             }
             middle::ir::ValueType::Array(_, _) => {
                 let cap = Self::_cal_capas_factor(&ty).with_context(|| context!())?;
-                // let
-                // let dims =
-                // let e_ty = Self::
-                // let capa = Self::_cal_capas_rev(&ty);
-                // let sz: usize = capa.iter().product();
-                // (sz << 2/* *4 */) as u32
-                // todo!()
                 (cap << 2) as u32
             }
         };
@@ -365,26 +358,29 @@ impl IRBuilder {
         regs: &HashMap<Address, Reg>,
         fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<Vec<Inst>> {
-        let mut ret: Vec<Inst> = Vec::new();
         let addr =
             Self::address_from(store.get_ptr(), regs, stack_slots).with_context(|| context!())?;
         let (val, prepare) = Self::prepare_store_rs2(store.get_value(), reg_gener, regs, fmms)
             .with_context(|| context!())?;
+
         let Operand::Reg(val) = val else {
-            // 注意, 这里可能会出现 fmm 的情况
             return Err(anyhow!("store value is not reg")).with_context(|| context!());
         };
+
+        let mut ret: Vec<Inst> = Vec::new();
         ret.extend(prepare);
         match addr {
             Operand::Reg(base) => {
+                // load/store Reg 的来源只能是 gep ->
                 let sw = SwInst::new(val, 0.into(), base);
                 ret.push(sw.into());
             }
             Operand::StackSlot(slot) => {
-                let sd = StoreInst::new(slot, val);
+                let sd = StoreInst::new(slot, val).with_8byte();
                 ret.push(sd.into());
             }
             Operand::Label(label) => {
+                // load/store label 只能是全局数组/变量, 全局数组一定只能是 int/float -> 4Byte -> sw/lw
                 let addr = reg_gener.gen_virtual_usual_reg();
                 let lla = LlaInst::new(addr, label);
                 ret.push(lla.into());
@@ -429,7 +425,7 @@ impl IRBuilder {
                 ret.push(lw.into());
             }
             Operand::StackSlot(slot) => {
-                let ld = LoadInst::new(dst_reg, slot); // 对于 stack, 就是使用的 ld
+                let ld = LoadInst::new(dst_reg, slot).with_8byte(); // 对于 stack, 就是使用的 ld
                 ret.push(ld.into());
             }
             Operand::Label(label) => {
