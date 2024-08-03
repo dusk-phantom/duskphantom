@@ -14,7 +14,7 @@ impl IRBuilder {
         let idxes = gep.get_index();
         let ty = gep.get_ptr().get_type();
         let (_, ofst, prepare) =
-            Self::__cal_offset(&ty, idxes, reg_gener, regs).with_context(|| context!())?;
+            Self::_cal_offset(&ty, idxes, reg_gener, regs).with_context(|| context!())?;
         ret.extend(prepare);
         let _mid = reg_gener.gen_virtual_usual_reg();
         let slli = SllInst::new(_mid.into(), ofst.into(), (2).into()); // sysy 的数据都是 4Byte
@@ -46,7 +46,7 @@ impl IRBuilder {
         Ok(ret)
     }
 
-    fn __cal_offset(
+    fn _cal_offset(
         ty: &middle::ir::ValueType,
         idxes: &[middle::ir::Operand],
         reg_gener: &mut RegGenerator,
@@ -57,82 +57,48 @@ impl IRBuilder {
         Vec<Inst>,
     )> {
         let mut ret = Vec::new();
+        if idxes.is_empty() {
+            return Ok((1, REG_ZERO, ret));
+        }
         match ty {
             middle::ir::ValueType::Void => {
                 Err(anyhow!("gep can't be void: {}", ty)).with_context(|| context!())
             }
             middle::ir::ValueType::SignedChar
             | middle::ir::ValueType::Int
-            | middle::ir::ValueType::Bool => todo!(),
-            middle::ir::ValueType::Float => todo!(),
-            // %77 = getelementptr [3 x [2 x [4 x [8 x [7 x i32]]]]], ptr @arr2, i64 0, i64 %5, i64 %8, i64 %11, i64 %27, i64 0
-            middle::ir::ValueType::Array(ty, sz) => {
+            | middle::ir::ValueType::Bool => {
+                assert!(idxes.len() == 1); // 这种情况是 idxes 和 types 同时耗尽
                 let (idx, prepare) =
                     Self::prepare_rs1_i(&idxes[0], reg_gener, regs).with_context(|| context!())?;
                 ret.extend(prepare);
-                if idxes.len() > 1 {
-                    let (factor, acc, prepare) =
-                        Self::__cal_offset(ty, &idxes[1..], reg_gener, regs)
-                            .with_context(|| context!())?;
-                    ret.extend(prepare);
-                    let factor = sz * factor;
-                    let dst0 = reg_gener.gen_virtual_usual_reg();
-                    let li = LiInst::new(dst0.into(), (factor as i64).into());
-                    ret.push(li.into());
-                    let dst1 = reg_gener.gen_virtual_usual_reg();
-                    let mul = MulInst::new(dst1.into(), idx.clone(), dst0.into());
-                    ret.push(mul.into());
-                    let _acc = reg_gener.gen_virtual_usual_reg();
-                    let add = AddInst::new(_acc.into(), acc.into(), dst1.into());
-                    ret.push(add.into());
-                    Ok((factor, _acc, ret))
-                } else {
-                    let factor = Self::_cal_capas_factor(ty).with_context(|| context!())?;
-                    let dst0 = reg_gener.gen_virtual_usual_reg();
-                    let li = LiInst::new(dst0.into(), (factor as i64).into());
-                    ret.push(li.into());
-                    let dst1 = reg_gener.gen_virtual_usual_reg();
-                    let mul = MulInst::new(dst1.into(), idx.clone(), dst0.into());
-                    ret.push(mul.into());
-                    Ok((factor, dst1, ret))
-                }
+                Ok((1, idx, ret))
+            }
+            middle::ir::ValueType::Float => todo!(),
+            middle::ir::ValueType::Array(ty, sz) => {
+                // 这里 ty 是拿到当前数组的类型
+                let (idx, prepare) =
+                    Self::prepare_rs1_i(&idxes[0], reg_gener, regs).with_context(|| context!())?;
+                ret.extend(prepare);
+                let (_factor, _acc, prepare) = Self::_cal_offset(ty, &idxes[1..], reg_gener, regs)
+                    .with_context(|| context!())?;
+                ret.extend(prepare);
+                let factor = sz * _factor; // 当前类型的 sizeof
+                let fac = reg_gener.gen_virtual_usual_reg();
+                let li = LiInst::new(fac.into(), (factor as i64).into()); // 部分阶乘
+                ret.push(li.into());
+                let part = reg_gener.gen_virtual_usual_reg(); // 部分积
+                let mul = MulInst::new(part.into(), idx.into(), fac.into());
+                ret.push(mul.into());
+                let acc = reg_gener.gen_virtual_usual_reg(); // 部分结果
+                let add = AddInst::new(acc.into(), _acc.into(), part.into());
+                ret.push(add.into());
+                Ok((factor, acc, ret))
             }
             // %getelementptr_85 = getelementptr i32, ptr %getelementptr_84, i32 0
             // %getelementptr_57 = getelementptr [2 x i32], ptr %getelementptr_38, i32 3
             // %getelementptr_58 = getelementptr [2 x i32], ptr %getelementptr_57, i32 0, i32 0
             // 应该这么说, gep 的第一层永远是 ptr
-            middle::ir::ValueType::Pointer(poi) => {
-                let (idx, prepare) =
-                    Self::prepare_rs1_i(&idxes[0], reg_gener, regs).with_context(|| context!())?;
-                ret.extend(prepare);
-                // dbg!(poi);
-                if idxes.len() > 1 {
-                    let (factor, acc, prepare) =
-                        Self::__cal_offset(poi, &idxes[1..], reg_gener, regs)
-                            .with_context(|| context!())?;
-                    ret.extend(prepare);
-                    let dst0 = reg_gener.gen_virtual_usual_reg();
-                    let li = LiInst::new(dst0.into(), (factor as i64).into());
-                    ret.push(li.into());
-                    let dst1 = reg_gener.gen_virtual_usual_reg();
-                    let mul = MulInst::new(dst1.into(), idx.clone(), dst0.into());
-                    ret.push(mul.into());
-                    let _acc = reg_gener.gen_virtual_usual_reg();
-                    let add = AddInst::new(_acc.into(), acc.into(), dst1.into());
-                    ret.push(add.into());
-                    Ok((factor, _acc, ret))
-                } else {
-                    let factor = Self::_cal_capas_factor(poi).with_context(|| context!())?;
-                    let dst0 = reg_gener.gen_virtual_usual_reg();
-                    let li = LiInst::new(dst0.into(), (factor as i64).into());
-                    ret.push(li.into());
-                    let dst1 = reg_gener.gen_virtual_usual_reg();
-                    let mul = MulInst::new(dst1.into(), idx.clone(), dst0.into());
-                    ret.push(mul.into());
-                    Ok((factor, dst1, ret))
-                }
-                // 判断下面有没有了,
-            }
+            middle::ir::ValueType::Pointer(poi) => Self::_cal_offset(poi, idxes, reg_gener, regs),
         }
     }
 }

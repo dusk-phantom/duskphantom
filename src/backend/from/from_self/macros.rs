@@ -12,7 +12,7 @@ macro_rules! ssa2tac_three_usual_Rtype {
         insts.extend(prepare);
         let dst = $reg_gener.gen_virtual_usual_reg();
         $regs.insert(sub as *const _ as Address, dst);
-        let sub_inst = $tac_inst_ty::new(dst.into(), op0, op1);
+        let sub_inst = $tac_inst_ty::new(dst.into(), op0.into(), op1.into());
         insts.push(sub_inst.into());
         Ok(insts)
     }};
@@ -31,7 +31,7 @@ macro_rules! ssa2tac_three_usual_Itype {
         insts.extend(prepare);
         let dst = $reg_gener.gen_virtual_usual_reg();
         $regs.insert(addi as *const _ as Address, dst);
-        let addi_inst = $tac_inst_ty::new(dst.into(), op0, op1);
+        let addi_inst = $tac_inst_ty::new(dst.into(), op0.into(), op1);
         insts.push(addi_inst.into());
         Ok(insts)
     }};
