@@ -1,11 +1,7 @@
 use std::collections::HashMap;
 
+use super::*;
 use anyhow::{anyhow, Context, Result};
-
-use crate::backend::var::FloatVar;
-use crate::backend::{
-    Fmm, Inst, Label, LiInst, LlaInst, LwInst, Operand, Reg, RegGenerator, StackSlot,
-};
 
 use crate::context;
 
@@ -13,7 +9,6 @@ use crate::middle;
 use crate::middle::ir::Instruction;
 use crate::utils::mem::ObjPtr;
 
-use super::*;
 use builder::IRBuilder;
 
 impl IRBuilder {

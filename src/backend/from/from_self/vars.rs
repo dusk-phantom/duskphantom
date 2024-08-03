@@ -2,7 +2,7 @@ use super::builder::IRBuilder;
 use irs::var::ArrVar;
 use middle::ir::Constant;
 
-use crate::backend::var::{self, Var};
+use super::*;
 
 use anyhow::Result;
 

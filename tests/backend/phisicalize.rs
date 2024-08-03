@@ -1,5 +1,6 @@
 use compiler::backend::irs::*;
 use insta::assert_debug_snapshot;
+
 #[test]
 fn test_handle_offset_overflow() {
     let mut entry = Block::new("".to_string());
@@ -17,6 +18,7 @@ fn test_handle_offset_overflow() {
     f.stack_allocator_mut().replace(ssa);
 
     phisicalize_func(&mut f).unwrap();
+
     assert_debug_snapshot!(f,@r###"
     Func {
         name: "test",

@@ -1,27 +1,29 @@
 #[cfg(test)]
 #[cfg(feature = "clang_enabled")]
+use super::*;
 mod from_llvm_tests {
 
+    use super::*;
     use anyhow::Result;
-    use compiler::{backend, clang_frontend};
+    use compiler::clang_frontend;
     use insta::assert_debug_snapshot;
 
-    fn parse_to_backend(code: &str) -> Result<backend::Program> {
+    fn parse_to_backend(code: &str) -> Result<Program> {
         let tmp_cfile = tempfile::Builder::new().suffix(".c").tempfile()?;
         std::fs::write(tmp_cfile.path(), code)?;
         let front: clang_frontend::Program = clang_frontend::Program::parse_file(tmp_cfile.path())?;
-        let program: backend::Program = backend::from_llvm::gen_from_clang(&front)?;
+        let program: Program = backend::from_llvm::gen_from_clang(&front)?;
         Ok(program)
     }
 
     #[allow(unused)]
-    fn parse_to_single_module(code: &str) -> Result<backend::Module> {
+    fn parse_to_single_module(code: &str) -> Result<Module> {
         let prog = parse_to_backend(code)?;
         Ok(prog.modules.into_iter().next().unwrap())
     }
 
     #[allow(unused)]
-    fn find_func<'a>(module: &'a backend::Module, name: &str) -> Option<&'a backend::Func> {
+    fn find_func<'a>(module: &'a Module, name: &str) -> Option<&'a Func> {
         module.funcs.iter().find(|f| f.name() == name)
     }
 

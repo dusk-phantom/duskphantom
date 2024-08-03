@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::fprintln;
 
-use super::*;
+use super::irs::*;
 
 // turn virtual backend module to phisic backend module
 #[allow(unused)]
