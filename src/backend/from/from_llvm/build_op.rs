@@ -136,9 +136,7 @@ impl IRBuilder {
         })
     }
 
-    /// if operand is Imm imm ,return Operand::Imm(imm)
-    /// if operand is Reg reg ,return Operand::Reg(reg)
-    /// if operand is Fmm fmm ,return Operand::Fmm(fmm)
+    /// value must be a fmm,imm, or a reg
     pub fn value_from(operand: &llvm_ir::Operand, regs: &HashMap<Name, Reg>) -> Result<Operand> {
         if let Ok(c) = Self::const_from(operand) {
             Ok(c)
