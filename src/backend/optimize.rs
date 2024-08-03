@@ -19,6 +19,7 @@ pub fn optimize(program: &mut prog::Program) -> Result<()> {
     Ok(())
 }
 
+#[allow(unused)]
 fn optimize_func(func: &mut Func) -> Result<()> {
     // inst combine? 匹配一些模式,将多条指令合并成一条
     inst_combine::handle_inst_combine(func)?;

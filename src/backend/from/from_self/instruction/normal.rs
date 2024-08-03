@@ -149,7 +149,12 @@ impl IRBuilder {
                 );
                 Self::build_icmp_inst(icmp, reg_gener, regs)
             }
-            middle::ir::instruction::InstType::FCmp => todo!(),
+            middle::ir::instruction::InstType::FCmp => {
+                let fcmp = downcast_ref::<middle::ir::instruction::misc_inst::FCmp>(
+                    inst.as_ref().as_ref(),
+                );
+                Self::build_fcmp_inst(fcmp, reg_gener, regs)
+            }
             middle::ir::instruction::InstType::Phi => {
                 let phi =
                     downcast_ref::<middle::ir::instruction::misc_inst::Phi>(inst.as_ref().as_ref());
@@ -163,6 +168,15 @@ impl IRBuilder {
                 Self::build_call_inst(call, reg_gener, regs, fmms)
             }
         }
+    }
+
+    #[allow(unused)]
+    fn build_fcmp_inst(
+        fcmp: &middle::ir::instruction::misc_inst::FCmp,
+        reg_gener: &mut RegGenerator,
+        regs: &mut HashMap<Address, Reg>,
+    ) -> Result<Vec<Inst>> {
+        todo!()
     }
 
     fn build_phi_inst(
