@@ -68,7 +68,8 @@ impl IRBuilder {
             }
             middle::ir::ValueType::SignedChar
             | middle::ir::ValueType::Int
-            | middle::ir::ValueType::Bool => {
+            | middle::ir::ValueType::Bool
+            | middle::ir::ValueType::Float => {
                 assert!(idxes.len() == 1); // 这种情况是 idxes 和 types 同时耗尽
                 let (idx, prepare) =
                     Self::prepare_rs1_i(&idxes[0], reg_gener, regs).with_context(|| context!())?;
@@ -76,7 +77,6 @@ impl IRBuilder {
                 println!("{}", ty);
                 Ok((1, idx, ret))
             }
-            middle::ir::ValueType::Float => todo!(),
             middle::ir::ValueType::Array(ty, sz) => {
                 // 这里 ty 是拿到当前数组的类型
                 let (idx, prepare) =
