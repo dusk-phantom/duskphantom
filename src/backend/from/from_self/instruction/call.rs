@@ -86,7 +86,22 @@ impl IRBuilder {
                         ret_insts.push(sd.into());
                     }
                 }
-                /* TODO Operand::StackSlot(_) 可能是局部数组 */
+                Operand::StackSlot(ss) => {
+                    if i_arg_num < 8 {
+                        let p_reg = Reg::new(REG_A0.id() + i_arg_num, true);
+                        phisic_arg_regs.push(p_reg);
+                        let laddr = LocalAddr::new(p_reg, ss);
+                        ret_insts.push(laddr.into());
+                        i_arg_num += 1;
+                    } else {
+                        let v_reg = reg_gener.gen_virtual_usual_reg();
+                        let laddr = LocalAddr::new(v_reg, ss);
+                        ret_insts.push(laddr.into());
+                        let sd = SdInst::new(v_reg, extra_arg_stack.into(), REG_SP);
+                        ret_insts.push(sd.into());
+                        extra_arg_stack += 8;
+                    }
+                }
                 _ => {
                     /*  Operand::Label(_) */
                     return Err(anyhow!("argument can't be a label".to_string()))

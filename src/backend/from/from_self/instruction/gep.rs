@@ -71,7 +71,7 @@ impl IRBuilder {
         let mut ret = Vec::new();
         if idxes.is_empty() {
             let factor = Self::_cal_capas_factor(ty).with_context(|| context!())?;
-            println!("ty={}, factor={}", ty, factor);
+            // println!("ty={}, factor={}", ty, factor);
             return Ok((factor, REG_ZERO, ret));
         }
         match ty {
