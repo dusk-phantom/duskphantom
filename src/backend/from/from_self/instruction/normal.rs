@@ -127,11 +127,15 @@ impl IRBuilder {
                 let itofp = downcast_ref::<middle::ir::instruction::extend_inst::ItoFp>(
                     inst.as_ref().as_ref(),
                 );
-                let src = Self::no_load_from(itofp.get_src(), regs).with_context(|| context!())?;
+                let mut ret = Vec::new();
+                let (src, prepare) = Self::prepare_rs1_i(itofp.get_src(), reg_gener, regs)
+                    .with_context(|| context!())?;
+                ret.extend(prepare);
                 let dst = reg_gener.gen_virtual_float_reg();
-                let fcvtsw = I2fInst::new(dst.into(), src);
+                let fcvtsw = I2fInst::new(dst.into(), src.into());
+                ret.push(fcvtsw.into());
                 regs.insert(itofp as *const _ as Address, dst);
-                Ok(vec![fcvtsw.into()])
+                Ok(ret)
             }
             middle::ir::instruction::InstType::FpToI => {
                 let fptoi = downcast_ref::<middle::ir::instruction::extend_inst::FpToI>(
@@ -153,7 +157,7 @@ impl IRBuilder {
                 let fcmp = downcast_ref::<middle::ir::instruction::misc_inst::FCmp>(
                     inst.as_ref().as_ref(),
                 );
-                Self::build_fcmp_inst(fcmp, reg_gener, regs)
+                Self::build_fcmp_inst(fcmp, reg_gener, regs, fmms)
             }
             middle::ir::instruction::InstType::Phi => {
                 let phi =
@@ -170,13 +174,107 @@ impl IRBuilder {
         }
     }
 
-    #[allow(unused)]
     fn build_fcmp_inst(
         fcmp: &middle::ir::instruction::misc_inst::FCmp,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
+        fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<Vec<Inst>> {
-        todo!()
+        /* ---------- 辅助函数 ---------- */
+        fn __prepare_normal_op0_op1(
+            fcmp: &middle::ir::instruction::misc_inst::FCmp,
+            reg_gener: &mut RegGenerator,
+            regs: &HashMap<Address, Reg>,
+            insts: &mut Vec<Inst>,
+            fmms: &mut HashMap<Fmm, FloatVar>,
+        ) -> Result<(Operand, Operand)> {
+            let lhs = fcmp.get_lhs();
+            let rhs = fcmp.get_rhs();
+            let (op0, prepare) = IRBuilder::prepare_f(lhs, reg_gener, regs, fmms)?;
+            insts.extend(prepare);
+            let (op1, prepare) = IRBuilder::prepare_f(rhs, reg_gener, regs, fmms)?;
+            insts.extend(prepare);
+            Ok((op0, op1))
+        }
+        fn __prepare_rev_op0_op1(
+            fcmp: &middle::ir::instruction::misc_inst::FCmp,
+            reg_gener: &mut RegGenerator,
+            regs: &HashMap<Address, Reg>,
+            insts: &mut Vec<Inst>,
+            fmms: &mut HashMap<Fmm, FloatVar>,
+        ) -> Result<(Operand, Operand)> {
+            let lhs = fcmp.get_lhs();
+            let rhs = fcmp.get_rhs();
+            let (op0, prepare) = IRBuilder::prepare_f(rhs, reg_gener, regs, fmms)?;
+            insts.extend(prepare);
+            let (op1, prepare) = IRBuilder::prepare_f(lhs, reg_gener, regs, fmms)?;
+            insts.extend(prepare);
+            Ok((op0, op1))
+        }
+
+        /* ---------- 正文 ---------- */
+
+        let flag = reg_gener.gen_virtual_usual_reg();
+        regs.insert(fcmp as *const _ as Address, flag);
+
+        let mut ret = Vec::new();
+
+        match fcmp.op {
+            middle::ir::instruction::misc_inst::FCmpOp::Oeq
+            | middle::ir::instruction::misc_inst::FCmpOp::Ueq => {
+                let (op0, op1) = __prepare_normal_op0_op1(fcmp, reg_gener, regs, &mut ret, fmms)?;
+                let feqs = FeqsInst::new(flag.into(), op0, op1);
+                ret.push(feqs.into());
+            }
+            middle::ir::instruction::misc_inst::FCmpOp::One
+            | middle::ir::instruction::misc_inst::FCmpOp::Une => {
+                // a != b <=> !(a == b) <=> (a == b) == 0
+                let (op0, op1) = __prepare_normal_op0_op1(fcmp, reg_gener, regs, &mut ret, fmms)?;
+                let _mid = reg_gener.gen_virtual_usual_reg();
+                let feqs = FeqsInst::new(_mid.into(), op0, op1);
+                ret.push(feqs.into());
+                let seqz = SeqzInst::new(flag.into(), _mid.into());
+                ret.push(seqz.into());
+            }
+            middle::ir::instruction::misc_inst::FCmpOp::Olt
+            | middle::ir::instruction::misc_inst::FCmpOp::Ult => {
+                let (op0, op1) = __prepare_normal_op0_op1(fcmp, reg_gener, regs, &mut ret, fmms)?;
+                let flts = FltsInst::new(flag.into(), op0, op1);
+                ret.push(flts.into());
+            }
+            middle::ir::instruction::misc_inst::FCmpOp::Ole
+            | middle::ir::instruction::misc_inst::FCmpOp::Ule => {
+                let (op0, op1) = __prepare_normal_op0_op1(fcmp, reg_gener, regs, &mut ret, fmms)?;
+                let fles = FlesInst::new(flag.into(), op0, op1);
+                ret.push(fles.into());
+            }
+            middle::ir::instruction::misc_inst::FCmpOp::Ogt
+            | middle::ir::instruction::misc_inst::FCmpOp::Ugt => {
+                // a > b <=> b < a <=> op0 < op1
+                let (op0, op1) = __prepare_rev_op0_op1(fcmp, reg_gener, regs, &mut ret, fmms)?;
+                let flts = FltsInst::new(flag.into(), op0, op1);
+                ret.push(flts.into());
+            }
+            middle::ir::instruction::misc_inst::FCmpOp::Oge
+            | middle::ir::instruction::misc_inst::FCmpOp::Uge => {
+                // a >= b <=> b <= a
+                let (op0, op1) = __prepare_rev_op0_op1(fcmp, reg_gener, regs, &mut ret, fmms)?;
+                let fles = FlesInst::new(flag.into(), op0, op1);
+                ret.push(fles.into());
+            }
+            middle::ir::instruction::misc_inst::FCmpOp::Ord => todo!(),
+            middle::ir::instruction::misc_inst::FCmpOp::Uno => todo!(),
+            middle::ir::instruction::misc_inst::FCmpOp::False => {
+                let li = LiInst::new(flag.into(), 0.into());
+                ret.push(li.into());
+            }
+            middle::ir::instruction::misc_inst::FCmpOp::True => {
+                let li = LiInst::new(flag.into(), 1.into());
+                ret.push(li.into());
+            }
+        }
+
+        Ok(ret)
     }
 
     fn build_phi_inst(
@@ -226,7 +324,7 @@ impl IRBuilder {
         regs: &mut HashMap<Address, Reg>,
     ) -> Result<Vec<Inst>> {
         /* ---------- 辅助函数 ---------- */
-        fn prepare_normal_op0_op1(
+        fn __prepare_normal_op0_op1(
             icmp: &middle::ir::instruction::misc_inst::ICmp,
             reg_gener: &mut RegGenerator,
             regs: &HashMap<Address, Reg>,
@@ -240,7 +338,7 @@ impl IRBuilder {
             insts.extend(prepare);
             Ok((op0.into(), op1))
         }
-        fn prepare_rev_op0_op1(
+        fn __prepare_rev_op0_op1(
             icmp: &middle::ir::instruction::misc_inst::ICmp,
             reg_gener: &mut RegGenerator,
             regs: &HashMap<Address, Reg>,
@@ -255,7 +353,7 @@ impl IRBuilder {
             Ok((op0.into(), op1))
         }
 
-        /* ----------  ---------- */
+        /* ---------- 正文 ---------- */
 
         // let mut ret = Vec::new();
         let flag = reg_gener.gen_virtual_usual_reg();
@@ -266,7 +364,7 @@ impl IRBuilder {
         match icmp.op {
             middle::ir::instruction::misc_inst::ICmpOp::Eq => {
                 // a == b <=> a ^ b == 0
-                let (op0, op1) = prepare_normal_op0_op1(icmp, reg_gener, regs, &mut ret)?;
+                let (op0, op1) = __prepare_normal_op0_op1(icmp, reg_gener, regs, &mut ret)?;
                 let _mid = reg_gener.gen_virtual_usual_reg();
                 let xor = XorInst::new(_mid.into(), op0.clone(), op1.clone());
                 let seqz = SeqzInst::new(flag.into(), _mid.into());
@@ -275,7 +373,7 @@ impl IRBuilder {
             }
             middle::ir::instruction::misc_inst::ICmpOp::Ne => {
                 // a != b <=> a ^ b != 0
-                let (op0, op1) = prepare_normal_op0_op1(icmp, reg_gener, regs, &mut ret)?;
+                let (op0, op1) = __prepare_normal_op0_op1(icmp, reg_gener, regs, &mut ret)?;
                 let _mid = reg_gener.gen_virtual_usual_reg();
                 let xor = XorInst::new(_mid.into(), op0.clone(), op1.clone());
                 let snez = SnezInst::new(flag.into(), _mid.into());
@@ -284,13 +382,13 @@ impl IRBuilder {
             }
             middle::ir::instruction::misc_inst::ICmpOp::Slt => {
                 // a < b
-                let (op0, op1) = prepare_normal_op0_op1(icmp, reg_gener, regs, &mut ret)?;
+                let (op0, op1) = __prepare_normal_op0_op1(icmp, reg_gener, regs, &mut ret)?;
                 let slt = SltInst::new(flag.into(), op0, op1);
                 ret.push(slt.into());
             }
             middle::ir::instruction::misc_inst::ICmpOp::Sle => {
                 // lhs <= rhs <=> ~(lhs > rhs) <=> (lhs > rhs) == 0 <=> (rhs < lhs) == 0 === (op0 < op1) == 0
-                let (op0, op1) = prepare_rev_op0_op1(icmp, reg_gener, regs, &mut ret)?;
+                let (op0, op1) = __prepare_rev_op0_op1(icmp, reg_gener, regs, &mut ret)?;
                 let _mid = reg_gener.gen_virtual_usual_reg();
                 let slt = SltInst::new(_mid.into(), op0, op1);
                 let seqz = SeqzInst::new(flag.into(), _mid.into());
@@ -299,13 +397,13 @@ impl IRBuilder {
             }
             middle::ir::instruction::misc_inst::ICmpOp::Sgt => {
                 // lhs > rhs <=> rhs < lhs <=> op0 < op1
-                let (op0, op1) = prepare_rev_op0_op1(icmp, reg_gener, regs, &mut ret)?;
+                let (op0, op1) = __prepare_rev_op0_op1(icmp, reg_gener, regs, &mut ret)?;
                 let slt = SltInst::new(flag.into(), op0, op1);
                 ret.push(slt.into());
             }
             middle::ir::instruction::misc_inst::ICmpOp::Sge => {
                 // op0 >= op1 <=> ~(op0 < op1) <=> (op0 < op1) == 0
-                let (op0, op1) = prepare_normal_op0_op1(icmp, reg_gener, regs, &mut ret)?;
+                let (op0, op1) = __prepare_normal_op0_op1(icmp, reg_gener, regs, &mut ret)?;
                 let _mid = reg_gener.gen_virtual_usual_reg();
                 let slt = SltInst::new(_mid.into(), op0, op1);
                 let seqz = SeqzInst::new(flag.into(), _mid.into());
