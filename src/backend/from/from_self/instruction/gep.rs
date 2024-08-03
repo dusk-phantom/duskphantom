@@ -1,3 +1,5 @@
+use crate::fprintln;
+
 use super::*;
 
 /** @brief GetElementPtrInst
@@ -10,6 +12,7 @@ impl IRBuilder {
         stack_slots: &HashMap<Address, StackSlot>,
     ) -> Result<Vec<Inst>> {
         let mut ret = Vec::new();
+        fprintln!("log/build_gep_inst.log";'a';"gep:{}",gep);
 
         let idxes = gep.get_index();
         let ty = gep.get_ptr().get_type();
@@ -17,6 +20,9 @@ impl IRBuilder {
             Self::_cal_offset(&ty, idxes, reg_gener, regs).with_context(|| context!())?;
         ret.extend(prepare);
         let _mid = reg_gener.gen_virtual_usual_reg();
+
+        fprintln!("log/build_gep_inst.log";'a';"ofst:{:?}",ofst);
+
         let slli = SllInst::new(_mid.into(), ofst.into(), (2).into()); // sysy 的数据都是 4Byte
         ret.push(slli.into());
 
@@ -39,8 +45,14 @@ impl IRBuilder {
                 }
                 _ => unimplemented!(), // Fmm(_) Imm(_)
             };
+
+        fprintln!("log/build_gep_inst.log";'a';"base:{:?}", base);
+
         let dst = reg_gener.gen_virtual_usual_reg();
         let add = AddInst::new(dst.into(), base.into(), _mid.into());
+
+        fprintln!("log/build_gep_inst.log";'a';"final:{:?}", dst);
+
         ret.push(add.into());
         regs.insert(gep as *const _ as usize, dst);
         Ok(ret)
