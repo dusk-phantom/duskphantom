@@ -125,6 +125,8 @@ impl InstChecker for Riscv {
             Inst::F2i(f2i) => self.check_f2i(f2i),
             Inst::I2f(i2f) => self.check_i2f(i2f),
             Inst::Ret => true,
+            Inst::Sltu(sltu) => self.check_sltu(sltu),
+            Inst::Sgtu(sgut) => self.check_sgtu(sgut),
         }
     }
 }
@@ -135,6 +137,16 @@ impl Riscv {
             && matches!(add.lhs(), Operand::Reg(_))
             && (matches!(add.rhs(), Operand::Reg(_))
                 || Self::check_imm_op_in_i_type_inst(add.rhs()))
+    }
+    fn check_sltu(&self, sltu: &SltuInst) -> bool {
+        matches!(sltu.dst(), Operand::Reg(_))
+            && matches!(sltu.lhs(), Operand::Reg(_))
+            && matches!(sltu.rhs(), Operand::Reg(_))
+    }
+    fn check_sgtu(&self, sgtu: &SgtuInst) -> bool {
+        matches!(sgtu.dst(), Operand::Reg(_))
+            && matches!(sgtu.lhs(), Operand::Reg(_))
+            && matches!(sgtu.rhs(), Operand::Reg(_))
     }
 
     fn check_snez(&self, snez: &SnezInst) -> bool {

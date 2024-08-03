@@ -57,6 +57,8 @@ pub enum Inst {
 
     // comparison operation
     Slt(SltInst),
+    Sltu(SltuInst),
+    Sgtu(SgtuInst),
     Seqz(SeqzInst),
     Snez(SnezInst),
 
@@ -162,6 +164,8 @@ impl Inst {
             Inst::Snez(snez) => snez.gen_asm(),
             Inst::Not(not) => not.gen_asm(),
             Inst::LocalAddr(local_addr) => local_addr.gen_asm(),
+            Inst::Sltu(sltu) => sltu.gen_asm(),
+            Inst::Sgtu(sgtu) => sgtu.gen_asm(),
         }
     }
 }
@@ -222,6 +226,8 @@ impl RegReplace for Inst {
             Inst::Snez(snez) => snez.replace_use(from, to),
             Inst::Not(not) => not.replace_use(from, to),
             Inst::LocalAddr(laddr) => laddr.replace_use(from, to),
+            Inst::Sltu(sltu) => sltu.replace_use(from, to),
+            Inst::Sgtu(sgtu) => sgtu.replace_use(from, to),
         }
     }
 
@@ -265,6 +271,8 @@ impl RegReplace for Inst {
             Inst::Snez(snez) => snez.replace_def(from, to),
             Inst::Not(not) => not.replace_def(from, to),
             Inst::LocalAddr(laddr) => laddr.replace_def(from, to),
+            Inst::Sltu(sltu) => sltu.replace_def(from, to),
+            Inst::Sgtu(sgtu) => sgtu.replace_def(from, to),
         }
     }
 }
@@ -294,6 +302,8 @@ impl_inst_convert!(NotInst, Not);
 
 // for comparison
 impl_inst_convert!(SltInst, Slt);
+impl_inst_convert!(SltuInst, Sltu);
+impl_inst_convert!(SgtuInst, Sgtu);
 impl_inst_convert!(SeqzInst, Seqz);
 impl_inst_convert!(SnezInst, Snez);
 

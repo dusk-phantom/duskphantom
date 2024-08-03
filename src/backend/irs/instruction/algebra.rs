@@ -15,6 +15,8 @@ impl_three_op_inst!(XorInst, "xor");
 
 // 实现比较指令
 impl_three_op_inst!(SltInst, "slt");
+impl_three_op_inst!(SltuInst, "sltu");
+impl_three_op_inst!(SgtuInst, "sgtu");
 impl_two_op_inst!(SnezInst, "snez");
 impl_two_op_inst!(SeqzInst, "seqz");
 

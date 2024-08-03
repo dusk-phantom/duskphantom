@@ -323,7 +323,9 @@ impl IRBuilder {
                 ret.push(xor.into());
                 ret.push(snez.into());
             }
-            llvm_ir::IntPredicate::UGT => todo!(),
+            llvm_ir::IntPredicate::UGT => {
+                todo!();
+            }
             llvm_ir::IntPredicate::UGE => todo!(),
             llvm_ir::IntPredicate::ULT => todo!(),
             llvm_ir::IntPredicate::ULE => todo!(),
