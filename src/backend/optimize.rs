@@ -158,10 +158,10 @@ mod reg_alloc {
                 break;
             }
             for r in to_remove {
-                let inter = graph_to_simplify.remove(&r).unwrap_or_default();
-                for v in inter {
+                let nbs = graph_to_simplify.remove(&r).unwrap_or_default();
+                for nb in nbs {
                     graph_to_simplify
-                    .get_mut(&v)
+                    .get_mut(&nb)
                     .expect(
                         "in a consistent reg inter graph ,v inter to v2,must means v2 inter to v",
                     )

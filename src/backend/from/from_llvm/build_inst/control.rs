@@ -1,6 +1,7 @@
 // build control flow inst
 use super::*;
 use builder::IRBuilder;
+use common::asm_of_insts;
 impl IRBuilder {
     pub fn build_call_inst(
         call: &llvm_ir::instruction::Call,
@@ -8,6 +9,8 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Name, Reg>,
     ) -> Result<Vec<Inst>> {
+        dbg!(call);
+        dbg!(call.to_string());
         let f_name = match &call.function {
             rayon::iter::Either::Left(_) => todo!(),
             rayon::iter::Either::Right(op) => {
@@ -17,6 +20,10 @@ impl IRBuilder {
         if f_name == "llvm.memset.p0.i64" {
             return Self::build_memset_inst(call, stack_slots, regs);
         }
+        if f_name == "llvm.smax.i32" {
+            return Self::build_call_smax_i32(call, reg_gener, regs);
+        }
+
         let mut ret: Vec<Inst> = Vec::new();
 
         let mut i_arg: u32 = 0;
@@ -230,6 +237,62 @@ impl IRBuilder {
 
         assert!(call.dest.is_none());
         ret.push(call_inst.into());
+
+        Ok(ret)
+    }
+
+    /// build smax.i32 inst
+    fn build_call_smax_i32(
+        call: &llvm_ir::instruction::Call,
+        reg_gener: &mut RegGenerator,
+        regs: &mut HashMap<Name, Reg>,
+    ) -> Result<Vec<Inst>> {
+        let f_name = match &call.function {
+            rayon::iter::Either::Left(_) => todo!(),
+            rayon::iter::Either::Right(op) => {
+                Self::func_name_from(op).with_context(|| context!())?
+            }
+        };
+        assert!(f_name == "llvm.smax.i32");
+        let mut ret: Vec<Inst> = Vec::new();
+        // choose the max value of two i32
+        assert!(call.arguments.len() == 2);
+        let op0 = &call.arguments[0].0;
+        let op1 = &call.arguments[1].0;
+
+        let (op0, pre_insert) = Self::prepare_usual_lhs(op0, reg_gener, regs)?;
+        ret.extend(pre_insert);
+        let (op1, pre_insert) = Self::prepare_usual_lhs(op1, reg_gener, regs)?;
+        ret.extend(pre_insert);
+
+        // if op0 > op1, ge_flag = 1, else ge_flag = 0
+        let ge_flag = reg_gener.gen_virtual_usual_reg();
+        let sltu = SltInst::new(ge_flag.into(), op1.clone(), op0.clone());
+        ret.push(sltu.into());
+
+        let (and_op, pre_insert) = Self::build_and_op(&ge_flag.into(), reg_gener)?;
+        ret.extend(pre_insert);
+
+        let and_op1 = reg_gener.gen_virtual_usual_reg();
+        let not = NotInst::new(and_op1.into(), and_op.clone());
+        ret.push(not.into());
+
+        let add0 = reg_gener.gen_virtual_usual_reg();
+        let add = AddInst::new(add0.into(), and_op, op0.clone());
+        ret.push(add.into());
+
+        let add1 = reg_gener.gen_virtual_usual_reg();
+        let add = AddInst::new(add1.into(), and_op1.into(), op1.clone());
+        ret.push(add.into());
+
+        let max = reg_gener.gen_virtual_usual_reg();
+        let add = AddInst::new(max.into(), op0, and_op1.into());
+        ret.push(add.into());
+
+        regs.insert(call.dest.clone().unwrap(), max);
+
+        dbg!(&ret);
+        println!("{}", asm_of_insts(&ret));
 
         Ok(ret)
     }
