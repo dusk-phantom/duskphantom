@@ -240,6 +240,18 @@ impl IRBuilder {
                                 .with_context(|| context!())?;
                             *store.dst_mut() = *new_ss;
                         }
+                        Inst::LocalAddr(local_addr) => {
+                            let new_ss = new_stack_slots
+                                .get(local_addr.stack_slot())
+                                .ok_or_else(|| {
+                                    anyhow!(
+                                        "not found mapping of stack slot {:?} ",
+                                        local_addr.stack_slot()
+                                    )
+                                })
+                                .with_context(|| context!())?;
+                            *local_addr.stack_slot_mut() = *new_ss;
+                        }
                         _ => {
                             continue;
                         }
