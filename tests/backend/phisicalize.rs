@@ -16,6 +16,7 @@ fn test_handle_offset_overflow() {
     entry.push_inst(Inst::Ret);
     let mut f = Func::new("test".to_string(), vec![], entry);
     f.stack_allocator_mut().replace(ssa);
+    f.reg_gener_mut().replace(rg);
 
     phisicalize_func(&mut f).unwrap();
 
@@ -24,7 +25,18 @@ fn test_handle_offset_overflow() {
         name: "test",
         args: [],
         ret: None,
-        reg_gener: None,
+        reg_gener: Some(
+            RegGenerator {
+                usual_counter: ParalCounter {
+                    end: 100000000,
+                    counter: 33,
+                },
+                float_counter: ParalCounter {
+                    end: 100000000,
+                    counter: 32,
+                },
+            },
+        ),
         stack_allocator: Some(
             StackAllocator {
                 alloc_from: 2432,
