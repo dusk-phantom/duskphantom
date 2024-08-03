@@ -1,4 +1,4 @@
-use crate::{llvm2tac_binary_float, llvm2tac_three_op_float, llvm2tac_three_op_usual};
+use crate::{llvm2tac_binary_float, llvm2tac_r2_c, llvm2tac_three_op_float, llvm2tac_three_usual};
 
 use super::*;
 use llvm_ir::{Constant, Name};
@@ -17,12 +17,13 @@ impl IRBuilder {
         // dbg!(&inst);
         match inst {
             llvm_ir::Instruction::Add(add) => {
-                llvm2tac_three_op_usual!(AllowSwap; AddInst, add, reg_gener, regs)
+                llvm2tac_three_usual!(AllowSwap; AddInst, add, reg_gener, regs)
             }
             llvm_ir::Instruction::Sub(sub) => Self::build_sub(sub, reg_gener, regs),
-            llvm_ir::Instruction::Mul(mul) => {
-                llvm2tac_three_op_usual!(AllowSwap; MulInst, mul, reg_gener, regs)
-            }
+            llvm_ir::Instruction::Mul(mul) => llvm2tac_r2_c!(MulInst, mul, reg_gener, regs),
+            llvm_ir::Instruction::SDiv(div) => llvm2tac_r2_c!(DivInst, div, reg_gener, regs),
+            llvm_ir::Instruction::UDiv(_) => todo!(),
+            llvm_ir::Instruction::URem(_) => todo!(),
             llvm_ir::Instruction::FAdd(fadd) => {
                 llvm2tac_three_op_float!(AddInst, fadd, reg_gener, regs, fmms)
             }
@@ -42,32 +43,29 @@ impl IRBuilder {
                 llvm2tac_binary_float!(NegInst, fneg, reg_gener, regs, fmms)
             }
             llvm_ir::Instruction::And(and) => {
-                llvm2tac_three_op_usual!(AllowSwap;AndInst, and, reg_gener, regs)
+                llvm2tac_three_usual!(AllowSwap;AndInst, and, reg_gener, regs)
             }
             llvm_ir::Instruction::Or(or) => {
-                llvm2tac_three_op_usual!(AllowSwap;OrInst, or, reg_gener, regs)
+                llvm2tac_three_usual!(AllowSwap;OrInst, or, reg_gener, regs)
             }
             llvm_ir::Instruction::Xor(xor) => {
-                llvm2tac_three_op_usual!(AllowSwap;XorInst, xor, reg_gener, regs)
+                llvm2tac_three_usual!(AllowSwap;XorInst, xor, reg_gener, regs)
             }
             llvm_ir::Instruction::SRem(srem) => {
-                llvm2tac_three_op_usual!(DenySwap;RemInst, srem, reg_gener, regs)
+                llvm2tac_three_usual!(DenySwap;RemInst, srem, reg_gener, regs)
             }
             // process logical shift right
             llvm_ir::Instruction::LShr(lshr) => {
-                llvm2tac_three_op_usual!(DenySwap;SrlInst, lshr, reg_gener, regs)
+                llvm2tac_three_usual!(DenySwap;SrlInst, lshr, reg_gener, regs)
             }
             // process logical shift left
             llvm_ir::Instruction::Shl(shl) => {
-                llvm2tac_three_op_usual!(DenySwap;SllInst, shl, reg_gener, regs)
+                llvm2tac_three_usual!(DenySwap;SllInst, shl, reg_gener, regs)
             }
             // process arithmetic shift right
             llvm_ir::Instruction::AShr(ashr) => {
-                llvm2tac_three_op_usual!(DenySwap;SraInst, ashr, reg_gener, regs)
+                llvm2tac_three_usual!(DenySwap;SraInst, ashr, reg_gener, regs)
             }
-            llvm_ir::Instruction::UDiv(_) => todo!(),
-            llvm_ir::Instruction::SDiv(_) => todo!(),
-            llvm_ir::Instruction::URem(_) => todo!(),
             llvm_ir::Instruction::ExtractElement(_) => todo!(),
             llvm_ir::Instruction::InsertElement(_) => todo!(),
             llvm_ir::Instruction::ShuffleVector(_) => todo!(),
@@ -120,6 +118,23 @@ impl IRBuilder {
             llvm_ir::Instruction::CatchPad(_) => todo!(),
             llvm_ir::Instruction::CleanupPad(_) => todo!(),
         }
+    }
+
+    #[allow(unused)]
+    fn build_div_inst(
+        div: &llvm_ir::instruction::UDiv,
+        reg_gener: &mut RegGenerator,
+        regs: &mut HashMap<Name, Reg>,
+    ) -> Result<Vec<Inst>> {
+        let mut ret: Vec<Inst> = Vec::new();
+        let (lhs, pre_insert) = Self::prepare_usual_lhs(&div.operand0, reg_gener, regs)?;
+        ret.extend(pre_insert);
+        let rhs = Self::value_from(&div.operand1, regs)?;
+        let dst = reg_gener.gen_virtual_usual_reg();
+        regs.insert(div.dest.clone(), dst);
+        let div = DivInst::new(dst.into(), lhs, rhs);
+        ret.push(div.into());
+        Ok(ret)
     }
 
     fn build_fpext(

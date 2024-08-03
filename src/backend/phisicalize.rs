@@ -20,7 +20,7 @@ pub fn phisicalize_func(func: &mut Func) -> Result<()> {
     println!("{}", func.gen_asm());
 
     fprintln!("log/before_handle_unlegal_inst.log", "{}", func.gen_asm());
-    handle_unlegal_inst(func)?;
+    handle_illegal_inst(func)?;
 
     fprintln!("log/before_phisicalize.log", "{}", func.gen_asm());
 
@@ -67,38 +67,36 @@ const fn tmp_f_regs() -> [Reg; 3] {
 /// e.g. mul's rhs must be a register
 /// e.g. sltu's rhs must be a register
 /// e.g. div's rhs must be a register
-pub fn handle_unlegal_inst(func: &mut Func) -> Result<()> {
+pub fn handle_illegal_inst(func: &mut Func) -> Result<()> {
     let mut r_g = func
         .reg_gener_mut()
         .take()
         .ok_or(anyhow!("msg: reg_gener not found"))
         .with_context(|| context!())?;
+    macro_rules! process_rhs_imm {
+        ($inst:ident,$r_g:ident,$new_insts:ident) => {
+            if let Operand::Imm(imm) = $inst.rhs() {
+                let mid = $r_g.gen_virtual_usual_reg();
+                let li = LiInst::new(mid.into(), imm.into());
+                *$inst.rhs_mut() = Operand::Reg(mid);
+                $new_insts.push(li.into());
+                $new_insts.push($inst.clone().into());
+            } else {
+                $new_insts.push($inst.clone().into());
+            }
+        };
+    }
     for bb in func.iter_bbs_mut() {
         let mut new_insts: Vec<Inst> = Vec::new();
         for inst in bb.insts_mut() {
             match inst {
-                Inst::Sltu(sltu) => {
-                    if let Operand::Imm(imm) = sltu.rhs() {
-                        let mid = r_g.gen_virtual_usual_reg();
-                        let li = LiInst::new(mid.into(), imm.into());
-                        *sltu.rhs_mut() = Operand::Reg(mid);
-                        new_insts.push(li.into());
-                        new_insts.push(sltu.clone().into());
-                    } else {
-                        new_insts.push(inst.clone());
-                    }
-                }
-                Inst::Sgtu(sgtu) => {
-                    if let Operand::Imm(imm) = sgtu.rhs() {
-                        let mid = r_g.gen_virtual_usual_reg();
-                        let li = LiInst::new(mid.into(), imm.into());
-                        *sgtu.rhs_mut() = Operand::Reg(mid);
-                        new_insts.push(li.into());
-                        new_insts.push(sgtu.clone().into());
-                    } else {
-                        new_insts.push(inst.clone());
-                    }
-                }
+                Inst::Sltu(sltu) => process_rhs_imm!(sltu, r_g, new_insts),
+                Inst::Sgtu(sgtu) => process_rhs_imm!(sgtu, r_g, new_insts),
+                Inst::Mul(mul) => process_rhs_imm!(mul, r_g, new_insts),
+                Inst::Div(div) => process_rhs_imm!(div, r_g, new_insts),
+                Inst::Rem(rem) => process_rhs_imm!(rem, r_g, new_insts),
+                Inst::Sub(sub) => process_rhs_imm!(sub, r_g, new_insts),
+                // TODO, divu
                 _ => {
                     new_insts.push(inst.clone());
                 }

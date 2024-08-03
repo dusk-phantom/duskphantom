@@ -1,5 +1,7 @@
 #[macro_export]
-macro_rules! llvm2tac_three_op_usual {
+/// in this macro ,if rhs is constant and out of bound,then it will move it to a reg,then keep on
+/// if with AllowSwap attribute ,it will try swap lhs and rhs to make new rhs a constant
+macro_rules! llvm2tac_three_usual {
     (AllowSwap; $tac_inst_ty:ident,$inst:ident, $reg_gener:ident,$regs:ident) => {{
         use $crate::backend::irs::*;
         let mut ret: Vec<Inst> = vec![];
@@ -37,6 +39,24 @@ macro_rules! llvm2tac_three_op_usual {
         $regs.insert(dest, dst);
         let tac_inst = $tac_inst_ty::new(dst.into(), lhs, rhs);
         ret.push(tac_inst.into());
+        Ok(ret)
+    }};
+}
+
+#[macro_export]
+/// this macro could be use to gen construction of three op inst
+/// allowing rhs be constant even out of bound,even unlegal
+macro_rules! llvm2tac_r2_c {
+    ($tac_inst_ty:ident,$inst:ident, $reg_gener:ident,$regs:ident) => {{
+        use $crate::backend::irs::*;
+        let mut ret: Vec<Inst> = Vec::new();
+        let (lhs, pre_insert) = Self::prepare_usual_lhs(&$inst.operand0, $reg_gener, $regs)?;
+        ret.extend(pre_insert);
+        let rhs = Self::value_from(&$inst.operand1, $regs)?;
+        let dst = $reg_gener.gen_virtual_usual_reg();
+        $regs.insert($inst.dest.clone(), dst);
+        let mul = $tac_inst_ty::new(dst.into(), lhs, rhs);
+        ret.push(mul.into());
         Ok(ret)
     }};
 }
