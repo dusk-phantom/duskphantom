@@ -56,6 +56,9 @@ impl RegUses for Inst {
             Inst::Sltu(sltu) => sltu.uses(),
             Inst::Sgtu(sgtu) => sgtu.uses(),
             Inst::UDiv(udiv) => udiv.uses(),
+            Inst::Feqs(feqs) => feqs.uses(),
+            Inst::Fles(fles) => fles.uses(),
+            Inst::Flts(flts) => flts.uses(),
         }
     }
 }
@@ -103,6 +106,9 @@ impl RegDefs for Inst {
             Inst::Sltu(sltu) => sltu.defs(),
             Inst::Sgtu(sgtu) => sgtu.defs(),
             Inst::UDiv(udiv) => udiv.defs(),
+            Inst::Feqs(feqs) => feqs.defs(),
+            Inst::Fles(fles) => fles.defs(),
+            Inst::Flts(flts) => flts.defs(),
         }
     }
 }

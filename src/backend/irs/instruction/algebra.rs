@@ -21,6 +21,10 @@ impl_three_op_inst!(SgtuInst, "sgtu");
 impl_two_op_inst!(SnezInst, "snez");
 impl_two_op_inst!(SeqzInst, "seqz");
 
+impl_three_op_inst!(FeqsInst, "feq.s");
+impl_three_op_inst!(FlesInst, "fle.s");
+impl_three_op_inst!(FltsInst, "flt.s");
+
 impl_two_op_inst!(NegInst, "neg");
 impl_two_op_inst!(MvInst, "mv");
 
@@ -52,6 +56,9 @@ mod c {
     impl_inst_convert!(SgtuInst, Sgtu);
     impl_inst_convert!(SeqzInst, Seqz);
     impl_inst_convert!(SnezInst, Snez);
+    impl_inst_convert!(FeqsInst, Feqs);
+    impl_inst_convert!(FlesInst, Fles);
+    impl_inst_convert!(FltsInst, Flts);
 }
 
 #[cfg(test)]
