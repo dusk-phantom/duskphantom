@@ -53,6 +53,8 @@ impl RegUses for Inst {
             Inst::Snez(snez) => snez.uses(),
             Inst::Not(not) => not.uses(),
             Inst::LocalAddr(laddr) => laddr.uses(),
+            Inst::Sltu(sltu) => sltu.uses(),
+            Inst::Sgtu(sgtu) => sgtu.uses(),
         }
     }
 }
@@ -97,6 +99,8 @@ impl RegDefs for Inst {
             Inst::Snez(snez) => snez.defs(),
             Inst::Not(not) => not.defs(),
             Inst::LocalAddr(laddr) => laddr.defs(),
+            Inst::Sltu(sltu) => sltu.defs(),
+            Inst::Sgtu(sgtu) => sgtu.defs(),
         }
     }
 }
