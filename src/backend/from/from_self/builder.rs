@@ -139,6 +139,7 @@ impl IRBuilder {
             }
         }
 
+        /* ---------- stack allocator, 后面物理化也会用到 ---------- */
         *m_f.stack_allocator_mut() = Some(stack_allocator);
         Ok((m_f, caller_reg_stack.try_into()?))
     }
@@ -172,14 +173,24 @@ impl IRBuilder {
         max_callee_regs_stacks: &HashMap<String, u32>,
     ) -> Result<()> {
         for f in funcs {
-            let mut old_stack_slots: HashMap<StackSlot, usize> = HashMap::new();
             let mut new_stack_allocator = StackAllocator::new();
-            // 统计 slot 的使用次数
+
+            /* ---------- 为额外参数分配空间 ---------- */
+
+            let max_callee_regs_need = *max_callee_regs_stacks.get(f.name()).unwrap_or(&0);
+            new_stack_allocator.alloc(max_callee_regs_need);
+
+            /* ---------- 重排序栈 ---------- */
+
+            let mut old_stack_slots: HashMap<StackSlot, usize /* times */> = HashMap::new();
+
+            /* ***** 统计每个 slot 使用的次数 ***** */
             for bb in f.iter_bbs() {
                 for inst in bb.insts() {
                     let stack_slot = match inst {
                         Inst::Load(load) => *load.src(),
                         Inst::Store(store) => *store.dst(),
+                        Inst::LocalAddr(local_addr) => *local_addr.stack_slot(),
                         _ => {
                             continue;
                         }
@@ -188,16 +199,19 @@ impl IRBuilder {
                     old_stack_slots.insert(stack_slot, new_times);
                 }
             }
-            let max_callee_regs_need = *max_callee_regs_stacks.get(f.name()).unwrap_or(&0);
-            new_stack_allocator.alloc(max_callee_regs_need);
+
+            /* ***** 按照 times 排序 ***** */
             let mut old_stack_slots: Vec<(StackSlot, usize)> =
                 old_stack_slots.into_iter().collect();
             old_stack_slots.sort_by(|a, b| a.1.cmp(&b.1)); // 按照 times 排序
 
-            let order_stack_slots = |old_stack_slots: Vec<(StackSlot, usize)>| {
+            /* ***** 分配到两边 ***** */
+            let ordered_stack_slots = {
                 let mut left_sss: Vec<StackSlot> = Vec::new();
                 let mut right_sss: Vec<StackSlot> = Vec::new();
-                for (idx, (ss, _)) in old_stack_slots.iter().rev().enumerate() {
+                for (idx /* 下标, 奇偶 */, (ss, _ /* times 用不到了 */)) in
+                    old_stack_slots.iter().rev().enumerate()
+                {
                     if idx % 2 == 0 {
                         left_sss.push(*ss);
                     } else {
@@ -207,13 +221,12 @@ impl IRBuilder {
                 left_sss.extend(right_sss.iter().rev());
                 left_sss
             };
-            let ordered_stack_slots = order_stack_slots(old_stack_slots);
 
-            let mut new_stack_slots: HashMap<StackSlot, StackSlot> = HashMap::new();
-            for ss in ordered_stack_slots {
-                let new_ss = new_stack_allocator.alloc(ss.size());
-                new_stack_slots.insert(ss, new_ss);
-            }
+            /* ***** 构造一个新的 allocator ***** */
+            let new_stack_slots: HashMap<StackSlot, StackSlot> = ordered_stack_slots
+                .iter()
+                .map(|&ss| (ss, new_stack_allocator.alloc(ss.size())))
+                .collect();
 
             for bb in f.iter_bbs_mut() {
                 for inst in bb.insts_mut() {
@@ -235,6 +248,18 @@ impl IRBuilder {
                                 })
                                 .with_context(|| context!())?;
                             *store.dst_mut() = *new_ss;
+                        }
+                        Inst::LocalAddr(local_addr) => {
+                            let new_ss = new_stack_slots
+                                .get(local_addr.stack_slot())
+                                .ok_or_else(|| {
+                                    anyhow!(
+                                        "not found mapping of stack slot {:?}",
+                                        local_addr.stack_slot()
+                                    )
+                                })
+                                .with_context(|| context!())?;
+                            *local_addr.stack_slot_mut() = *new_ss;
                         }
                         _ => {
                             continue;
