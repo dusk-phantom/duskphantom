@@ -324,11 +324,31 @@ impl IRBuilder {
                 ret.push(snez.into());
             }
             llvm_ir::IntPredicate::UGT => {
-                todo!();
+                let (op0, op1) = prepare_normal_op0_op1(icmp, reg_gener, regs, &mut ret)?;
+                let sgtu = SgtuInst::new(dst.into(), op0.clone(), op1.clone());
+                ret.push(sgtu.into());
             }
-            llvm_ir::IntPredicate::UGE => todo!(),
-            llvm_ir::IntPredicate::ULT => todo!(),
-            llvm_ir::IntPredicate::ULE => todo!(),
+            llvm_ir::IntPredicate::UGE => {
+                let (op0, op1) = prepare_normal_op0_op1(icmp, reg_gener, regs, &mut ret)?;
+                let mid_var = reg_gener.gen_virtual_usual_reg();
+                let sltu = SltuInst::new(mid_var.into(), op0.clone(), op1.clone());
+                let xori = XorInst::new(dst.into(), mid_var.into(), 1.into());
+                ret.push(sltu.into());
+                ret.push(xori.into());
+            }
+            llvm_ir::IntPredicate::ULT => {
+                let (op0, op1) = prepare_rev_op0_op1(icmp, reg_gener, regs, &mut ret)?;
+                let sltu = SltuInst::new(dst.into(), op0.clone(), op1.clone());
+                ret.push(sltu.into());
+            }
+            llvm_ir::IntPredicate::ULE => {
+                let (op0, op1) = prepare_rev_op0_op1(icmp, reg_gener, regs, &mut ret)?;
+                let mid_var = reg_gener.gen_virtual_usual_reg();
+                let sgtu = SgtuInst::new(mid_var.into(), op0, op1);
+                let xori = XorInst::new(dst.into(), mid_var.into(), 1.into());
+                ret.push(sgtu.into());
+                ret.push(xori.into());
+            }
             llvm_ir::IntPredicate::SGT => {
                 // notice sge(op0,op1) equal to slt(op0,op1)
                 let (op0, op1) = prepare_rev_op0_op1(icmp, reg_gener, regs, &mut ret)?;
