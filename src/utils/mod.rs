@@ -9,4 +9,6 @@ pub mod frame_map;
 #[macro_use]
 pub mod log;
 
+pub mod vec_util;
+
 pub mod diff;

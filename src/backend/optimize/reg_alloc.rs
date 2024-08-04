@@ -1,20 +1,58 @@
 use super::*;
 
 pub fn handle_reg_alloc(func: &mut Func) -> Result<()> {
-    todo!();
+    // count the interference graph
+    let mut reg_graphs = Func::reg_interfere_graph(func)?;
+
+    let (colors, spills) = reg_alloc(&reg_graphs, free_iregs(), free_fregs())?;
+
+    apply_colors(func, colors);
+
+    apply_spills(func, spills);
+
     Ok(())
 }
 
-// 能够用于寄存器分配的寄存器,也就是除了特殊寄存器以外的寄存器, 这里的特殊寄存器包括: zero, ra, sp, gp, tp,s0
-fn available_iregs() -> &'static [Reg; 26] {
+pub fn apply_colors(func: &mut Func, colors: HashMap<Reg, Reg>) {
+    for block in func.iter_bbs_mut() {
+        for inst in block.insts_mut() {
+            let uses: Vec<Reg> = inst.uses().into_iter().cloned().collect();
+            let defs: Vec<Reg> = inst.defs().into_iter().cloned().collect();
+            for r in uses.iter().filter(|r| r.is_virtual()) {
+                if let Some(color) = colors.get(r) {
+                    inst.replace_use(*r, *color);
+                }
+            }
+            for r in defs.into_iter().filter(|r| r.is_virtual()) {
+                if let Some(color) = colors.get(&r) {
+                    inst.replace_def(r, *color);
+                }
+            }
+        }
+    }
+}
+
+/// 使用t0-t2来处理spill的虚拟寄存器
+pub fn apply_spills(func: &mut Func, spills: HashSet<Reg>) {
+    if spills.is_empty() {
+        return;
+    }
+    phisicalize::phisicalize_reg(func);
+}
+
+/// 能够用于寄存器分配的寄存器,也就是除了特殊寄存器以外的寄存器, 这里的特殊寄存器包括: zero, ra, sp, gp, tp,s0,t0-t3 <br>
+/// 其中t0-t3是临时寄存器,t0-t2用于处理spill的虚拟寄存器,t3用于计算内存操作指令off溢出时的地址 <br>
+/// s0是栈帧指针,用于保存调用者保存的寄存器 <br>
+/// ...
+fn free_iregs() -> &'static [Reg; 22] {
     &[
         // usual registers
-        REG_T0, REG_T1, REG_T2, REG_S1, REG_A0, REG_A1, REG_A2, REG_A3, REG_A4, REG_A5, REG_A6,
-        REG_A7, REG_S2, REG_S3, REG_S4, REG_S5, REG_S6, REG_S7, REG_S8, REG_S9, REG_S10, REG_S11,
-        REG_T3, REG_T4, REG_T5, REG_T6,
+        REG_S1, REG_A0, REG_A1, REG_A2, REG_A3, REG_A4, REG_A5, REG_A6, REG_A7, REG_S2, REG_S3,
+        REG_S4, REG_S5, REG_S6, REG_S7, REG_S8, REG_S9, REG_S10, REG_S11, REG_T4, REG_T5, REG_T6,
     ]
 }
-fn available_fregs() -> &'static [Reg; 32] {
+
+fn free_fregs() -> &'static [Reg; 32] {
     // usual registers
     &[
         // float registers
@@ -192,8 +230,7 @@ mod tests {
         graph.insert(i_v1, std::collections::HashSet::from_iter(vec![i_v2, i_v3]));
         graph.insert(i_v2, std::collections::HashSet::from_iter(vec![i_v1, i_v3]));
         graph.insert(i_v3, std::collections::HashSet::from_iter(vec![i_v1, i_v2]));
-        let (colors, to_spill) =
-            super::reg_alloc(&graph, available_iregs(), available_fregs()).unwrap();
+        let (colors, to_spill) = super::reg_alloc(&graph, free_iregs(), free_fregs()).unwrap();
         dbg!(&colors);
         check_alloc(&graph, &colors, &to_spill);
     }
