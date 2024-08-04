@@ -1,10 +1,10 @@
 #[cfg(test)]
 #[cfg(feature = "clang_enabled")]
-use super::*;
+
 mod from_llvm_tests {
 
-    use super::*;
     use anyhow::Result;
+    use compiler::backend::irs::*;
     use compiler::clang_frontend;
     use insta::assert_debug_snapshot;
 
@@ -12,7 +12,7 @@ mod from_llvm_tests {
         let tmp_cfile = tempfile::Builder::new().suffix(".c").tempfile()?;
         std::fs::write(tmp_cfile.path(), code)?;
         let front: clang_frontend::Program = clang_frontend::Program::parse_file(tmp_cfile.path())?;
-        let program: Program = backend::from_llvm::gen_from_clang(&front)?;
+        let program: Program = from_llvm::gen_from_clang(&front)?;
         Ok(program)
     }
 
