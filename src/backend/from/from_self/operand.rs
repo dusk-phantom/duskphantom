@@ -69,6 +69,7 @@ impl IRBuilder {
         regs: &HashMap<Address, Reg>,
     ) -> Result<Reg> {
         let addr = instr.as_ref().as_ref() as *const dyn Instruction as *const () as Address;
+        println!("{}", instr);
         let reg = regs
             .get(&addr)
             .ok_or(anyhow!("local var not found {}", addr))
