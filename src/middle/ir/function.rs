@@ -98,7 +98,6 @@ define_graph_iterator!(DFSIterator, Vec<BBPtr>, pop, get_succ_bb);
 define_graph_iterator!(DFSIteratorRev, Vec<BBPtr>, pop, get_pred_bb);
 
 /// Postorder iterator.
-/// When a block is visited, it's guaranteed that all its successors have been visited.
 pub struct POIterator {
     container: VecDeque<BBPtr>,
 }
@@ -125,7 +124,6 @@ impl From<BBPtr> for POIterator {
 }
 
 /// Reverse postorder iterator.
-/// When a block is visited, it's guaranteed that all its predecessors have been visited.
 pub struct RPOIterator {
     container: Vec<BBPtr>,
 }
