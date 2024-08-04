@@ -131,6 +131,7 @@ impl Value {
             (ValueType::Bool, ValueType::Float) => {
                 // Convert to int first and then float
                 let inst = kit.program.mem_pool.get_zext(uncast_operand);
+                kit.exit.unwrap().push_back(inst);
                 let inst = kit.program.mem_pool.get_itofp(inst.into());
                 kit.exit.unwrap().push_back(inst);
                 Ok(inst.into())
