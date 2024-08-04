@@ -20,11 +20,13 @@ pub fn optimize(program: &mut prog::Program) -> Result<()> {
 }
 
 #[allow(unused)]
-fn optimize_func(func: &mut Func) -> Result<()> {
-    // inst combine? 匹配一些模式,将多条指令合并成一条
-    inst_combine::handle_inst_combine(func)?;
+pub fn optimize_func(func: &mut Func) -> Result<()> {
     // inst split? 将一条指令拆分成多条
     inst_split::handle_inst_split(func)?;
+
+    // inst combine? 匹配一些模式,将多条指令合并成一条
+    inst_combine::handle_inst_combine(func)?;
+
     // inst scheduling
     inst_scaduling::handle_inst_scheduling(func)?;
     // register allocation
@@ -41,7 +43,7 @@ fn optimize_func(func: &mut Func) -> Result<()> {
 }
 
 #[allow(unused)]
-mod inst_combine {
+pub mod inst_combine {
     use super::*;
     /// 处理指令结合,一些指令的组合可能被优化成一条指令
     pub fn handle_inst_combine(func: &mut Func) -> Result<()> {
@@ -51,7 +53,7 @@ mod inst_combine {
 }
 
 #[allow(unused)]
-mod inst_split {
+pub mod inst_split {
     use super::*;
 
     /// 处理乘法和除法的优化,部分乘法和除法可以 优化成移位
@@ -75,7 +77,7 @@ mod inst_split {
 }
 
 #[allow(unused)]
-mod inst_scaduling {
+pub mod inst_scaduling {
     use super::*;
     /// 处理指令调度,将指令重新排序,以便于后续的优化
     pub fn handle_inst_scheduling(func: &mut Func) -> Result<()> {
@@ -85,7 +87,7 @@ mod inst_scaduling {
 }
 
 #[allow(unused)]
-mod reg_alloc {
+pub mod reg_alloc {
     use super::*;
 
     pub fn handle_reg_alloc(func: &mut Func) -> Result<()> {
@@ -310,7 +312,7 @@ mod reg_alloc {
 }
 
 #[allow(unused)]
-mod caller_callee {
+pub mod caller_callee {
     use super::*;
     /// 处理调用者保存和被调用者保存
     pub fn handle_caller_callee(func: &mut Func) -> Result<()> {
@@ -320,7 +322,7 @@ mod caller_callee {
 }
 
 #[allow(unused)]
-mod block_reordering {
+pub mod block_reordering {
     use super::*;
     /// 处理块的重新排序
     pub fn handle_block_reordering(func: &mut Func) -> Result<()> {
@@ -330,7 +332,7 @@ mod block_reordering {
 }
 
 #[allow(unused)]
-mod stack_frame {
+pub mod stack_frame {
     use super::*;
     /// 处理栈帧的开启和关闭
     pub fn handle_stack_frame(func: &mut Func) -> Result<()> {
