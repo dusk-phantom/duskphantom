@@ -28,31 +28,50 @@ impl Module {
         None
     }
     pub fn gen_asm(&self) -> String {
-        //
-        let thread_pool = rayon::ThreadPoolBuilder::new()
-            .num_threads(CONFIG.num_parallel_for_global_gen_asm)
-            .build()
-            .unwrap();
-        let global = thread_pool.install(|| {
-            self.global
-                .par_iter()
-                .map(|v| v.gen_asm())
-                .collect::<Vec<String>>()
-                .join("\n")
-        });
-        let mut funcs: Vec<&func::Func> = self.funcs.iter().collect();
-        funcs.sort_by_cached_key(|f| f.name());
-        let thread_pool = rayon::ThreadPoolBuilder::new()
-            .num_threads(CONFIG.num_parallel_for_func_gen_asm)
-            .build()
-            .unwrap();
-        let funcs = thread_pool.install(|| {
-            funcs
-                .par_iter()
-                .map(|f| f.gen_asm())
-                .collect::<Vec<String>>()
-                .join("\n")
-        });
+        let mut global = String::new();
+        if CONFIG.num_parallel_for_global_gen_asm <= 1 {
+            println!("num_parallel_for_global_gen_asm <= 1");
+            for v in self.global.iter() {
+                global.push_str(v.gen_asm().as_str());
+                global.push('\n');
+            }
+        } else {
+            let thread_pool = rayon::ThreadPoolBuilder::new()
+                .num_threads(CONFIG.num_parallel_for_global_gen_asm)
+                .build()
+                .unwrap();
+            global = thread_pool.install(|| {
+                self.global
+                    .par_iter()
+                    .map(|v| v.gen_asm())
+                    .collect::<Vec<String>>()
+                    .join("\n")
+            });
+        }
+        // sort funcs by name
+
+        let mut fs: Vec<&func::Func> = self.funcs.iter().collect();
+        fs.sort_by_cached_key(|f| f.name());
+        let mut funcs = String::with_capacity(1024);
+        if CONFIG.num_parallel_for_func_gen_asm <= 1 {
+            println!("num_parallel_for_func_gen_asm <= 1");
+            for f in fs.iter() {
+                funcs.push_str(f.gen_asm().as_str());
+                funcs.push('\n');
+            }
+        } else {
+            let thread_pool = rayon::ThreadPoolBuilder::new()
+                .num_threads(CONFIG.num_parallel_for_func_gen_asm)
+                .build()
+                .unwrap();
+            funcs = thread_pool.install(|| {
+                fs.par_iter()
+                    .map(|f| f.gen_asm())
+                    .collect::<Vec<String>>()
+                    .join("\n")
+            });
+        };
+
         gen_asm::GenTool::gen_prog("test.c", global.as_str(), funcs.as_str())
     }
 }

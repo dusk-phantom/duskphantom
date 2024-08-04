@@ -6,7 +6,6 @@ pub struct Config {
     pub num_parallel_for_global_gen_asm: usize,
     pub num_parallel_for_func_gen_asm: usize,
     pub num_parallel_for_block_gen_asm: usize,
-    pub num_parallel_for_inst_gen_asm: usize,
     pub reg_alloc_algo: String,
 }
 
@@ -18,9 +17,8 @@ lazy_static! {
         } else {
             Config {
                 num_parallel_for_global_gen_asm: 12,
+                num_parallel_for_func_gen_asm: 4,
                 num_parallel_for_block_gen_asm: 3,
-                num_parallel_for_func_gen_asm: 2,
-                num_parallel_for_inst_gen_asm: 2,
                 reg_alloc_algo: "graph-coloring".to_string(),
             }
         }
