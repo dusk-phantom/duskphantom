@@ -180,7 +180,7 @@ pub fn phisicalize_reg(func: &mut Func) -> Result<()> {
     Ok(())
 }
 
-fn handle_ra(func: &mut Func) -> Result<()> {
+pub fn handle_ra(func: &mut Func) -> Result<()> {
     // if func is not a caller, then no need to handle ra
     if !func.is_caller() {
         return Ok(());
@@ -212,7 +212,7 @@ fn final_stack_size(func: &Func) -> Result<u32> {
     Ok(r as u32)
 }
 
-fn handle_stack(func: &mut Func) -> Result<()> {
+pub fn handle_stack(func: &mut Func) -> Result<()> {
     // alloc stack for s0, in fact, we could choose not to store-restore s0
     func.stack_allocator_mut().iter_mut().for_each(|sa| {
         sa.alloc(8);
@@ -271,7 +271,7 @@ fn handle_stack(func: &mut Func) -> Result<()> {
     Ok(())
 }
 
-fn handle_mem(func: &mut Func) -> Result<()> {
+pub fn handle_mem(func: &mut Func) -> Result<()> {
     let stack_size = final_stack_size(func)?;
     for bb in func.iter_bbs_mut() {
         for inst in bb.insts_mut() {
@@ -286,9 +286,7 @@ fn handle_mem(func: &mut Func) -> Result<()> {
     Ok(())
 }
 
-#[allow(unused)]
-fn handle_offset_overflows(func: &mut Func) -> Result<()> {
-    let stack_size = final_stack_size(func)?;
+pub fn handle_offset_overflows(func: &mut Func) -> Result<()> {
     macro_rules! handle_offset_overflow {
         ($inst:ident,$inst_ty:ident,$new_insts:ident) => {
             if !$inst.offset().in_limit(12) {
