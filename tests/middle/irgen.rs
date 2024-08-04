@@ -2263,6 +2263,33 @@ mod tests {
     }
 
     #[test]
+    fn test_multi_zero_array() {
+        let code = r#"
+        int x[3][4] = {};
+        "#;
+        let program = parse(code).unwrap();
+        let result = gen(&program).unwrap();
+        let llvm_ir = result.module.gen_llvm_ir();
+        assert_snapshot!(llvm_ir, @r###"
+        @x = dso_local global [3 x [4 x i32]] zeroinitializer
+        declare i32 @getint()
+        declare i32 @getch()
+        declare float @getfloat()
+        declare void @putint(i32 %p0)
+        declare void @putch(i32 %p0)
+        declare void @putfloat(float %p0)
+        declare i32 @getarray(i32* %p0)
+        declare i32 @getfarray(float* %p0)
+        declare void @putarray(i32 %p0, i32* %p1)
+        declare void @putfarray(i32 %p0, float* %p1)
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
+        declare void @putf()
+        declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
+        "###);
+    }
+
+    #[test]
     fn test_stack_overflow() {
         let code = r#"
 int main() {

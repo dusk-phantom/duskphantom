@@ -9,11 +9,16 @@ use crate::frontend::{Expr, Type};
 /// # Panics
 /// Please make sure `arr` is non-empty.
 pub fn reshape_const_array(arr: &mut VecDeque<Expr>, ty: &Type) -> Result<Expr> {
+    if arr.is_empty() {
+        // Use default initializer for `{}`
+        return ty.default_initializer();
+    }
     if let Type::Array(element_ty, len) = ty {
         let size = len.to_i32()?;
         let mut new_arr: Vec<Expr> = vec![];
         for _ in 0..size {
             let Some(first_item) = arr.pop_front() else {
+                // Later elements are missing, fill with default initializer
                 new_arr.push(element_ty.default_initializer()?);
                 continue;
             };
