@@ -9,6 +9,8 @@ pub mod transform;
 
 use std::pin::Pin;
 
+use self::transform::deadcode_elimination;
+
 pub struct Program {
     pub module: ir::Module,
     pub mem_pool: Pin<Box<IRBuilder>>,
@@ -21,9 +23,9 @@ pub fn gen(program: &frontend::Program) -> Result<Program, MiddleError> {
     }
 }
 
-pub fn optimize(_program: &mut Program) {
-    // deadcode_elimination(&mut _program.module);
-    mem2reg::optimize_program(_program).unwrap();
+pub fn optimize(program: &mut Program) {
+    mem2reg::optimize_program(program).unwrap();
+    deadcode_elimination::optimize_program(program).unwrap();
 }
 
 impl Default for Program {

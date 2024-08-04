@@ -157,6 +157,15 @@ impl BasicBlock {
         }
     }
 
+    /// Returns a reverse iterator of the `BasicBlock`.
+    /// The iterator yields the `InstPtr` of the `BasicBlock` except the head instruction.
+    pub fn iter_rev(&self) -> BasicBlockIteratorRev {
+        BasicBlockIteratorRev {
+            cur: self.head_inst,
+            prev: self.head_inst.get_prev(),
+        }
+    }
+
     pub fn gen_llvm_ir(&self) -> String {
         let mut ir = String::new();
         ir += &format!("{}:\n", self.name);
@@ -212,6 +221,20 @@ impl Iterator for BasicBlockIterator {
     fn next(&mut self) -> Option<Self::Item> {
         self.cur = self.next?;
         self.next = self.cur.get_next();
+        Some(self.cur)
+    }
+}
+
+pub struct BasicBlockIteratorRev {
+    cur: InstPtr,
+    prev: Option<InstPtr>,
+}
+
+impl Iterator for BasicBlockIteratorRev {
+    type Item = InstPtr;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.cur = self.prev?;
+        self.prev = self.cur.get_prev();
         Some(self.cur)
     }
 }

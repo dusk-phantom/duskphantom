@@ -56,6 +56,16 @@ impl Function {
         BFSIteratorRev::from(self.exit.unwrap())
     }
 
+    /// Create a postorder iterator to traverse the graph structure of basicblocks.
+    pub fn po_iter(&self) -> POIterator {
+        POIterator::from(self.entry.unwrap())
+    }
+
+    /// Create a reverse postorder iterator to traverse the graph structure of basicblocks.
+    pub fn rpo_iter(&self) -> RPOIterator {
+        RPOIterator::from(self.entry.unwrap())
+    }
+
     pub fn gen_llvm_ir(&self) -> String {
         let header = if self.is_lib() { "declare" } else { "define" };
         let mut ir = format!("{} {} @{}(", header, self.return_type, self.name);
@@ -86,6 +96,68 @@ define_graph_iterator!(BFSIterator, VecDeque<BBPtr>, pop_front, get_succ_bb);
 define_graph_iterator!(BFSIteratorRev, VecDeque<BBPtr>, pop_front, get_pred_bb);
 define_graph_iterator!(DFSIterator, Vec<BBPtr>, pop, get_succ_bb);
 define_graph_iterator!(DFSIteratorRev, Vec<BBPtr>, pop, get_pred_bb);
+
+/// Postorder iterator.
+pub struct POIterator {
+    container: VecDeque<BBPtr>,
+}
+
+impl Iterator for POIterator {
+    type Item = BBPtr;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.container.pop_front()
+    }
+}
+
+impl From<BBPtr> for POIterator {
+    fn from(bb: BBPtr) -> Self {
+        // Run postorder traversal
+        let mut container = Vec::new();
+        let mut visited = HashSet::new();
+        run_postorder(bb, &mut visited, &mut container);
+
+        // Wrap in iterator
+        Self {
+            container: container.into(),
+        }
+    }
+}
+
+/// Reverse postorder iterator.
+pub struct RPOIterator {
+    container: Vec<BBPtr>,
+}
+
+impl Iterator for RPOIterator {
+    type Item = BBPtr;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.container.pop()
+    }
+}
+
+impl From<BBPtr> for RPOIterator {
+    fn from(bb: BBPtr) -> Self {
+        // Run postorder traversal
+        let mut container = Vec::new();
+        let mut visited = HashSet::new();
+        run_postorder(bb, &mut visited, &mut container);
+
+        // Wrap in iterator
+        Self { container }
+    }
+}
+
+/// Run a complete post order traversal.
+fn run_postorder(bb: BBPtr, visited: &mut HashSet<BBPtr>, container: &mut Vec<BBPtr>) {
+    if visited.contains(&bb) {
+        return;
+    }
+    visited.insert(bb);
+    for succ in bb.get_succ_bb() {
+        run_postorder(*succ, visited, container);
+    }
+    container.push(bb);
+}
 
 pub type ParaPtr = ObjPtr<Parameter>;
 impl Display for ParaPtr {
