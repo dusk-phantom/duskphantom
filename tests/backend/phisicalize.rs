@@ -39,7 +39,7 @@ fn test_handle_offset_overflow() {
         ),
         stack_allocator: Some(
             StackAllocator {
-                alloc_from: 2432,
+                alloc_from: 2424,
             },
         ),
         entry: Block {
@@ -117,59 +117,7 @@ fn test_handle_offset_overflow() {
                     LiInst(
                         Reg(
                             Reg {
-                                id: 9,
-                                is_usual: true,
-                            },
-                        ),
-                        Imm(
-                            Imm(
-                                2416,
-                            ),
-                        ),
-                    ),
-                ),
-                Add(
-                    AddInst(
-                        Reg(
-                            Reg {
-                                id: 9,
-                                is_usual: true,
-                            },
-                        ),
-                        Reg(
-                            Reg {
-                                id: 9,
-                                is_usual: true,
-                            },
-                        ),
-                        Reg(
-                            Reg {
-                                id: 2,
-                                is_usual: true,
-                            },
-                        ),
-                    ),
-                ),
-                Sd(
-                    SdInst(
-                        Reg {
-                            id: 9,
-                            is_usual: true,
-                        },
-                        Imm(
-                            0,
-                        ),
-                        Reg {
-                            id: 9,
-                            is_usual: true,
-                        },
-                    ),
-                ),
-                Li(
-                    LiInst(
-                        Reg(
-                            Reg {
-                                id: 9,
+                                id: 28,
                                 is_usual: true,
                             },
                         ),
@@ -184,13 +132,13 @@ fn test_handle_offset_overflow() {
                     AddInst(
                         Reg(
                             Reg {
-                                id: 9,
+                                id: 28,
                                 is_usual: true,
                             },
                         ),
                         Reg(
                             Reg {
-                                id: 9,
+                                id: 28,
                                 is_usual: true,
                             },
                         ),
@@ -212,7 +160,7 @@ fn test_handle_offset_overflow() {
                             0,
                         ),
                         Reg {
-                            id: 9,
+                            id: 28,
                             is_usual: true,
                         },
                     ),
@@ -221,7 +169,7 @@ fn test_handle_offset_overflow() {
                     LiInst(
                         Reg(
                             Reg {
-                                id: 9,
+                                id: 28,
                                 is_usual: true,
                             },
                         ),
@@ -236,13 +184,13 @@ fn test_handle_offset_overflow() {
                     AddInst(
                         Reg(
                             Reg {
-                                id: 9,
+                                id: 28,
                                 is_usual: true,
                             },
                         ),
                         Reg(
                             Reg {
-                                id: 9,
+                                id: 28,
                                 is_usual: true,
                             },
                         ),
@@ -264,59 +212,7 @@ fn test_handle_offset_overflow() {
                             0,
                         ),
                         Reg {
-                            id: 9,
-                            is_usual: true,
-                        },
-                    ),
-                ),
-                Li(
-                    LiInst(
-                        Reg(
-                            Reg {
-                                id: 9,
-                                is_usual: true,
-                            },
-                        ),
-                        Imm(
-                            Imm(
-                                2416,
-                            ),
-                        ),
-                    ),
-                ),
-                Add(
-                    AddInst(
-                        Reg(
-                            Reg {
-                                id: 9,
-                                is_usual: true,
-                            },
-                        ),
-                        Reg(
-                            Reg {
-                                id: 9,
-                                is_usual: true,
-                            },
-                        ),
-                        Reg(
-                            Reg {
-                                id: 2,
-                                is_usual: true,
-                            },
-                        ),
-                    ),
-                ),
-                Ld(
-                    LdInst(
-                        Reg {
-                            id: 9,
-                            is_usual: true,
-                        },
-                        Imm(
-                            0,
-                        ),
-                        Reg {
-                            id: 9,
+                            id: 28,
                             is_usual: true,
                         },
                     ),
