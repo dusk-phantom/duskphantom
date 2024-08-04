@@ -1,7 +1,5 @@
-use traversal::{DftPost, DftPostRev};
-
 use super::*;
-use crate::{define_graph_iterator, graph_iterator};
+use crate::define_graph_iterator;
 
 pub type FunPtr = ObjPtr<Function>;
 
@@ -44,13 +42,6 @@ impl Function {
         BFSIterator::from(self.entry.unwrap())
     }
 
-    /// Create a post order iterator to traverse the graph structure of basicblocks.
-    /// Traverse in the direction of data flow with the function entry as the starting point.
-    /// Do not change the graph structure during traversal, which may cause unknown errors
-    pub fn postorder_iter(&self) -> BFSIterator {
-        BFSIterator::from(self.entry.unwrap())
-    }
-
     /// Create a depth-first iterator to traverse the graph structure of basicblocks.
     /// Traverse in the reverse direction of data flow with the function exit as the starting point.
     /// Do not change the graph structure during traversal, which may cause unknown errors
@@ -65,12 +56,14 @@ impl Function {
         BFSIteratorRev::from(self.exit.unwrap())
     }
 
-    pub fn dfs_post_iter(&self) -> impl Iterator<Item = BBPtr> + '_ {
-        graph_iterator!(self, DftPost)
+    /// Create a postorder iterator to traverse the graph structure of basicblocks.
+    pub fn po_iter(&self) -> POIterator {
+        POIterator::from(self.entry.unwrap())
     }
 
-    pub fn dfs_post_iter_rev(&self) -> impl Iterator<Item = BBPtr> + '_ {
-        graph_iterator!(self, DftPostRev)
+    /// Create a reverse postorder iterator to traverse the graph structure of basicblocks.
+    pub fn rpo_iter(&self) -> RPOIterator {
+        RPOIterator::from(self.entry.unwrap())
     }
 
     pub fn gen_llvm_ir(&self) -> String {
@@ -103,6 +96,70 @@ define_graph_iterator!(BFSIterator, VecDeque<BBPtr>, pop_front, get_succ_bb);
 define_graph_iterator!(BFSIteratorRev, VecDeque<BBPtr>, pop_front, get_pred_bb);
 define_graph_iterator!(DFSIterator, Vec<BBPtr>, pop, get_succ_bb);
 define_graph_iterator!(DFSIteratorRev, Vec<BBPtr>, pop, get_pred_bb);
+
+/// Postorder iterator.
+/// When a block is visited, it's guaranteed that all its successors have been visited.
+pub struct POIterator {
+    container: VecDeque<BBPtr>,
+}
+
+impl Iterator for POIterator {
+    type Item = BBPtr;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.container.pop_front()
+    }
+}
+
+impl From<BBPtr> for POIterator {
+    fn from(bb: BBPtr) -> Self {
+        // Run postorder traversal
+        let mut container = Vec::new();
+        let mut visited = HashSet::new();
+        run_postorder(bb, &mut visited, &mut container);
+
+        // Wrap in iterator
+        Self {
+            container: container.into(),
+        }
+    }
+}
+
+/// Reverse postorder iterator.
+/// When a block is visited, it's guaranteed that all its predecessors have been visited.
+pub struct RPOIterator {
+    container: Vec<BBPtr>,
+}
+
+impl Iterator for RPOIterator {
+    type Item = BBPtr;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.container.pop()
+    }
+}
+
+impl From<BBPtr> for RPOIterator {
+    fn from(bb: BBPtr) -> Self {
+        // Run postorder traversal
+        let mut container = Vec::new();
+        let mut visited = HashSet::new();
+        run_postorder(bb, &mut visited, &mut container);
+
+        // Wrap in iterator
+        Self { container }
+    }
+}
+
+/// Run a complete post order traversal.
+fn run_postorder(bb: BBPtr, visited: &mut HashSet<BBPtr>, container: &mut Vec<BBPtr>) {
+    if visited.contains(&bb) {
+        return;
+    }
+    visited.insert(bb);
+    for succ in bb.get_succ_bb() {
+        run_postorder(*succ, visited, container);
+    }
+    container.push(bb);
+}
 
 pub type ParaPtr = ObjPtr<Parameter>;
 impl Display for ParaPtr {
