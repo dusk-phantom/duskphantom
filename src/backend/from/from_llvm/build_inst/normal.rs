@@ -102,7 +102,7 @@ impl IRBuilder {
             llvm_ir::Instruction::BitCast(_) => todo!(),
             llvm_ir::Instruction::AddrSpaceCast(_) => todo!(),
             llvm_ir::Instruction::ICmp(icmp) => Self::build_icmp_inst(icmp, reg_gener, regs),
-            llvm_ir::Instruction::FCmp(_) => todo!(),
+            llvm_ir::Instruction::FCmp(fcmp) => Self::build_fcmp_inst(fcmp, reg_gener, regs, fmms),
             llvm_ir::Instruction::Phi(phi) => {
                 Self::build_phi_inst(phi, reg_gener, regs, insert_back_for_remove_phi)
             }
@@ -420,6 +420,83 @@ impl IRBuilder {
                 ret.push(xori.into());
             }
         }
+        Ok(ret)
+    }
+
+    fn build_fcmp_inst(
+        fcmp: &llvm_ir::instruction::FCmp,
+        reg_gener: &mut RegGenerator,
+        regs: &mut HashMap<Name, Reg>,
+        fmms: &mut HashMap<Fmm, FloatVar>,
+    ) -> Result<Vec<Inst>> {
+        let mut ret = Vec::new();
+        let dst = reg_gener.gen_virtual_usual_reg();
+        regs.insert(fcmp.dest.clone(), dst);
+
+        fn prepare_op0_op1(
+            fcmp: &llvm_ir::instruction::FCmp,
+            reg_gener: &mut RegGenerator,
+            regs: &HashMap<Name, Reg>,
+            fmms: &mut HashMap<Fmm, FloatVar>,
+            insts: &mut Vec<Inst>,
+        ) -> Result<(Operand, Operand)> {
+            let (op0, prepare) =
+                IRBuilder::prepare_float_lhs(&fcmp.operand0, reg_gener, regs, fmms)?;
+            insts.extend(prepare);
+            let (op1, prepare) =
+                IRBuilder::prepare_float_lhs(&fcmp.operand1, reg_gener, regs, fmms)?;
+            insts.extend(prepare);
+            Ok((op0, op1))
+        }
+
+        let (op0, op1) = prepare_op0_op1(fcmp, reg_gener, regs, fmms, &mut ret)?;
+        dbg!(fcmp);
+        match fcmp.predicate {
+            llvm_ir::FPPredicate::False => todo!(),
+            llvm_ir::FPPredicate::OEQ => {
+                let feq = FeqsInst::new(dst.into(), op0, op1);
+                ret.push(feq.into());
+            }
+            llvm_ir::FPPredicate::OLT => {
+                let flt = FltsInst::new(dst.into(), op0, op1);
+                ret.push(flt.into());
+            }
+            llvm_ir::FPPredicate::OGT => {
+                let flt = FltsInst::new(dst.into(), op1, op0);
+                ret.push(flt.into());
+            }
+            llvm_ir::FPPredicate::OGE => {
+                let fle = FlesInst::new(dst.into(), op1, op0);
+                ret.push(fle.into());
+            }
+            llvm_ir::FPPredicate::OLE => {
+                let fle = FlesInst::new(dst.into(), op0, op1);
+                ret.push(fle.into());
+            }
+            llvm_ir::FPPredicate::ONE => {
+                let mid_var = reg_gener.gen_virtual_usual_reg();
+                let feq = FeqsInst::new(mid_var.into(), op0, op1);
+                let xori = XorInst::new(dst.into(), mid_var.into(), 1.into());
+                ret.push(feq.into());
+                ret.push(xori.into());
+            }
+            llvm_ir::FPPredicate::UNE => {
+                let mid_var = reg_gener.gen_virtual_usual_reg();
+                let feq = FeqsInst::new(mid_var.into(), op0, op1);
+                let xori = XorInst::new(dst.into(), mid_var.into(), 1.into());
+                ret.push(feq.into());
+                ret.push(xori.into());
+            }
+            llvm_ir::FPPredicate::ORD => todo!(),
+            llvm_ir::FPPredicate::UNO => todo!(),
+            llvm_ir::FPPredicate::UEQ => todo!(),
+            llvm_ir::FPPredicate::UGT => todo!(),
+            llvm_ir::FPPredicate::UGE => todo!(),
+            llvm_ir::FPPredicate::ULT => todo!(),
+            llvm_ir::FPPredicate::ULE => todo!(),
+            llvm_ir::FPPredicate::True => todo!(),
+        }
+
         Ok(ret)
     }
 
