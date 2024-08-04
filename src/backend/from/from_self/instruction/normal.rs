@@ -124,17 +124,18 @@ impl IRBuilder {
             }
             middle::ir::instruction::InstType::SextTo => todo!(),
             middle::ir::instruction::InstType::ItoFp => {
-                let itofp = downcast_ref::<middle::ir::instruction::extend_inst::ItoFp>(
+                let i2fp = downcast_ref::<middle::ir::instruction::extend_inst::ItoFp>(
                     inst.as_ref().as_ref(),
                 );
                 let mut ret = Vec::new();
-                let (src, prepare) = Self::prepare_rs1_i(itofp.get_src(), reg_gener, regs)
+                println!("{}", i2fp.get_src());
+                let (src, prepare) = Self::prepare_rs1_i(i2fp.get_src(), reg_gener, regs)
                     .with_context(|| context!())?;
                 ret.extend(prepare);
                 let dst = reg_gener.gen_virtual_float_reg();
                 let fcvtsw = I2fInst::new(dst.into(), src.into());
                 ret.push(fcvtsw.into());
-                regs.insert(itofp as *const _ as Address, dst);
+                regs.insert(i2fp as *const _ as Address, dst);
                 Ok(ret)
             }
             middle::ir::instruction::InstType::FpToI => {
@@ -303,19 +304,26 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
     ) -> Result<Vec<Inst>> {
-        match zext.get_src() {
-            middle::ir::Operand::Constant(_) => todo!(),
-            middle::ir::Operand::Global(_) => todo!(),
-            middle::ir::Operand::Parameter(_) => todo!(),
-            middle::ir::Operand::Instruction(instr) => {
-                let src =
-                    Self::local_var_except_param_from(instr, regs).with_context(|| context!())?;
-                let dst = reg_gener.gen_virtual_usual_reg();
-                regs.insert(zext as *const _ as Address, dst);
-                let xt = AndInst::new(dst.into(), src.into(), (-1).into());
-                Ok(vec![xt.into()])
-            }
-        }
+        // match zext.get_src() {
+        //     middle::ir::Operand::Constant(_) => todo!(),
+        //     middle::ir::Operand::Global(_) => todo!(),
+        //     middle::ir::Operand::Parameter(_) => todo!(),
+        //     middle::ir::Operand::Instruction(instr) => {
+        //         let src =
+        //             Self::local_var_except_param_from(instr, regs).with_context(|| context!())?;
+
+        //         let dst = reg_gener.gen_virtual_usual_reg();
+        //         regs.insert(zext as *const _ as Address, dst);
+        //         let xt = AndInst::new(dst.into(), src.into(), (-1).into());
+        //         Ok(vec![xt.into()])
+        //     }
+        // }
+        let mut ret = Vec::new();
+        let (src, prepare) =
+            Self::prepare_rs1_i(zext.get_src(), reg_gener, regs).with_context(|| context!())?;
+        ret.extend(prepare);
+        regs.insert(zext as *const _ as Address, src);
+        Ok(ret)
     }
 
     fn build_icmp_inst(

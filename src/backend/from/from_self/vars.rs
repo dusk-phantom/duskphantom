@@ -1,6 +1,5 @@
 use super::builder::IRBuilder;
 use irs::var::ArrVar;
-use middle::ir::Constant;
 
 use super::*;
 
@@ -28,7 +27,6 @@ impl IRBuilder {
         Ok(global_vars)
     }
 
-    #[allow(unused)]
     fn build_zero_initializer(name: &str, ty: &middle::ir::ValueType) -> Result<Var> {
         match ty.get_base_type() {
             middle::ir::ValueType::Int => {
@@ -53,83 +51,112 @@ impl IRBuilder {
         }
     }
 
-    #[allow(unused)]
-    fn build_arr_var(name: &str, arr: &Vec<Constant>) -> Result<Var> {
-        let flattened = Self::_flatten_arr(arr)?;
-        if let Some(first) = flattened.first() {
-            match first {
-                Constant::Int(_) => {
-                    let mut arr: Vec<(usize, u32)> = Vec::new();
-                    for (index, item) in flattened.iter().enumerate() {
-                        let Constant::Int(i) = item else {
-                            return Err(anyhow!("can't not receive a mixed arr: {:?}", first))
-                                .with_context(|| context!());
-                        };
-                        arr.push((index, *i as u32)); // 这个应该是位模式的转换
+    fn build_arr_var(name: &str, arr: &[middle::ir::Constant]) -> Result<Var> {
+        if let Some(is_int) = Self::_is_int(&arr[0]) {
+            if is_int {
+                let mut init = Vec::new();
+                let mut len = 0;
+                for (sz, item) in Self::_init_arr_i(arr)? {
+                    if item != 0 {
+                        init.push((len, item));
                     }
-                    let var = ArrVar {
-                        name: name.to_string(),
-                        capacity: arr.len(),
-                        init: arr,
-                        is_const: false,
-                    };
-                    Ok(var.into())
+                    len += sz;
                 }
-                Constant::Float(_) => {
-                    let mut arr: Vec<(usize, f32)> = Vec::new();
-                    for (index, item) in flattened.iter().enumerate() {
-                        let Constant::Float(f) = item else {
-                            return Err(anyhow!("can't not receive a mixed arr: {:?}", first))
-                                .with_context(|| context!());
-                        };
-                        arr.push((index, *f)); // 这个应该是位模式的转换
+                let var: ArrVar<u32> = ArrVar {
+                    name: name.to_string(),
+                    capacity: len,
+                    init,
+                    is_const: false,
+                };
+                Ok(var.into())
+            } else {
+                let mut init = Vec::new();
+                let mut len = 0;
+                for (sz, item) in Self::_init_arr_f(arr)? {
+                    if item != (0 as f32) {
+                        init.push((len, item));
                     }
-                    let var = ArrVar {
-                        name: name.to_string(),
-                        capacity: arr.len(),
-                        init: arr,
-                        is_const: false,
-                    };
-                    Ok(var.into())
+                    len += sz;
                 }
-                Constant::SignedChar(_) => unimplemented!(),
-                Constant::Bool(_) => unimplemented!(),
-                Constant::Array(_) | Constant::Zero(_) => {
-                    Err(anyhow!("arr has been flattened: {:?}", first)).with_context(|| context!())
-                } // Cons
+                let var: ArrVar<f32> = ArrVar {
+                    name: name.to_string(),
+                    capacity: len,
+                    init,
+                    is_const: false,
+                };
+                Ok(var.into())
             }
         } else {
-            Err(anyhow!("backend get an empty array from middle: {:?}", arr))
-                .with_context(|| context!())
+            Err(anyhow!("can't handle mixed arr")).with_context(|| context!())
         }
     }
 
-    /// 递归的展平数组
-    fn _flatten_arr(arr: &Vec<Constant>) -> Result<Vec<Constant>> {
-        let mut flattened = Vec::new();
+    fn _init_arr_i(
+        arr: &[middle::ir::Constant],
+    ) -> Result<Vec<(usize /* 大小, 而不是下标 */, u32)>> {
+        let mut init = Vec::new();
         for item in arr {
             match item {
-                Constant::Array(sub_arr) => {
-                    let sub_flattened = Self::_flatten_arr(sub_arr)?;
-                    flattened.extend(sub_flattened);
+                middle::ir::Constant::Int(i) => init.push((1, *i as u32)),
+                middle::ir::Constant::SignedChar(c) => init.push((1, *c as u32)),
+                middle::ir::Constant::Bool(b) => init.push((1, *b as u32)),
+                middle::ir::Constant::Float(_) => {
+                    return Err(anyhow!("float in int arr")).with_context(|| context!())
                 }
-                _ => flattened.push(item.clone()),
+                middle::ir::Constant::Array(arr) => {
+                    let sub_init = Self::_init_arr_i(arr)?;
+                    init.extend(sub_init);
+                }
+                middle::ir::Constant::Zero(zero) => {
+                    init.push((zero.size(), 0));
+                }
             }
         }
-        Ok(flattened)
+        Ok(init)
     }
 
-    // pub fn basic_element_type(ty: &middle::ir::ValueType) -> middle::ir::ValueType {
-    //     match ty {
-    //         middle::ir::ValueType::Array(ty, _) => Self::basic_element_type(ty),
-    //         middle::ir::ValueType::Void => todo!(),
-    //         ty => ty.clone(), // middle::ir::ValueType::Float
-    //                           // | middle::ir::ValueType::SignedChar
-    //                           // | middle::ir::ValueType::Bool
-    //                           // | middle::ir::ValueType::Pointer(_)
-    //                           // | middle::ir::ValueType::Int => ty.clone(),
-    //     }
-    // }
+    fn _init_arr_f(
+        arr: &[middle::ir::Constant],
+    ) -> Result<Vec<(usize /* 大小, 而不是下标 */, f32)>> {
+        let mut init = Vec::new();
+        for item in arr {
+            match item {
+                middle::ir::Constant::SignedChar(_)
+                | middle::ir::Constant::Int(_)
+                | middle::ir::Constant::Bool(_) => {
+                    return Err(anyhow!("int in float arr")).with_context(|| context!())
+                }
+                middle::ir::Constant::Float(f) => init.push((1, *f)),
+                middle::ir::Constant::Array(arr) => {
+                    let sub_init = Self::_init_arr_f(arr)?;
+                    init.extend(sub_init);
+                }
+                middle::ir::Constant::Zero(zero) => {
+                    init.push((zero.size(), 0 as f32));
+                }
+            }
+        }
+        Ok(init)
+    }
+
+    /// can't handle mixed arr
+    fn _is_int(con: &middle::ir::Constant) -> Option<bool> {
+        match con {
+            middle::ir::Constant::Int(_) => Some(true),
+            middle::ir::Constant::SignedChar(_) => Some(true),
+            middle::ir::Constant::Bool(_) => Some(true),
+            middle::ir::Constant::Float(_) => Some(false),
+            middle::ir::Constant::Array(arr) => {
+                for element in arr {
+                    if let Some(is_int) = Self::_is_int(element) {
+                        return Some(is_int);
+                    }
+                }
+                None // 这种情况是: 全部是 Zero 的情况, 按道理来说应该走 build_zero_initializer 这条分支
+            }
+            middle::ir::Constant::Zero(_) => None,
+        }
+    }
 
     fn build_int_var(name: &str, value: i32) -> Result<Var> {
         let var = var::Var::Prim(var::PrimVar::IntVar(var::IntVar {
