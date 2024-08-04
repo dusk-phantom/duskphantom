@@ -196,7 +196,7 @@ pub trait Instruction: Display {
     /// But for the case of having a successor but no predecessor, it does not report an error.
     unsafe fn move_self(&mut self) {
         if let Some(mut prev) = self.get_manager().prev {
-            let mut next = self.get_next().unwrap_or_else(|| {
+            let mut next = self.get_manager().next.unwrap_or_else(|| {
                 panic!(
                     "move_self failed! inst {} has a prev ({}) but no next",
                     self.get_type(),
@@ -482,11 +482,33 @@ impl InstManager {
     ///
     /// FIXME: explain why it is unsafe,and describe the safety requirements
     pub unsafe fn set_operand(&mut self, index: usize, operand: Operand) {
-        if let Operand::Instruction(mut inst) = self.operand[index] {
-            let user = inst.get_user_mut();
-            user.iter()
-                .position(|x| x == &self.self_ptr.unwrap())
-                .map(|x| user.swap_remove(x));
+        match self.operand[index] {
+            Operand::Instruction(mut inst) => {
+                inst.get_user_mut().retain(|x| x != &self.self_ptr.unwrap());
+            }
+            Operand::Parameter(mut param) => {
+                param
+                    .get_user_mut()
+                    .retain(|x| x != &self.self_ptr.unwrap());
+            }
+            Operand::Global(mut global) => {
+                global
+                    .get_user_mut()
+                    .retain(|x| x != &self.self_ptr.unwrap());
+            }
+            _ => {}
+        }
+        match operand {
+            Operand::Instruction(mut inst) => {
+                inst.get_user_mut().push(self.self_ptr.unwrap());
+            }
+            Operand::Parameter(mut param) => {
+                param.add_user(self.self_ptr.unwrap());
+            }
+            Operand::Global(mut global) => {
+                global.add_user(self.self_ptr.unwrap());
+            }
+            _ => {}
         }
         self.operand[index] = operand;
     }

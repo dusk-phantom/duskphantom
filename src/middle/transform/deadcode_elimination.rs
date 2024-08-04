@@ -1,32 +1,68 @@
-use crate::middle::ir;
+use anyhow::Result;
+
+use crate::middle::ir::instruction::InstType;
 use crate::middle::ir::{BBPtr, FunPtr, InstPtr, Operand};
+use crate::middle::Program;
 
 #[allow(unused)]
-pub fn deadcode_elimination(modu: &mut ir::Module) {
-    modu.functions
-        .iter()
-        .for_each(|x| deadcode_elimination_func(*x));
+pub fn optimize_program(program: &mut Program) -> Result<()> {
+    DCE::new(program).deadcode_elimination();
+    Ok(())
 }
 
-pub fn deadcode_elimination_func(func: FunPtr) {
-    func.bfs_iter_rev().for_each(deadcode_elimination_block);
+pub struct DCE<'a> {
+    program: &'a mut Program,
 }
-pub fn deadcode_elimination_block(bb: BBPtr) {
+
+impl<'a> DCE<'a> {
+    pub fn new(program: &'a mut Program) -> Self {
+        Self { program }
+    }
+
+    pub fn deadcode_elimination(&mut self) {
+        self.program
+            .module
+            .functions
+            .clone()
+            .iter()
+            .filter(|f| !f.is_lib())
+            .for_each(deadcode_elimination_func);
+
+        // Global variable does not require revisit, remove unused variables at the end
+        self.program
+            .module
+            .global_variables
+            .retain(|x| !x.get_user().is_empty());
+    }
+}
+
+fn deadcode_elimination_func(func: &FunPtr) {
+    // Use post order traversal to reduce revisits
+    func.po_iter().for_each(deadcode_elimination_block);
+}
+
+fn deadcode_elimination_block(bb: BBPtr) {
+    // Iterate forward so that next instruction is always valid
     bb.iter().for_each(deadcode_elimination_inst);
 }
-pub fn deadcode_elimination_inst(mut inst: InstPtr) {
-    if !inst.get_user().is_empty() {
+
+fn deadcode_elimination_inst(mut inst: InstPtr) {
+    if !inst.get_user().is_empty() || has_side_effect(inst) {
         return;
     }
-    let ops: Vec<Operand> = inst.get_operand().into();
+    let operands: Vec<_> = inst.get_operand().into();
     inst.remove_self();
-    for ele in ops {
-        match ele {
-            // Need to call deadcode_elimination again?
-            Operand::Instruction(i) => deadcode_elimination_inst(i),
-            // TODO: Other Operand
-            Operand::Global(_) => {}
-            _ => {}
+    for op in operands {
+        if let Operand::Instruction(inst) = op {
+            deadcode_elimination_inst(inst);
         }
     }
+}
+
+fn has_side_effect(inst: InstPtr) -> bool {
+    // TODO pure function analysis
+    matches!(
+        inst.get_type(),
+        InstType::Store | InstType::Call | InstType::Ret | InstType::Br
+    )
 }

@@ -260,7 +260,7 @@ impl Instruction for FCmp {
 }
 
 pub struct Phi {
-    pub incoming_values: Vec<(Operand, BBPtr)>,
+    incoming_values: Vec<(Operand, BBPtr)>,
     manager: InstManager,
 }
 
@@ -268,11 +268,11 @@ impl Phi {
     pub fn get_incoming_values(&self) -> &[(Operand, BBPtr)] {
         &self.incoming_values
     }
-    /// # Safety
-    ///
-    /// FIXME: explain why it is unsafe,and describe the safety requirements
-    pub unsafe fn set_incoming_values(&mut self, incoming_values: Vec<(Operand, BBPtr)>) {
-        self.incoming_values = incoming_values;
+    pub fn add_incoming_value(&mut self, val: Operand, pred: BBPtr) {
+        self.incoming_values.push((val.clone(), pred));
+        unsafe {
+            self.get_manager_mut().add_operand(val);
+        }
     }
     pub fn get_incoming_value(&self, bb: BBPtr) -> Option<&Operand> {
         for (val, pred) in &self.incoming_values {

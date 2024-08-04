@@ -70,7 +70,7 @@ impl PhiPack {
         let phi = downcast_mut::<Phi>(self.inst.as_mut().as_mut());
 
         // Add argument to phi
-        phi.incoming_values.push((phi_arg.1, phi_arg.0));
+        phi.add_incoming_value(phi_arg.1, phi_arg.0);
     }
 }
 
