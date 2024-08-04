@@ -165,36 +165,26 @@ fn output(asm: String, output_path: &str, asm_flag: bool) -> Result<(), Compiler
 
 #[allow(unused)]
 pub fn asm2bin(asm: String) -> anyhow::Result<Vec<u8>> {
-    // 使用lcc将汇编代码编译成二进制文件
-    #[cfg(feature = "clang_enabled")]
-    {
-        let mut builder = tempfile::Builder::new();
-        let tmp_asm_file = builder.suffix(".s").tempfile().unwrap();
-        let tmp_bin_file = builder.suffix(".bin").tempfile().unwrap();
-        let tmp_bin_path = tmp_bin_file.path();
-        let tmp_asm_path = tmp_asm_file.path();
-        std::fs::write(tmp_asm_path, asm).expect("msg: write asm failed");
+    // 使用riskv64-linux-gnu-gcc编译
+    let mut builder = tempfile::Builder::new();
+    let tmp_asm_file = builder.suffix(".s").tempfile().unwrap();
+    let tmp_bin_file = builder.suffix(".bin").tempfile().unwrap();
+    let tmp_bin_path = tmp_bin_file.path();
+    let tmp_asm_path = tmp_asm_file.path();
+    std::fs::write(tmp_asm_path, asm).expect("msg: write asm failed");
 
-        // let mut cmd = std::process::Command::new("llc");
-        // cmd.arg("-o")
-        //     .arg(tmp_bin_path)
-        //     .arg(tmp_asm_path)
-        //     .arg("-Wl,-Ttext=0x80000000");
-        let mut cmd = std::process::Command::new("riscv64-linux-gnu-gcc-12");
-        cmd.arg(tmp_asm_path).arg("-o").arg(tmp_bin_path);
+    let mut cmd = std::process::Command::new("riscv64-linux-gnu-gcc-12");
+    cmd.arg(tmp_asm_path).arg("-o").arg(tmp_bin_path);
 
-        let output = cmd.output().expect("msg: exec llc failed");
-        if !output.status.success() {
-            panic!(
-                "msg: exec llc failed\n{}",
-                String::from_utf8_lossy(&output.stderr)
-            );
-        }
-        let bin = std::fs::read(tmp_bin_path).expect("msg: read bin failed");
-        Ok(bin)
+    let output = cmd
+        .output()
+        .expect("msg: exec riskv64-linux-gnu-gcc failed");
+    if !output.status.success() {
+        panic!(
+            "msg: exec riskv64-linux-gnu-gcc failed\n{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
-    #[cfg(not(feature = "clang_enabled"))]
-    {
-        Ok(asm.as_bytes().to_vec())
-    }
+    let bin = std::fs::read(tmp_bin_path).expect("msg: read bin failed");
+    Ok(bin)
 }
