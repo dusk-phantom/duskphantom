@@ -1,5 +1,7 @@
+use traversal::{DftPost, DftPostRev};
+
 use super::*;
-use crate::define_graph_iterator;
+use crate::{define_graph_iterator, graph_iterator};
 
 pub type FunPtr = ObjPtr<Function>;
 
@@ -42,6 +44,13 @@ impl Function {
         BFSIterator::from(self.entry.unwrap())
     }
 
+    /// Create a post order iterator to traverse the graph structure of basicblocks.
+    /// Traverse in the direction of data flow with the function entry as the starting point.
+    /// Do not change the graph structure during traversal, which may cause unknown errors
+    pub fn postorder_iter(&self) -> BFSIterator {
+        BFSIterator::from(self.entry.unwrap())
+    }
+
     /// Create a depth-first iterator to traverse the graph structure of basicblocks.
     /// Traverse in the reverse direction of data flow with the function exit as the starting point.
     /// Do not change the graph structure during traversal, which may cause unknown errors
@@ -54,6 +63,14 @@ impl Function {
     /// Do not change the graph structure during traversal, which may cause unknown errors
     pub fn bfs_iter_rev(&self) -> BFSIteratorRev {
         BFSIteratorRev::from(self.exit.unwrap())
+    }
+
+    pub fn dfs_post_iter(&self) -> impl Iterator<Item = BBPtr> + '_ {
+        graph_iterator!(self, DftPost)
+    }
+
+    pub fn dfs_post_iter_rev(&self) -> impl Iterator<Item = BBPtr> + '_ {
+        graph_iterator!(self, DftPostRev)
     }
 
     pub fn gen_llvm_ir(&self) -> String {

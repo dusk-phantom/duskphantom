@@ -31,6 +31,16 @@ macro_rules! define_graph_iterator {
     };
 }
 
+#[macro_export]
+macro_rules! graph_iterator {
+    ($self:ident, $name:ident) => {
+        $name::new($self.exit.as_ref().unwrap(), |bb: &BBPtr| {
+            bb.get_succ_bb().iter()
+        })
+        .map(|(_, x)| *x)
+    };
+}
+
 /// Use this macro to generate some code for instruction to simplify the codesize.
 /// Make sure to use this macro in the impl Instruction block
 /// and the Instruction struct must have a field named manager

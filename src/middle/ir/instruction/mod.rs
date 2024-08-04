@@ -196,7 +196,7 @@ pub trait Instruction: Display {
     /// But for the case of having a successor but no predecessor, it does not report an error.
     unsafe fn move_self(&mut self) {
         if let Some(mut prev) = self.get_manager().prev {
-            let mut next = self.get_next().unwrap_or_else(|| {
+            let mut next = self.get_manager().next.unwrap_or_else(|| {
                 panic!(
                     "move_self failed! inst {} has a prev ({}) but no next",
                     self.get_type(),
