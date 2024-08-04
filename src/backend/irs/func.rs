@@ -34,6 +34,15 @@ impl Func {
     }
 
     pub fn gen_asm(&self) -> String {
+        if CONFIG.num_parallel_for_func_gen_asm == 1 {
+            println!("num_parallel_for_func_gen_asm == 1");
+            let mut bbs_asm = String::with_capacity(256);
+            for bb in self.iter_bbs() {
+                bbs_asm.push_str(bb.gen_asm().as_str());
+                bbs_asm.push('\n');
+            }
+            return GenTool::gen_func(self.name.as_str(), bbs_asm.as_str());
+        }
         let thread_pool = rayon::ThreadPoolBuilder::new()
             .num_threads(CONFIG.num_parallel_for_block_gen_asm)
             .build()

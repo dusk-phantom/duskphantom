@@ -46,6 +46,7 @@ pub fn compile(
     } else {
         backend::phisicalize(&mut program)?;
     }
+
     // check valid
     #[cfg(not(feature = "gen_virtual_asm"))]
     checker::ProgramChecker::check_valid(&checker::Riscv, &program);
