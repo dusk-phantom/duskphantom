@@ -26,7 +26,7 @@ pub mod stack;
 pub fn optimize(program: &mut prog::Program) -> Result<()> {
     #[cfg(feature = "backend_opt")]
     {
-        for m in self.program.clone().as_mut().modules.iter_mut() {
+        for m in program.modules.iter_mut() {
             for f in m.funcs.iter_mut() {
                 optimize_func(f)?;
             }
