@@ -13,9 +13,8 @@ pub fn word(input: &mut &str) -> PResult<String> {
 }
 
 /// List of all keywords.
-const KEYWORDS: [&str; 20] = [
-    "void", "int", "float", "string", "char", "bool", "struct", "enum", "union", "false", "true",
-    "sizeof", "break", "continue", "return", "if", "else", "do", "while", "for",
+const KEYWORDS: [&str; 10] = [
+    "void", "int", "float", "break", "continue", "return", "if", "else", "do", "while",
 ];
 
 /// Parser of an identifier, a word which is not a keyword.
