@@ -128,7 +128,6 @@ impl IRBuilder {
                     inst.as_ref().as_ref(),
                 );
                 let mut ret = Vec::new();
-                println!("{}", i2fp.get_src());
                 let (src, prepare) = Self::prepare_rs1_i(i2fp.get_src(), reg_gener, regs)
                     .with_context(|| context!())?;
                 ret.extend(prepare);
