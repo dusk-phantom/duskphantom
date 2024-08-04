@@ -19,8 +19,6 @@ pub fn prefix(input: &mut &str) -> PResult<Expr> {
         '{' => curly(separated(0.., expr, token(","))).map(Expr::Array),
         '.' | '0'..='9' => pad(constant_number),
         '"' => pad(string_lit).map(Expr::String),
-        'f' => token("false").value(Expr::Int(0)),
-        't' => token("true").value(Expr::Int(1)),
         '(' => paren(expr),
         _ => fail,
     };
