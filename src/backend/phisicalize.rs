@@ -27,12 +27,12 @@ pub fn phisicalize_func(func: &mut Func) -> Result<()> {
     fprintln!("log/phisicalize_func.s", "{}", func.gen_asm());
 
     // 为函数开头和结尾插入callee-save regs的保存和恢复
-    handle_callee_save(func)?;
-    fprintln!("log/handle_callee_save.s", "{}", func.gen_asm());
+    // handle_callee_save(func)?;
+    // fprintln!("log/handle_callee_save.s", "{}", func.gen_asm());
 
-    // 为call指令前后插入caller-save regs的保存和恢复
-    handle_caller_save(func)?;
-    fprintln!("log/handle_caller_save.s", "{}", func.gen_asm());
+    // // 为call指令前后插入caller-save regs的保存和恢复
+    // handle_caller_save(func)?;
+    // fprintln!("log/handle_caller_save.s", "{}", func.gen_asm());
 
     // entry和exit插入ra寄存器的保存和恢复
     handle_ra(func)?;
@@ -255,8 +255,8 @@ fn handle_callee_save(func: &mut Func) -> Result<()> {
     regs.retain(|r| Reg::callee_save_regs().contains(r));
 
     // 额外加入s1寄存器,因为在计算地址的时候会额外使用s1寄存器存储临时值
-    assert!(REG_S1.is_callee_save());
-    regs.insert(REG_S1);
+    assert!(REG_T3.is_callee_save());
+    regs.insert(REG_T3);
 
     // 为这些物理寄存器分配栈上空间
     let mut stack_allocator = func
@@ -403,9 +403,9 @@ fn handle_offset_overflows(func: &mut Func) -> Result<()> {
     macro_rules! handle_offset_overflow {
         ($inst:ident,$inst_ty:ident,$new_insts:ident) => {
             if !$inst.offset().in_limit(12) {
-                let li = LiInst::new(REG_S1.into(), $inst.offset().into());
-                let add = AddInst::new(REG_S1.into(), REG_S1.into(), REG_SP.into());
-                let new_ld = $inst_ty::new(*$inst.dst(), 0.into(), REG_S1);
+                let li = LiInst::new(REG_T3.into(), $inst.offset().into());
+                let add = AddInst::new(REG_T3.into(), REG_T3.into(), REG_SP.into());
+                let new_ld = $inst_ty::new(*$inst.dst(), 0.into(), REG_T3);
                 $new_insts.push(li.into());
                 $new_insts.push(add.into());
                 $new_insts.push(new_ld.into());
@@ -428,9 +428,9 @@ fn handle_offset_overflows(func: &mut Func) -> Result<()> {
                         if imm.in_limit(12) {
                             new_insts.push(inst.clone());
                         } else {
-                            let li = LiInst::new(REG_S1.into(), imm.into());
+                            let li = LiInst::new(REG_T3.into(), imm.into());
                             let new_add =
-                                AddInst::new(add.dst().clone(), add.lhs().clone(), REG_S1.into());
+                                AddInst::new(add.dst().clone(), add.lhs().clone(), REG_T3.into());
                             new_insts.push(li.into());
                             new_insts.push(new_add.into());
                         }
