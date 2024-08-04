@@ -12,7 +12,6 @@ impl IRBuilder {
     pub fn build_global_var(self_global_vars: &Vec<middle::ir::GlobalPtr>) -> Result<Vec<Var>> {
         let mut global_vars = Vec::new();
         for global_var in self_global_vars {
-            // dbg!(&global_var);
             let name = &global_var.name;
             let new_var = match &global_var.initializer {
                 middle::ir::Constant::SignedChar(_) => unimplemented!(),
@@ -52,42 +51,38 @@ impl IRBuilder {
     }
 
     fn build_arr_var(name: &str, arr: &[middle::ir::Constant]) -> Result<Var> {
-        if let Some(is_int) = Self::_is_int(&arr[0]) {
-            if is_int {
-                let mut init = Vec::new();
-                let mut len = 0;
-                for (sz, item) in Self::_init_arr_i(arr)? {
-                    if item != 0 {
-                        init.push((len, item));
-                    }
-                    len += sz;
+        if Self::_is_int(arr) {
+            let mut init = Vec::new();
+            let mut len = 0;
+            for (sz, item) in Self::_init_arr_i(arr)? {
+                if item != 0 {
+                    init.push((len, item));
                 }
-                let var: ArrVar<u32> = ArrVar {
-                    name: name.to_string(),
-                    capacity: len,
-                    init,
-                    is_const: false,
-                };
-                Ok(var.into())
-            } else {
-                let mut init = Vec::new();
-                let mut len = 0;
-                for (sz, item) in Self::_init_arr_f(arr)? {
-                    if item != (0 as f32) {
-                        init.push((len, item));
-                    }
-                    len += sz;
-                }
-                let var: ArrVar<f32> = ArrVar {
-                    name: name.to_string(),
-                    capacity: len,
-                    init,
-                    is_const: false,
-                };
-                Ok(var.into())
+                len += sz;
             }
+            let var: ArrVar<u32> = ArrVar {
+                name: name.to_string(),
+                capacity: len,
+                init,
+                is_const: false,
+            };
+            Ok(var.into())
         } else {
-            Err(anyhow!("can't handle mixed arr")).with_context(|| context!())
+            let mut init = Vec::new();
+            let mut len = 0;
+            for (sz, item) in Self::_init_arr_f(arr)? {
+                if item != (0 as f32) {
+                    init.push((len, item));
+                }
+                len += sz;
+            }
+            let var: ArrVar<f32> = ArrVar {
+                name: name.to_string(),
+                capacity: len,
+                init,
+                is_const: false,
+            };
+            Ok(var.into())
         }
     }
 
@@ -140,7 +135,7 @@ impl IRBuilder {
     }
 
     /// can't handle mixed arr
-    fn _is_int(con: &middle::ir::Constant) -> Option<bool> {
+    fn __is_int(con: &middle::ir::Constant) -> Option<bool> {
         match con {
             middle::ir::Constant::Int(_) => Some(true),
             middle::ir::Constant::SignedChar(_) => Some(true),
@@ -148,7 +143,7 @@ impl IRBuilder {
             middle::ir::Constant::Float(_) => Some(false),
             middle::ir::Constant::Array(arr) => {
                 for element in arr {
-                    if let Some(is_int) = Self::_is_int(element) {
+                    if let Some(is_int) = Self::__is_int(element) {
                         return Some(is_int);
                     }
                 }
@@ -156,6 +151,16 @@ impl IRBuilder {
             }
             middle::ir::Constant::Zero(_) => None,
         }
+    }
+
+    /// 全部是 Zero 也算是 int
+    fn _is_int(arr: &[middle::ir::Constant]) -> bool {
+        for item in arr {
+            if let Some(is_int) = Self::__is_int(item) {
+                return is_int;
+            }
+        }
+        true
     }
 
     fn build_int_var(name: &str, value: i32) -> Result<Var> {
