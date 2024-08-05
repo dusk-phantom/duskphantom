@@ -98,11 +98,9 @@ impl IRBuilder {
                     .with_context(|| context!())?;
                 ret.extend(prepare);
                 let factor = sz * _factor; // 当前类型的 sizeof
-                let fac = reg_gener.gen_virtual_usual_reg();
-                let li = LiInst::new(fac.into(), (factor as i64).into()); // 部分阶乘
-                ret.push(li.into());
                 let part = reg_gener.gen_virtual_usual_reg(); // 部分积
-                let mul = MulInst::new(part.into(), idx.into(), fac.into()).with_8byte();
+                let mul =
+                    MulInst::new(part.into(), idx.into(), (factor as i64).into()).with_8byte();
                 ret.push(mul.into());
                 let acc = reg_gener.gen_virtual_usual_reg(); // 部分结果
                 let add = AddInst::new(acc.into(), _acc.into(), part.into()).with_8byte();

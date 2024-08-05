@@ -47,7 +47,7 @@ impl IRBuilder {
                 // Ok(insts)
             }
             middle::ir::instruction::InstType::Sub => {
-                ssa2tac_three_usual_Rtype!(SubInst, Sub, inst, regs, reg_gener)
+                ssa2tac_three_usual_Itype!(SubInst, Sub, inst, regs, reg_gener)
             }
             // 通过类型转换，可以做到: FAdd 的输入一定是 Float 类型的寄存器
             middle::ir::instruction::InstType::FSub => {
@@ -55,17 +55,17 @@ impl IRBuilder {
                 ssa2tac_three_float!(SubInst, FSub, inst, regs, reg_gener, fmms)
             }
             middle::ir::instruction::InstType::Mul => {
-                ssa2tac_three_usual_Rtype!(MulInst, Mul, inst, regs, reg_gener)
+                ssa2tac_three_usual_Itype!(MulInst, Mul, inst, regs, reg_gener)
             }
             middle::ir::instruction::InstType::FMul => {
                 // ssa2tac_binary_float!(inst, regs, reg_gener, FMul, Mul, MulInst)
                 ssa2tac_three_float!(MulInst, FMul, inst, regs, reg_gener, fmms)
             }
             middle::ir::instruction::InstType::SDiv => {
-                ssa2tac_three_usual_Rtype!(DivInst, SDiv, inst, regs, reg_gener)
+                ssa2tac_three_usual_Itype!(DivInst, SDiv, inst, regs, reg_gener)
             }
             middle::ir::instruction::InstType::SRem => {
-                ssa2tac_three_usual_Rtype!(RemInst, SRem, inst, regs, reg_gener)
+                ssa2tac_three_usual_Itype!(RemInst, SRem, inst, regs, reg_gener)
             }
             middle::ir::instruction::InstType::UDiv => todo!(), // TODO 目前还没有 udiv 和 urem
             middle::ir::instruction::InstType::URem => todo!(),
