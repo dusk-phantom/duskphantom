@@ -1,5 +1,5 @@
 pub mod block;
-#[allow(clippy::legacy_numeric_constants)]
+
 pub mod func;
 // pub mod inst;
 #[macro_use]

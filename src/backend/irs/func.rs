@@ -1,5 +1,4 @@
 use std::collections::{HashMap, HashSet};
-use std::usize;
 
 use super::*;
 use super::{block::Block, gen_asm::GenTool};
@@ -334,7 +333,7 @@ impl Func {
             graph.insert(*p_reg, HashSet::new());
             for other_p_reg in p_regs {
                 if p_reg != other_p_reg {
-                    graph.get_mut(p_reg).unwrap().insert(*other_p_reg);
+                    graph.entry(*p_reg).or_default().insert(*other_p_reg);
                 }
             }
         }
@@ -353,25 +352,19 @@ impl Func {
             for inst in bb.insts().iter().rev() {
                 let defs = inst.defs();
                 for reg in defs.clone() {
-                    if !graph.contains_key(reg) {
-                        graph.insert(*reg, HashSet::new());
-                    }
                     alive_regs.remove(reg);
                     for alive_reg in alive_regs.iter() {
-                        graph.get_mut(reg).expect("").insert(*alive_reg);
-                        graph.get_mut(alive_reg).expect("").insert(*reg);
+                        graph.entry(*reg).or_default().insert(*alive_reg);
+                        graph.entry(*alive_reg).or_default().insert(*reg);
                     }
                     alive_regs.insert(*reg);
                 }
                 alive_regs.retain(|r| !defs.contains(&r));
                 for reg in inst.uses() {
-                    if !graph.contains_key(reg) {
-                        graph.insert(*reg, HashSet::new());
-                    }
                     alive_regs.insert(*reg);
                     for alive_reg in alive_regs.iter() {
-                        graph.get_mut(reg).expect("").insert(*alive_reg);
-                        graph.get_mut(alive_reg).expect("").insert(*reg);
+                        graph.entry(*reg).or_default().insert(*alive_reg);
+                        graph.entry(*alive_reg).or_default().insert(*reg);
                     }
                 }
             }
