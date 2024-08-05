@@ -17,7 +17,7 @@ pub mod utils;
 #[cfg(not(feature = "gen_virtual_asm"))]
 use backend::checker;
 
-use clap::{arg, App};
+use clap::arg;
 
 /// compile sysy source code to rv64gc asm
 pub fn compile(

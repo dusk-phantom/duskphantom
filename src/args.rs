@@ -1,42 +1,54 @@
+use clap::Parser;
+
 use super::*;
 
-#[derive(Debug)]
-pub struct Args {
-    pub sy_path: Option<String>,
-    pub output_path: String,
-    pub opt_flag: bool,
-    pub asm_flag: bool,
-    pub ll_path: Option<String>,
+#[derive(Parser, Debug)]
+#[command(version,about,long_about=None)]
+pub struct Cli {
+    pub sy: String,
+    #[arg(short = 'O', long, default_value = "0")]
+    pub optimize: i32,
+    #[arg(short = 'S', long)]
+    pub asm: bool,
+    #[arg(short = 'o', long, value_name = "output")]
+    pub output: String,
+    #[arg(short, long, value_name = "llvm_path")]
+    pub ll: Option<String>,
 }
 
-pub fn get_args() -> Args {
-    let matches = App::new("compiler")
-        .about("compiler <src> [-S] [-o <output>] [-O]")
-        .arg(arg!(<src> "Source file").index(1))
-        .arg(arg!(-S --asm "output asm file"))
-        .arg(arg!(-o --output <FILE> "output asm file").default_value("a.s"))
-        .arg(arg!(-O --optimized "optimization level"))
-        .arg(arg!(-l --llvm [FILE] "output llvm ir file"))
-        .get_matches();
-    let sy_path = matches.value_of("src").map(|s| s.to_string());
-    let output_path = matches.value_of("output").unwrap().to_string();
-    let opt_flag = matches.is_present("optimized");
-    let asm_flag = matches.is_present("asm");
-    let ll_path = matches.value_of("llvm").map(|s| s.to_string());
-    Args {
-        sy_path,
-        output_path,
-        opt_flag,
-        asm_flag,
-        ll_path,
+#[cfg(test)]
+mod tests {
+    use super::*;
+    static BIN: &str = "compiler";
+    #[test]
+    fn test_normal() {
+        let cli = super::Cli::parse_from([BIN, "1.sy", "-S", "-o", "1.s"]);
+        dbg!(&cli);
+        assert_eq!(cli.sy, "1.sy");
+        assert_eq!(cli.output, "1.s");
+        assert_eq!(cli.optimize, 0);
+        assert!(cli.asm);
+        assert_eq!(cli.ll, None);
     }
-}
+    #[test]
+    fn test_optimize() {
+        let cli = super::Cli::parse_from([BIN, "1.sy", "-S", "-o", "1.s", "-O1"]);
+        dbg!(&cli);
+        assert_eq!(cli.sy, "1.sy");
+        assert_eq!(cli.output, "1.s");
+        assert_eq!(cli.optimize, 1);
+        assert!(cli.asm);
+        assert_eq!(cli.ll, None);
+    }
 
-pub fn get_sy_out_opt_asm(args: &Args) -> (String, String, bool, bool) {
-    (
-        args.sy_path.clone().unwrap(),
-        args.output_path.clone(),
-        args.opt_flag,
-        args.asm_flag,
-    )
+    #[test]
+    fn test_ll() {
+        let cli = super::Cli::parse_from([BIN, "1.sy", "-S", "-o", "1.s", "--ll", "1.ll"]);
+        dbg!(&cli);
+        assert_eq!(cli.sy, "1.sy");
+        assert_eq!(cli.output, "1.s");
+        assert_eq!(cli.optimize, 0);
+        assert!(cli.asm);
+        assert_eq!(cli.ll, Some("1.ll".to_string()));
+    }
 }

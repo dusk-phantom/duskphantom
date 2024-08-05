@@ -3,14 +3,26 @@ extern crate compiler;
 pub fn main() {
     #[cfg(feature = "clang_enabled")]
     {
-        use compiler::compile_clang_llc;
-        use compiler::errors::handle_error;
-        use std::borrow::Borrow;
-        let args = compiler::args::get_args();
-        let (sy_path, output_path, opt_flag, asm_flag) = compiler::args::get_sy_out_opt_asm(&args);
-        let result = compile_clang_llc(&sy_path, &output_path, opt_flag, asm_flag, args.ll_path);
-        if let Err(err) = result.borrow() {
-            handle_error(err);
-        }
+        use clap::Parser;
+        use compiler::args::Cli;
+        let cli = Cli::parse();
+        start_compiler_cl(&cli);
+    }
+}
+#[cfg(feature = "clang_enabled")]
+fn start_compiler_cl(cli: &compiler::args::Cli) {
+    use compiler::compile_clang_llc;
+    use compiler::errors::handle_error;
+    use std::borrow::Borrow;
+    let (sy_path, output_path, opt_flag, asm_flag, ll_path) = (
+        &cli.sy,
+        &cli.output,
+        cli.optimize != 0,
+        cli.asm,
+        cli.ll.clone(),
+    );
+    let result = compile_clang_llc(sy_path, output_path, opt_flag, asm_flag, ll_path);
+    if let Err(err) = result.borrow() {
+        handle_error(err);
     }
 }
