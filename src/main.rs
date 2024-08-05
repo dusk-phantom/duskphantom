@@ -3,19 +3,22 @@ extern crate compiler;
 
 use std::borrow::Borrow;
 
-use compiler::{args::get_args, compile, errors::handle_error};
+use clap::Parser;
+use compiler::{args::Cli, compile, errors::handle_error};
 
 fn main() {
-    let args = get_args();
-    println!("{:?}", args);
+    let cli = Cli::parse();
+    start_compiler(&cli);
+}
+fn start_compiler(cli: &Cli) {
     let (sy_path, output_path, opt_flag, asm_flag, ll_path) = (
-        args.sy_path.unwrap(),
-        args.output_path,
-        args.opt_flag,
-        args.asm_flag,
-        args.ll_path,
+        &cli.sy,
+        &cli.output,
+        cli.optimize != 0,
+        cli.asm,
+        cli.ll.clone(),
     );
-    let result = compile(&sy_path, &output_path, opt_flag, asm_flag, ll_path);
+    let result = compile(sy_path, output_path, opt_flag, asm_flag, ll_path);
     if let Err(err) = result.borrow() {
         handle_error(err);
     }
