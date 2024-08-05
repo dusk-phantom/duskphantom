@@ -18,7 +18,9 @@ pub fn phisicalize(program: &mut Program) -> Result<(), BackendError> {
 
 pub fn phisicalize_func(func: &mut Func) -> Result<()> {
     fprintln!("log/before_handle_unlegal_inst.log", "{}", func.gen_asm());
-    handle_illegal_inst(func)?;
+
+    // handle_illegal_inst(func)?;
+    inst_split::handle_mul_div_opt(func)?;
 
     fprintln!("log/before_phisicalize.log", "{}", func.gen_asm());
 
@@ -90,57 +92,8 @@ pub fn handle_illegal_inst(func: &mut Func) -> Result<()> {
             match inst {
                 Inst::Sltu(sltu) => process_rhs_imm!(sltu, r_g, new_insts),
                 Inst::Sgtu(sgtu) => process_rhs_imm!(sgtu, r_g, new_insts),
-                Inst::Mul(mul) => {
-                    if let Operand::Imm(imm) = mul.rhs() {
-                        let num = **imm;
-                        if num == 0 {
-                            let dst = mul.dst();
-                            let li = LiInst::new(dst.clone(), 0.into());
-                            new_insts.push(li.into());
-                        } else if (num & (num - 1) == 0) && (num > 0) {
-                            let power = num.trailing_zeros();
-                            let slli = SllInst::new(
-                                mul.dst().clone(),
-                                mul.lhs().clone(),
-                                (power as i64).into(),
-                            );
-                            // FIXME 这里需要 sllwi, 或者 slli
-                            new_insts.push(slli.into());
-                        } else {
-                            // log2f64(num as f64)
-                            let mid = r_g.gen_virtual_usual_reg();
-                            let li = LiInst::new(mid.into(), imm.into());
-                            *mul.rhs_mut() = Operand::Reg(mid);
-                            new_insts.push(li.into());
-                            new_insts.push(mul.clone().into());
-                        }
-                    } else {
-                        new_insts.push(inst.clone());
-                    }
-                }
-                Inst::Div(div) => {
-                    if let Operand::Imm(imm) = div.rhs() {
-                        let num = **imm;
-                        if (num & (num - 1) == 0) && (num > 0) {
-                            let power = num.trailing_zeros();
-                            let srai = SraInst::new(
-                                div.dst().clone(),
-                                div.lhs().clone(),
-                                (power as i64).into(),
-                            );
-                            new_insts.push(srai.into());
-                        } else {
-                            // log2f64(num as f64)
-                            let mid = r_g.gen_virtual_usual_reg();
-                            let li = LiInst::new(mid.into(), imm.into());
-                            *div.rhs_mut() = Operand::Reg(mid);
-                            new_insts.push(li.into());
-                            new_insts.push(div.clone().into());
-                        }
-                    } else {
-                        new_insts.push(inst.clone());
-                    }
-                }
+                Inst::Mul(mul) => process_rhs_imm!(mul, r_g, new_insts),
+                Inst::Div(div) => process_rhs_imm!(div, r_g, new_insts),
                 Inst::Rem(rem) => process_rhs_imm!(rem, r_g, new_insts),
                 Inst::Sub(sub) => process_rhs_imm!(sub, r_g, new_insts),
                 // TODO, divu
