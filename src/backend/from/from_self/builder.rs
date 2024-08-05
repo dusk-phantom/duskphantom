@@ -134,7 +134,28 @@ impl IRBuilder {
                         let li = LiInst::new(phi_dst.into(), from);
                         bb.insert_before_term(li.into())?;
                     }
-                    _ => unimplemented!(),
+                    Operand::Fmm(fmm) => {
+                        let lit = if let Some(f_var) = fmms.get(&fmm) {
+                            f_var.name.clone()
+                        } else {
+                            let name = Self::fmm_lit_label_from(&fmm);
+                            fmms.insert(
+                                fmm.clone(),
+                                FloatVar {
+                                    name: name.clone(),
+                                    init: Some(fmm.clone().try_into()?),
+                                    is_const: true,
+                                },
+                            );
+                            name
+                        };
+                        let addr = reg_gener.gen_virtual_usual_reg();
+                        let lla = LlaInst::new(addr, lit.into());
+                        bb.insert_before_term(lla.into())?;
+                        let loadf = LwInst::new(phi_dst, 0.into(), addr);
+                        bb.insert_before_term(loadf.into())?;
+                    }
+                    _ => return Err(anyhow!("not support {:?}", from)), /* stackslot(_), label(_) */
                 }
             }
         }
