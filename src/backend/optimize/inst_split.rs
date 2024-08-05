@@ -4,43 +4,21 @@ use super::*;
 
 /// 处理乘法和除法的优化,部分乘法和除法可以 优化成移位
 pub fn handle_mul_div_opt(func: &mut Func) -> Result<()> {
-    /// FIXME: use optimize here
-    handle_illegal_inst(func)?;
-    Ok(())
-}
-
-fn handle_illegal_inst(func: &mut Func) -> Result<()> {
     let mut r_g = func
         .reg_gener_mut()
         .take()
         .ok_or(anyhow!("msg: reg_gener not found"))
         .with_context(|| context!())?;
-    macro_rules! process_rhs_imm {
-        ($inst:ident,$r_g:ident,$new_insts:ident) => {
-            if let Operand::Imm(imm) = $inst.rhs() {
-                let mid = $r_g.gen_virtual_usual_reg();
-                let li = LiInst::new(mid.into(), imm.into());
-                *$inst.rhs_mut() = Operand::Reg(mid);
-                $new_insts.push(li.into());
-                $new_insts.push($inst.clone().into());
-            } else {
-                $new_insts.push($inst.clone().into());
-            }
-        };
-    }
+
     for bb in func.iter_bbs_mut() {
         let mut new_insts: Vec<Inst> = Vec::new();
         for inst in bb.insts_mut() {
             match inst {
-                Inst::Sltu(sltu) => process_rhs_imm!(sltu, r_g, new_insts),
-                Inst::Sgtu(sgtu) => process_rhs_imm!(sgtu, r_g, new_insts),
                 Inst::Mul(mul) => mul_opt(mul, &mut r_g, &mut new_insts),
                 Inst::Div(div) => div_opt(div, &mut r_g, &mut new_insts),
                 Inst::Rem(rem) => rem_opt(rem, &mut r_g, &mut new_insts),
-                Inst::Sub(sub) => process_rhs_imm!(sub, r_g, new_insts),
-                // TODO, divu
                 _ => {
-                    new_insts.push(inst.clone());
+                    new_insts.push(inst.clone()); // 这里就是啥也不干
                 }
             }
         }
