@@ -1,3 +1,5 @@
+use crate::fprintln;
+
 use super::*;
 
 pub fn handle_reg_alloc(func: &mut Func) -> Result<()> {
@@ -90,12 +92,12 @@ pub fn reg_alloc(
             }
             let num_inter = v.iter().filter(|v| v.is_usual() == k.is_usual()).count();
             if k.is_float() {
-                if num_inter >= f_colors.len() {
+                if num_inter < f_colors.len() {
                     to_remove.push(*k);
                     later_to_color.push_back(*k);
                 }
             } else if k.is_usual() {
-                if num_inter >= i_colors.len() {
+                if num_inter < i_colors.len() {
                     to_remove.push(*k);
                     later_to_color.push_back(*k);
                 }
@@ -112,9 +114,9 @@ pub fn reg_alloc(
             for nb in nbs {
                 graph_to_simplify
                     .get_mut(&nb)
-                    .expect(
-                        "in a consistent reg inter graph ,v inter to v2,must means v2 inter to v",
-                    )
+                    .ok_or_else(|| {
+                        anyhow!("neighbors of node {} must be in the graph", r.gen_asm())
+                    })?
                     .remove(&r);
             }
         }
