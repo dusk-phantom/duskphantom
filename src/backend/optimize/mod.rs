@@ -1,3 +1,5 @@
+use crate::fprintln;
+
 use super::irs::*;
 use std::collections::{HashMap, HashSet, VecDeque};
 
@@ -51,8 +53,10 @@ pub fn optimize_func(func: &mut Func) -> Result<()> {
     // inst scheduling
     schedule::handle_inst_scheduling(func)?;
 
+    fprintln!("log/after_inst_scheduling.s", "{}", func.gen_asm());
     // register allocation
     reg_alloc::handle_reg_alloc(func)?;
+    fprintln!("log/after_reg_alloc.s", "{}", func.gen_asm());
 
     // processing caller-save and callee-save
     caller_callee::handle_caller_callee(func)?;
