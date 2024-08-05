@@ -1,5 +1,5 @@
 #[cfg(test)]
-pub mod tests_mem2reg {
+pub mod tests_dce {
     use insta::assert_snapshot;
 
     use compiler::{

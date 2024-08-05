@@ -1597,7 +1597,7 @@ mod tests {
         store i1 %icmp_6, ptr %alloca_5
         %alloca_8 = alloca i1
         %itofp_9 = sitofp i32 1 to float
-        %fcmp_10 = fcmp ult float %itofp_9, 0x3ff19999a0000000
+        %fcmp_10 = fcmp olt float %itofp_9, 0x3ff19999a0000000
         store i1 %fcmp_10, ptr %alloca_8
         %load_14 = load i1, ptr %alloca_5
         br i1 %load_14, label %alt0, label %final1

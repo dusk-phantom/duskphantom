@@ -9,7 +9,7 @@ pub mod transform;
 
 use std::pin::Pin;
 
-use self::transform::deadcode_elimination;
+use self::transform::{constant_fold, deadcode_elimination};
 
 pub struct Program {
     pub module: ir::Module,
@@ -25,6 +25,8 @@ pub fn gen(program: &frontend::Program) -> Result<Program, MiddleError> {
 
 pub fn optimize(program: &mut Program) {
     mem2reg::optimize_program(program).unwrap();
+    deadcode_elimination::optimize_program(program).unwrap();
+    constant_fold::optimize_program(program).unwrap();
     deadcode_elimination::optimize_program(program).unwrap();
 }
 

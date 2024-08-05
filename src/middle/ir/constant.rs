@@ -62,6 +62,12 @@ impl From<i32> for Constant {
     }
 }
 
+impl From<u32> for Constant {
+    fn from(u: u32) -> Self {
+        Self::Int(u as i32)
+    }
+}
+
 impl From<f32> for Constant {
     fn from(fl: f32) -> Self {
         Self::Float(fl)
@@ -71,5 +77,49 @@ impl From<f32> for Constant {
 impl From<bool> for Constant {
     fn from(b: bool) -> Self {
         Self::Bool(b)
+    }
+}
+
+impl From<Constant> for i32 {
+    fn from(val: Constant) -> Self {
+        match val {
+            Constant::Int(x) => x,
+            Constant::Float(x) => x as i32,
+            Constant::Bool(x) => x as i32,
+            _ => panic!("Cannot cast {} to i32", val),
+        }
+    }
+}
+
+impl From<Constant> for u32 {
+    fn from(val: Constant) -> Self {
+        match val {
+            Constant::Int(x) => x as u32,
+            Constant::Float(x) => x as u32,
+            Constant::Bool(x) => x as u32,
+            _ => panic!("Cannot cast {} to u32", val),
+        }
+    }
+}
+
+impl From<Constant> for f32 {
+    fn from(val: Constant) -> Self {
+        match val {
+            Constant::Int(x) => x as f32,
+            Constant::Float(x) => x,
+            Constant::Bool(x) => x as i32 as f32,
+            _ => panic!("Cannot cast {} to f32", val),
+        }
+    }
+}
+
+impl From<Constant> for bool {
+    fn from(val: Constant) -> Self {
+        match val {
+            Constant::Int(x) => x != 0,
+            Constant::Float(x) => x != 0.0,
+            Constant::Bool(x) => x,
+            _ => panic!("Cannot cast {} to bool", val),
+        }
     }
 }

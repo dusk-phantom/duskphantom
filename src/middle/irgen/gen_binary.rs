@@ -155,7 +155,7 @@ impl<'a> FunctionKit<'a> {
                             let inst =
                                 self.program
                                     .mem_pool
-                                    .get_fcmp(FCmpOp::Ugt, max_ty, lop, rop);
+                                    .get_fcmp(FCmpOp::Ogt, max_ty, lop, rop);
                             exit.push_back(inst);
                             Ok(Value::ReadOnly(inst.into()))
                         }
@@ -185,7 +185,7 @@ impl<'a> FunctionKit<'a> {
                             let inst =
                                 self.program
                                     .mem_pool
-                                    .get_fcmp(FCmpOp::Ult, max_ty, lop, rop);
+                                    .get_fcmp(FCmpOp::Olt, max_ty, lop, rop);
                             exit.push_back(inst);
                             Ok(Value::ReadOnly(inst.into()))
                         }
@@ -215,7 +215,7 @@ impl<'a> FunctionKit<'a> {
                             let inst =
                                 self.program
                                     .mem_pool
-                                    .get_fcmp(FCmpOp::Uge, max_ty, lop, rop);
+                                    .get_fcmp(FCmpOp::Oge, max_ty, lop, rop);
                             exit.push_back(inst);
                             Ok(Value::ReadOnly(inst.into()))
                         }
@@ -245,7 +245,7 @@ impl<'a> FunctionKit<'a> {
                             let inst =
                                 self.program
                                     .mem_pool
-                                    .get_fcmp(FCmpOp::Ule, max_ty, lop, rop);
+                                    .get_fcmp(FCmpOp::Ole, max_ty, lop, rop);
                             exit.push_back(inst);
                             Ok(Value::ReadOnly(inst.into()))
                         }
@@ -272,7 +272,7 @@ impl<'a> FunctionKit<'a> {
                             let inst =
                                 self.program
                                     .mem_pool
-                                    .get_fcmp(FCmpOp::Ueq, max_ty, lop, rop);
+                                    .get_fcmp(FCmpOp::Oeq, max_ty, lop, rop);
                             exit.push_back(inst);
                             Ok(Value::ReadOnly(inst.into()))
                         }
@@ -299,7 +299,7 @@ impl<'a> FunctionKit<'a> {
                             let inst =
                                 self.program
                                     .mem_pool
-                                    .get_fcmp(FCmpOp::Une, max_ty, lop, rop);
+                                    .get_fcmp(FCmpOp::One, max_ty, lop, rop);
                             exit.push_back(inst);
                             Ok(Value::ReadOnly(inst.into()))
                         }
