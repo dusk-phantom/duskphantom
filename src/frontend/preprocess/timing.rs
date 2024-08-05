@@ -1,10 +1,10 @@
 pub fn process(input: &str) -> String {
-    // Replace `(\W?)starttime\(\)` with `$1_sysy_starttime($LN)`
-    let regex = regex::Regex::new(r"(\W?)starttime\(\)").unwrap();
+    // Replace `starttime\(\)` with `_sysy_starttime($LN)` if character before is not connected
+    let regex = regex::Regex::new(r"([^A-Za-z0-9_]|^)starttime\(\)").unwrap();
     let replaced = regex.replace_all(input, "${1}_sysy_starttime($$LN)");
 
-    // Replace `(\W?)stoptime\(\)` with `$1_sysy_stoptime($LN)`
-    let regex = regex::Regex::new(r"(\W?)stoptime\(\)").unwrap();
+    // Replace `stoptime\(\)` with `_sysy_stoptime($LN)` if character before is not connected
+    let regex = regex::Regex::new(r"([^A-Za-z0-9_]|^)stoptime\(\)").unwrap();
     let replaced = regex.replace_all(&replaced, "${1}_sysy_stoptime($$LN)");
 
     // Replace `$LN` with real line number
@@ -39,8 +39,8 @@ pub mod tests_timing {
         assert_snapshot!(process(&code), @r###"
         _sysy_starttime(1);
         _sysy_starttime(2);
-        _sysy_starttime(3);x1_sysy_starttime(3);_sysy_starttime(3);
-        _sysy_stoptime(4);_sysy_stoptime(4);__sysy_stoptime(4);
+        _sysy_starttime(3);x1starttime();_sysy_starttime(3);
+        _sysy_stoptime(4);_sysy_stoptime(4);_stoptime();
         "###);
     }
 }
