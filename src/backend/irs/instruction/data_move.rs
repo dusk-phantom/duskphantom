@@ -194,7 +194,9 @@ impl LocalAddr {
     }
     pub fn phisicalize(&self, stack_size: u32) -> Result<Inst> {
         let (off, base) = phisicalize_addr(&self.src, stack_size);
-        Ok(AddInst::new(self.dst.into(), base.into(), off.into()).into())
+        Ok(AddInst::new(self.dst.into(), base.into(), off.into())
+            .with_8byte()
+            .into())
     }
 }
 

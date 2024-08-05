@@ -111,6 +111,7 @@ fn test_handle_offset_overflow() {
                                 is_usual: true,
                             },
                         ),
+                        false,
                     ),
                 ),
                 Li(
@@ -148,6 +149,7 @@ fn test_handle_offset_overflow() {
                                 is_usual: true,
                             },
                         ),
+                        false,
                     ),
                 ),
                 Lw(
@@ -200,6 +202,7 @@ fn test_handle_offset_overflow() {
                                 is_usual: true,
                             },
                         ),
+                        false,
                     ),
                 ),
                 Sd(

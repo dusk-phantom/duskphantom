@@ -7,6 +7,7 @@ macro_rules! impl_three_op_inst {
             pub fn new(dst: Operand, lhs: Operand, rhs: Operand) -> Self {
                 Self(dst, lhs, rhs)
             }
+
             pub fn dst(&self) -> &Operand {
                 &self.0
             }
@@ -35,6 +36,115 @@ macro_rules! impl_three_op_inst {
                     if r.is_usual() {
                         if matches!(self.rhs(), Operand::Imm(_)) {
                             format!("{}i {},{},{}", $inst_name, dst, lhs, rhs)
+                        } else {
+                            format!("{} {},{},{}", $inst_name, dst, lhs, rhs)
+                        }
+                    } else {
+                        format!("f{}.s {},{},{}", $inst_name, dst, lhs, rhs)
+                    }
+                } else {
+                    format!("{} {},{},{}", $inst_name, dst, lhs, rhs)
+                }
+            }
+        }
+        impl RegDefs for $ty_name {
+            fn defs(&self) -> Vec<&Reg> {
+                if let Operand::Reg(reg) = self.dst() {
+                    vec![reg]
+                } else {
+                    vec![]
+                }
+            }
+        }
+        impl RegUses for $ty_name {
+            fn uses(&self) -> Vec<&Reg> {
+                let mut regs = vec![];
+                if let Operand::Reg(r1) = self.lhs() {
+                    regs.push(r1);
+                    if let Operand::Reg(r2) = self.rhs() {
+                        if r2 != r1 {
+                            regs.push(r2);
+                        }
+                    }
+                } else if let Operand::Reg(reg) = self.rhs() {
+                    regs.push(reg);
+                }
+                regs
+            }
+        }
+        impl RegReplace for $ty_name {
+            fn replace_use(&mut self, from: Reg, to: Reg) -> Result<()> {
+                if let Operand::Reg(r1) = self.lhs_mut() {
+                    if *r1 == from {
+                        *r1 = to;
+                    }
+                }
+                if let Operand::Reg(r2) = self.rhs_mut() {
+                    if *r2 == from {
+                        *r2 = to;
+                    }
+                }
+                Ok(())
+            }
+            fn replace_def(&mut self, from: Reg, to: Reg) -> Result<()> {
+                if let Operand::Reg(r) = self.dst_mut() {
+                    if *r == from {
+                        *r = to;
+                    }
+                }
+                Ok(())
+            }
+        }
+    };
+}
+#[macro_export]
+macro_rules! impl_three_op_inst_with_dstmem {
+    ($ty_name:ident,$inst_name:expr) => {
+        #[derive(Clone, Debug)]
+        pub struct $ty_name(Operand, Operand, Operand, bool);
+        impl $ty_name {
+            pub fn new(dst: Operand, lhs: Operand, rhs: Operand) -> Self {
+                Self(dst, lhs, rhs, false)
+            }
+
+            pub fn with_8byte(mut self) -> Self {
+                self.3 = true;
+                self
+            }
+
+            pub fn dst(&self) -> &Operand {
+                &self.0
+            }
+            pub fn lhs(&self) -> &Operand {
+                &self.1
+            }
+            pub fn rhs(&self) -> &Operand {
+                &self.2
+            }
+            pub fn dst_mut(&mut self) -> &mut Operand {
+                &mut self.0
+            }
+            pub fn lhs_mut(&mut self) -> &mut Operand {
+                &mut self.1
+            }
+            pub fn rhs_mut(&mut self) -> &mut Operand {
+                &mut self.2
+            }
+
+            pub fn gen_asm(&self) -> String {
+                let dst = self.dst().gen_asm();
+                let lhs = self.lhs().gen_asm();
+                let rhs = self.rhs().gen_asm();
+
+                if let Operand::Reg(r) = self.dst() {
+                    if r.is_usual() {
+                        let with_8byte = self.3;
+                        if matches!(self.rhs(), Operand::Imm(_)) {
+                            if with_8byte {
+                                format!("{}i {},{},{}", $inst_name, dst, lhs, rhs)
+                            } else {
+                                format!("{}iw {},{},{}", $inst_name, dst, lhs, rhs)
+                            }
                         } else {
                             format!("{} {},{},{}", $inst_name, dst, lhs, rhs)
                         }

@@ -1,11 +1,11 @@
 use super::*;
 
-impl_three_op_inst!(AddInst, "add");
-impl_three_op_inst!(SubInst, "sub");
-impl_three_op_inst!(MulInst, "mul");
+impl_three_op_inst_with_dstmem!(AddInst, "add");
+impl_three_op_inst_with_dstmem!(SubInst, "sub");
+impl_three_op_inst_with_dstmem!(MulInst, "mul");
 impl_three_op_inst!(RemInst, "rem");
 impl_three_op_inst!(DivInst, "div");
-impl_three_op_inst!(SllInst, "sll");
+impl_three_op_inst_with_dstmem!(SllInst, "sll");
 impl_three_op_inst!(SrlInst, "srl");
 impl_three_op_inst!(SraInst, "sra");
 impl_three_op_inst!(AndInst, "and");
@@ -69,7 +69,9 @@ mod tests {
     fn test_gem_asm_add() {
         let add = AddInst::new(REG_A0.into(), REG_A1.into(), REG_A2.into());
         assert_eq!(add.gen_asm(), "add a0,a1,a2");
-        let addi = AddInst::new(REG_A0.into(), REG_A1.into(), 1.into());
+        let addiw = AddInst::new(REG_A0.into(), REG_A1.into(), 1.into());
+        assert_eq!(addiw.gen_asm(), "addiw a0,a1,1");
+        let addi = AddInst::new(REG_A0.into(), REG_A1.into(), 1.into()).with_8byte();
         assert_eq!(addi.gen_asm(), "addi a0,a1,1");
         let fadd = AddInst::new(REG_FA0.into(), REG_FA1.into(), REG_FA2.into());
         assert_eq!(fadd.gen_asm(), "fadd.s fa0,fa1,fa2");

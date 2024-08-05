@@ -23,7 +23,7 @@ impl IRBuilder {
 
         fprintln!("log/build_gep_inst.log";'a';"ofst:{:?}",ofst);
 
-        let slli = SllInst::new(_mid.into(), ofst.into(), (2).into()); // sysy 的数据都是 4Byte
+        let slli = SllInst::new(_mid.into(), ofst.into(), (2).into()).with_8byte(); // sysy 的数据都是 4Byte
         ret.push(slli.into());
 
         // /* ---------- base ---------- */
@@ -49,7 +49,7 @@ impl IRBuilder {
         fprintln!("log/build_gep_inst.log";'a';"base:{:?}", base);
 
         let dst = reg_gener.gen_virtual_usual_reg();
-        let add = AddInst::new(dst.into(), base.into(), _mid.into());
+        let add = AddInst::new(dst.into(), base.into(), _mid.into()).with_8byte();
 
         fprintln!("log/build_gep_inst.log";'a';"final:{:?}", dst);
 
@@ -102,10 +102,10 @@ impl IRBuilder {
                 let li = LiInst::new(fac.into(), (factor as i64).into()); // 部分阶乘
                 ret.push(li.into());
                 let part = reg_gener.gen_virtual_usual_reg(); // 部分积
-                let mul = MulInst::new(part.into(), idx.into(), fac.into());
+                let mul = MulInst::new(part.into(), idx.into(), fac.into()).with_8byte();
                 ret.push(mul.into());
                 let acc = reg_gener.gen_virtual_usual_reg(); // 部分结果
-                let add = AddInst::new(acc.into(), _acc.into(), part.into());
+                let add = AddInst::new(acc.into(), _acc.into(), part.into()).with_8byte();
                 ret.push(add.into());
                 Ok((factor, acc, ret))
             }
