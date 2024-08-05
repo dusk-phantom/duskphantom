@@ -236,7 +236,7 @@ pub fn handle_stack(func: &mut Func) -> Result<()> {
         to_insert_front.push(li.into());
         REG_T0.into()
     };
-    let open_stack = AddInst::new(REG_SP.into(), REG_SP.into(), to_minus);
+    let open_stack = AddInst::new(REG_SP.into(), REG_SP.into(), to_minus).with_8byte();
     to_insert_front.push(open_stack.into());
 
     let entry = func.entry_mut().insts_mut();
@@ -256,7 +256,7 @@ pub fn handle_stack(func: &mut Func) -> Result<()> {
     } else {
         let li = LiInst::new(REG_T0.into(), offset.into());
         insert_before_ret.push(li.into());
-        let add = AddInst::new(REG_T1.into(), REG_S0.into(), REG_T0.into());
+        let add = AddInst::new(REG_T1.into(), REG_S0.into(), REG_T0.into()).with_8byte();
         insert_before_ret.push(add.into());
         let ld = LdInst::new(REG_S0, 0.into(), REG_T1);
         insert_before_ret.push(ld.into());
@@ -291,7 +291,8 @@ pub fn handle_offset_overflows(func: &mut Func) -> Result<()> {
         ($inst:ident,$inst_ty:ident,$new_insts:ident) => {
             if !$inst.offset().in_limit(12) {
                 let li = LiInst::new(REG_T3.into(), $inst.offset().into());
-                let add = AddInst::new(REG_T3.into(), REG_T3.into(), $inst.base().into());
+                let add =
+                    AddInst::new(REG_T3.into(), REG_T3.into(), $inst.base().into()).with_8byte();
                 let new_ld = $inst_ty::new(*$inst.dst(), 0.into(), REG_T3);
                 $new_insts.push(li.into());
                 $new_insts.push(add.into());
