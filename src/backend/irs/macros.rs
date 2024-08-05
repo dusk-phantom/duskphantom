@@ -146,7 +146,11 @@ macro_rules! impl_three_op_inst_with_dstmem {
                                 format!("{}iw {},{},{}", $inst_name, dst, lhs, rhs)
                             }
                         } else {
-                            format!("{} {},{},{}", $inst_name, dst, lhs, rhs)
+                            if with_8byte {
+                                format!("{} {},{},{}", $inst_name, dst, lhs, rhs)
+                            } else {
+                                format!("{}w {},{},{}", $inst_name, dst, lhs, rhs)
+                            }
                         }
                     } else {
                         format!("f{}.s {},{},{}", $inst_name, dst, lhs, rhs)

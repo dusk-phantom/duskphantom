@@ -318,8 +318,8 @@ pub fn handle_offset_overflows(func: &mut Func) -> Result<()> {
                             new_insts.push(inst.clone());
                         } else {
                             let li = LiInst::new(REG_T3.into(), imm.into());
-                            let new_add =
-                                AddInst::new(add.dst().clone(), add.lhs().clone(), REG_T3.into());
+                            let mut new_add = add.clone();
+                            *new_add.rhs_mut() = REG_T3.into();
                             new_insts.push(li.into());
                             new_insts.push(new_add.into());
                         }
