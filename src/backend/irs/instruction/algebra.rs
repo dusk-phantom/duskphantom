@@ -68,7 +68,7 @@ mod tests {
     #[test]
     fn test_gem_asm_add() {
         let add = AddInst::new(REG_A0.into(), REG_A1.into(), REG_A2.into());
-        assert_eq!(add.gen_asm(), "add a0,a1,a2");
+        assert_eq!(add.gen_asm(), "addw a0,a1,a2");
         let addiw = AddInst::new(REG_A0.into(), REG_A1.into(), 1.into());
         assert_eq!(addiw.gen_asm(), "addiw a0,a1,1");
         let addi = AddInst::new(REG_A0.into(), REG_A1.into(), 1.into()).with_8byte();
@@ -79,7 +79,7 @@ mod tests {
     #[test]
     fn test_gem_asm_sub() {
         let sub = SubInst::new(REG_A0.into(), REG_A1.into(), REG_A2.into());
-        assert_eq!(sub.gen_asm(), "sub a0,a1,a2");
+        assert_eq!(sub.gen_asm(), "subw a0,a1,a2");
         let subi = SubInst::new(REG_A0.into(), REG_A1.into(), 1.into());
         assert!(!checker::InstChecker::check_valid(
             &checker::Riscv,
