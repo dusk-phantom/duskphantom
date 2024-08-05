@@ -39,8 +39,8 @@ pub mod tests_timing {
         assert_snapshot!(process(&code), @r###"
         _sysy_starttime(1);
         _sysy_starttime(2);
-        _sysy_starttime(3);x1_sysy_starttime(3);_sysy_starttime(3);
-        _sysy_stoptime(4);_sysy_stoptime(4);__sysy_stoptime(4);
+        _sysy_starttime(3);x1starttime();_sysy_starttime(3);
+        _sysy_stoptime(4);_sysy_stoptime(4);_stoptime();
         "###);
     }
 }
