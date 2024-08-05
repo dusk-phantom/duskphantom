@@ -130,7 +130,7 @@ pub fn blank(input: &mut &str) -> PResult<()> {
 
 /// Parser of blank beginning with line comment.
 pub fn line_comment(input: &mut &str) -> PResult<()> {
-    ("//", take_until(0.., '\n'), blank)
+    ("//", opt(take_until(0.., '\n')), blank)
         .value(())
         .parse_next(input)
 }
