@@ -13,7 +13,7 @@ pub fn decl(input: &mut &str) -> PResult<Decl> {
     // Attempt to match a macro.
     if input.starts_with('#') {
         return alt((
-            (token("#include"), take_until(0.., '\n'), blank).value(Decl::Stack(vec![])),
+            (token("#include"), opt(take_until(0.., '\n')), blank).value(Decl::Stack(vec![])),
             (token("#define"), pad(ident), expr)
                 .map(|(_, id, expr)| Decl::Const(Type::Int, id, Some(expr))),
         ))

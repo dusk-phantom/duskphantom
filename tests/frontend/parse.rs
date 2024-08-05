@@ -469,8 +469,8 @@ pub mod tests_parse {
     #[test]
     fn test_macro() {
         let code = r#"
-            #include "sylib.h"
-            #define MAX 100
+        #include "sylib.h"
+        #define MAX 100
         "#;
         match parse(code) {
             Ok(result) => {
@@ -488,6 +488,59 @@ pub mod tests_parse {
                             Some(
                                 Int(
                                     100,
+                                ),
+                            ),
+                        ),
+                    ],
+                }
+                "###
+                )
+            }
+            Err(err) => match err {
+                FrontendError::ParseError(s) => panic!("{}", s),
+                FrontendError::OptimizeError => panic!("optimize error"),
+            },
+        }
+    }
+
+    #[test]
+    fn test_trailing_comment() {
+        let code = r#"
+        /*/skipher/*/
+        //int main(){
+        int main(){
+            ////return 0;}/*
+            /*}
+            //}return 1;*/
+            //}return 2;*//*
+            return 3;
+            //*/
+        }
+        //"#;
+        match parse(code) {
+            Ok(result) => {
+                assert_debug_snapshot!(
+                    result,
+                    @r###"
+                Program {
+                    module: [
+                        Func(
+                            Function(
+                                Int,
+                                [],
+                            ),
+                            "main",
+                            Some(
+                                Block(
+                                    [
+                                        Return(
+                                            Some(
+                                                Int(
+                                                    3,
+                                                ),
+                                            ),
+                                        ),
+                                    ],
                                 ),
                             ),
                         ),
