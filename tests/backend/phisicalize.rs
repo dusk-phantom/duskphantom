@@ -1,4 +1,4 @@
-use compiler::backend::irs::*;
+use compiler::{backend::irs::*, fprintln};
 use insta::assert_debug_snapshot;
 
 #[test]
@@ -253,9 +253,30 @@ fn test_handle_offset_overflow() {
                 ),
                 Ret,
             ],
-            to_bbs: [],
         },
         other_bbs: [],
     }
     "###);
+}
+
+#[test]
+fn test_handle_long_jmp() {
+    use compiler::backend::irs::*;
+    use compiler::fprintln;
+    let mut bb0 = Block::new("bb0".to_string());
+    let mut bb1 = Block::new("bb1".to_string());
+    let mut bb2 = Block::new("bb2".to_string());
+    bb0.push_inst(JmpInst::new("bb2".into()).into());
+    [(); 1000]
+        .iter()
+        .for_each(|_| bb1.push_inst(LiInst::new(REG_A0.into(), 1.into()).into()));
+    bb1.push_inst(Inst::Ret);
+    bb2.push_inst(JmpInst::new("bb1".into()).into());
+    let mut f = Func::new("f".to_string(), vec![], bb0);
+    f.push_bb(bb1);
+    f.push_bb(bb2);
+    let mut mdl = Module::new("test");
+    mdl.funcs.push(f);
+    dbg!(mdl.gen_asm());
+    fprintln!("1.s", "{}", mdl.gen_asm());
 }

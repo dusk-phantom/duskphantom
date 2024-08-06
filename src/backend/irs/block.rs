@@ -5,8 +5,6 @@ use super::{gen_asm::GenTool, *};
 pub struct Block {
     label: String,
     insts: Vec<Inst>,
-    // Vec<(inst index, label)>, to be filled after all insts are generated
-    to_bbs: Vec<(usize, String)>,
 }
 
 impl Default for Block {
@@ -14,7 +12,6 @@ impl Default for Block {
         Self {
             label: "default".to_string(),
             insts: vec![],
-            to_bbs: vec![],
         }
     }
 }
@@ -32,7 +29,6 @@ impl Block {
         Block {
             label,
             insts: Vec::new(),
-            to_bbs: Vec::new(),
         }
     }
 

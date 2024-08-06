@@ -289,6 +289,33 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56254986775e3233ffa9c4d7d3faaf6d36a2c09d30b20687e9f88bc8bafc16c8"
 
 [[package]]
+name = "duskphantom"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bitvec",
+ "clap 4.5.13",
+ "criterion",
+ "diff",
+ "graph",
+ "hexf-parse",
+ "indoc",
+ "insta",
+ "lazy_static",
+ "llvm-ir",
+ "once_cell",
+ "rand",
+ "rayon",
+ "regex",
+ "serde",
+ "serde_yaml",
+ "tempfile",
+ "thiserror",
+ "typed-arena",
+ "winnow",
+]
+
+[[package]]
 name = "either"
 version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -378,33 +405,6 @@ name = "hexf-parse"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dfa686283ad6dd069f105e5ab091b04c62850d3e4cf5d67debad1933f55023df"
-
-[[package]]
-name = "hitc"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bitvec",
- "clap 4.5.13",
- "criterion",
- "diff",
- "graph",
- "hexf-parse",
- "indoc",
- "insta",
- "lazy_static",
- "llvm-ir",
- "once_cell",
- "rand",
- "rayon",
- "regex",
- "serde",
- "serde_yaml",
- "tempfile",
- "thiserror",
- "typed-arena",
- "winnow",
-]
 
 [[package]]
 name = "indexmap"

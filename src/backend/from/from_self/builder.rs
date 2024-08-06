@@ -31,7 +31,7 @@ impl IRBuilder {
         };
 
         Ok(prog::Program {
-            entry: None,
+            entry: Some(mdl.name.clone()),
             modules: vec![mdl],
         })
     }
