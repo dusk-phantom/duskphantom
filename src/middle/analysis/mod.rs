@@ -4,4 +4,3 @@ use std::collections::{HashMap, HashSet};
 
 pub mod dominator_tree;
 pub mod loop_tools;
-pub mod simple_gvn;
