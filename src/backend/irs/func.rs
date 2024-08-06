@@ -117,6 +117,10 @@ impl Func {
 
     /// get all virtual regs in the function
     pub fn v_regs(&self) -> HashSet<Reg> {
+        self.regs().into_iter().filter(|r| r.is_virtual()).collect()
+    }
+
+    pub fn regs(&self) -> HashSet<Reg> {
         let mut regs = HashSet::new();
         for bb in self.iter_bbs() {
             for inst in bb.insts() {
@@ -182,6 +186,28 @@ impl Func {
             }
         }
         ret.into_iter()
+    }
+
+    pub fn merge_bb(&mut self, from: &str, to: &str) -> Result<()> {
+        fn remove_to(vec: &mut Vec<Block>, to: &str) -> Result<Block> {
+            let idx = vec.iter().position(|bb| bb.label() == to);
+            if let Some(idx) = idx {
+                Ok(vec.remove(idx))
+            } else {
+                Err(anyhow!(""))
+            }
+        }
+        let to = remove_to(&mut self.other_bbs, to)?;
+        let from = if self.entry().label() == from {
+            self.entry_mut()
+        } else {
+            self.iter_bbs_mut()
+                .find(|bb| bb.label() == from)
+                .ok_or(anyhow!(""))
+                .with_context(|| context!())?
+        };
+        from.merge(to)?;
+        Ok(())
     }
 }
 
