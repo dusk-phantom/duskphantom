@@ -42,6 +42,11 @@ impl<'a> InstCombine<'a> {
             }
             for bb in fun.rpo_iter() {
                 for inst in bb.iter() {
+                    self.useless_elim(inst);
+                }
+            }
+            for bb in fun.rpo_iter() {
+                for inst in bb.iter() {
                     self.make_shift(inst);
                 }
             }
