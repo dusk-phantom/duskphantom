@@ -15,20 +15,20 @@ use crate::middle::{
 
 #[allow(unused)]
 pub fn optimize_program(program: &mut Program) -> Result<()> {
-    ConstantFold::new(program).constant_fold();
+    ConstantFold::new(program).run();
     Ok(())
 }
 
-pub struct ConstantFold<'a> {
+struct ConstantFold<'a> {
     program: &'a mut Program,
 }
 
 impl<'a> ConstantFold<'a> {
-    pub fn new(program: &'a mut Program) -> Self {
+    fn new(program: &'a mut Program) -> Self {
         Self { program }
     }
 
-    pub fn constant_fold(&mut self) {
+    fn run(&mut self) {
         self.program
             .module
             .functions
@@ -38,15 +38,15 @@ impl<'a> ConstantFold<'a> {
             .for_each(|func| self.constant_fold_func(func));
     }
 
-    pub fn constant_fold_func(&mut self, func: &FunPtr) {
+    fn constant_fold_func(&mut self, func: &FunPtr) {
         func.rpo_iter().for_each(|bb| self.constant_fold_block(bb));
     }
 
-    pub fn constant_fold_block(&mut self, bb: BBPtr) {
+    fn constant_fold_block(&mut self, bb: BBPtr) {
         bb.iter().for_each(|inst| self.constant_fold_inst(inst));
     }
 
-    pub fn constant_fold_inst(&mut self, mut inst: InstPtr) {
+    fn constant_fold_inst(&mut self, mut inst: InstPtr) {
         match inst.get_type() {
             InstType::Add | InstType::FAdd => {
                 let lhs = inst.get_operand()[0].clone();
@@ -253,7 +253,7 @@ impl<'a> ConstantFold<'a> {
 }
 
 impl Constant {
-    pub fn cast(self, ty: &ValueType) -> Self {
+    fn cast(self, ty: &ValueType) -> Self {
         match ty {
             ValueType::Int => Into::<i32>::into(self).into(),
             ValueType::Float => Into::<f32>::into(self).into(),

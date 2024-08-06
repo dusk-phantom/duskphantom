@@ -6,20 +6,20 @@ use crate::middle::Program;
 
 #[allow(unused)]
 pub fn optimize_program(program: &mut Program) -> Result<()> {
-    DCE::new(program).deadcode_elimination();
+    DeadCodeElimination::new(program).deadcode_elimination();
     Ok(())
 }
 
-pub struct DCE<'a> {
+struct DeadCodeElimination<'a> {
     program: &'a mut Program,
 }
 
-impl<'a> DCE<'a> {
-    pub fn new(program: &'a mut Program) -> Self {
+impl<'a> DeadCodeElimination<'a> {
+    fn new(program: &'a mut Program) -> Self {
         Self { program }
     }
 
-    pub fn deadcode_elimination(&mut self) {
+    fn deadcode_elimination(&mut self) {
         self.program
             .module
             .functions

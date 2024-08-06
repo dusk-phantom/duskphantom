@@ -54,3 +54,19 @@ impl From<GlobalPtr> for Operand {
         Self::Global(gvar)
     }
 }
+
+impl Operand {
+    pub fn is_const(&self) -> bool {
+        match self {
+            Operand::Constant(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn get_const(&self) -> Option<Constant> {
+        match self {
+            Operand::Constant(c) => Some(c.clone()),
+            _ => None,
+        }
+    }
+}
