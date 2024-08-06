@@ -148,13 +148,12 @@ mod tests {
         [-] b1:
         mv a1,a2
         beq a1,zero,b2
-        [-] j b3
-        [+] ret
+        j b3
         b2:
         mv a2,a3
         j b3
-        [-] b3:
-        [-] ret
+        b3:
+        ret
         .size	, .-
         "###);
     }
