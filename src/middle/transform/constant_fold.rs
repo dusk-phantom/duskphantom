@@ -106,16 +106,6 @@ impl<'a> ConstantFold<'a> {
                     inst.replace_self(&result.into());
                 }
             }
-            InstType::LShr => {
-                let lhs = inst.get_operand()[0].clone();
-                let rhs = inst.get_operand()[1].clone();
-                if let (Operand::Constant(lhs), Operand::Constant(rhs)) = (lhs, rhs) {
-                    let lhs: u32 = lhs.into();
-                    let rhs: u32 = rhs.into();
-                    let result = lhs >> rhs;
-                    inst.replace_self(&Operand::Constant(result.into()));
-                }
-            }
             InstType::AShr => {
                 let lhs = inst.get_operand()[0].clone();
                 let rhs = inst.get_operand()[1].clone();
