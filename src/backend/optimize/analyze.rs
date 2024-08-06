@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use super::*;
 
 impl Block {
@@ -147,7 +149,9 @@ impl Func {
         }
         // for each basic block, collect interference between regs
         let (ins, outs) = Func::in_out_bbs(f)?;
+
         let reg_lives = Func::reg_lives(f, &ins, &outs)?;
+        dbg!(&reg_lives);
         // FIXME: 使用位图实现的寄存器记录表来加速运算过程，以及节省内存
         for bb in f.iter_bbs() {
             let mut alive_regs: HashSet<Reg> = reg_lives.live_outs(bb).clone();
@@ -216,6 +220,28 @@ impl<'a> OutBBs<'a> {
 pub struct RegLives {
     live_ins: HashMap<String, HashSet<Reg>>,
     live_outs: HashMap<String, HashSet<Reg>>,
+}
+impl Debug for RegLives {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RegLives")
+            .field(
+                "live_ins",
+                &self
+                    .live_ins
+                    .iter()
+                    .map(|(k, v)| (k, v.iter().map(|v| v.gen_asm())))
+                    .collect::<Vec<_>>(),
+            )
+            .field(
+                "live_outs",
+                &self
+                    .live_outs
+                    .iter()
+                    .map(|(k, v)| (k, v.iter().map(|v| v.gen_asm())))
+                    .collect::<Vec<_>>(),
+            )
+            .finish()
+    }
 }
 impl RegLives {
     pub fn live_ins(&self, bb: &Block) -> &HashSet<Reg> {
