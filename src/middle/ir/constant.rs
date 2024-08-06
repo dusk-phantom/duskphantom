@@ -1,5 +1,7 @@
 use std::hash::{Hash, Hasher};
 
+use instruction::InstType;
+
 use super::*;
 
 #[derive(Clone, Debug)]
@@ -84,6 +86,19 @@ impl Constant {
                 ValueType::Array(Box::new(sub_type), arr.len())
             }
             Constant::Zero(t) => t.clone(),
+        }
+    }
+
+    /// Apply instruction on identity and this constant.
+    /// For example, apply(4, Sub) = 0 - 4 = 4.
+    ///
+    /// # Panics
+    /// Please make sure constant type and inst type is supported.
+    pub fn apply(self, ty: InstType) -> Constant {
+        match ty {
+            InstType::Add | InstType::FAdd => self,
+            InstType::Sub | InstType::FSub => -self,
+            _ => unimplemented!(),
         }
     }
 }
