@@ -144,9 +144,9 @@ pub fn compile_self_llc(
         llvm,
     };
     let mut program = clang_backend::gen_from_clang(&program)?;
-    if opt_flag {
-        clang_backend::optimize(&mut program);
-    }
+    // if opt_flag {
+    //     clang_backend::optimize(&mut program);
+    // }
     let asm = program.gen_asm();
     output(asm, output_path, asm_flag)
 }

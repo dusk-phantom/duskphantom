@@ -65,7 +65,7 @@ macro_rules! gen_common_code {
 #[macro_export]
 macro_rules! define_inst_type_enum {
     ($( $variant:ident ),*) => {
-        #[derive(Clone, Copy, Eq, PartialEq)]
+        #[derive(Clone, Copy, Eq, PartialEq, Hash)]
         pub enum InstType {
             $( $variant ),*
         }

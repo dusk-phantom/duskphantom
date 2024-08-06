@@ -1,6 +1,8 @@
+use std::hash::{Hash, Hasher};
+
 use super::*;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub enum Constant {
     SignedChar(i8),
     Int(i32),
@@ -8,6 +10,36 @@ pub enum Constant {
     Bool(bool),
     Array(Vec<Constant>),
     Zero(ValueType),
+}
+
+impl PartialEq for Constant {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Constant::SignedChar(c1), Constant::SignedChar(c2)) => c1 == c2,
+            (Constant::Int(i1), Constant::Int(i2)) => i1 == i2,
+            // Compare float in bits to have `Eq` trait implemented
+            (Constant::Float(f1), Constant::Float(f2)) => f1.to_bits() == f2.to_bits(),
+            (Constant::Bool(b1), Constant::Bool(b2)) => b1 == b2,
+            (Constant::Array(arr1), Constant::Array(arr2)) => arr1 == arr2,
+            (Constant::Zero(t1), Constant::Zero(t2)) => t1 == t2,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for Constant {}
+
+impl Hash for Constant {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            Constant::SignedChar(c) => c.hash(state),
+            Constant::Int(i) => i.hash(state),
+            Constant::Float(f) => f.to_bits().hash(state),
+            Constant::Bool(b) => b.hash(state),
+            Constant::Array(arr) => arr.hash(state),
+            Constant::Zero(t) => t.hash(state),
+        }
+    }
 }
 
 impl std::fmt::Display for Constant {
