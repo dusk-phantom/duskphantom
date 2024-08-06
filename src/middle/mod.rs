@@ -1,6 +1,6 @@
 use crate::{errors::MiddleError, frontend, utils::mem::ObjPtr};
 use ir::ir_builder::IRBuilder;
-use transform::{mem2reg, simple_gvn};
+use transform::{inst_combine, mem2reg, simple_gvn};
 
 mod analysis;
 pub mod ir;
@@ -29,6 +29,8 @@ pub fn optimize(program: &mut Program) {
     constant_fold::optimize_program(program).unwrap();
     deadcode_elimination::optimize_program(program).unwrap();
     simple_gvn::optimize_program(program).unwrap();
+    deadcode_elimination::optimize_program(program).unwrap();
+    inst_combine::optimize_program(program).unwrap();
     deadcode_elimination::optimize_program(program).unwrap();
 }
 
