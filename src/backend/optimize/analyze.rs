@@ -10,9 +10,11 @@ impl Block {
                 Inst::Ble(b) => tos.push(b.label().to_string()),
                 Inst::Bgt(b) => tos.push(b.label().to_string()),
                 Inst::Bge(b) => tos.push(b.label().to_string()),
+                Inst::Beq(b) => tos.push(b.label().to_string()),
                 Inst::Jmp(jmp) => {
                     let label: &Label = jmp.dst().try_into()?;
                     tos.push(label.to_string());
+                    break;
                 }
                 Inst::Tail(_) => break,
                 Inst::Ret => break,
