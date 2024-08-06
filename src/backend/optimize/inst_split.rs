@@ -73,7 +73,7 @@ fn rem_opt(rem: &mut RemInst, r_g: &mut RegGenerator, new_insts: &mut Vec<Inst>)
 fn mul_opt(mul: &mut MulInst, r_g: &mut RegGenerator, new_insts: &mut Vec<Inst>) {
     if let Operand::Imm(imm) = mul.rhs() {
         let num = **imm;
-        let ones = _get_one_indices(num);
+        let ones: Vec<u32> = (0..64).filter(|&i| (num >> i) & 1 == 1).collect();
         if let Some((m, n)) = _is_sub_pattern(num) {
             let lhs = mul.lhs();
             let sll_m = r_g.gen_virtual_usual_reg();
@@ -116,6 +116,7 @@ fn mul_opt(mul: &mut MulInst, r_g: &mut RegGenerator, new_insts: &mut Vec<Inst>)
     }
 }
 
+#[inline]
 /// (1 << m) - (1 << n)
 fn _is_sub_pattern(num: i64) -> Option<(u32, u32)> {
     /// 最小的, 大于 num 的, 二次幂
@@ -152,26 +153,6 @@ fn _is_sub_pattern_test() {
     if let Some((m, n)) = _is_sub_pattern(7) {
         dbg!(m, n);
     }
-}
-
-fn _get_one_indices(num: i64) -> Vec<u32> {
-    let mut indices = Vec::new();
-    let mut n = num;
-    let mut index = 0;
-    while n != 0 {
-        if n & 1 == 1 {
-            indices.push(index);
-        }
-        n >>= 1;
-        index += 1;
-    }
-    indices
-}
-
-#[test]
-fn _get_one_indices_test() {
-    let indices = _get_one_indices(0b01011);
-    dbg!(indices);
 }
 
 /// handle li , li
