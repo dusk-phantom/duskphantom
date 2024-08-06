@@ -5,110 +5,83 @@ pub fn handle_caller_callee(func: &mut Func) -> Result<()> {
     handle_callee_save(func)?;
     Ok(())
 }
+fn take_ssa(f: &mut Func) -> Result<StackAllocator> {
+    f.stack_allocator_mut()
+        .take()
+        .ok_or(anyhow!("stack allocator is none"))
+}
 
 #[allow(unused)]
 fn handle_caller_save(func: &mut Func) -> Result<()> {
-    // 统计代码中使用到的caller save寄存器,然后在函数调用前后保存和恢复这些寄存器
-    let mut regs: HashSet<Reg> = HashSet::new();
-    for bb in func.iter_bbs() {
-        for inst in bb.insts() {
-            let uses = inst.uses();
-            let defs = inst.defs();
-            regs.extend(uses.iter().filter(|r| r.is_physical()).cloned());
-            regs.extend(defs.iter().filter(|r| r.is_physical()).cloned());
-        }
-    }
-    regs.retain(|r| Reg::caller_save_regs().contains(r));
-    regs.retain(|r| !tmp_i_regs().contains(r) && !tmp_f_regs().contains(r));
+    let mut ssa = take_ssa(func)?;
+    let mut available_ss = Vec::new();
 
-    // 为这些物理寄存器分配栈上空间,并在函数调用前后保存和恢复这些寄存器
-    let mut stack_allocator = func
-        .stack_allocator_mut()
-        .take()
-        .expect("msg: stack allocator not found");
-    let mut reg_ss = HashMap::new();
-    for r in regs.iter() {
-        let ss = stack_allocator.alloc(8);
-        reg_ss.insert(*r, ss);
-    }
-    func.stack_allocator_mut().replace(stack_allocator);
-
-    // 为每个函数调用前后插入保存和恢复寄存器的指令
+    let (ins, outs) = Func::in_out_bbs(func)?;
+    let reg_lives = Func::reg_lives(func, &ins, &outs)?;
     for bb in func.iter_bbs_mut() {
-        let mut new_insts = Vec::new();
-        for inst in bb.insts() {
-            match inst {
-                Inst::Call(call) => {
-                    // 计算要在函数调用前后保护(保存和恢复)的寄存器
-                    let mut to_protect = reg_ss.clone();
-                    let mut call_defs = call.defs();
-                    to_protect.retain(|r, _| !call_defs.contains(&r));
-
-                    // 为这些寄存器在call指令前后插入保存和恢复指令
-                    for (r, ss) in to_protect.iter() {
-                        let sd = StoreInst::new(*ss, *r).with_8byte();
-                        new_insts.push(sd.into());
-                    }
-                    new_insts.push(inst.clone());
-                    for (r, ss) in to_protect.iter() {
-                        let ld = LoadInst::new(*r, *ss).with_8byte();
-                        new_insts.push(ld.into());
-                    }
+        let mut new_insts_rev: Vec<Inst> = vec![];
+        let mut alive_regs = reg_lives.live_outs(bb).clone();
+        alive_regs.retain(|r| r.is_caller_save());
+        for inst in bb.insts_mut().iter_mut().rev() {
+            if let Inst::Call(call) = inst {
+                let mut to_save = alive_regs.clone().into_iter().collect::<Vec<_>>();
+                to_save.retain(|r| !call.defs().contains(&r));
+                for i in (available_ss.len()..to_save.len()) {
+                    available_ss.push(ssa.alloc(8));
                 }
-                _ => {
-                    new_insts.push(inst.clone());
+                for (r, ss) in to_save.iter().zip(available_ss.iter()) {
+                    new_insts_rev.push(LoadInst::new(*r, *ss).into());
                 }
+                new_insts_rev.push(inst.clone());
+                for (r, ss) in to_save.iter().zip(available_ss.iter()) {
+                    new_insts_rev.push(StoreInst::new(*ss, *r).into());
+                }
+            } else {
+                new_insts_rev.push(inst.clone());
             }
+            alive_regs.retain(|r| !inst.defs().contains(&r));
+            alive_regs.extend(inst.uses().iter().cloned());
+            alive_regs.retain(|r| r.is_caller_save());
+            // update alive_regs
         }
-        *bb.insts_mut() = new_insts;
+        new_insts_rev.reverse();
+        bb.insts_mut().clear();
+        bb.insts_mut().extend(new_insts_rev);
     }
 
+    func.stack_allocator_mut().replace(ssa);
     Ok(())
 }
 
 #[allow(unused)]
 fn handle_callee_save(func: &mut Func) -> Result<()> {
-    // 统计代码中使用到的callee save寄存器,然后在函数开头和结尾保存和恢复这些寄存器
-    let mut regs: HashSet<Reg> = HashSet::new();
-    for bb in func.iter_bbs() {
-        for inst in bb.insts() {
-            let uses = inst.uses();
-            let defs = inst.defs();
-            regs.extend(uses.iter().filter(|r| r.is_physical()).cloned());
-            regs.extend(defs.iter().filter(|r| r.is_physical()).cloned());
+    let mut ssa = take_ssa(func)?;
+
+    let mut available_ss: Vec<StackSlot> = Vec::new();
+    let mut regs = func.regs();
+    regs.retain(|r| r.is_callee_save());
+    (0..regs.len()).for_each(|_| available_ss.push(ssa.alloc(8)));
+
+    let mut insert_front: Vec<Inst> = vec![];
+    for (r, ss) in regs.iter().zip(available_ss.iter()) {
+        insert_front.push(StoreInst::new(*ss, *r).into());
+    }
+
+    let mut insert_back: Vec<Inst> = vec![];
+    for (r, ss) in regs.iter().zip(available_ss.iter()) {
+        insert_back.push(LoadInst::new(*r, *ss).into());
+    }
+
+    let entry = func.entry_mut();
+    entry.insts_mut().splice(0..0, insert_front.iter().cloned());
+
+    let exits = func.exit_bbs_mut();
+    for bb in exits {
+        for inst in insert_back.iter() {
+            bb.insert_before_term(inst.clone())?;
         }
     }
-    regs.retain(|r| Reg::callee_save_regs().contains(r));
 
-    // 为这些物理寄存器分配栈上空间
-    let mut stack_allocator = func
-        .stack_allocator_mut()
-        .take()
-        .expect("msg: stack allocator not found");
-    let mut reg_ss = HashMap::new();
-    for r in regs.iter() {
-        let ss = stack_allocator.alloc(8);
-        reg_ss.insert(*r, ss);
-    }
-    func.stack_allocator_mut().replace(stack_allocator);
-
-    // 为函数开头和结尾插入保存和恢复寄存器的指令
-    let entry = func.entry_mut().insts_mut();
-    reg_ss
-        .iter()
-        .map(|(r, ss)| StoreInst::new(*ss, *r).with_8byte())
-        .for_each(|i| entry.insert(0, i.into()));
-
-    let exit_bbs = func.exit_bbs_mut();
-
-    let mut load_back = reg_ss
-        .iter()
-        .map(|(r, ss)| LoadInst::new(*r, *ss).with_8byte());
-    for bb in exit_bbs {
-        load_back.clone().for_each(|i| {
-            bb.insert_before_term(i.into());
-        });
-    }
-
+    func.stack_allocator_mut().replace(ssa);
     Ok(())
 }

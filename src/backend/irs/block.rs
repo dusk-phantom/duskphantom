@@ -84,3 +84,23 @@ impl Block {
         Ok(())
     }
 }
+
+impl Block {
+    /// this func is only available while
+    /// self's last inst is a jmp to other block
+    /// this func will merge other block to self
+    /// note: this func is specially designed for use in Func::merge_bb
+    pub fn merge(&mut self, other: Block) -> Result<()> {
+        let last = self.insts.pop();
+        if let Some(Inst::Jmp(jmp)) = last {
+            let dst = jmp.dst();
+            if let Operand::Label(label) = dst {
+                if label.as_str() != other.label() {
+                    return Err(anyhow!("can't merge block"));
+                }
+            }
+        }
+        self.insts.extend(other.insts);
+        Ok(())
+    }
+}
