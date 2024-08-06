@@ -142,8 +142,11 @@ impl<'a> InstCombine<'a> {
                 let lhs = inst.get_operand()[0].clone();
                 let rhs = inst.get_operand()[1].clone();
                 if lhs.is_const() && !rhs.is_const() {
-                    inst.set_operand(0, rhs);
-                    inst.set_operand(1, lhs);
+                    // Safety: swapping operand does not change use-def chain
+                    unsafe {
+                        let vec = inst.get_operand_mut();
+                        vec.swap(0, 1);
+                    }
                 }
             }
             _ => (),
