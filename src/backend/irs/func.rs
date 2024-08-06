@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use super::*;
 use super::{block::Block, gen_asm::GenTool};
+
 use crate::config::CONFIG;
 use rayon::prelude::*;
 
@@ -326,47 +327,51 @@ impl Func {
     /// compute the reg interference graph of a function
     pub fn reg_interfere_graph(f: &Func) -> Result<HashMap<Reg, HashSet<Reg>>> {
         let mut graph: HashMap<Reg, HashSet<Reg>> = HashMap::new();
-
-        // for each physical register, add it to the graph
-        let p_regs = Reg::physical_regs();
-        for p_reg in p_regs {
-            graph.insert(*p_reg, HashSet::new());
-            for other_p_reg in p_regs {
-                if p_reg != other_p_reg {
-                    graph.entry(*p_reg).or_default().insert(*other_p_reg);
+        fn add_inter(g: &mut HashMap<Reg, HashSet<Reg>>, r1: &Reg, r2: &Reg) {
+            if r1.is_virtual() || r2.is_virtual() {
+                if r1 == r2 {
+                    g.entry(*r1).or_default();
+                    return;
                 }
+                g.entry(*r1).or_default().insert(*r2);
+                g.entry(*r2).or_default().insert(*r1);
             }
         }
-
+        fn add_node(g: &mut HashMap<Reg, HashSet<Reg>>, r: &Reg) {
+            if r.is_virtual() {
+                g.entry(*r).or_default();
+            }
+        }
         // for each basic block, collect interference between regs
         let (ins, outs) = Func::in_out_bbs(f)?;
         let reg_lives = Func::reg_lives(f, &ins, &outs)?;
         // FIXME: 使用位图实现的寄存器记录表来加速运算过程，以及节省内存
         for bb in f.iter_bbs() {
             let mut alive_regs: HashSet<Reg> = reg_lives.live_outs(bb).clone();
-            for r in alive_regs.iter() {
-                if !graph.contains_key(r) {
-                    graph.insert(*r, HashSet::new());
-                }
+            for r in &alive_regs {
+                add_node(&mut graph, r);
             }
             for inst in bb.insts().iter().rev() {
-                let defs = inst.defs();
-                for reg in defs.clone() {
-                    alive_regs.remove(reg);
+                // 计算该指令处的冲突
+                // case 1: 该指令定义的寄存器与当前存活的自己以外的所有寄存器冲突
+                for r in inst.defs() {
+                    add_node(&mut graph, r);
                     for alive_reg in alive_regs.iter() {
-                        graph.entry(*reg).or_default().insert(*alive_reg);
-                        graph.entry(*alive_reg).or_default().insert(*reg);
-                    }
-                    alive_regs.insert(*reg);
-                }
-                alive_regs.retain(|r| !defs.contains(&r));
-                for reg in inst.uses() {
-                    alive_regs.insert(*reg);
-                    for alive_reg in alive_regs.iter() {
-                        graph.entry(*reg).or_default().insert(*alive_reg);
-                        graph.entry(*alive_reg).or_default().insert(*reg);
+                        add_inter(&mut graph, r, alive_reg);
                     }
                 }
+                // case 2: 该指令处使用的寄存器与(alive_regs - defs)中自己以外的所有寄存器冲突
+                for r in inst.uses().iter().filter(|r1| !inst.defs().contains(r1)) {
+                    add_node(&mut graph, r);
+                    for alive_reg in alive_regs.iter() {
+                        add_inter(&mut graph, r, alive_reg);
+                    }
+                }
+                // 然后更新存活寄存器集合 new_alive=alive_regs-defs+uses
+                alive_regs.retain(|r| !inst.defs().contains(&r));
+                alive_regs.extend(inst.uses().iter().cloned());
+
+                // dbg!(g2txt(&graph));
             }
         }
 

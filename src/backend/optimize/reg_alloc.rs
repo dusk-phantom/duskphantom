@@ -3,9 +3,11 @@ use crate::fprintln;
 use super::*;
 
 pub fn handle_reg_alloc(func: &mut Func) -> Result<()> {
+    // dbg!(&func);
     // count the interference graph
     let mut reg_graphs = Func::reg_interfere_graph(func)?;
 
+    fprintln!("log/reg_graphs.log", "{}", g2txt(&reg_graphs));
     let (colors, spills) = reg_alloc(&reg_graphs, free_iregs(), free_fregs())?;
 
     apply_colors(func, colors);
@@ -78,6 +80,19 @@ pub fn reg_alloc(
     i_colors: &[Reg],
     f_colors: &[Reg],
 ) -> Result<(HashMap<Reg, Reg>, HashSet<Reg>)> {
+    fn remove_node(g: &mut HashMap<Reg, HashSet<Reg>>, r: Reg) -> Result<()> {
+        let nbs = g.remove(&r).unwrap_or_default();
+        for nb in nbs {
+            g.get_mut(&nb)
+                .ok_or(anyhow!(
+                    "neighbors of node {} must be in the graph",
+                    r.gen_asm()
+                ))?
+                .remove(&r);
+        }
+        Ok(())
+    }
+
     let mut graph_to_simplify = graph.clone();
 
     let mut later_to_color: VecDeque<Reg> = VecDeque::new();
@@ -110,15 +125,7 @@ pub fn reg_alloc(
             break;
         }
         for r in to_remove {
-            let nbs = graph_to_simplify.remove(&r).unwrap_or_default();
-            for nb in nbs {
-                graph_to_simplify
-                    .get_mut(&nb)
-                    .ok_or_else(|| {
-                        anyhow!("neighbors of node {} must be in the graph", r.gen_asm())
-                    })?
-                    .remove(&r);
-            }
+            remove_node(&mut graph_to_simplify, r)?;
         }
     }
 
@@ -162,6 +169,28 @@ pub fn reg_alloc(
     }
 
     Ok((colors, to_spill))
+}
+
+//////////////////////////////////////////////////////
+/// some helper functions
+//////////////////////////////////////////////////////
+pub fn g2txt(g: &HashMap<Reg, HashSet<Reg>>) -> String {
+    let mut s = String::new();
+    s.push_str("{\n");
+    for (k, v) in g {
+        s.push('{');
+        s.push_str(&format!("{} -> ", k.gen_asm()));
+        let mut v = v.iter();
+        if let Some(r) = v.next() {
+            s.push_str(&r.gen_asm());
+        }
+        for r in v {
+            s.push_str(&format!(",{}", r.gen_asm()));
+        }
+        s.push_str("},\n");
+    }
+    s.push('}');
+    s
 }
 
 #[cfg(test)]
