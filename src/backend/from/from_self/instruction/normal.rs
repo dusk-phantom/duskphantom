@@ -669,25 +669,53 @@ impl IRBuilder {
             .with_context(|| context!())?;
         let mut br_insts: Vec<Inst> = Vec::new();
         if br.is_cond_br() {
-            let (cond, instrs) =
-                Self::prepare_cond(br.get_cond(), regs).with_context(|| context!())?;
-            br_insts.extend(instrs);
-            let true_bb = parent_bb
-                .get_succ_bb()
-                .first()
-                .ok_or(anyhow!("get true bb failed"))
-                .with_context(|| context!())?;
-            let true_label = Self::label_name_from(true_bb);
-            let false_bb = parent_bb
-                .get_succ_bb()
-                .get(1)
-                .ok_or(anyhow!("get false bb failed"))
-                .with_context(|| context!())?;
-            let false_label = Self::label_name_from(false_bb);
-            let beqz = BeqInst::new(cond, REG_ZERO, false_label.into());
-            let j = JmpInst::new(true_label.into());
-            br_insts.push(beqz.into());
-            br_insts.push(j.into());
+            let cond = br.get_cond();
+            if let middle::ir::Operand::Constant(con) = cond {
+                let cond: bool = match con {
+                    middle::ir::Constant::Bool(bo) => *bo,
+                    middle::ir::Constant::SignedChar(ch) => *ch != 0,
+                    middle::ir::Constant::Int(i) => *i != 0,
+                    _ => todo!(), /* middle::ir::Constant::Float(_) middle::ir::Constant::Array(_) middle::ir::Constant::Zero(_)  */
+                };
+                if cond {
+                    let true_bb = parent_bb
+                        .get_succ_bb()
+                        .first()
+                        .ok_or(anyhow!("get true bb failed"))
+                        .with_context(|| context!())?;
+                    let succ_label = Self::label_name_from(true_bb);
+                    let j = JmpInst::new(succ_label.into());
+                    br_insts.push(j.into());
+                } else {
+                    let false_bb = parent_bb
+                        .get_succ_bb()
+                        .get(1)
+                        .ok_or(anyhow!("get false bb failed"))
+                        .with_context(|| context!())?;
+                    let succ_label = Self::label_name_from(false_bb);
+                    let j = JmpInst::new(succ_label.into());
+                    br_insts.push(j.into());
+                }
+            } else {
+                let (cond, instrs) = Self::prepare_cond(cond, regs).with_context(|| context!())?;
+                br_insts.extend(instrs);
+                let true_bb = parent_bb
+                    .get_succ_bb()
+                    .first()
+                    .ok_or(anyhow!("get true bb failed"))
+                    .with_context(|| context!())?;
+                let true_label = Self::label_name_from(true_bb);
+                let false_bb = parent_bb
+                    .get_succ_bb()
+                    .get(1)
+                    .ok_or(anyhow!("get false bb failed"))
+                    .with_context(|| context!())?;
+                let false_label = Self::label_name_from(false_bb);
+                let beqz = BeqInst::new(cond, REG_ZERO, false_label.into());
+                let j = JmpInst::new(true_label.into());
+                br_insts.push(beqz.into());
+                br_insts.push(j.into());
+            }
         } else {
             let succ = parent_bb
                 .get_succ_bb()
