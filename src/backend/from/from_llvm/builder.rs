@@ -8,12 +8,24 @@ use std::collections::HashMap;
 pub struct IRBuilder;
 
 impl IRBuilder {
-    pub fn gen_from_clang(program: &clang_frontend::Program) -> Result<Program> {
-        let llvm_module = &program.llvm;
-        Self::gen_from_llvm_ir(llvm_module)
+    pub fn gen_from_ll_code(ll: &str) -> Result<Module> {
+        let ll_path = tempfile::Builder::new().suffix(".ll").tempfile()?;
+        std::fs::write(ll_path.path(), ll)?;
+        let ll_mdl = llvm_ir::Module::from_ir_path(ll_path.path())
+            .map_err(|e| anyhow!("parse llvm ir failed: {:?}", e))?;
+        Self::gen_from_llvm_ir_module(&ll_mdl)
     }
 
-    pub fn gen_from_llvm_ir(llvm_ir: &llvm_ir::Module) -> Result<Program> {
+    pub fn gen_from_clang(program: &clang_frontend::Program) -> Result<Program> {
+        let llvm_module = &program.llvm;
+        let mdl = Self::gen_from_llvm_ir_module(llvm_module)?;
+        Ok(Program {
+            entry: Some(mdl.name.clone()),
+            modules: vec![mdl],
+        })
+    }
+
+    pub fn gen_from_llvm_ir_module(llvm_ir: &llvm_ir::Module) -> Result<Module> {
         let mut global_vars = Self::build_global_var(&llvm_ir.global_vars)?;
         let mut fmms: HashMap<Fmm, FloatVar> = HashMap::new();
         let funcs = Self::build_funcs(&llvm_ir.functions, &mut fmms)?;
@@ -27,10 +39,7 @@ impl IRBuilder {
             global: global_vars,
             funcs,
         };
-        Ok(Program {
-            entry: None,
-            modules: vec![mdl],
-        })
+        Ok(mdl)
     }
 
     /**
