@@ -5,7 +5,7 @@ use crate::context;
 use super::Constant;
 
 /// Represent the type of a value.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum ValueType {
     Void,
     SignedChar,
