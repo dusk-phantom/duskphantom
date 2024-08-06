@@ -14,6 +14,16 @@ pub struct Module {
 }
 
 impl Module {
+    #[allow(dead_code)]
+    pub fn new(name: &str) -> Self {
+        Module {
+            name: name.to_string(),
+            global: vec![],
+            funcs: vec![],
+            entry: None,
+        }
+    }
+
     pub fn name(&self) -> &str {
         self.name.as_str()
     }

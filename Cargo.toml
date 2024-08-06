@@ -1,5 +1,5 @@
 [package]
-name = "hitc"
+name = "duskphantom"
 version = "0.1.0"
 edition = "2021"
 default-run = "compiler-cs"
@@ -22,6 +22,7 @@ path = "src/main_clang_llc.rs"
 [[bin]]
 name = "compiler-cs"
 path = "src/main_clang_self.rs"
+
 
 # 使用自己实现的中端导出llvm ir,使用llc作为后端
 [[bin]]

@@ -6,6 +6,8 @@ use std::collections::{HashMap, HashSet, VecDeque};
 #[allow(unused)]
 pub mod inst_combine;
 
+pub mod analyze;
+
 #[allow(unused)]
 pub mod inst_split;
 
