@@ -14,11 +14,19 @@ pub fn handle_long_jump(func: &mut Func) -> Result<()> {
 /// FIXME: test needed
 pub fn handle_single_jmp(func: &mut Func) -> Result<()> {
     let (ins, outs) = Func::in_out_bbs(func)?;
+
     let mut to_merge: HashMap<String, String> = HashMap::new();
     for bb in func.iter_bbs() {
         let outs_of_bb = outs.outs(bb);
+        if outs_of_bb.len() != 1 {
+            continue;
+        }
         if let Some(out) = outs_of_bb.first() {
-            if let Some(in_to_out) = ins.ins(out).first() {
+            let ins_of_out = ins.ins(out);
+            if ins_of_out.len() != 1 {
+                continue;
+            }
+            if let Some(in_to_out) = ins_of_out.first() {
                 if in_to_out.label() == bb.label() {
                     to_merge.insert(bb.label().to_owned(), out.label().to_owned());
                 }
@@ -150,4 +158,7 @@ mod tests {
         .size	, .-
         "###);
     }
+
+    #[test]
+    fn t3() {}
 }

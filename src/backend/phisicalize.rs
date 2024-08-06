@@ -53,6 +53,7 @@ pub fn phisicalize_func(func: &mut Func) -> Result<()> {
     handle_offset_overflows(func)?;
     fprintln!("log/handle_offset_overflows.s", "{}", func.gen_asm());
 
+    optimize::block_reorder::handle_single_jmp(func)?;
     Ok(())
 }
 
