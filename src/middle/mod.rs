@@ -29,6 +29,7 @@ pub fn optimize(program: &mut Program) {
     constant_fold::optimize_program(program).unwrap();
     deadcode_elimination::optimize_program(program).unwrap();
     simple_gvn::optimize_program(program).unwrap();
+    deadcode_elimination::optimize_program(program).unwrap();
 }
 
 impl Default for Program {
