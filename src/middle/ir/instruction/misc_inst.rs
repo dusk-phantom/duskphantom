@@ -66,7 +66,7 @@ impl IRBuilder {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
 pub enum ICmpOp {
     Eq,
     Ne,
@@ -158,7 +158,7 @@ impl Instruction for ICmp {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
 pub enum FCmpOp {
     Oeq,
     Ogt,
