@@ -45,6 +45,7 @@ pub fn optimize(program: &mut prog::Program) -> Result<()> {
 pub fn optimize_func(func: &mut Func) -> Result<()> {
     // inst split? 将一条指令拆分成多条
     inst_split::handle_mul_div_opt(func)?;
+    phisicalize::handle_illegal_inst(func)?;
     // inst_split::handle_li(func)?;
 
     // inst combine? 匹配一些模式,将多条指令合并成一条
