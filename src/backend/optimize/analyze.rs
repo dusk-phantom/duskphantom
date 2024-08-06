@@ -1,7 +1,6 @@
 use super::*;
 
 impl Block {
-    /// FIXME
     pub fn to_bbs(bb: &Block) -> Result<Vec<String>> {
         let mut tos = vec![];
         for inst in bb.insts() {
