@@ -3,8 +3,9 @@ use std::collections::{HashMap, HashSet};
 use crate::middle::ir::{BBPtr, FunPtr};
 
 pub struct DominatorTree {
-    func: FunPtr,
-    dom_map: HashMap<BBPtr, HashSet<BBPtr>>,
+    fun: FunPtr,
+    dominator_map: HashMap<BBPtr, HashSet<BBPtr>>,
+    dominatee_map: Option<HashMap<BBPtr, HashSet<BBPtr>>>,
     idom_map: Option<HashMap<BBPtr, BBPtr>>,
     df_map: Option<HashMap<BBPtr, HashSet<BBPtr>>>,
 }
@@ -13,8 +14,9 @@ pub struct DominatorTree {
 impl DominatorTree {
     pub fn new(fun: FunPtr) -> Self {
         DominatorTree {
-            func: fun,
-            dom_map: HashMap::new(),
+            fun,
+            dominator_map: HashMap::new(),
+            dominatee_map: None,
             idom_map: None,
             df_map: None,
         }
@@ -25,7 +27,7 @@ impl DominatorTree {
     }
 
     pub fn get_dominator(&mut self, dominatee: BBPtr) -> HashSet<BBPtr> {
-        match self.dom_map.get(&dominatee) {
+        match self.dominator_map.get(&dominatee) {
             Some(dom) => dom.clone(),
             None => {
                 // Traverse up dominator tree
@@ -43,19 +45,11 @@ impl DominatorTree {
         }
     }
 
-    pub fn get_dominatee(&mut self, dominator: BBPtr) -> Vec<BBPtr> {
-        self.get_idom_map()
-            .iter()
-            .filter_map(
-                |(bb, idom)| {
-                    if *idom == dominator {
-                        Some(*bb)
-                    } else {
-                        None
-                    }
-                },
-            )
-            .collect()
+    pub fn get_dominatee(&mut self, dominator: BBPtr) -> HashSet<BBPtr> {
+        self.get_dominatee_map()
+            .get(&dominator)
+            .cloned()
+            .unwrap_or_default()
     }
 
     pub fn get_idom(&mut self, dominatee: BBPtr) -> Option<BBPtr> {
@@ -73,9 +67,18 @@ impl DominatorTree {
         match self.idom_map {
             Some(ref idoms) => idoms,
             None => {
-                let entry = self.func.entry.unwrap();
-                self.idom_map = Some(get_idom_map(entry));
+                self.calculate_idom();
                 self.idom_map.as_ref().unwrap()
+            }
+        }
+    }
+
+    fn get_dominatee_map(&mut self) -> &HashMap<BBPtr, HashSet<BBPtr>> {
+        match self.dominatee_map {
+            Some(ref doms) => doms,
+            None => {
+                self.calculate_idom();
+                self.dominatee_map.as_ref().unwrap()
             }
         }
     }
@@ -84,110 +87,94 @@ impl DominatorTree {
         match self.df_map {
             Some(ref df) => df,
             None => {
-                let func = self.func;
-                let idoms = self.get_idom_map();
-                self.df_map = Some(get_df_map(func, idoms));
+                self.calculate_df();
                 self.df_map.as_ref().unwrap()
             }
         }
     }
-}
 
-/// Get dominance frontiers of each basic block in the function
-#[allow(unused)]
-fn get_df_map(fun: FunPtr, idoms: &HashMap<BBPtr, BBPtr>) -> HashMap<BBPtr, HashSet<BBPtr>> {
-    let mut df = HashMap::new();
-    for bb in fun.dfs_iter() {
-        for pred in bb.get_pred_bb() {
-            let mut runner = *pred;
+    fn calculate_idom(&mut self) {
+        let mut idom_map = HashMap::new();
+        let mut dominatee_map = HashMap::new();
+        let entry = self.fun.entry.unwrap();
+        let mut postorder_map = HashMap::new();
+        self.fun.po_iter().enumerate().for_each(|(i, bb)| {
+            postorder_map.insert(bb, i as i32);
+        });
 
-            // Hop up from each predecessor until runner is a dominator of bb
-            // For non-entry block, the first hit must be it's immediate dominator
-            // For entry block, the first hit must be itself, as doms(entry) = { entry }
-            while runner != idoms.get(&bb).copied().unwrap_or(bb) {
-                df.entry(runner).or_insert(HashSet::new()).insert(bb);
+        // Calculate idom with reverse postorder
+        for current_bb in self.fun.rpo_iter() {
+            if current_bb == entry {
+                continue;
+            }
+            let mut new_idom = None;
+            for pred in current_bb.get_pred_bb() {
+                if idom_map.contains_key(pred) {
+                    if let Some(idom) = new_idom {
+                        new_idom = Some(intersect(*pred, idom, &postorder_map, &idom_map));
+                    } else {
+                        new_idom = Some(*pred);
+                    }
+                }
+            }
+            let new_idom = new_idom.unwrap_or(entry);
+            idom_map.insert(current_bb, new_idom);
+            dominatee_map
+                .entry(new_idom)
+                .or_insert(HashSet::new())
+                .insert(current_bb);
+        }
 
-                // Only update runner if it's not dead block
-                if let Some(new_runner) = idoms.get(&runner) {
-                    runner = *new_runner;
-                } else {
-                    break;
+        // Assign idom map and dominatee map to self
+        self.idom_map = Some(idom_map);
+        self.dominatee_map = Some(dominatee_map);
+    }
+
+    fn calculate_df(&mut self) {
+        let fun = self.fun;
+        let idoms = self.get_idom_map();
+        let mut df_map = HashMap::new();
+        for bb in fun.dfs_iter() {
+            for pred in bb.get_pred_bb() {
+                let mut runner = *pred;
+
+                // Hop up from each predecessor until runner is a dominator of bb
+                // For non-entry block, the first hit must be it's immediate dominator
+                // For entry block, the first hit must be itself, as doms(entry) = { entry }
+                while runner != idoms.get(&bb).copied().unwrap_or(bb) {
+                    df_map.entry(runner).or_insert(HashSet::new()).insert(bb);
+
+                    // Only update runner if it's not dead block
+                    if let Some(new_runner) = idoms.get(&runner) {
+                        runner = *new_runner;
+                    } else {
+                        break;
+                    }
                 }
             }
         }
+
+        // Assign df map to self
+        self.df_map = Some(df_map);
     }
-    df
 }
 
-/// Get immediate dominators of each basic block in the function
-#[allow(unused)]
-fn get_idom_map(entry: BBPtr) -> HashMap<BBPtr, BBPtr> {
-    let mut idoms = HashMap::new();
-
-    /// Calculate postorder with dfs
-    fn dfs_postorder(
-        current_bb: BBPtr,
-        visited: &mut HashSet<BBPtr>,
-        postorder_map: &mut HashMap<BBPtr, i32>,
-        postorder_array: &mut Vec<BBPtr>,
-    ) {
-        if visited.contains(&current_bb) {
-            return;
+/// Function to get lowest common ancestor of two basic blocks in the dominator tree
+fn intersect(
+    mut n: BBPtr,
+    mut m: BBPtr,
+    postorder_map: &HashMap<BBPtr, i32>,
+    idoms: &HashMap<BBPtr, BBPtr>,
+) -> BBPtr {
+    while n != m {
+        while postorder_map[&n] < postorder_map[&m] {
+            n = idoms[&n];
         }
-        visited.insert(current_bb);
-        for succ in current_bb.get_succ_bb() {
-            dfs_postorder(*succ, visited, postorder_map, postorder_array);
+        while postorder_map[&m] < postorder_map[&n] {
+            m = idoms[&m];
         }
-        postorder_map.insert(current_bb, postorder_map.len() as i32);
-        postorder_array.push(current_bb);
     }
-    let mut postorder_map = HashMap::new();
-    let mut postorder_array = Vec::new();
-    dfs_postorder(
-        entry,
-        &mut HashSet::new(),
-        &mut postorder_map,
-        &mut postorder_array,
-    );
-
-    /// Function to get lowest common ancestor of two basic blocks in the dominator tree
-    fn intersect(
-        mut n: BBPtr,
-        mut m: BBPtr,
-        postorder_map: &HashMap<BBPtr, i32>,
-        idoms: &HashMap<BBPtr, BBPtr>,
-    ) -> BBPtr {
-        while n != m {
-            while postorder_map[&n] < postorder_map[&m] {
-                n = idoms[&n];
-            }
-            while postorder_map[&m] < postorder_map[&n] {
-                m = idoms[&m];
-            }
-        }
-        n
-    }
-
-    // Calculate idom with reverse postorder
-    for current_bb in postorder_array.iter().rev() {
-        if *current_bb == entry {
-            continue;
-        }
-        let mut new_idom = None;
-        for pred in current_bb.get_pred_bb() {
-            if idoms.contains_key(pred) {
-                if let Some(idom) = new_idom {
-                    new_idom = Some(intersect(*pred, idom, &postorder_map, &idoms));
-                } else {
-                    new_idom = Some(*pred);
-                }
-            }
-        }
-        idoms.insert(*current_bb, new_idom.unwrap_or(entry));
-    }
-
-    // Return idoms
-    idoms
+    n
 }
 
 #[cfg(test)]
