@@ -123,17 +123,31 @@ impl BasicBlock {
 
     /// Remove current block. This:
     /// - removes block from successor's predecessor list
-    /// - removes successor's phi argument
+    /// - removes successor's phi operand
     ///
     /// # Panics
     /// Please make sure this block is unreachable!
     pub fn remove_self(&mut self) {
-        for succ in self.succ_bbs.iter_mut() {
-            succ.pred_bbs.retain(|x| x.id != self.id);
-            for mut inst in succ.iter() {
-                if inst.get_type() == InstType::Phi {
-                    let inst = downcast_mut::<Phi>(inst.as_mut().as_mut());
-                    inst.remove_incoming_value(self.id);
+        for succ in self.succ_bbs.iter() {
+            succ.clone().remove_pred_bb(ObjPtr::new(self));
+        }
+    }
+
+    /// Remove a predecessor of this block.
+    pub fn remove_pred_bb(&mut self, pred: BBPtr) {
+        // Remove pred bb
+        self.pred_bbs.retain(|x| x.id != pred.id);
+
+        // Remove phi operand
+        for mut inst in self.iter() {
+            if inst.get_type() == InstType::Phi {
+                let inst = downcast_mut::<Phi>(inst.as_mut().as_mut());
+                inst.remove_incoming_value(pred.id);
+
+                // If phi has only one operand, replace with the operand
+                if inst.get_incoming_values().len() == 1 {
+                    let only_op = inst.get_incoming_values()[0].0.clone();
+                    inst.replace_self(&only_op);
                 }
             }
         }
@@ -141,10 +155,10 @@ impl BasicBlock {
 
     /// Replace successor with given mapping.
     pub fn replace_succ_bb(&mut self, from: BBPtr, to: BBPtr) {
-        if !self.succ_bbs.is_empty() && self.succ_bbs[0] == from {
+        if !self.succ_bbs.is_empty() && self.succ_bbs[0].id == from.id {
             self.set_true_bb(to);
         }
-        if self.succ_bbs.len() >= 2 && self.succ_bbs[1] == from {
+        if self.succ_bbs.len() >= 2 && self.succ_bbs[1].id == from.id {
             self.set_false_bb(to);
         }
     }
@@ -156,7 +170,7 @@ impl BasicBlock {
             self.succ_bbs.push(bb);
         } else {
             let mut next = self.succ_bbs[0];
-            next.pred_bbs.retain(|x| x.id != self.id);
+            next.remove_pred_bb(self_ptr);
             self.succ_bbs[0] = bb;
         }
         bb.pred_bbs.push(self_ptr);
@@ -172,7 +186,7 @@ impl BasicBlock {
             self.succ_bbs.push(bb);
         } else {
             let mut next = self.succ_bbs[1];
-            next.pred_bbs.retain(|x| x.id != self.id);
+            next.remove_pred_bb(self_ptr);
             self.succ_bbs[1] = bb;
         }
         bb.pred_bbs.push(self_ptr);
@@ -181,10 +195,22 @@ impl BasicBlock {
     /// Remove basic block to jump to when the condition is false.
     /// This will only execute when false bb exists.
     pub fn remove_false_bb(&mut self) {
+        let self_ptr = ObjPtr::new(self);
         if self.succ_bbs.len() == 2 {
             let mut next = self.succ_bbs[1];
-            next.pred_bbs.retain(|x| x.id != self.id);
+            next.remove_pred_bb(self_ptr);
             self.succ_bbs.pop();
+        }
+    }
+
+    /// Remove basic block to jump to when the condition is true.
+    /// This will only execute when false bb exists.
+    pub fn remove_true_bb(&mut self) {
+        let self_ptr = ObjPtr::new(self);
+        if self.succ_bbs.len() == 2 {
+            let mut next = self.succ_bbs[0];
+            next.remove_pred_bb(self_ptr);
+            self.succ_bbs.remove(0);
         }
     }
 

@@ -275,11 +275,13 @@ impl Phi {
         }
     }
     pub fn remove_incoming_value(&mut self, pred_id: usize) {
-        let index = self
+        let Some(index) = self
             .incoming_values
             .iter()
             .position(|(_, p)| p.id == pred_id)
-            .unwrap();
+        else {
+            return;
+        };
         self.incoming_values.remove(index);
         unsafe {
             self.get_manager_mut().remove_operand(index);

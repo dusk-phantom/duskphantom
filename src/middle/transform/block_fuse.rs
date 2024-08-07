@@ -43,7 +43,7 @@ impl<'a> BlockFuse<'a> {
     /// these two blocks can be fused as one.
     fn fuse_block(&mut self, mut bb: BBPtr, mut fun: FunPtr) {
         if bb.get_pred_bb().len() == 1 {
-            let pred = bb.get_pred_bb()[0];
+            let mut pred = bb.get_pred_bb()[0];
             if pred.get_succ_bb().len() == 1 {
                 // Last instruction is "br", move the rest to successor block
                 for inst in pred.iter_rev().skip(1) {
@@ -60,6 +60,9 @@ impl<'a> BlockFuse<'a> {
                 if fun.entry == Some(pred) {
                     fun.entry = Some(bb);
                 }
+
+                // Remove pred
+                pred.remove_self();
             }
         }
     }
