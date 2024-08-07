@@ -1,10 +1,5 @@
 use super::*;
 
-pub fn handle_long_jump(func: &mut Func) -> Result<()> {
-    // FIXME
-    Ok(())
-}
-
 #[allow(unused)]
 /// FIXME: test needed
 pub fn handle_single_jmp(func: &mut Func) -> Result<()> {

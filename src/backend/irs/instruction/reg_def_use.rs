@@ -121,8 +121,6 @@ impl RegDefs for LlaInst {
     }
 }
 
-impl RegUses for JmpInst {}
-impl RegDefs for JmpInst {}
 impl RegUses for LdInst {
     fn uses(&self) -> Vec<&Reg> {
         vec![self.base()]
