@@ -68,7 +68,8 @@ impl<'a> InstCombine<'a> {
         let inst_type = inst.get_type();
 
         // Useless instruction elimination:
-        // x + 0, x - 0, x * 1, x / 1, x >> 0, x << 0, 0 / x, x * 0, phi x, ..., x
+        // x + 0, x - 0, x * 1, x / 1, x >> 0, x << 0,
+        // 0 / x, x * 0, phi x, ..., x, br true, ...
         match inst_type {
             InstType::Add | InstType::Sub => {
                 let lhs = inst.get_operand()[0].clone();
@@ -140,6 +141,24 @@ impl<'a> InstCombine<'a> {
                 let all_same = inst.get_operand().iter().all(|op| *op == first);
                 if all_same {
                     inst.replace_self(&first);
+                    return;
+                }
+            }
+            InstType::Br => {
+                let cond = inst.get_operand().first().cloned();
+                if let Some(Operand::Constant(Constant::Bool(cond))) = cond {
+                    // Rewire basic block
+                    let mut parent_bb = inst.get_parent_bb().unwrap();
+                    let false_bb = parent_bb.get_succ_bb()[1];
+                    parent_bb.remove_false_bb();
+                    if !cond {
+                        parent_bb.set_true_bb(false_bb);
+                    }
+
+                    // Replace instruction with unconditional jump
+                    let new_inst = self.program.mem_pool.get_br(None);
+                    inst.insert_after(new_inst);
+                    inst.remove_self();
                     return;
                 }
             }

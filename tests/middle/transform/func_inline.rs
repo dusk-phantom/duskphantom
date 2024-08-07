@@ -6,7 +6,9 @@ pub mod tests_func_inline {
         frontend::parse,
         middle::{
             irgen::gen,
-            transform::{constant_fold, deadcode_elimination, func_inline, mem2reg},
+            transform::{
+                block_fuse, constant_fold, deadcode_elimination, func_inline, inst_combine, mem2reg,
+            },
         },
         utils::diff::diff,
     };
@@ -30,12 +32,16 @@ pub mod tests_func_inline {
         let parsed = parse(code).unwrap();
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
+        constant_fold::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
         deadcode_elimination::optimize_program(&mut program).unwrap();
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
         func_inline::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
+        block_fuse::optimize_program(&mut program).unwrap();
         deadcode_elimination::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
@@ -54,54 +60,49 @@ pub mod tests_func_inline {
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @func(i32 %n) {
-        entry:
-        call void @putint(i32 %n)
-        br label %exit
-
+        [-] entry:
+        [-] call void @putint(i32 %n)
+        [-] br label %exit
+        [-] 
         exit:
+        [+] call void @putint(i32 %n)
         ret i32 %n
 
 
         }
         define i32 @main() {
-        entry:
-        %call_18 = call i32 @getint()
-        br label %cond0
-
+        [-] entry:
+        [-] %call_18 = call i32 @getint()
+        [-] br label %cond0
+        [-] 
         cond0:
+        [+] %call_18 = call i32 @getint()
         %icmp_26 = icmp sgt i32 %call_18, 10
-        br i1 %icmp_26, label %alt4, label %final5
+        [-] br i1 %icmp_26, label %alt4, label %final5
+        [+] br i1 %icmp_26, label %alt4_split2, label %final5
 
-        alt4:
+        [-] alt4:
         [-] %call_31 = call i32 @func(i32 %call_18)
         [-] %icmp_32 = icmp ne i32 %call_31, 0
-        [-] br label %final5
-        [+] br label %entry_inline0
+        [+] alt4_split2:
+        [+] call void @putint(i32 %call_18)
+        [+] %icmp_32 = icmp ne i32 %call_18, 0
+        br label %final5
 
         final5:
         [-] %phi_34 = phi i1 [false, %cond0], [%icmp_32, %alt4]
         [+] %phi_34 = phi i1 [false, %cond0], [%icmp_32, %alt4_split2]
         br i1 %phi_34, label %then1, label %alt2
 
-        [+] entry_inline0:
-        [+] call void @putint(i32 %call_18)
-        [+] br label %exit_inline1
-        [+] 
         then1:
-        br label %final3
+        [-] br label %final3
+        [+] br label %exit
 
         alt2:
-        br label %final3
-
-        [+] exit_inline1:
-        [+] br label %alt4_split2
-        [+] 
-        final3:
+        [-] br label %final3
+        [-] 
+        [-] final3:
         br label %exit
-        [+] 
-        [+] alt4_split2:
-        [+] %icmp_32 = icmp ne i32 %call_18, 0
-        [+] br label %final5
 
         exit:
         ret i32 0
@@ -127,12 +128,16 @@ pub mod tests_func_inline {
         let parsed = parse(code).unwrap();
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
+        constant_fold::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
         deadcode_elimination::optimize_program(&mut program).unwrap();
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
         func_inline::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
+        block_fuse::optimize_program(&mut program).unwrap();
         deadcode_elimination::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
@@ -151,59 +156,43 @@ pub mod tests_func_inline {
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @f(i32 %x) {
-        entry:
-        br label %cond0
-
+        [-] entry:
+        [-] br label %cond0
+        [-] 
         cond0:
         %icmp_13 = icmp sgt i32 %x, 5
-        br i1 %icmp_13, label %then1, label %alt2
+        [-] br i1 %icmp_13, label %then1, label %alt2
+        [+] br i1 %icmp_13, label %then1, label %final3
 
         then1:
         %Add_16 = add i32 %x, 1
         br label %exit
 
-        alt2:
-        br label %final3
+        [-] alt2:
+        [-] br label %final3
+        [+] final3:
+        [+] %Add_21 = add i32 %x, 2
+        [+] br label %exit
 
         exit:
         %phi_32 = phi i32 [%Add_16, %then1], [%Add_21, %final3]
         ret i32 %phi_32
 
-        final3:
-        %Add_21 = add i32 %x, 2
-        br label %exit
+        [-] final3:
+        [-] %Add_21 = add i32 %x, 2
+        [-] br label %exit
 
-
+        [-] 
         }
         define i32 @main() {
-        entry:
+        [-] entry:
         [-] %call_29 = call i32 @f(i32 5)
-        [+] br label %entry_inline0
-        [+] 
-        [+] entry_inline0:
-        [+] br label %cond0_inline1
-        [+] 
-        [+] cond0_inline1:
-        [+] br i1 false, label %then1_inline5, label %alt2_inline2
-        [+] 
-        [+] then1_inline5:
-        [+] br label %exit_inline4
-        [+] 
-        [+] alt2_inline2:
-        [+] br label %final3_inline3
-        [+] 
-        [+] exit_inline4:
-        [+] %phi_44 = phi i32 [6, %then1_inline5], [7, %final3_inline3]
-        [+] br label %entry_split6
-        [+] 
         [+] final3_inline3:
-        [+] br label %exit_inline4
-        [+] 
-        [+] entry_split6:
         br label %exit
 
         exit:
         [-] ret i32 %call_29
+        [+] %phi_44 = phi i32 [6, %then1_inline5], [7, %final3_inline3]
         [+] ret i32 %phi_44
 
 
@@ -226,12 +215,16 @@ pub mod tests_func_inline {
         let parsed = parse(code).unwrap();
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
+        constant_fold::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
         deadcode_elimination::optimize_program(&mut program).unwrap();
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
         func_inline::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
+        block_fuse::optimize_program(&mut program).unwrap();
         deadcode_elimination::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
@@ -250,29 +243,21 @@ pub mod tests_func_inline {
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @f(i32 %x) {
-        entry:
-        %Add_8 = add i32 %x, 1
-        br label %exit
-
+        [-] entry:
+        [-] %Add_8 = add i32 %x, 1
+        [-] br label %exit
+        [-] 
         exit:
+        [+] %Add_8 = add i32 %x, 1
         ret i32 %Add_8
 
 
         }
         define i32 @main() {
-        entry:
+        [-] entry:
         [-] %call_16 = call i32 @f(i32 5)
-        [+] br label %entry_inline0
-        [+] 
-        [+] entry_inline0:
-        [+] br label %exit_inline1
-        [+] 
-        [+] exit_inline1:
-        [+] br label %entry_split2
-        [+] 
-        [+] entry_split2:
-        br label %exit
-
+        [-] br label %exit
+        [-] 
         exit:
         [-] ret i32 %call_16
         [+] ret i32 6

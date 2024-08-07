@@ -1,3 +1,4 @@
+mod block_fuse;
 mod constant_fold;
 mod deadcode_elimination;
 mod func_inline;
