@@ -4,7 +4,7 @@ use std::{
 };
 
 pub trait Node: Eq + Hash + Clone {
-    fn get_succ(&self) -> Vec<Self>;
+    fn get_succ(&mut self) -> Vec<Self>;
 }
 
 /// Postorder iterator.
@@ -76,7 +76,7 @@ where
 }
 
 /// Run a complete post order traversal.
-fn run_postorder<T>(bb: T, visited: &mut HashSet<T>, container: &mut Vec<T>)
+fn run_postorder<T>(mut bb: T, visited: &mut HashSet<T>, container: &mut Vec<T>)
 where
     T: Node,
 {

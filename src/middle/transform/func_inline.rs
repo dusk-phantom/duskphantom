@@ -5,13 +5,19 @@ use anyhow::Result;
 use crate::{
     backend::from_self::downcast_ref,
     middle::{
+        analysis::call_graph::CallGraph,
         ir::{
-            instruction::{misc_inst::Call, terminator_inst::Ret, InstType},
+            instruction::{misc_inst::Call, InstType},
             BBPtr, FunPtr, InstPtr, Instruction, Operand, ParaPtr,
         },
         Program,
     },
 };
+
+pub fn optimize_program(program: &mut Program) -> Result<()> {
+    FuncInline::new(program).run();
+    Ok(())
+}
 
 struct FuncInline<'a> {
     program: &'a mut Program,
@@ -19,10 +25,18 @@ struct FuncInline<'a> {
 }
 
 impl<'a> FuncInline<'a> {
-    fn unique_name(&mut self, base_name: String) -> String {
-        let name = format!("inline_{}_{}", base_name, self.counter);
-        self.counter += 1;
-        name
+    fn new(program: &'a mut Program) -> Self {
+        Self {
+            program,
+            counter: 0,
+        }
+    }
+
+    fn run(&mut self) {
+        let call_graph = CallGraph::new(self.program);
+        for node in call_graph.po_iter() {
+            self.process_func(node.fun);
+        }
     }
 
     fn process_func(&mut self, fun: FunPtr) {
@@ -136,5 +150,11 @@ impl<'a> FuncInline<'a> {
 
         // Return new function
         new_func
+    }
+
+    fn unique_name(&mut self, base_name: String) -> String {
+        let name = format!("inline_{}_{}", base_name, self.counter);
+        self.counter += 1;
+        name
     }
 }

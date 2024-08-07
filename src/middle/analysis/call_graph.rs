@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::{
     backend::from_self::downcast_ref,
     middle::{
@@ -10,34 +12,65 @@ use crate::{
     utils::traverse::{Node, POIterator},
 };
 
-pub fn build_call_graph(program: &Program) -> POIterator<CallGraphNode> {
-    let main_fun = program
-        .module
-        .functions
-        .iter()
-        .find(|f| f.name == "main")
-        .cloned()
-        .unwrap();
-    let node = CallGraphNode { fun: main_fun };
-    node.into()
+pub struct CallGraph {
+    main_fun: FunPtr,
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct CallGraphNode {
-    fun: FunPtr,
+impl CallGraph {
+    pub fn new(program: &Program) -> Self {
+        let main_fun = program
+            .module
+            .functions
+            .iter()
+            .find(|f| f.name == "main")
+            .cloned()
+            .unwrap();
+        Self { main_fun }
+    }
+
+    pub fn po_iter<'a>(&'a self) -> impl Iterator<Item = CallGraphNode<'a>> {
+        let node = CallGraphNode {
+            fun: self.main_fun,
+            context: self,
+        };
+        POIterator::from(node)
+    }
 }
 
-impl Node for CallGraphNode {
-    fn get_succ(&self) -> Vec<Self> {
-        let mut result = Vec::new();
+#[derive(Clone)]
+pub struct CallGraphNode<'a> {
+    pub fun: FunPtr,
+    context: &'a CallGraph,
+}
+
+impl<'a> PartialEq for CallGraphNode<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        self.fun == other.fun
+    }
+}
+
+impl<'a> Eq for CallGraphNode<'a> {}
+
+impl<'a> std::hash::Hash for CallGraphNode<'a> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.fun.hash(state);
+    }
+}
+
+impl<'a> Node for CallGraphNode<'a> {
+    fn get_succ(&mut self) -> Vec<Self> {
+        let mut result = HashSet::new();
         for bb in self.fun.dfs_iter() {
             for inst in bb.iter() {
                 if inst.get_type() == InstType::Call {
                     let call = downcast_ref::<Call>(inst.as_ref().as_ref());
-                    result.push(CallGraphNode { fun: call.func });
+                    result.insert(CallGraphNode {
+                        fun: call.func,
+                        context: self.context,
+                    });
                 }
             }
         }
-        result
+        result.into_iter().collect()
     }
 }
