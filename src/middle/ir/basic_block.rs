@@ -1,3 +1,5 @@
+use instruction::{downcast_mut, misc_inst::Phi, InstType};
+
 use super::*;
 
 pub type BBPtr = ObjPtr<BasicBlock>;
@@ -119,6 +121,24 @@ impl BasicBlock {
         &self.succ_bbs
     }
 
+    /// Remove current block. This:
+    /// - removes block from successor's predecessor list
+    /// - removes successor's phi argument
+    ///
+    /// # Panics
+    /// Please make sure this block is unreachable!
+    pub fn remove_self(&mut self) {
+        for succ in self.succ_bbs.iter_mut() {
+            succ.pred_bbs.retain(|x| x.id != self.id);
+            for mut inst in succ.iter() {
+                if inst.get_type() == InstType::Phi {
+                    let inst = downcast_mut::<Phi>(inst.as_mut().as_mut());
+                    inst.remove_incoming_value(self.id);
+                }
+            }
+        }
+    }
+
     /// Replace successor with given mapping.
     pub fn replace_succ_bb(&mut self, from: BBPtr, to: BBPtr) {
         if !self.succ_bbs.is_empty() && self.succ_bbs[0] == from {
@@ -136,7 +156,7 @@ impl BasicBlock {
             self.succ_bbs.push(bb);
         } else {
             let mut next = self.succ_bbs[0];
-            next.pred_bbs.retain(|x| *x != self_ptr);
+            next.pred_bbs.retain(|x| x.id != self.id);
             self.succ_bbs[0] = bb;
         }
         bb.pred_bbs.push(self_ptr);
@@ -152,7 +172,7 @@ impl BasicBlock {
             self.succ_bbs.push(bb);
         } else {
             let mut next = self.succ_bbs[1];
-            next.pred_bbs.retain(|x| *x != self_ptr);
+            next.pred_bbs.retain(|x| x.id != self.id);
             self.succ_bbs[1] = bb;
         }
         bb.pred_bbs.push(self_ptr);
@@ -161,10 +181,9 @@ impl BasicBlock {
     /// Remove basic block to jump to when the condition is false.
     /// This will only execute when false bb exists.
     pub fn remove_false_bb(&mut self) {
-        let self_ptr = ObjPtr::new(self);
         if self.succ_bbs.len() == 2 {
             let mut next = self.succ_bbs[1];
-            next.pred_bbs.retain(|x| *x != self_ptr);
+            next.pred_bbs.retain(|x| x.id != self.id);
             self.succ_bbs.pop();
         }
     }
