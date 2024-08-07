@@ -486,7 +486,7 @@ impl InstManager {
     /// For example, if len(operand) == 1 and index == 3,
     /// it will just append operand to the end, so len(operand) == 2.
     pub unsafe fn set_operand(&mut self, index: usize, operand: Operand) {
-        if index > self.operand.len() {
+        if index >= self.operand.len() {
             self.add_operand(operand);
             return;
         }

@@ -99,6 +99,12 @@ impl Instruction for Br {
                 next_bb[1].name
             )
         } else {
+            if next_bb.is_empty() {
+                panic!(
+                    "basic block {} has no successor but ends with br",
+                    parent_bb.name
+                );
+            }
             format!("br label %{}", next_bb[0].name)
         }
     }
