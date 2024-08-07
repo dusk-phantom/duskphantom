@@ -10,7 +10,6 @@ pub struct ProgramKit<'a> {
     pub env: FrameMap<'a, String, Value>,
     pub fun_env: FrameMap<'a, String, FunPtr>,
     pub program: &'a mut middle::Program,
-    pub counter: &'a mut usize,
 }
 
 /// A program kit (top level) can generate declarations
@@ -24,12 +23,5 @@ impl<'a> ProgramKit<'a> {
             self.gen_impl(decl)?;
         }
         Ok(())
-    }
-
-    /// Generate a unique basic block name
-    pub fn unique_name(&mut self, base: &str) -> String {
-        let name = format!("{}{}", base, self.counter);
-        *self.counter += 1;
-        name
     }
 }

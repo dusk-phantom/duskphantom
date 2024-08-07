@@ -19,12 +19,10 @@ mod value;
 /// Generate middle IR from a frontend AST
 pub fn gen(program: &frontend::Program) -> Result<middle::Program> {
     let mut result = middle::Program::new();
-    let mut counter = 0;
     ProgramKit {
         program: &mut result,
         env: FrameMap::new(),
         fun_env: FrameMap::new(),
-        counter: &mut counter,
     }
     .gen(program)?;
     Ok(result)
