@@ -185,8 +185,11 @@ pub fn phisicalize_reg(func: &mut Func) -> Result<()> {
 }
 
 /// you must make sure func 's each bb has at most two successors
+/// this func will turn a long direct jump to a redirect jump using a mid reg
 #[allow(unused)]
-pub fn handle_long_jump(func: &mut Func, mid_reg: &Reg) -> Result<()> {
+/// FIXME: 还没考虑处理完长跳转后产生新的长跳转的情况
+/// 不过如果输入的func满足最多最后两条指令是跳转指令,那么处理长跳转的过程中不会产生新的长跳转
+pub fn handle_long_jump(func: &mut Func, mid_reg: &Reg, dis_limit: usize) -> Result<()> {
     let mut bb_idx_for_long_jmp = 0;
     let f_name = func.name().to_string();
     let mut new_label = || {
@@ -197,23 +200,11 @@ pub fn handle_long_jump(func: &mut Func, mid_reg: &Reg) -> Result<()> {
     let dis_counter = func.bb_distances();
 
     let mut to_add_afters: HashMap<String, Vec<Block>> = HashMap::new();
-    macro_rules! handle_long_jmp_for_jmp {
-        ($jmp:expr,$mid_reg:expr,$dis_counter:expr,$bb_name:expr) => {
-            match $jmp {
-                JmpInst::Long(_, _) => {}
-                JmpInst::Short(dst) => {
-                    let to_bb: Label = dst.clone().try_into()?;
-                    if $dis_counter.distance_between($bb_name, &to_bb).unwrap() > 200_000 {
-                        $jmp.set_long(*$mid_reg);
-                    }
-                }
-            }
-        };
-    }
+
     macro_rules! handle_long_jmp_for_branch {
-        ($branch_inst:ident,$new_label_func:ident,$dis_counter:ident,$mid_reg:ident,$to_add_after:ident,$bb_name:ident) => {
+        ($branch_inst:ident,$new_label_func:ident,$dis_counter:ident,$mid_reg:ident,$to_add_after:ident,$bb_name:ident,$dis_limit:expr) => {{
             let target = $branch_inst.label().clone();
-            if $dis_counter.distance_between(&$bb_name, &target).unwrap() > 200_000 {
+            if $dis_counter.distance_between(&$bb_name, &target).unwrap() > $dis_limit {
                 let n = new_label();
                 *$branch_inst.label_mut() = n.clone().into();
 
@@ -224,7 +215,7 @@ pub fn handle_long_jump(func: &mut Func, mid_reg: &Reg) -> Result<()> {
 
                 $to_add_after.push(new_bb);
             }
-        };
+        }};
     }
     for bb in func.iter_bbs_mut() {
         let bb_name = bb.label().to_string();
@@ -235,71 +226,65 @@ pub fn handle_long_jump(func: &mut Func, mid_reg: &Reg) -> Result<()> {
                     JmpInst::Long(_, _) => {}
                     JmpInst::Short(dst) => {
                         let to_bb: Label = dst.clone().try_into()?;
-                        if dis_counter.distance_between(&bb_name, &to_bb).unwrap() > 200_000 {
+                        if dis_counter.distance_between(&bb_name, &to_bb).unwrap() > dis_limit {
                             jmp.set_long(*mid_reg);
                         }
                     }
                 },
-                Inst::Beq(beq) => {
-                    handle_long_jmp_for_branch!(
-                        beq,
-                        new_label,
-                        dis_counter,
-                        mid_reg,
-                        add_after,
-                        bb_name
-                    );
-                }
-                Inst::Bne(bne) => {
-                    handle_long_jmp_for_branch!(
-                        bne,
-                        new_label,
-                        dis_counter,
-                        mid_reg,
-                        add_after,
-                        bb_name
-                    );
-                }
-                Inst::Bge(bge) => {
-                    handle_long_jmp_for_branch!(
-                        bge,
-                        new_label,
-                        dis_counter,
-                        mid_reg,
-                        add_after,
-                        bb_name
-                    );
-                }
-                Inst::Bgt(bgt) => {
-                    handle_long_jmp_for_branch!(
-                        bgt,
-                        new_label,
-                        dis_counter,
-                        mid_reg,
-                        add_after,
-                        bb_name
-                    );
-                }
-                Inst::Ble(ble) => {
-                    handle_long_jmp_for_branch!(
-                        ble,
-                        new_label,
-                        dis_counter,
-                        mid_reg,
-                        add_after,
-                        bb_name
-                    );
-                }
-                Inst::Blt(blt) => {
-                    handle_long_jmp_for_branch!(
-                        blt,
-                        new_label,
-                        dis_counter,
-                        mid_reg,
-                        add_after,
-                        bb_name
-                    );
-                }
+                Inst::Beq(beq) => handle_long_jmp_for_branch!(
+                    beq,
+                    new_label,
+                    dis_counter,
+                    mid_reg,
+                    add_after,
+                    bb_name,
+                    dis_limit
+                ),
+                Inst::Bne(bne) => handle_long_jmp_for_branch!(
+                    bne,
+                    new_label,
+                    dis_counter,
+                    mid_reg,
+                    add_after,
+                    bb_name,
+                    dis_limit
+                ),
+                Inst::Bge(bge) => handle_long_jmp_for_branch!(
+                    bge,
+                    new_label,
+                    dis_counter,
+                    mid_reg,
+                    add_after,
+                    bb_name,
+                    dis_limit
+                ),
+                Inst::Bgt(bgt) => handle_long_jmp_for_branch!(
+                    bgt,
+                    new_label,
+                    dis_counter,
+                    mid_reg,
+                    add_after,
+                    bb_name,
+                    dis_limit
+                ),
+                Inst::Ble(ble) => handle_long_jmp_for_branch!(
+                    ble,
+                    new_label,
+                    dis_counter,
+                    mid_reg,
+                    add_after,
+                    bb_name,
+                    dis_limit
+                ),
+                Inst::Blt(blt) => handle_long_jmp_for_branch!(
+                    blt,
+                    new_label,
+                    dis_counter,
+                    mid_reg,
+                    add_after,
+                    bb_name,
+                    dis_limit
+                ),
                 _ => {}
             }
         }

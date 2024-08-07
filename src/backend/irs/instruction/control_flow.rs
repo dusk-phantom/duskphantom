@@ -109,8 +109,8 @@ impl JmpInst {
                 let dst = dst.gen_asm();
                 let mid_reg = mid_reg.gen_asm();
                 let mut asm = String::new();
-                asm.push_str(&format!("auipc {}, %pcrel_hi({})", mid_reg, dst));
-                asm.push_str(&format!("jalr zero, {}, %pcrel_lo({})", mid_reg, dst));
+                asm.push_str(&format!("lla {},{}\n", mid_reg, dst));
+                asm.push_str(&format!("jalr zero,{},0", mid_reg));
                 asm
             }
         }
