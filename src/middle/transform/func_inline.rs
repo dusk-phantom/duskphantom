@@ -112,7 +112,7 @@ impl<'a> FuncInline<'a> {
     fn mirror_func(&mut self, fun: FunPtr, arg_map: HashMap<ParaPtr, Operand>) -> FunPtr {
         let mut inst_map: HashMap<InstPtr, InstPtr> = HashMap::new();
         let mut block_map: HashMap<BBPtr, BBPtr> = HashMap::new();
-        let mut new_func = self
+        let mut new_fun = self
             .program
             .mem_pool
             .new_function(String::new(), fun.return_type.clone());
@@ -133,12 +133,12 @@ impl<'a> FuncInline<'a> {
         }
 
         // Set entry and exit for new function
-        new_func.entry = block_map.get(&fun.entry.unwrap()).cloned();
-        new_func.exit = block_map.get(&fun.exit.unwrap()).cloned();
+        new_fun.entry = block_map.get(&fun.entry.unwrap()).cloned();
+        new_fun.exit = block_map.get(&fun.exit.unwrap()).cloned();
 
         // Replace operand to local instruction and inlined argument
         // Safety: new and old instruction set does not overlap, so set_operand is safe
-        for bb in new_func.dfs_iter() {
+        for bb in new_fun.dfs_iter() {
             for inst in bb.iter() {
                 for (ix, op) in inst.get_operand().iter().enumerate() {
                     if let Operand::Instruction(old_inst) = op {
@@ -153,19 +153,21 @@ impl<'a> FuncInline<'a> {
         }
 
         // Replace succ bb
-        for bb in new_func.dfs_iter() {
+        for bb in fun.dfs_iter() {
             let mut new_bb = block_map.get(&bb).cloned().unwrap();
             let succ_bb = bb.get_succ_bb();
             if !succ_bb.is_empty() {
-                new_bb.set_true_bb(block_map.get(&succ_bb[0]).cloned().unwrap());
+                let new_succ = block_map.get(&succ_bb[0]).cloned().unwrap();
+                new_bb.set_true_bb(new_succ);
             }
             if succ_bb.len() >= 2 {
-                new_bb.set_false_bb(block_map.get(&succ_bb[1]).cloned().unwrap());
+                let new_succ = block_map.get(&succ_bb[1]).cloned().unwrap();
+                new_bb.set_false_bb(new_succ);
             }
         }
 
         // Return new function
-        new_func
+        new_fun
     }
 
     fn unique_name(&mut self, base_name: String) -> String {
