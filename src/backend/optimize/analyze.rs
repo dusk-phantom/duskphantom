@@ -32,7 +32,7 @@ impl Func {
     pub fn bbs_graph_to_dot(&self) -> String {
         let successors = self.successors().unwrap();
         let mut dot = String::new();
-        dot.push_str("digraph {\n");
+        dot.push_str("digraph bbs{\n");
         for (from, tos) in successors {
             for to in tos {
                 dot.push_str(&format!("\"{}\" -> \"{}\";\n", from, to));
@@ -184,7 +184,6 @@ impl Func {
 
     /// compute the reg interference graph of a function
     pub fn reg_interfere_graph(f: &Func) -> Result<HashMap<Reg, HashSet<Reg>>> {
-        let mut graph: HashMap<Reg, HashSet<Reg>> = HashMap::new();
         fn add_inter(g: &mut HashMap<Reg, HashSet<Reg>>, r1: &Reg, r2: &Reg) {
             if r1.is_virtual() || r2.is_virtual() {
                 if r1 == r2 {
@@ -201,9 +200,9 @@ impl Func {
             }
         }
         // for each basic block, collect interference between regs
-
+        let mut graph: HashMap<Reg, HashSet<Reg>> = HashMap::new();
         let reg_lives = Func::reg_lives(f)?;
-        dbg!(&reg_lives);
+        // dbg!(&reg_lives);
         // FIXME: 使用位图实现的寄存器记录表来加速运算过程，以及节省内存
         for bb in f.iter_bbs() {
             let mut alive_regs: HashSet<Reg> = reg_lives.live_outs(bb).clone();
