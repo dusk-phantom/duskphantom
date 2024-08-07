@@ -64,10 +64,9 @@ pub fn optimize_func(func: &mut Func) -> Result<()> {
     // processing caller-save and callee-save
     caller_callee::handle_caller_callee(func)?;
 
-    // block reordering
-    block_reorder::handle_block_reordering(func)?;
-
     // processing stack frame's opening and closing
     stack::handle_stack(func)?;
+
+    block_reorder::handle_single_jmp(func)?;
     Ok(())
 }
