@@ -152,6 +152,18 @@ impl<'a> FuncInline<'a> {
             }
         }
 
+        // Replace succ bb
+        for bb in new_func.dfs_iter() {
+            let mut new_bb = block_map.get(&bb).cloned().unwrap();
+            let succ_bb = bb.get_succ_bb();
+            if !succ_bb.is_empty() {
+                new_bb.set_true_bb(block_map.get(&succ_bb[0]).cloned().unwrap());
+            }
+            if succ_bb.len() >= 2 {
+                new_bb.set_false_bb(block_map.get(&succ_bb[1]).cloned().unwrap());
+            }
+        }
+
         // Return new function
         new_func
     }
