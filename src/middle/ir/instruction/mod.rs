@@ -74,7 +74,7 @@ pub trait Instruction: Display {
 
     /// # Safety
     /// Do not call this function directly
-    unsafe fn copy_self(&self) -> Box<dyn Instruction>;
+    fn copy_self(&self) -> Box<dyn Instruction>;
 
     /// Returns the type of current instruction.
     fn get_type(&self) -> InstType;
@@ -482,8 +482,14 @@ impl InstManager {
 impl InstManager {
     /// # Safety
     ///
-    /// FIXME: explain why it is unsafe,and describe the safety requirements
+    /// If index is out of bounds, it will behave as `add`.
+    /// For example, if len(operand) == 1 and index == 3,
+    /// it will just append operand to the end, so len(operand) == 2.
     pub unsafe fn set_operand(&mut self, index: usize, operand: Operand) {
+        if index > self.operand.len() {
+            self.add_operand(operand);
+            return;
+        }
         match self.operand[index] {
             Operand::Instruction(mut inst) => {
                 inst.get_user_mut().retain(|x| x != &self.self_ptr.unwrap());

@@ -28,7 +28,7 @@ impl CallGraph {
         Self { main_fun }
     }
 
-    pub fn po_iter<'a>(&'a self) -> impl Iterator<Item = CallGraphNode<'a>> {
+    pub fn po_iter(&self) -> impl Iterator<Item = CallGraphNode<'_>> {
         let node = CallGraphNode {
             fun: self.main_fun,
             context: self,

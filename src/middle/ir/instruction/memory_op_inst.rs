@@ -166,7 +166,7 @@ impl Instruction for Alloca {
         )
     }
 
-    unsafe fn copy_self(&self) -> Box<dyn Instruction> {
+    fn copy_self(&self) -> Box<dyn Instruction> {
         Box::new(Alloca {
             value_type: self.value_type.clone(),
             num_elements: self.num_elements,
@@ -216,12 +216,10 @@ impl Instruction for Load {
         )
     }
 
-    unsafe fn copy_self(&self) -> Box<dyn Instruction> {
-        let mut inst = Box::new(Load {
+    fn copy_self(&self) -> Box<dyn Instruction> {
+        Box::new(Load {
             manager: InstManager::new(self.get_value_type()),
-        });
-        inst.get_manager_mut().add_operand(self.get_ptr().clone());
-        inst
+        })
     }
 }
 
@@ -285,13 +283,10 @@ impl Instruction for Store {
         )
     }
 
-    unsafe fn copy_self(&self) -> Box<dyn Instruction> {
-        let mut inst = Box::new(Store {
+    fn copy_self(&self) -> Box<dyn Instruction> {
+        Box::new(Store {
             manager: InstManager::new(ValueType::Void),
-        });
-        inst.get_manager_mut().add_operand(self.get_value().clone());
-        inst.get_manager_mut().add_operand(self.get_ptr().clone());
-        inst
+        })
     }
 }
 
@@ -362,16 +357,11 @@ impl Instruction for GetElementPtr {
         s
     }
 
-    unsafe fn copy_self(&self) -> Box<dyn Instruction> {
-        let mut inst = Box::new(GetElementPtr {
+    fn copy_self(&self) -> Box<dyn Instruction> {
+        Box::new(GetElementPtr {
             element_type: self.element_type.clone(),
             manager: InstManager::new(self.get_value_type()),
-        });
-        inst.get_manager_mut().add_operand(self.get_ptr().clone());
-        for i in self.get_index() {
-            inst.get_manager_mut().add_operand(i.clone());
-        }
-        inst
+        })
     }
 }
 
