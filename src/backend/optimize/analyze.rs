@@ -29,37 +29,66 @@ impl Block {
 
 /// impl Some functionality for reg alloc
 impl Func {
+    pub fn bbs_graph_to_dot(&self) -> String {
+        let successors = self.successors().unwrap();
+        let mut dot = String::new();
+        dot.push_str("digraph {\n");
+        for (from, tos) in successors {
+            for to in tos {
+                dot.push_str(&format!("\"{}\" -> \"{}\";\n", from, to));
+            }
+        }
+        dot.push_str("}\n");
+        dot
+    }
+
+    /// return a hashmap of basic block label to its successors
+    pub fn successors(&self) -> Result<HashMap<String, HashSet<String>>> {
+        let mut hmp: HashMap<String, HashSet<String>> = HashMap::new();
+        for bb in self.iter_bbs() {
+            let to_bbs: HashSet<String> = Block::to_bbs(bb)?.into_iter().collect();
+            hmp.insert(bb.label().to_string(), to_bbs);
+        }
+        Ok(hmp)
+    }
+
+    /// return a hashmap of basic block label to its predecessors
+    pub fn predecessors_from_succs(
+        &self,
+        succs: &HashMap<String, HashSet<String>>,
+    ) -> HashMap<String, HashSet<String>> {
+        let mut hmp: HashMap<String, HashSet<String>> = HashMap::new();
+        for bb in self.iter_bbs() {
+            hmp.insert(bb.label().to_string(), HashSet::new());
+        }
+        for (from, tos) in succs {
+            for to in tos {
+                hmp.entry(to.to_string())
+                    .or_default()
+                    .insert(from.to_string());
+            }
+        }
+        hmp
+    }
+
     /// compute the in and out set of each basic block
     /// return a tuple of two hashmaps, the first one is in set, the second one is out set
     pub fn in_out_bbs(f: &Func) -> Result<(InBBs, OutBBs)> {
-        let mut outs: HashMap<String, Vec<String>> = HashMap::new();
-        for bb in f.iter_bbs() {
-            let to_bbs: Vec<String> = Block::to_bbs(bb)?;
-            outs.insert(bb.label().to_string(), to_bbs);
-        }
-        let mut ins: HashMap<String, Vec<String>> = HashMap::new();
-        for bb in f.iter_bbs() {
-            let to_bbs = outs.get(bb.label()).unwrap();
-            for to_bb in to_bbs {
-                if let Some(ins_to_bb) = ins.get_mut(to_bb) {
-                    ins_to_bb.push(bb.label().to_string());
-                } else {
-                    ins.insert(to_bb.to_string(), vec![bb.label().to_string()]);
-                }
-            }
-            if !ins.contains_key(bb.label()) {
-                ins.insert(bb.label().to_string(), vec![]);
-            }
-        }
+        let successors = f.successors()?;
+        let predecessors = f.predecessors_from_succs(&successors);
+
         let bbs: HashMap<String, &Block> = f
             .iter_bbs()
             .map(|bb| (bb.label().to_string(), bb))
             .collect();
         let ins = InBBs {
             bbs: bbs.clone(),
-            ins,
+            ins: predecessors,
         };
-        let outs = OutBBs { bbs, outs };
+        let outs = OutBBs {
+            bbs,
+            outs: successors,
+        };
 
         Ok((ins, outs))
     }
@@ -212,12 +241,12 @@ impl Func {
 #[derive(Debug)]
 pub struct InBBs<'a> {
     bbs: HashMap<String, &'a Block>,
-    ins: HashMap<String, Vec<String>>,
+    ins: HashMap<String, HashSet<String>>,
 }
 #[derive(Debug)]
 pub struct OutBBs<'a> {
     bbs: HashMap<String, &'a Block>,
-    outs: HashMap<String, Vec<String>>,
+    outs: HashMap<String, HashSet<String>>,
 }
 impl<'a> InBBs<'a> {
     pub fn ins(&'a self, bb: &Block) -> Vec<&'a Block> {
