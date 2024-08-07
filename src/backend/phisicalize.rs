@@ -184,6 +184,88 @@ pub fn phisicalize_reg(func: &mut Func) -> Result<()> {
     Ok(())
 }
 
+/// you must make sure func 's each bb has at most two successors
+#[allow(unused)]
+pub fn handle_long_jump(func: &mut Func, mid_reg: &Reg) -> Result<()> {
+    let mut bb_idx_for_long_jmp = 0;
+    let f_name = func.name().to_string();
+    let mut new_label = || {
+        bb_idx_for_long_jmp += 1;
+        format!("{}_long_jmp_{}", &f_name, bb_idx_for_long_jmp)
+    };
+    let num_insts: Vec<(String, usize)> = func
+        .iter_bbs()
+        .map(|bb| (bb.label().to_string(), bb.insts().len()))
+        .collect();
+    let count_distance = |bb: &str, another_bb: &str| {
+        let p0 = num_insts.iter().position(|(l, _)| l == bb).unwrap();
+        let p1 = num_insts.iter().position(|(l, _)| l == another_bb).unwrap();
+        let dis = num_insts
+            .iter()
+            .skip(p0)
+            .take(p1 - p0)
+            .map(|(_, n)| n)
+            .sum::<usize>();
+        dis
+    };
+
+    let mut to_add_after: HashMap<String, Vec<Block>> = HashMap::new();
+
+    for bb in func.iter_bbs_mut() {
+        let mut for_lj_bbs: Vec<Block> = vec![];
+        for (i, inst) in bb.insts_mut().iter_mut().rev().enumerate() {
+            match inst {
+                Inst::Jmp(jmp) => {
+                    // FIXME, count distance
+                    jmp.set_long(*mid_reg);
+                    break;
+                }
+                Inst::Beq(branch_inst) => {
+                    let n = new_label();
+                    *branch_inst.label_mut() = n.clone().into();
+                    let mut new_bb = Block::new(n.clone());
+                    let mut lj = JmpInst::new(n.into());
+                    lj.set_long(*mid_reg);
+                    new_bb.push_inst(lj.into());
+                    for_lj_bbs.push(new_bb);
+                }
+                Inst::Bne(bne) => {}
+                Inst::Bge(bge) => {}
+                Inst::Bgt(bgt) => {}
+                Inst::Ble(ble) => {}
+                Inst::Blt(blt) => {}
+                _ => {}
+            }
+        }
+        for (i, inst) in bb.insts_mut().iter_mut().rev().enumerate() {
+            match inst {
+                Inst::Jmp(jmp) => {
+                    // FIXME, count distance
+                    jmp.set_long(*mid_reg);
+                    break;
+                }
+                Inst::Beq(beq) => {
+                    let n = new_label();
+                    *beq.label_mut() = n.clone().into();
+                    let mut new_bb = Block::new(n.clone());
+                    let mut lj = JmpInst::new(n.into());
+                    lj.set_long(*mid_reg);
+                    new_bb.push_inst(lj.into());
+                    for_lj_bbs.push(new_bb);
+                }
+                Inst::Bne(bne) => {}
+                Inst::Bge(bge) => {}
+                Inst::Bgt(bgt) => {}
+                Inst::Ble(ble) => {}
+                Inst::Blt(blt) => {}
+                _ => {}
+            }
+        }
+    }
+    // FIXME
+    Ok(())
+}
+
 pub fn handle_ra(func: &mut Func) -> Result<()> {
     // if func is not a caller, then no need to handle ra
     if !func.is_caller() {

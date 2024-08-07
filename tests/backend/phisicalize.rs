@@ -1,3 +1,5 @@
+use std::process::Command;
+
 use compiler::{backend::irs::*, fprintln};
 use insta::assert_debug_snapshot;
 
@@ -259,6 +261,7 @@ fn test_handle_offset_overflow() {
     "###);
 }
 
+#[ignore = "This test need riscv64-linux-gnu-gcc to compile"]
 #[test]
 fn test_handle_long_jmp() {
     use compiler::backend::irs::*;
@@ -267,16 +270,24 @@ fn test_handle_long_jmp() {
     let mut bb1 = Block::new("bb1".to_string());
     let mut bb2 = Block::new("bb2".to_string());
     bb0.push_inst(JmpInst::new("bb2".into()).into());
-    [(); 1000]
+    [(); 2000000]
         .iter()
         .for_each(|_| bb1.push_inst(LiInst::new(REG_A0.into(), 1.into()).into()));
     bb1.push_inst(Inst::Ret);
     bb2.push_inst(JmpInst::new("bb1".into()).into());
-    let mut f = Func::new("f".to_string(), vec![], bb0);
+    let mut f = Func::new("main".to_string(), vec![], bb0);
     f.push_bb(bb1);
     f.push_bb(bb2);
     let mut mdl = Module::new("test");
     mdl.funcs.push(f);
-    dbg!(mdl.gen_asm());
+    let asm_path = tempfile::Builder::new().suffix(".s").tempfile().unwrap();
+    // let asm = mdl.gen_asm();
+    // std::fs::write(asm_path.path(), asm).unwrap();
+    // let cp = Command::new("riscv64-linux-gnu-gcc")
+    //     .arg(asm_path.path())
+    //     .arg("-o")
+    //     .arg("/dev/null")
+    //     .output()
+    //     .unwrap();
     fprintln!("1.s", "{}", mdl.gen_asm());
 }

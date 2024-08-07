@@ -211,6 +211,41 @@ impl Func {
     }
 }
 
+pub struct BBDistanceCounter {
+    num_insts: Vec<(String, usize)>,
+}
+impl BBDistanceCounter {
+    /// FIXME: test needed
+    pub fn distance_between(&self, from: &str, to: &str) -> Option<usize> {
+        let from_idx = self.num_insts.iter().position(|(label, _)| label == from)?;
+        let to_idx = self.num_insts.iter().position(|(label, _)| label == to)?;
+        if from_idx < to_idx {
+            let distance = self.num_insts[(from_idx + 1)..to_idx]
+                .iter()
+                .map(|(_, num_inst)| *num_inst)
+                .sum();
+            Some(distance)
+        } else {
+            let distance = self.num_insts[to_idx..=from_idx]
+                .iter()
+                .map(|(_, num_inst)| *num_inst)
+                .sum();
+            Some(distance)
+        }
+    }
+}
+/// helper method for handling long jmp
+impl Func {
+    pub fn bb_distances(&self) -> BBDistanceCounter {
+        let num_insts: Vec<(String, usize)> = self
+            .iter_bbs()
+            .map(|bb| (bb.label().to_string(), bb.insts().len()))
+            .collect();
+
+        BBDistanceCounter { num_insts }
+    }
+}
+
 #[derive(Clone)]
 pub struct BBIter<'a> {
     entry: &'a Block,
