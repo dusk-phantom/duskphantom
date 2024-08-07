@@ -141,8 +141,7 @@ impl Func {
         // consider live_use
         let live_use = Func::reg_live_use(f);
         let live_def = Func::reg_live_def(f);
-        dbg!(&live_use);
-        dbg!(&live_def);
+
         for (bb, live_use_bb) in live_use.iter() {
             live_ins.insert(bb.to_string(), live_use_bb.clone());
         }
@@ -152,6 +151,8 @@ impl Func {
         let mut changed = true;
         while changed {
             changed = false;
+            // new_live_out = SUM(live_in[succ[bb]])
+            // new_live_in = old_live_in U ( SUM(live_in[out[bb]]) - live_def[bb] ) U new_live_out
             for bb in bb_iter.clone() {
                 let mut new_live_in = live_ins.get(bb.label()).cloned().unwrap_or(HashSet::new());
                 for in_bb in ins.ins(bb) {
@@ -167,6 +168,14 @@ impl Func {
                         new_live_out.extend(in_.iter().cloned());
                     }
                 }
+
+                new_live_in.extend(
+                    new_live_out
+                        .iter()
+                        .cloned()
+                        .filter(|r| !live_def[bb.label()].contains(r)),
+                );
+
                 if !live_ins.contains_key(bb.label()) || new_live_in != live_ins[bb.label()] {
                     live_ins.insert(bb.label().to_string(), new_live_in);
                     changed = true;
