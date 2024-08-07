@@ -3,6 +3,7 @@ pub use anyhow::Result;
 mod builder;
 mod instruction;
 mod operand;
+mod utils;
 mod vars;
 
 #[macro_use]

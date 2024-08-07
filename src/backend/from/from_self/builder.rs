@@ -50,7 +50,10 @@ impl IRBuilder {
 
             // Build the function
             let fu = self_func.as_ref();
-            let (func, caller_regs_stack) = Self::build_func(fu, fmms)?;
+            let (mut func, caller_regs_stack) = Self::build_func(fu, fmms)?;
+
+            Self::label_rename_func(&mut func, fu)?;
+
             caller_regs_stacks.insert(func.name().to_string(), caller_regs_stack);
             funcs.push(func);
         }
