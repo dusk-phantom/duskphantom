@@ -1,3 +1,5 @@
+use graph::UdGraph;
+
 use crate::fprintln;
 
 use super::*;
@@ -7,6 +9,8 @@ pub fn handle_reg_alloc(func: &mut Func) -> Result<()> {
     let mut reg_graphs = Func::reg_interfere_graph(func)?;
 
     fprintln!("log/reg_graphs.log", "{}", g2txt(&reg_graphs));
+    let dot = UdGraph::<Reg>::from(reg_graphs.clone()).gen_dot("reg_graph", |r| r.gen_asm());
+    fprintln!("graph.dot", "{}", dot);
     let (colors, spills) = reg_alloc(&reg_graphs, free_iregs(), free_fregs())?;
 
     apply_colors(func, colors);
@@ -196,6 +200,31 @@ pub fn g2txt(g: &HashMap<Reg, HashSet<Reg>>) -> String {
 mod tests {
     use super::*;
     use graph::{udgraph, UdGraph};
+    fn check_alloc(
+        graph: &HashMap<Reg, HashSet<Reg>>,
+        colors: &HashMap<Reg, Reg>,
+        to_spill: &HashSet<Reg>,
+    ) {
+        for (k, v) in graph.iter() {
+            if to_spill.contains(k) {
+                continue;
+            }
+            let k_color = colors.get(k).unwrap();
+            let mut inter_colors = HashSet::new();
+            for r in v {
+                if r.is_physical() {
+                    inter_colors.insert(*r);
+                    continue;
+                }
+                if to_spill.contains(r) {
+                    continue;
+                }
+                inter_colors.insert(*colors.get(r).unwrap());
+            }
+
+            assert!(!inter_colors.contains(k_color));
+        }
+    }
 
     impl std::str::FromStr for Reg {
         type Err = anyhow::Error;
@@ -221,32 +250,6 @@ mod tests {
             };
 
             Ok(Reg::new(id, is_usual))
-        }
-    }
-
-    fn check_alloc(
-        graph: &HashMap<Reg, HashSet<Reg>>,
-        colors: &HashMap<Reg, Reg>,
-        to_spill: &HashSet<Reg>,
-    ) {
-        for (k, v) in graph.iter() {
-            if to_spill.contains(k) {
-                continue;
-            }
-            let k_color = colors.get(k).unwrap();
-            let mut inter_colors = HashSet::new();
-            for r in v {
-                if r.is_physical() {
-                    inter_colors.insert(*r);
-                    continue;
-                }
-                if to_spill.contains(r) {
-                    continue;
-                }
-                inter_colors.insert(*colors.get(r).unwrap());
-            }
-
-            assert!(!inter_colors.contains(k_color));
         }
     }
 
