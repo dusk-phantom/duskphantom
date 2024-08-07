@@ -110,11 +110,15 @@ impl DominatorTree {
             let mut new_idom = None;
             for pred in current_bb.get_pred_bb() {
                 if idom_map.contains_key(pred) {
+                    // Set idom as intersection of predecessors
                     if let Some(idom) = new_idom {
                         new_idom = Some(intersect(*pred, idom, &postorder_map, &idom_map));
                     } else {
                         new_idom = Some(*pred);
                     }
+                } else if *pred == entry {
+                    // If one of predecessor is entry, intersection is entry
+                    new_idom = Some(entry);
                 }
             }
             let new_idom = new_idom.unwrap_or(entry);

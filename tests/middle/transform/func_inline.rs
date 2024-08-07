@@ -7,7 +7,8 @@ pub mod tests_func_inline {
         middle::{
             irgen::gen,
             transform::{
-                block_fuse, constant_fold, deadcode_elimination, func_inline, inst_combine, mem2reg,
+                block_fuse, constant_fold, deadcode_elimination, func_inline, inst_combine,
+                mem2reg, unreachable_block_elim,
             },
         },
         utils::diff::diff,
@@ -41,6 +42,7 @@ pub mod tests_func_inline {
         func_inline::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
         inst_combine::optimize_program(&mut program).unwrap();
+        unreachable_block_elim::optimize_program(&mut program).unwrap();
         block_fuse::optimize_program(&mut program).unwrap();
         deadcode_elimination::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
@@ -137,6 +139,7 @@ pub mod tests_func_inline {
         func_inline::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
         inst_combine::optimize_program(&mut program).unwrap();
+        unreachable_block_elim::optimize_program(&mut program).unwrap();
         block_fuse::optimize_program(&mut program).unwrap();
         deadcode_elimination::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
@@ -187,13 +190,11 @@ pub mod tests_func_inline {
         define i32 @main() {
         [-] entry:
         [-] %call_29 = call i32 @f(i32 5)
-        [+] final3_inline3:
-        br label %exit
-
+        [-] br label %exit
+        [-] 
         exit:
         [-] ret i32 %call_29
-        [+] %phi_44 = phi i32 [6, %then1_inline5], [7, %final3_inline3]
-        [+] ret i32 %phi_44
+        [+] ret i32 7
 
 
         }
@@ -224,6 +225,7 @@ pub mod tests_func_inline {
         func_inline::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
         inst_combine::optimize_program(&mut program).unwrap();
+        unreachable_block_elim::optimize_program(&mut program).unwrap();
         block_fuse::optimize_program(&mut program).unwrap();
         deadcode_elimination::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();

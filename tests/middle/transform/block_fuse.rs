@@ -6,7 +6,10 @@ pub mod tests_func_inline {
         frontend::parse,
         middle::{
             irgen::gen,
-            transform::{block_fuse, constant_fold, deadcode_elimination, inst_combine, mem2reg},
+            transform::{
+                block_fuse, constant_fold, deadcode_elimination, inst_combine, mem2reg,
+                unreachable_block_elim,
+            },
         },
         utils::diff::diff,
     };
@@ -37,6 +40,7 @@ pub mod tests_func_inline {
         // Check after optimization
         constant_fold::optimize_program(&mut program).unwrap();
         inst_combine::optimize_program(&mut program).unwrap();
+        unreachable_block_elim::optimize_program(&mut program).unwrap();
         block_fuse::optimize_program(&mut program).unwrap();
         deadcode_elimination::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
@@ -57,21 +61,25 @@ pub mod tests_func_inline {
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
         [-] entry:
-        [-] call void @putint(i32 1)
+        [+] exit:
+        call void @putint(i32 1)
         [-] br label %cond0
         [-] 
         [-] cond0:
-        [-] br label %alt2
+        [-] br i1 false, label %then1, label %alt2
         [-] 
-        alt2:
-        [+] call void @putint(i32 1)
+        [-] then1:
+        [-] call void @putint(i32 2)
+        [-] br label %final3
+        [-] 
+        [-] alt2:
         call void @putint(i32 3)
         [-] br label %final3
         [-] 
         [-] final3:
-        br label %exit
-
-        exit:
+        [-] br label %exit
+        [-] 
+        [-] exit:
         ret i32 0
 
 
@@ -103,6 +111,7 @@ pub mod tests_func_inline {
         // Check after optimization
         constant_fold::optimize_program(&mut program).unwrap();
         inst_combine::optimize_program(&mut program).unwrap();
+        unreachable_block_elim::optimize_program(&mut program).unwrap();
         block_fuse::optimize_program(&mut program).unwrap();
         deadcode_elimination::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
@@ -127,16 +136,20 @@ pub mod tests_func_inline {
         [-] br label %cond0
         [-] 
         [-] cond0:
-        [-] br label %alt2
+        [-] br i1 false, label %then1, label %alt2
         [-] 
-        alt2:
+        [-] then1:
+        [-] call void @putint(i32 2)
+        [-] br label %final3
+        [-] 
+        [-] alt2:
         [-] br label %final3
         [-] 
         [-] final3:
-        [+] call void @putint(i32 1)
-        br label %exit
-
+        [-] br label %exit
+        [-] 
         exit:
+        [+] call void @putint(i32 1)
         ret i32 0
 
 

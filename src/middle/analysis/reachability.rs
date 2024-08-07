@@ -14,4 +14,8 @@ impl Reachability {
         }
         Self { reachable }
     }
+
+    pub fn is_reachable(&self, bb: BBPtr) -> bool {
+        self.reachable.contains(&bb)
+    }
 }

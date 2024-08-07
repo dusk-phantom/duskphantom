@@ -1,6 +1,8 @@
 use crate::{errors::MiddleError, frontend, utils::mem::ObjPtr};
 use ir::ir_builder::IRBuilder;
-use transform::{block_fuse, func_inline, inst_combine, mem2reg, simple_gvn};
+use transform::{
+    block_fuse, func_inline, inst_combine, mem2reg, simple_gvn, unreachable_block_elim,
+};
 
 mod analysis;
 pub mod ir;
@@ -36,6 +38,7 @@ pub fn optimize(program: &mut Program) {
     func_inline::optimize_program(program).unwrap();
     constant_fold::optimize_program(program).unwrap();
     inst_combine::optimize_program(program).unwrap();
+    unreachable_block_elim::optimize_program(program).unwrap();
     block_fuse::optimize_program(program).unwrap();
 
     // Do global value numbering to remove redundancy further

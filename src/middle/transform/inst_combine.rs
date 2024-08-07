@@ -144,24 +144,6 @@ impl<'a> InstCombine<'a> {
                     return;
                 }
             }
-            InstType::Br => {
-                let cond = inst.get_operand().first().cloned();
-                if let Some(Operand::Constant(Constant::Bool(cond))) = cond {
-                    // Rewire basic block
-                    let mut parent_bb = inst.get_parent_bb().unwrap();
-                    let false_bb = parent_bb.get_succ_bb()[1];
-                    parent_bb.remove_false_bb();
-                    if !cond {
-                        parent_bb.set_true_bb(false_bb);
-                    }
-
-                    // Replace instruction with unconditional jump
-                    let new_inst = self.program.mem_pool.get_br(None);
-                    inst.insert_after(new_inst);
-                    inst.remove_self();
-                    return;
-                }
-            }
             _ => (),
         }
 
