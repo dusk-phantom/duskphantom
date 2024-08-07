@@ -64,8 +64,37 @@ impl Func {
         Ok((ins, outs))
     }
 
+    pub fn reg_live_use(f: &Func) -> HashMap<String, HashSet<Reg>> {
+        let mut live_use: HashMap<String, HashSet<Reg>> = HashMap::new();
+        for bb in f.iter_bbs() {
+            let mut live_use_bb: HashSet<Reg> = HashSet::new();
+            for inst in bb.insts().iter().rev() {
+                live_use_bb.retain(|r| !inst.defs().contains(&r));
+                live_use_bb.extend(inst.uses().iter().cloned());
+            }
+            live_use.insert(bb.label().to_string(), live_use_bb);
+        }
+        live_use
+    }
+
+    pub fn reg_live_def(f: &Func) -> HashMap<String, HashSet<Reg>> {
+        let mut live_def: HashMap<String, HashSet<Reg>> = HashMap::new();
+
+        for bb in f.iter_bbs() {
+            let mut live_def_bb: HashSet<Reg> = HashSet::new();
+            for inst in bb.insts().iter().rev() {
+                live_def_bb.extend(inst.defs().iter().cloned());
+                live_def_bb.retain(|r| !inst.uses().contains(&r));
+            }
+            live_def.insert(bb.label().to_string(), live_def_bb);
+        }
+        live_def
+    }
+
     /// compute the live in and live out set of regs of each basic block
-    pub fn reg_lives<'a>(f: &'a Func, ins: &InBBs<'a>, outs: &OutBBs<'a>) -> Result<RegLives> {
+    pub fn reg_lives(f: &Func) -> Result<RegLives> {
+        let (ins, outs) = Func::in_out_bbs(f)?;
+
         let mut live_ins: HashMap<String, HashSet<Reg>> = HashMap::new();
         let mut live_outs: HashMap<String, HashSet<Reg>> = HashMap::new();
 
@@ -80,18 +109,11 @@ impl Func {
         let bb_iter = f.iter_bbs();
 
         // consider live_use
-        for bb in bb_iter.clone() {
-            let mut live_in: HashSet<Reg> = HashSet::new();
-            let mut defed_regs: HashSet<Reg> = HashSet::new();
-            for inst in bb.insts().iter().rev() {
-                for reg in inst.uses() {
-                    if !defed_regs.contains(reg) {
-                        live_in.insert(*reg);
-                    }
-                }
-                defed_regs.extend(inst.defs());
-            }
-            live_ins.insert(bb.label().to_string(), live_in);
+        let live_use = Func::reg_live_use(f);
+        let live_def = Func::reg_live_def(f);
+
+        for (bb, live_use_bb) in live_use.iter() {
+            live_ins.insert(bb.to_string(), live_use_bb.clone());
         }
 
         // loop to compute live_in and live_out
@@ -106,6 +128,8 @@ impl Func {
                         new_live_in.extend(out.iter().cloned());
                     }
                 }
+                new_live_in.retain(|r| !live_def[bb.label()].contains(r));
+
                 let mut new_live_out = live_outs.get(bb.label()).cloned().unwrap_or(HashSet::new());
                 for out_bb in outs.outs(bb) {
                     if let Some(in_) = live_ins.get(out_bb.label()) {
@@ -148,9 +172,8 @@ impl Func {
             }
         }
         // for each basic block, collect interference between regs
-        let (ins, outs) = Func::in_out_bbs(f)?;
 
-        let reg_lives = Func::reg_lives(f, &ins, &outs)?;
+        let reg_lives = Func::reg_lives(f)?;
         dbg!(&reg_lives);
         // FIXME: 使用位图实现的寄存器记录表来加速运算过程，以及节省内存
         for bb in f.iter_bbs() {
@@ -229,7 +252,15 @@ impl Debug for RegLives {
                 &self
                     .live_ins
                     .iter()
-                    .map(|(k, v)| (k, v.iter().map(|v| v.gen_asm())))
+                    .map(|(k, v)| {
+                        (
+                            k,
+                            v.iter()
+                                .map(|v| v.gen_asm())
+                                .collect::<Vec<String>>()
+                                .join(", "),
+                        )
+                    })
                     .collect::<Vec<_>>(),
             )
             .field(
@@ -237,7 +268,15 @@ impl Debug for RegLives {
                 &self
                     .live_outs
                     .iter()
-                    .map(|(k, v)| (k, v.iter().map(|v| v.gen_asm())))
+                    .map(|(k, v)| {
+                        (
+                            k,
+                            v.iter()
+                                .map(|v| v.gen_asm())
+                                .collect::<Vec<String>>()
+                                .join(", "),
+                        )
+                    })
                     .collect::<Vec<_>>(),
             )
             .finish()

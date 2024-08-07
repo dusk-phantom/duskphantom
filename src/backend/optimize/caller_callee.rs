@@ -16,8 +16,7 @@ fn handle_caller_save(func: &mut Func) -> Result<()> {
     let mut ssa = take_ssa(func)?;
     let mut available_ss = Vec::new();
 
-    let (ins, outs) = Func::in_out_bbs(func)?;
-    let reg_lives = Func::reg_lives(func, &ins, &outs)?;
+    let reg_lives = Func::reg_lives(func)?;
     for bb in func.iter_bbs_mut() {
         let mut new_insts_rev: Vec<Inst> = vec![];
         let mut alive_regs = reg_lives.live_outs(bb).clone();
@@ -30,11 +29,11 @@ fn handle_caller_save(func: &mut Func) -> Result<()> {
                     available_ss.push(ssa.alloc(8));
                 }
                 for (r, ss) in to_save.iter().zip(available_ss.iter()) {
-                    new_insts_rev.push(LoadInst::new(*r, *ss).into());
+                    new_insts_rev.push(LoadInst::new(*r, *ss).with_8byte().into());
                 }
                 new_insts_rev.push(inst.clone());
                 for (r, ss) in to_save.iter().zip(available_ss.iter()) {
-                    new_insts_rev.push(StoreInst::new(*ss, *r).into());
+                    new_insts_rev.push(StoreInst::new(*ss, *r).with_8byte().into());
                 }
             } else {
                 new_insts_rev.push(inst.clone());
@@ -64,12 +63,12 @@ fn handle_callee_save(func: &mut Func) -> Result<()> {
 
     let mut insert_front: Vec<Inst> = vec![];
     for (r, ss) in regs.iter().zip(available_ss.iter()) {
-        insert_front.push(StoreInst::new(*ss, *r).into());
+        insert_front.push(StoreInst::new(*ss, *r).with_8byte().into());
     }
 
     let mut insert_back: Vec<Inst> = vec![];
     for (r, ss) in regs.iter().zip(available_ss.iter()) {
-        insert_back.push(LoadInst::new(*r, *ss).into());
+        insert_back.push(LoadInst::new(*r, *ss).with_8byte().into());
     }
 
     let entry = func.entry_mut();

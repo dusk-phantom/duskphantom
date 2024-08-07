@@ -3,7 +3,6 @@ use crate::fprintln;
 use super::*;
 
 pub fn handle_reg_alloc(func: &mut Func) -> Result<()> {
-    // dbg!(&func);
     // count the interference graph
     let mut reg_graphs = Func::reg_interfere_graph(func)?;
 
