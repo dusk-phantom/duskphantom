@@ -7,7 +7,7 @@ use super::*;
 pub fn handle_reg_alloc(func: &mut Func) -> Result<()> {
     // count the interference graph
     let mut reg_graphs = Func::reg_interfere_graph(func)?;
-
+    fprintln!("f_g.dot", "{}", func.bbs_graph_to_dot());
     fprintln!("log/reg_graphs.log", "{}", g2txt(&reg_graphs));
     let dot = UdGraph::<Reg>::from(reg_graphs.clone()).gen_dot("reg_graph", |r| r.gen_asm());
     fprintln!("graph.dot", "{}", dot);
