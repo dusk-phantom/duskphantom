@@ -544,6 +544,29 @@ impl InstManager {
     /// # Safety
     ///
     /// FIXME: explain why it is unsafe,and describe the safety requirements
+    pub unsafe fn remove_operand(&mut self, index: usize) {
+        let operand = self.operand.remove(index);
+        match operand {
+            Operand::Instruction(mut inst) => {
+                inst.get_user_mut().retain(|x| x != &self.self_ptr.unwrap());
+            }
+            Operand::Parameter(mut param) => {
+                param
+                    .get_user_mut()
+                    .retain(|x| x != &self.self_ptr.unwrap());
+            }
+            Operand::Global(mut global) => {
+                global
+                    .get_user_mut()
+                    .retain(|x| x != &self.self_ptr.unwrap());
+            }
+            _ => {}
+        }
+    }
+
+    /// # Safety
+    ///
+    /// FIXME: explain why it is unsafe,and describe the safety requirements
     pub unsafe fn set_id(&mut self, id: usize) {
         self.id = Some(id);
     }

@@ -274,6 +274,17 @@ impl Phi {
             self.get_manager_mut().add_operand(val);
         }
     }
+    pub fn remove_incoming_value(&mut self, pred_id: usize) {
+        let index = self
+            .incoming_values
+            .iter()
+            .position(|(_, p)| p.id == pred_id)
+            .unwrap();
+        self.incoming_values.remove(index);
+        unsafe {
+            self.get_manager_mut().remove_operand(index);
+        }
+    }
     pub fn get_incoming_value(&self, bb: BBPtr) -> Option<&Operand> {
         for (val, pred) in &self.incoming_values {
             if *pred == bb {
