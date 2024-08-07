@@ -78,15 +78,10 @@ impl Instruction for Ret {
         }
     }
 
-    unsafe fn copy_self(&self) -> Box<dyn Instruction> {
-        let mut inst = Box::new(Ret {
+    fn copy_self(&self) -> Box<dyn Instruction> {
+        Box::new(Ret {
             manager: InstManager::new(self.get_value_type()),
-        });
-        if !self.is_void() {
-            inst.get_manager_mut()
-                .add_operand(self.get_return_value().clone());
-        }
-        inst
+        })
     }
 }
 
@@ -108,13 +103,9 @@ impl Instruction for Br {
         }
     }
 
-    unsafe fn copy_self(&self) -> Box<dyn Instruction> {
-        let mut inst = Box::new(Br {
+    fn copy_self(&self) -> Box<dyn Instruction> {
+        Box::new(Br {
             manager: InstManager::new(self.get_value_type()),
-        });
-        if self.is_cond_br() {
-            inst.get_manager_mut().add_operand(self.get_cond().clone());
-        }
-        inst
+        })
     }
 }
