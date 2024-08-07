@@ -7,7 +7,11 @@ use crate::{
     middle::{
         analysis::call_graph::CallGraph,
         ir::{
-            instruction::{misc_inst::Call, InstType},
+            instruction::{
+                downcast_mut,
+                misc_inst::{Call, Phi},
+                InstType,
+            },
             BBPtr, FunPtr, InstPtr, Instruction, Operand, ParaPtr, ValueType,
         },
         Program,
@@ -54,16 +58,21 @@ impl<'a> FuncInline<'a> {
 
         // Process each call
         for call in calls {
-            self.process_call(call);
+            self.process_call(call, fun);
         }
     }
 
-    fn process_call(&mut self, mut inst: InstPtr) {
+    fn process_call(&mut self, mut inst: InstPtr, caller: FunPtr) {
         let call = downcast_ref::<Call>(inst.as_ref().as_ref());
         let func = call.func;
 
         // Refuse to inline library function
         if func.is_lib() {
+            return;
+        }
+
+        // If self-recursive, refuse to inline
+        if func == caller {
             return;
         }
 
@@ -102,7 +111,7 @@ impl<'a> FuncInline<'a> {
 
     /// Split given basic block at the position of given instruction.
     /// Given instruction and instruction afterwards will be put to exit block.
-    /// Returns exit block.
+    /// Argument block will be entry block, returns exit block.
     fn split_block_at(&mut self, bb: BBPtr, inst: InstPtr) -> BBPtr {
         let name = self.unique_name("split", &bb.name);
         let mut new_bb = self.program.mem_pool.new_basicblock(name);
@@ -118,18 +127,34 @@ impl<'a> FuncInline<'a> {
             }
         }
 
-        // Copy jump destination from bb
+        // Copy jump destination from bb, handle phi argument changes
         if !bb.get_succ_bb().is_empty() {
             let succ = bb.get_succ_bb()[0];
             new_bb.set_true_bb(succ);
+            self.replace_bb_in_phi(succ, bb, new_bb);
         }
         if bb.get_succ_bb().len() >= 2 {
             let succ = bb.get_succ_bb()[1];
             new_bb.set_false_bb(succ);
+            self.replace_bb_in_phi(succ, bb, new_bb);
         }
 
         // Return created block
         new_bb
+    }
+
+    /// Replace basic block in phi instruction with given mapping.
+    fn replace_bb_in_phi(&mut self, bb: BBPtr, from: BBPtr, to: BBPtr) {
+        for mut inst in bb.iter() {
+            if inst.get_type() == InstType::Phi {
+                let inst = downcast_mut::<Phi>(inst.as_mut().as_mut());
+                for (_, bb) in inst.get_incoming_values_mut().iter_mut() {
+                    if *bb == from {
+                        *bb = to;
+                    }
+                }
+            }
+        }
     }
 
     /// Mirror a function with given mapping.
@@ -144,7 +169,7 @@ impl<'a> FuncInline<'a> {
 
         // Copy blocks and instructions
         for bb in fun.dfs_iter() {
-            let name = self.unique_name("inlined", &bb.name);
+            let name = self.unique_name("inline", &bb.name);
             let mut new_bb = self.program.mem_pool.new_basicblock(name);
             block_map.insert(bb, new_bb);
             for inst in bb.iter() {
@@ -166,16 +191,34 @@ impl<'a> FuncInline<'a> {
         for bb in fun.dfs_iter() {
             for inst in bb.iter() {
                 let mut new_inst = inst_map.get(&inst).cloned().unwrap();
-                for (ix, op) in inst.get_operand().iter().enumerate() {
-                    if let Operand::Instruction(old_op) = op {
-                        let new_op = inst_map.get(old_op).cloned().unwrap();
-                        new_inst.set_operand(ix, new_op.into());
-                    } else if let Operand::Parameter(old_op) = op {
-                        let new_op = arg_map.get(old_op).cloned().unwrap();
-                        new_inst.set_operand(ix, new_op);
-                    } else {
-                        // Copy operands manually because `copy_instruction` does not copy them
-                        new_inst.set_operand(ix, op.clone());
+                if inst.get_type() == InstType::Phi {
+                    let inst = downcast_ref::<Phi>(inst.as_ref().as_ref());
+                    let new_inst = downcast_mut::<Phi>(new_inst.as_mut().as_mut());
+                    for (old_op, old_bb) in inst.get_incoming_values().iter() {
+                        let new_bb = block_map.get(old_bb).cloned().unwrap();
+                        if let Operand::Instruction(old_op) = old_op {
+                            let new_op = inst_map.get(old_op).cloned().unwrap();
+                            new_inst.add_incoming_value(new_op.into(), new_bb);
+                        } else if let Operand::Parameter(old_op) = old_op {
+                            let new_op = arg_map.get(old_op).cloned().unwrap();
+                            new_inst.add_incoming_value(new_op, new_bb);
+                        } else {
+                            // Copy operands manually because `copy_instruction` does not copy them
+                            new_inst.add_incoming_value(old_op.clone(), new_bb);
+                        }
+                    }
+                } else {
+                    for old_op in inst.get_operand().iter() {
+                        if let Operand::Instruction(old_op) = old_op {
+                            let new_op = inst_map.get(old_op).cloned().unwrap();
+                            new_inst.add_operand(new_op.into());
+                        } else if let Operand::Parameter(old_op) = old_op {
+                            let new_op = arg_map.get(old_op).cloned().unwrap();
+                            new_inst.add_operand(new_op);
+                        } else {
+                            // Copy operands manually because `copy_instruction` does not copy them
+                            new_inst.add_operand(old_op.clone());
+                        }
                     }
                 }
             }
@@ -200,7 +243,7 @@ impl<'a> FuncInline<'a> {
     }
 
     fn unique_name(&mut self, meta: &str, base_name: &str) -> String {
-        let name = format!("{}_{}_{}", meta, base_name, self.counter);
+        let name = format!("{}_{}{}", base_name, meta, self.counter);
         self.counter += 1;
         name
     }

@@ -109,6 +109,13 @@ pub trait Instruction: Display {
         &self.get_manager().operand
     }
 
+    /// Add an operand to the instruction.
+    fn add_operand(&mut self, operand: Operand) {
+        unsafe {
+            self.get_manager_mut().add_operand(operand);
+        }
+    }
+
     /// Set the operand of cur inst by index and operand (safe and interface).
     /// If there are two identical inst operands, they must all be overwritten,
     /// otherwise the use-def chain will be broken.
@@ -482,14 +489,8 @@ impl InstManager {
 impl InstManager {
     /// # Safety
     ///
-    /// If index is out of bounds, it will behave as `add`.
-    /// For example, if len(operand) == 1 and index == 3,
-    /// it will just append operand to the end, so len(operand) == 2.
+    /// If index is out of bounds, the function will panic.
     pub unsafe fn set_operand(&mut self, index: usize, operand: Operand) {
-        if index >= self.operand.len() {
-            self.add_operand(operand);
-            return;
-        }
         match self.operand[index] {
             Operand::Instruction(mut inst) => {
                 inst.get_user_mut().retain(|x| x != &self.self_ptr.unwrap());

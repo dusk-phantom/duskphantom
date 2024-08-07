@@ -26,13 +26,13 @@ pub fn gen(program: &frontend::Program) -> Result<Program, MiddleError> {
 pub fn optimize(program: &mut Program) {
     mem2reg::optimize_program(program).unwrap();
     deadcode_elimination::optimize_program(program).unwrap();
-    func_inline::optimize_program(program).unwrap();
-    deadcode_elimination::optimize_program(program).unwrap();
     constant_fold::optimize_program(program).unwrap();
     deadcode_elimination::optimize_program(program).unwrap();
-    simple_gvn::optimize_program(program).unwrap();
-    deadcode_elimination::optimize_program(program).unwrap();
     inst_combine::optimize_program(program).unwrap();
+    deadcode_elimination::optimize_program(program).unwrap();
+    func_inline::optimize_program(program).unwrap();
+    deadcode_elimination::optimize_program(program).unwrap();
+    simple_gvn::optimize_program(program).unwrap();
     deadcode_elimination::optimize_program(program).unwrap();
 }
 
