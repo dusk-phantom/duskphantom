@@ -1,6 +1,6 @@
 use crate::{errors::MiddleError, frontend, utils::mem::ObjPtr};
 use ir::ir_builder::IRBuilder;
-use transform::{func_inline, inst_combine, mem2reg, simple_gvn};
+use transform::{block_fuse, func_inline, inst_combine, mem2reg, simple_gvn};
 
 mod analysis;
 pub mod ir;
@@ -24,14 +24,21 @@ pub fn gen(program: &frontend::Program) -> Result<Program, MiddleError> {
 }
 
 pub fn optimize(program: &mut Program) {
+    // Convert program to SSA and prune unused alloc
     mem2reg::optimize_program(program).unwrap();
     deadcode_elimination::optimize_program(program).unwrap();
+
+    // Weaken instructions
     constant_fold::optimize_program(program).unwrap();
-    deadcode_elimination::optimize_program(program).unwrap();
     inst_combine::optimize_program(program).unwrap();
-    deadcode_elimination::optimize_program(program).unwrap();
+
+    // Inline functions, weaken inlined functions and remove redundant blocks
     func_inline::optimize_program(program).unwrap();
-    deadcode_elimination::optimize_program(program).unwrap();
+    constant_fold::optimize_program(program).unwrap();
+    inst_combine::optimize_program(program).unwrap();
+    block_fuse::optimize_program(program).unwrap();
+
+    // Do global value numbering to remove redundancy further
     simple_gvn::optimize_program(program).unwrap();
     deadcode_elimination::optimize_program(program).unwrap();
 }

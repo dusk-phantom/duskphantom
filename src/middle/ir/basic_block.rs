@@ -119,6 +119,16 @@ impl BasicBlock {
         &self.succ_bbs
     }
 
+    /// Replace successor with given mapping.
+    pub fn replace_succ_bb(&mut self, from: BBPtr, to: BBPtr) {
+        if !self.succ_bbs.is_empty() && self.succ_bbs[0] == from {
+            self.set_true_bb(to);
+        }
+        if self.succ_bbs.len() >= 2 && self.succ_bbs[1] == from {
+            self.set_false_bb(to);
+        }
+    }
+
     /// Sets which `BasicBlock` to jump to when the condition is true.
     pub fn set_true_bb(&mut self, mut bb: BBPtr) {
         let self_ptr = ObjPtr::new(self);
@@ -146,6 +156,17 @@ impl BasicBlock {
             self.succ_bbs[1] = bb;
         }
         bb.pred_bbs.push(self_ptr);
+    }
+
+    /// Remove basic block to jump to when the condition is false.
+    /// This will only execute when false bb exists.
+    pub fn remove_false_bb(&mut self) {
+        let self_ptr = ObjPtr::new(self);
+        if self.succ_bbs.len() == 2 {
+            let mut next = self.succ_bbs[1];
+            next.pred_bbs.retain(|x| *x != self_ptr);
+            self.succ_bbs.pop();
+        }
     }
 
     /// Returns a iterator of the `BasicBlock`.
