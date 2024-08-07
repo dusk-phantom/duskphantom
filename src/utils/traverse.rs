@@ -4,7 +4,7 @@ use std::{
 };
 
 pub trait Node: Eq + Hash + Clone {
-    fn get_succ(&self) -> Vec<&Self>;
+    fn get_succ(&self) -> Vec<Self>;
 }
 
 /// Postorder iterator.
