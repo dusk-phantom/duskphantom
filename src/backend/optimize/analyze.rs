@@ -25,6 +25,22 @@ impl Block {
         }
         Ok(tos)
     }
+    pub fn live_use_regs(&self) -> HashSet<Reg> {
+        let mut live_use = HashSet::new();
+        for inst in self.insts().iter().rev() {
+            live_use.retain(|r| !inst.defs().contains(&r));
+            live_use.extend(inst.uses().iter().cloned());
+        }
+        live_use
+    }
+    pub fn live_def_regs(&self) -> HashSet<Reg> {
+        let mut live_def = HashSet::new();
+        for inst in self.insts().iter().rev() {
+            live_def.extend(inst.defs().iter().cloned());
+            live_def.retain(|r| !inst.uses().contains(&r));
+        }
+        live_def
+    }
 }
 
 /// impl Some functionality for reg alloc
@@ -94,30 +110,15 @@ impl Func {
     }
 
     pub fn reg_live_use(f: &Func) -> HashMap<String, HashSet<Reg>> {
-        let mut live_use: HashMap<String, HashSet<Reg>> = HashMap::new();
-        for bb in f.iter_bbs() {
-            let mut live_use_bb: HashSet<Reg> = HashSet::new();
-            for inst in bb.insts().iter().rev() {
-                live_use_bb.retain(|r| !inst.defs().contains(&r));
-                live_use_bb.extend(inst.uses().iter().cloned());
-            }
-            live_use.insert(bb.label().to_string(), live_use_bb);
-        }
-        live_use
+        f.iter_bbs()
+            .map(|bb| (bb.label().to_string(), bb.live_use_regs()))
+            .collect()
     }
 
     pub fn reg_live_def(f: &Func) -> HashMap<String, HashSet<Reg>> {
-        let mut live_def: HashMap<String, HashSet<Reg>> = HashMap::new();
-
-        for bb in f.iter_bbs() {
-            let mut live_def_bb: HashSet<Reg> = HashSet::new();
-            for inst in bb.insts().iter().rev() {
-                live_def_bb.extend(inst.defs().iter().cloned());
-                live_def_bb.retain(|r| !inst.uses().contains(&r));
-            }
-            live_def.insert(bb.label().to_string(), live_def_bb);
-        }
-        live_def
+        f.iter_bbs()
+            .map(|bb| (bb.label().to_string(), bb.live_def_regs()))
+            .collect()
     }
 
     /// compute the live in and live out set of regs of each basic block
@@ -140,7 +141,8 @@ impl Func {
         // consider live_use
         let live_use = Func::reg_live_use(f);
         let live_def = Func::reg_live_def(f);
-
+        dbg!(&live_use);
+        dbg!(&live_def);
         for (bb, live_use_bb) in live_use.iter() {
             live_ins.insert(bb.to_string(), live_use_bb.clone());
         }
@@ -316,5 +318,37 @@ impl RegLives {
     }
     pub fn live_outs(&self, bb: &Block) -> &HashSet<Reg> {
         self.live_outs.get(bb.label()).unwrap()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use insta::assert_snapshot;
+    use std::collections::HashSet;
+
+    use super::{AddInst, Block, MvInst, Reg};
+    fn stringfy_regs(regs: &HashSet<Reg>) -> String {
+        let mut regs: Vec<String> = regs.iter().map(|r| r.gen_asm()).collect();
+        regs.sort();
+        format!("{{{}}}", regs.join(","))
+    }
+
+    #[test]
+    fn test_bb_live_use() {
+        // addiw x42,x38,1
+        // mv x32,x42
+        // mv x33,x35
+        // j .Lmain_cond0
+        let x38 = Reg::new(38, true);
+        let x32 = Reg::new(32, true);
+        let x42 = Reg::new(42, true);
+        let x35 = Reg::new(35, true);
+        let x33 = Reg::new(33, true);
+        let mut bb = Block::new("".to_string());
+        bb.push_inst(AddInst::new(x42.into(), x38.into(), 1.into()).into());
+        bb.push_inst(MvInst::new(x32.into(), x42.into()).into());
+        bb.push_inst(MvInst::new(x33.into(), x35.into()).into());
+        let live_use = bb.live_use_regs();
+        assert_snapshot!(stringfy_regs(&live_use),@"{x35,x38}");
     }
 }
