@@ -186,8 +186,7 @@ pub fn phisicalize_reg(func: &mut Func) -> Result<()> {
 
 /// you must make sure func 's each bb has at most two successors
 /// this func will turn a long direct jump to a redirect jump using a mid reg
-#[allow(unused)]
-/// FIXME: 还没考虑处理完长跳转后产生新的长跳转的情况
+/// Note!!!: 还没考虑处理完长跳转后产生新的长跳转的情况
 /// 不过如果输入的func满足最多最后两条指令是跳转指令,那么处理长跳转的过程中不会产生新的长跳转
 pub fn handle_long_jump(func: &mut Func, mid_reg: &Reg, dis_limit: usize) -> Result<()> {
     let mut bb_idx_for_long_jmp = 0;
@@ -196,104 +195,157 @@ pub fn handle_long_jump(func: &mut Func, mid_reg: &Reg, dis_limit: usize) -> Res
         bb_idx_for_long_jmp += 1;
         format!("{}_long_jmp_{}", &f_name, bb_idx_for_long_jmp)
     };
+    // first process
+    {
+        let dis_counter = func.bb_distances();
 
-    let dis_counter = func.bb_distances();
+        let mut to_add_afters: HashMap<String, Vec<Block>> = HashMap::new();
 
-    let mut to_add_afters: HashMap<String, Vec<Block>> = HashMap::new();
+        macro_rules! handle_long_jmp_for_branch {
+            ($branch_inst:ident,$new_label_func:ident,$dis_counter:ident,$mid_reg:ident,$to_add_after:ident,$bb_name:ident,$dis_limit:expr) => {{
+                let target = $branch_inst.label().clone();
+                if $dis_counter.distance_between(&$bb_name, &target).unwrap() > $dis_limit {
+                    let n = new_label();
+                    *$branch_inst.label_mut() = n.clone().into();
 
-    macro_rules! handle_long_jmp_for_branch {
-        ($branch_inst:ident,$new_label_func:ident,$dis_counter:ident,$mid_reg:ident,$to_add_after:ident,$bb_name:ident,$dis_limit:expr) => {{
-            let target = $branch_inst.label().clone();
-            if $dis_counter.distance_between(&$bb_name, &target).unwrap() > $dis_limit {
-                let n = new_label();
-                *$branch_inst.label_mut() = n.clone().into();
+                    let mut new_bb = Block::new(n.clone());
+                    let mut lj = JmpInst::new(target.into());
+                    lj.set_long(*mid_reg);
+                    new_bb.push_inst(lj.into());
 
-                let mut new_bb = Block::new(n.clone());
-                let mut lj = JmpInst::new(target.into());
-                lj.set_long(*mid_reg);
-                new_bb.push_inst(lj.into());
-
-                $to_add_after.push(new_bb);
-            }
-        }};
-    }
-    for bb in func.iter_bbs_mut() {
-        let bb_name = bb.label().to_string();
-        let mut add_after: Vec<Block> = vec![];
-        for inst in bb.insts_mut().iter_mut().rev() {
-            match inst {
-                Inst::Jmp(jmp) => match jmp {
-                    JmpInst::Long(_, _) => {}
-                    JmpInst::Short(dst) => {
-                        let to_bb: Label = dst.clone().try_into()?;
-                        if dis_counter.distance_between(&bb_name, &to_bb).unwrap() > dis_limit {
-                            jmp.set_long(*mid_reg);
+                    $to_add_after.push(new_bb);
+                }
+            }};
+        }
+        for bb in func.iter_bbs_mut() {
+            let bb_name = bb.label().to_string();
+            let mut add_after: Vec<Block> = vec![];
+            for inst in bb.insts_mut().iter_mut().rev() {
+                match inst {
+                    Inst::Jmp(jmp) => match jmp {
+                        JmpInst::Long(_, _) => {}
+                        JmpInst::Short(dst) => {
+                            let to_bb: Label = dst.clone().try_into()?;
+                            if dis_counter.distance_between(&bb_name, &to_bb).unwrap() > dis_limit {
+                                jmp.set_long(*mid_reg);
+                            }
                         }
+                    },
+                    Inst::Beq(beq) => handle_long_jmp_for_branch!(
+                        beq,
+                        new_label,
+                        dis_counter,
+                        mid_reg,
+                        add_after,
+                        bb_name,
+                        dis_limit
+                    ),
+                    Inst::Bne(bne) => handle_long_jmp_for_branch!(
+                        bne,
+                        new_label,
+                        dis_counter,
+                        mid_reg,
+                        add_after,
+                        bb_name,
+                        dis_limit
+                    ),
+                    Inst::Bge(bge) => handle_long_jmp_for_branch!(
+                        bge,
+                        new_label,
+                        dis_counter,
+                        mid_reg,
+                        add_after,
+                        bb_name,
+                        dis_limit
+                    ),
+                    Inst::Bgt(bgt) => handle_long_jmp_for_branch!(
+                        bgt,
+                        new_label,
+                        dis_counter,
+                        mid_reg,
+                        add_after,
+                        bb_name,
+                        dis_limit
+                    ),
+                    Inst::Ble(ble) => handle_long_jmp_for_branch!(
+                        ble,
+                        new_label,
+                        dis_counter,
+                        mid_reg,
+                        add_after,
+                        bb_name,
+                        dis_limit
+                    ),
+                    Inst::Blt(blt) => handle_long_jmp_for_branch!(
+                        blt,
+                        new_label,
+                        dis_counter,
+                        mid_reg,
+                        add_after,
+                        bb_name,
+                        dis_limit
+                    ),
+                    _ => {}
+                }
+            }
+            to_add_afters.insert(bb_name.clone(), add_after);
+        }
+
+        for (bb_name, add_after) in to_add_afters {
+            func.add_after(&bb_name, add_after)?;
+        }
+    }
+    {
+        let dis_counter = func.bb_distances();
+        macro_rules! handle_long_jmp_for_branch {
+            ($branch_inst:ident,$dis_counter:ident,$bb_name:ident,$dis_limit:expr) => {{
+                let target = $branch_inst.label().clone();
+                if $dis_counter.distance_between(&$bb_name, &target).unwrap() > $dis_limit {
+                    return Err(anyhow!(
+                        "msg: long jump not handled,may be a new long jump generated"
+                    ));
+                }
+            }};
+        }
+        for bb in func.iter_bbs_mut() {
+            let bb_name = bb.label().to_string();
+            for inst in bb.insts_mut().iter_mut().rev() {
+                match inst {
+                    Inst::Jmp(jmp) => match jmp {
+                        JmpInst::Long(_, _) => {}
+                        JmpInst::Short(dst) => {
+                            let to_bb: Label = dst.clone().try_into()?;
+                            if dis_counter.distance_between(&bb_name, &to_bb).unwrap() > dis_limit {
+                                return Err(anyhow!(
+                                    "msg: long jump not handled,may be a new long jump generated"
+                                ));
+                            }
+                        }
+                    },
+                    Inst::Beq(beq) => {
+                        handle_long_jmp_for_branch!(beq, dis_counter, bb_name, dis_limit)
                     }
-                },
-                Inst::Beq(beq) => handle_long_jmp_for_branch!(
-                    beq,
-                    new_label,
-                    dis_counter,
-                    mid_reg,
-                    add_after,
-                    bb_name,
-                    dis_limit
-                ),
-                Inst::Bne(bne) => handle_long_jmp_for_branch!(
-                    bne,
-                    new_label,
-                    dis_counter,
-                    mid_reg,
-                    add_after,
-                    bb_name,
-                    dis_limit
-                ),
-                Inst::Bge(bge) => handle_long_jmp_for_branch!(
-                    bge,
-                    new_label,
-                    dis_counter,
-                    mid_reg,
-                    add_after,
-                    bb_name,
-                    dis_limit
-                ),
-                Inst::Bgt(bgt) => handle_long_jmp_for_branch!(
-                    bgt,
-                    new_label,
-                    dis_counter,
-                    mid_reg,
-                    add_after,
-                    bb_name,
-                    dis_limit
-                ),
-                Inst::Ble(ble) => handle_long_jmp_for_branch!(
-                    ble,
-                    new_label,
-                    dis_counter,
-                    mid_reg,
-                    add_after,
-                    bb_name,
-                    dis_limit
-                ),
-                Inst::Blt(blt) => handle_long_jmp_for_branch!(
-                    blt,
-                    new_label,
-                    dis_counter,
-                    mid_reg,
-                    add_after,
-                    bb_name,
-                    dis_limit
-                ),
-                _ => {}
+                    Inst::Bne(bne) => {
+                        handle_long_jmp_for_branch!(bne, dis_counter, bb_name, dis_limit)
+                    }
+                    Inst::Bge(bge) => {
+                        handle_long_jmp_for_branch!(bge, dis_counter, bb_name, dis_limit)
+                    }
+                    Inst::Bgt(bgt) => {
+                        handle_long_jmp_for_branch!(bgt, dis_counter, bb_name, dis_limit)
+                    }
+                    Inst::Ble(ble) => {
+                        handle_long_jmp_for_branch!(ble, dis_counter, bb_name, dis_limit)
+                    }
+                    Inst::Blt(blt) => {
+                        handle_long_jmp_for_branch!(blt, dis_counter, bb_name, dis_limit)
+                    }
+                    _ => {}
+                }
             }
         }
-        to_add_afters.insert(bb_name.clone(), add_after);
     }
 
-    for (bb_name, add_after) in to_add_afters {
-        func.add_after(&bb_name, add_after);
-    }
     Ok(())
 }
 
