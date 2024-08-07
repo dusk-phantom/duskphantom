@@ -59,6 +59,12 @@ impl<'a> std::hash::Hash for CallGraphNode<'a> {
 
 impl<'a> Node for CallGraphNode<'a> {
     fn get_succ(&mut self) -> Vec<Self> {
+        // Library function does not call other functions
+        if self.fun.is_lib() {
+            return vec![];
+        }
+
+        // Find all calls in the function
         let mut result = HashSet::new();
         for bb in self.fun.dfs_iter() {
             for inst in bb.iter() {
@@ -71,6 +77,8 @@ impl<'a> Node for CallGraphNode<'a> {
                 }
             }
         }
+
+        // Deduplicate set and return
         result.into_iter().collect()
     }
 }

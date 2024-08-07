@@ -105,7 +105,13 @@ impl IRBuilder {
         inst
     }
 
-    /// Copy a instruction
+    /// Copy a instruction.
+    ///
+    /// As `Instruction::copy_self` can't access self_ptr,
+    /// operand can't be copied in copy_self with use-def chain maintained.
+    ///
+    /// `copy_instruction` does not copy operand, because
+    /// copied instruction's operand is usually reset anyway.
     pub fn copy_instruction(&mut self, inst: &dyn Instruction) -> InstPtr {
         unsafe {
             let mut inst = self.inst_pool.alloc(inst.copy_self());
