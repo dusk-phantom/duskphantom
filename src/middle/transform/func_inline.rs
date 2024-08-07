@@ -8,7 +8,7 @@ use crate::{
         analysis::call_graph::CallGraph,
         ir::{
             instruction::{misc_inst::Call, InstType},
-            BBPtr, FunPtr, InstPtr, Instruction, Operand, ParaPtr,
+            BBPtr, FunPtr, InstPtr, Instruction, Operand, ParaPtr, ValueType,
         },
         Program,
     },
@@ -70,7 +70,11 @@ impl<'a> FuncInline<'a> {
 
         // Replace call with operand of return, remove return
         let mut ret = new_func.exit.unwrap().get_last_inst();
-        inst.replace_self(&ret.get_operand()[0]);
+        if ret.get_value_type() == ValueType::Void {
+            inst.replace_self(&ret.get_operand()[0]);
+        } else {
+            inst.remove_self();
+        }
         ret.remove_self();
 
         // Wire func_exit -> after_exit
