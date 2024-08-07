@@ -146,15 +146,12 @@ impl Instruction for ICmp {
         )
     }
 
-    unsafe fn copy_self(&self) -> Box<dyn Instruction> {
-        let mut inst = Box::new(ICmp {
+    fn copy_self(&self) -> Box<dyn Instruction> {
+        Box::new(ICmp {
             op: self.op,
             comp_type: self.comp_type.clone(),
             manager: InstManager::new(ValueType::Bool),
-        });
-        inst.get_manager_mut().add_operand(self.get_lhs().clone());
-        inst.get_manager_mut().add_operand(self.get_rhs().clone());
-        inst
+        })
     }
 }
 
@@ -250,7 +247,7 @@ impl Instruction for FCmp {
         )
     }
 
-    unsafe fn copy_self(&self) -> Box<dyn Instruction> {
+    fn copy_self(&self) -> Box<dyn Instruction> {
         Box::new(FCmp {
             op: self.op,
             comp_type: self.comp_type.clone(),
@@ -267,6 +264,9 @@ pub struct Phi {
 impl Phi {
     pub fn get_incoming_values(&self) -> &[(Operand, BBPtr)] {
         &self.incoming_values
+    }
+    pub fn get_incoming_values_mut(&mut self) -> &mut [(Operand, BBPtr)] {
+        &mut self.incoming_values
     }
     pub fn add_incoming_value(&mut self, val: Operand, pred: BBPtr) {
         self.incoming_values.push((val.clone(), pred));
@@ -309,15 +309,11 @@ impl Instruction for Phi {
         res
     }
 
-    unsafe fn copy_self(&self) -> Box<dyn Instruction> {
-        let mut inst = Box::new(Phi {
-            incoming_values: self.incoming_values.clone(),
+    fn copy_self(&self) -> Box<dyn Instruction> {
+        Box::new(Phi {
+            incoming_values: vec![],
             manager: InstManager::new(self.get_value_type().clone()),
-        });
-        for (val, _) in &self.incoming_values {
-            inst.get_manager_mut().add_operand(val.clone());
-        }
-        inst
+        })
     }
 }
 
@@ -353,14 +349,10 @@ impl Instruction for Call {
         res
     }
 
-    unsafe fn copy_self(&self) -> Box<dyn Instruction> {
-        let mut inst = Box::new(Call {
+    fn copy_self(&self) -> Box<dyn Instruction> {
+        Box::new(Call {
             func: self.func,
             manager: InstManager::new(self.get_value_type()),
-        });
-        for arg in self.get_operand() {
-            inst.get_manager_mut().add_operand(arg.clone());
-        }
-        inst
+        })
     }
 }
