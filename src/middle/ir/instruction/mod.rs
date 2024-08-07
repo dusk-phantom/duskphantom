@@ -74,7 +74,7 @@ pub trait Instruction: Display {
 
     /// # Safety
     /// Do not call this function directly
-    unsafe fn copy_self(&self) -> Box<dyn Instruction>;
+    fn copy_self(&self) -> Box<dyn Instruction>;
 
     /// Returns the type of current instruction.
     fn get_type(&self) -> InstType;
@@ -109,7 +109,16 @@ pub trait Instruction: Display {
         &self.get_manager().operand
     }
 
-    /// Set the operand of cur inst by index and operand (safe and interface)
+    /// Add an operand to the instruction.
+    fn add_operand(&mut self, operand: Operand) {
+        unsafe {
+            self.get_manager_mut().add_operand(operand);
+        }
+    }
+
+    /// Set the operand of cur inst by index and operand (safe and interface).
+    /// If there are two identical inst operands, they must all be overwritten,
+    /// otherwise the use-def chain will be broken.
     ///
     /// # Panics
     /// It will panic with index out of range!
@@ -480,7 +489,7 @@ impl InstManager {
 impl InstManager {
     /// # Safety
     ///
-    /// FIXME: explain why it is unsafe,and describe the safety requirements
+    /// If index is out of bounds, the function will panic.
     pub unsafe fn set_operand(&mut self, index: usize, operand: Operand) {
         match self.operand[index] {
             Operand::Instruction(mut inst) => {

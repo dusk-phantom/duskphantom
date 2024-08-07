@@ -78,15 +78,10 @@ impl Instruction for Ret {
         }
     }
 
-    unsafe fn copy_self(&self) -> Box<dyn Instruction> {
-        let mut inst = Box::new(Ret {
+    fn copy_self(&self) -> Box<dyn Instruction> {
+        Box::new(Ret {
             manager: InstManager::new(self.get_value_type()),
-        });
-        if !self.is_void() {
-            inst.get_manager_mut()
-                .add_operand(self.get_return_value().clone());
-        }
-        inst
+        })
     }
 }
 
@@ -104,17 +99,19 @@ impl Instruction for Br {
                 next_bb[1].name
             )
         } else {
+            if next_bb.is_empty() {
+                panic!(
+                    "basic block {} has no successor but ends with br",
+                    parent_bb.name
+                );
+            }
             format!("br label %{}", next_bb[0].name)
         }
     }
 
-    unsafe fn copy_self(&self) -> Box<dyn Instruction> {
-        let mut inst = Box::new(Br {
+    fn copy_self(&self) -> Box<dyn Instruction> {
+        Box::new(Br {
             manager: InstManager::new(self.get_value_type()),
-        });
-        if self.is_cond_br() {
-            inst.get_manager_mut().add_operand(self.get_cond().clone());
-        }
-        inst
+        })
     }
 }
