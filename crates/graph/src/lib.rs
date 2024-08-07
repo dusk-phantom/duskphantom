@@ -111,6 +111,30 @@ impl<T: GraphNode> UdGraph<T> {
     }
 }
 
+impl<T: GraphNode> UdGraph<T> {
+    pub fn gen_dot(&self, graph_name: &str, node_shower: impl Fn(&T) -> String) -> String {
+        let mut res = String::new();
+        res.push_str(&format!("graph {} {{\n", graph_name));
+
+        let mut showed: HashSet<(u64, u64)> = HashSet::new();
+        for (k, v) in self.edges.iter() {
+            let from = self.get_node(*k).unwrap();
+            let from_str = node_shower(from);
+            for to in v {
+                if showed.contains(&(*k, *to)) || showed.contains(&(*to, *k)) {
+                    continue;
+                }
+                showed.insert((*k, *to));
+                let to = self.get_node(*to).unwrap();
+                let to_str = node_shower(to);
+                res.push_str(&format!("{} -- {};\n", from_str, to_str));
+            }
+        }
+        res.push_str("}\n");
+        res
+    }
+}
+
 pub struct UdGraphIter<'a, T: GraphNode> {
     graph: &'a UdGraph<T>,
     nodes_iter: std::collections::hash_map::Keys<'a, u64, T>,
