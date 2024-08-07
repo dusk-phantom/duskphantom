@@ -186,7 +186,6 @@ pub fn phisicalize_reg(func: &mut Func) -> Result<()> {
 
 /// you must make sure func 's each bb has at most two successors
 /// this func will turn a long direct jump to a redirect jump using a mid reg
-/// Note!!!: 还没考虑处理完长跳转后产生新的长跳转的情况
 /// 不过如果输入的func满足最多最后两条指令是跳转指令,那么处理长跳转的过程中不会产生新的长跳转
 pub fn handle_long_jump(func: &mut Func, mid_reg: &Reg, dis_limit: usize) -> Result<()> {
     let mut bb_idx_for_long_jmp = 0;
@@ -196,7 +195,7 @@ pub fn handle_long_jump(func: &mut Func, mid_reg: &Reg, dis_limit: usize) -> Res
         format!("{}_long_jmp_{}", &f_name, bb_idx_for_long_jmp)
     };
     // first process
-    {
+    let mut inner_process = |func: &mut Func| -> Result<()> {
         let dis_counter = func.bb_distances();
 
         let mut to_add_afters: HashMap<String, Vec<Block>> = HashMap::new();
@@ -294,31 +293,29 @@ pub fn handle_long_jump(func: &mut Func, mid_reg: &Reg, dis_limit: usize) -> Res
         for (bb_name, add_after) in to_add_afters {
             func.add_after(&bb_name, add_after)?;
         }
-    }
-    {
+        Ok(())
+    };
+
+    let check_contains_jmp = |func: &Func| -> Result<bool> {
         let dis_counter = func.bb_distances();
         macro_rules! handle_long_jmp_for_branch {
             ($branch_inst:ident,$dis_counter:ident,$bb_name:ident,$dis_limit:expr) => {{
                 let target = $branch_inst.label().clone();
                 if $dis_counter.distance_between(&$bb_name, &target).unwrap() > $dis_limit {
-                    return Err(anyhow!(
-                        "msg: long jump not handled,may be a new long jump generated"
-                    ));
+                    return Ok(true);
                 }
             }};
         }
-        for bb in func.iter_bbs_mut() {
+        for bb in func.iter_bbs() {
             let bb_name = bb.label().to_string();
-            for inst in bb.insts_mut().iter_mut().rev() {
+            for inst in bb.insts().iter().rev() {
                 match inst {
                     Inst::Jmp(jmp) => match jmp {
                         JmpInst::Long(_, _) => {}
                         JmpInst::Short(dst) => {
                             let to_bb: Label = dst.clone().try_into()?;
                             if dis_counter.distance_between(&bb_name, &to_bb).unwrap() > dis_limit {
-                                return Err(anyhow!(
-                                    "msg: long jump not handled,may be a new long jump generated"
-                                ));
+                                return Ok(true);
                             }
                         }
                     },
@@ -344,6 +341,11 @@ pub fn handle_long_jump(func: &mut Func, mid_reg: &Reg, dis_limit: usize) -> Res
                 }
             }
         }
+        Ok(false)
+    };
+    inner_process(func)?;
+    while check_contains_jmp(func)? {
+        inner_process(func)?;
     }
 
     Ok(())
