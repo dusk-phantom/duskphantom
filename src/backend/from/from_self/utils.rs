@@ -4,6 +4,16 @@ use std::collections::HashMap;
 
 use crate::middle;
 
+macro_rules! branch {
+    ($beq:ident /* beq */,  $label_map:ident /* label_map */) => {{
+        *$beq.label_mut() = $label_map
+            .get(&**$beq.label())
+            .ok_or(anyhow!("not found label"))?
+            .clone()
+            .into();
+    }};
+}
+
 impl IRBuilder {
     // pub fn label_rename_funcs(backend: &mut [Func], middle: &[FunPtr]) -> Result<()> {
     //     // 这里 zip 一起遍历, 是因为: 构造的时候就是一一对应的
@@ -39,46 +49,22 @@ impl IRBuilder {
                             .into();
                     }
                     Inst::Beq(beq) => {
-                        *beq.label_mut() = label_map
-                            .get(&**beq.label())
-                            .ok_or(anyhow!("not found label"))?
-                            .clone()
-                            .into();
+                        branch!(beq, label_map);
                     }
                     Inst::Bne(bne) => {
-                        *bne.label_mut() = label_map
-                            .get(&**bne.label())
-                            .ok_or(anyhow!("not found label"))?
-                            .clone()
-                            .into();
+                        branch!(bne, label_map);
                     }
                     Inst::Blt(blt) => {
-                        *blt.label_mut() = label_map
-                            .get(&**blt.label())
-                            .ok_or(anyhow!("not found label"))?
-                            .clone()
-                            .into();
+                        branch!(blt, label_map);
                     }
                     Inst::Ble(ble) => {
-                        *ble.label_mut() = label_map
-                            .get(&**ble.label())
-                            .ok_or(anyhow!("not found label"))?
-                            .clone()
-                            .into();
+                        branch!(ble, label_map);
                     }
                     Inst::Bgt(bgt) => {
-                        *bgt.label_mut() = label_map
-                            .get(&**bgt.label())
-                            .ok_or(anyhow!("not found label"))?
-                            .clone()
-                            .into();
+                        branch!(bgt, label_map);
                     }
                     Inst::Bge(bge) => {
-                        *bge.label_mut() = label_map
-                            .get(&**bge.label())
-                            .ok_or(anyhow!("not found label"))?
-                            .clone()
-                            .into();
+                        branch!(bge, label_map);
                     }
                     _ => { /* do nothing */ }
                 }
