@@ -14,3 +14,5 @@ pub mod vec_util;
 pub mod diff;
 
 pub mod maybe_owned;
+
+pub mod traverse;
