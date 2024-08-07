@@ -1,4 +1,6 @@
+use core::fmt;
 use std::collections::HashSet;
+use std::fmt::{Debug, Formatter};
 
 use super::*;
 use super::{block::Block, gen_asm::GenTool};
@@ -215,7 +217,6 @@ pub struct BBDistanceCounter {
     num_insts: Vec<(String, usize)>,
 }
 impl BBDistanceCounter {
-    /// FIXME: test needed
     pub fn distance_between(&self, from: &str, to: &str) -> Option<usize> {
         let from_idx = self.num_insts.iter().position(|(label, _)| label == from)?;
         let to_idx = self.num_insts.iter().position(|(label, _)| label == to)?;
@@ -236,7 +237,6 @@ impl BBDistanceCounter {
 }
 /// helper method for handling long jmp
 impl Func {
-    /// FIXME: test needed
     pub fn bb_distances(&self) -> BBDistanceCounter {
         let num_insts: Vec<(String, usize)> = self
             .iter_bbs()
@@ -246,10 +246,18 @@ impl Func {
         BBDistanceCounter { num_insts }
     }
 
-    #[allow(unused)]
-    /// FIXME:
     pub fn add_after(&mut self, bb: &str, add_after: Vec<Block>) -> Result<()> {
-        unimplemented!();
+        if self.entry.label() == bb {
+            self.other_bbs.splice(0..0, add_after);
+        } else {
+            let idx = self
+                .other_bbs
+                .iter()
+                .position(|b| b.label() == bb)
+                .ok_or_else(|| anyhow!("no such bb {}", bb))?;
+            self.other_bbs.splice(idx + 1..idx + 1, add_after);
+        }
+        Ok(())
     }
 }
 
@@ -258,6 +266,22 @@ pub struct BBIter<'a> {
     entry: &'a Block,
     other_bbs: Vec<&'a Block>,
     idx: usize,
+}
+impl Debug for BBIter<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BBIter")
+            .field("entry", &self.entry.label())
+            .field(
+                "other_bbs",
+                &self
+                    .other_bbs
+                    .iter()
+                    .map(|bb| bb.label())
+                    .collect::<Vec<_>>(),
+            )
+            .field("idx", &self.idx)
+            .finish()
+    }
 }
 impl<'a> Iterator for BBIter<'a> {
     type Item = &'a Block;
@@ -276,7 +300,12 @@ impl<'a> Iterator for BBIter<'a> {
 
 #[cfg(test)]
 mod tests {
+    use insta::assert_debug_snapshot;
+
     use super::*;
+    fn new_bb(n: &str) -> Block {
+        Block::new(n.to_string())
+    }
 
     #[test]
     fn test_iter_bb_order() {
@@ -305,5 +334,97 @@ mod tests {
         assert_eq!(func.args.len(), 0);
         assert_eq!(func.entry().label(), "entry");
         assert_eq!(func.ret(), None); // default return type is void
+    }
+
+    #[test]
+    fn test_add_after() {
+        let mut func = Func::new("main".to_string(), vec![], new_bb("entry"));
+        func.push_bb(new_bb("bb1"));
+        func.push_bb(new_bb("bb2"));
+
+        let new_bbs = vec![new_bb("new1"), new_bb("new2")];
+        func.add_after("entry", new_bbs).unwrap();
+
+        let iter = func.iter_bbs();
+        assert_debug_snapshot!(iter,@r###"
+        BBIter {
+            entry: "entry",
+            other_bbs: [
+                "new1",
+                "new2",
+                "bb1",
+                "bb2",
+            ],
+            idx: 0,
+        }
+        "###);
+    }
+
+    #[test]
+    fn test_add_after2() {
+        let mut func = Func::new("main".to_string(), vec![], new_bb("entry"));
+        func.push_bb(new_bb("bb1"));
+        func.push_bb(new_bb("bb2"));
+
+        let new_bbs = vec![new_bb("new1"), new_bb("new2")];
+        func.add_after("bb1", new_bbs).unwrap();
+
+        let iter = func.iter_bbs();
+        assert_debug_snapshot!(iter,@r###"
+        BBIter {
+            entry: "entry",
+            other_bbs: [
+                "bb1",
+                "new1",
+                "new2",
+                "bb2",
+            ],
+            idx: 0,
+        }
+        "###);
+    }
+
+    #[test]
+    fn test_add_after3() {
+        let mut func = Func::new("main".to_string(), vec![], new_bb("entry"));
+        func.push_bb(new_bb("bb1"));
+        func.push_bb(new_bb("bb2"));
+        let new_bbs = vec![new_bb("new1"), new_bb("new2")];
+        func.add_after("bb2", new_bbs).unwrap();
+        let iter = func.iter_bbs();
+        assert_debug_snapshot!(iter,@r###"
+        BBIter {
+            entry: "entry",
+            other_bbs: [
+                "bb1",
+                "bb2",
+                "new1",
+                "new2",
+            ],
+            idx: 0,
+        }
+        "###);
+    }
+
+    #[test]
+    fn test_dis_counter() {
+        let fill_insts = |bb: &mut Block, num: usize| {
+            for _ in 0..num {
+                bb.push_inst(MvInst::new(REG_A0.into(), REG_A1.into()).into());
+            }
+        };
+        let mut func = Func::new("main".to_string(), vec![], new_bb("entry"));
+        fill_insts(func.entry_mut(), 3);
+        let mut bb1 = new_bb("bb1");
+        fill_insts(&mut bb1, 2);
+        let mut bb2 = new_bb("bb2");
+        fill_insts(&mut bb2, 4);
+        func.push_bb(bb1);
+        func.push_bb(bb2);
+        let dis_counter = func.bb_distances();
+        assert_eq!(dis_counter.distance_between("entry", "bb1"), Some(0));
+        assert_eq!(dis_counter.distance_between("entry", "bb2"), Some(2));
+        assert_eq!(dis_counter.distance_between("bb1", "bb2"), Some(0));
+        assert_eq!(dis_counter.distance_between("bb2", "bb1"), Some(6));
     }
 }
