@@ -236,6 +236,7 @@ impl BBDistanceCounter {
 }
 /// helper method for handling long jmp
 impl Func {
+    /// FIXME: test needed
     pub fn bb_distances(&self) -> BBDistanceCounter {
         let num_insts: Vec<(String, usize)> = self
             .iter_bbs()
@@ -243,6 +244,12 @@ impl Func {
             .collect();
 
         BBDistanceCounter { num_insts }
+    }
+
+    #[allow(unused)]
+    /// FIXME:
+    pub fn add_after(&mut self, bb: &str, add_after: Vec<Block>) -> Result<()> {
+        unimplemented!();
     }
 }
 
