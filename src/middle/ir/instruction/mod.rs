@@ -109,7 +109,9 @@ pub trait Instruction: Display {
         &self.get_manager().operand
     }
 
-    /// Set the operand of cur inst by index and operand (safe and interface)
+    /// Set the operand of cur inst by index and operand (safe and interface).
+    /// If there are two identical inst operands, they must all be overwritten,
+    /// otherwise the use-def chain will be broken.
     ///
     /// # Panics
     /// It will panic with index out of range!
