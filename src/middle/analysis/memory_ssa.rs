@@ -45,6 +45,14 @@ impl<'a> MemorySSA<'a> {
         memory_ssa
     }
 
+    pub fn get_inst_node(&self, inst: InstPtr) -> Option<NodePtr> {
+        self.inst_to_node.get(&inst).cloned()
+    }
+
+    pub fn get_block_node(&self, bb: BBPtr) -> Option<NodePtr> {
+        self.block_to_node.get(&bb).cloned()
+    }
+
     pub fn get_user(&self, node: NodePtr) -> HashSet<NodePtr> {
         self.node_to_user.get(&node).cloned().unwrap_or_default()
     }
@@ -275,6 +283,21 @@ pub enum Node {
 }
 
 impl Node {
+    pub fn get_inst(&self) -> Option<InstPtr> {
+        match self {
+            Node::Normal(_, _, _, inst) => Some(*inst),
+            _ => None,
+        }
+    }
+
+    pub fn get_id(&self) -> usize {
+        match self {
+            Node::Entry(id) => *id,
+            Node::Normal(id, _, _, _) => *id,
+            Node::Phi(id, _, _) => *id,
+        }
+    }
+
     fn add_phi_arg(&mut self, arg: (BBPtr, NodePtr)) {
         match self {
             Node::Phi(_, args, _) => args.push(arg),
@@ -293,14 +316,6 @@ impl Node {
         match self {
             Node::Phi(_, _, range) => range.merge(another),
             _ => panic!("not a phi node"),
-        }
-    }
-
-    fn get_id(&self) -> usize {
-        match self {
-            Node::Entry(id) => *id,
-            Node::Normal(id, _, _, _) => *id,
-            Node::Phi(id, _, _) => *id,
         }
     }
 }
