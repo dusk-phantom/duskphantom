@@ -17,7 +17,7 @@ fn handle_block_scheduling(insts: &[Inst]) -> Result<Vec<Inst>> {
     // 1. 构造依赖图
     let mut graph = Graph::new(insts);
     // TODO while 循环, 进行指令调度
-    while !graph.graph.is_empty() {
+    while !graph.deps.is_empty() {
         // 1. 队列中所有的 cnt --
         for state in queue.iter_mut() {
             state.cnt -= 1;
@@ -25,16 +25,15 @@ fn handle_block_scheduling(insts: &[Inst]) -> Result<Vec<Inst>> {
         // 2. 找到 cnt == 0 的指令, 从队列中删除, 并且删除依赖
         for i in (0..queue.len()) {
             if queue[i].cnt == 0 {
-                let ready = &queue[i].op; // def -> ready
-                let def_inst = *graph.defs.get(ready).ok_or(anyhow!("not found in defs"))?;
-                graph.del_node(def_inst);
+                let def_rdy = queue[i].def; // def -> ready
+                graph.del_node(def_rdy);
                 queue.remove(i);
             }
         }
         // 3. 搜集 indegree == 0 的节点
         let no_deps = graph.collect_no_deps();
         // 4. 选取两条指令
-        let (inst1, inst2) = graph.select2_inst(&no_deps);
+        let (inst1, inst2) = graph.select2_inst(&no_deps).with_context(|| context!())?;
         if let Some((state_operand, inst)) = inst1 {
             // 5. emit 两条指令
             new_insts.push(inst);
@@ -54,23 +53,16 @@ fn handle_block_scheduling(insts: &[Inst]) -> Result<Vec<Inst>> {
 
 /* ---------- ---------- 数据结构 ---------- ---------- */
 
+type InstID = usize;
+
 /// 看看 operand 准备的咋样了
 struct StateOperand {
-    op: WrapOperand,
+    /// 定义的指令
+    def: InstID,
     cnt: usize,
 }
 
-type InstID = usize;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-enum WrapOperand {
-    /// lw, ld, sw, sd 会用这个, 保证相对顺序
-    /// jmp, ret 会用这个, 保证在倒数第二条指令之后
-    PreInst(InstID),
-    Stack(StackSlot),
-    Reg(Reg),
-}
-
+#[derive(Eq, PartialEq, Debug, Hash)]
 enum InstType {
     Integer,
     Mul,
@@ -151,11 +143,9 @@ impl Inst {
 #[derive(Debug)]
 struct Graph<'a> {
     /// 依赖图, 指向所依赖的指令
-    graph: HashMap<InstID /* use */, HashSet<InstID> /* def */>,
-    /// 一个 bb 中只有一个 def, 即使是中端来的 phi, 在一个 bb 中也只有一个 def
-    defs: HashMap<WrapOperand, InstID>,
-    /// 注意, 这个 uses 会出现 : 来自其他 bb 的寄存器
-    uses: HashMap<WrapOperand, HashSet<InstID>>,
+    deps: HashMap<InstID /* use */, HashSet<InstID> /* def */>,
+    /// 反向依赖图
+    anti: HashMap<InstID /* def */, HashSet<InstID> /* use */>,
     /// <id, WrapInst>
     insts: &'a [Inst],
 }
@@ -173,7 +163,7 @@ impl<'a> Graph<'a> {
             ));
         }
 
-        for (id, deps) in self.graph.iter() {
+        for (id, deps) in self.deps.iter() {
             for dep in deps.iter() {
                 dot.push_str(&format!("node{} -> node{};\n", dep, id));
             }
@@ -189,47 +179,83 @@ impl<'a> Graph<'a> {
     fn select2_inst(
         &self,
         avail: &[InstID],
-    ) -> (Option<(StateOperand, Inst)>, Option<(StateOperand, Inst)>) {
+    ) -> Result<(Option<(StateOperand, Inst)>, Option<(StateOperand, Inst)>)> {
+        // 空的情况
+        if avail.is_empty() {
+            return Ok((None, None));
+        }
+        // 有两个的情况
+        for i in 0..avail.len() {
+            for j in (i + 1)..avail.len() {
+                let inst1 = &self.insts[avail[i]];
+                let (latency1, inst_type1) = inst1.character().with_context(|| context!())?;
+                let inst2 = &self.insts[avail[j]];
+                let (latency2, inst_type2) = inst2.character().with_context(|| context!())?;
+                if inst_type1 != inst_type2
+                    || (inst_type1 == inst_type2 && inst_type1 == InstType::Integer)
+                {
+                    todo!();
+                }
+            }
+        }
+        // 只有一个的情况
+        let inst1 = &self.insts[avail[0]];
+        let (latency1, inst_type1) = inst1.character().with_context(|| context!())?;
+
         todo!()
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+enum WrapOperand {
+    /// lw, ld, sw, sd 会用这个, 保证相对顺序
+    /// jmp, ret 会用这个, 保证在倒数第二条指令之后
+    PreInst(InstID),
+    Stack(StackSlot),
+    Reg(Reg),
 }
 
 impl<'a> Graph<'a> {
     fn new(insts: &'a [Inst]) -> Self {
         let (defs, uses) = Self::construct_defs_uses(insts);
-        let mut graph: HashMap<InstID, HashSet<InstID>> = HashMap::new();
+        // 依赖图
+        let mut deps: HashMap<InstID, HashSet<InstID>> = HashMap::new();
         for (operand, use_insts) in uses.iter() {
             if let WrapOperand::PreInst(pre_mem_inst_id) = operand {
                 // sw/sd/lw/ld
                 for use_id in use_insts {
                     if use_id != pre_mem_inst_id {
-                        graph.entry(*use_id).or_default().insert(*pre_mem_inst_id);
+                        deps.entry(*use_id).or_default().insert(*pre_mem_inst_id);
                     }
                 }
             } else if let Some(def_inst) = defs.get(operand) {
                 for use_id in use_insts {
                     if use_id != def_inst {
-                        graph.entry(*use_id).or_default().insert(*def_inst);
+                        deps.entry(*use_id).or_default().insert(*def_inst);
                     }
                 }
             }
         }
         // 还剩下一些指令, 比方说 lla/li 只有 def 没有 use
         for (id, inst) in insts.iter().enumerate() {
-            graph.entry(id).or_default();
+            deps.entry(id).or_default();
         }
-        Self {
-            graph,
-            defs,
-            uses,
-            insts,
+
+        // 反向依赖图
+        let mut anti: HashMap<InstID, HashSet<InstID>> = HashMap::new();
+        for (u, d) in deps.iter() {
+            for dep in d.iter() {
+                anti.entry(*dep).or_default().insert(*u);
+            }
         }
+
+        Self { deps, anti, insts }
     }
 
     #[inline]
     fn collect_no_deps(&self) -> Vec<InstID> {
         let mut no_deps = Vec::new();
-        for (id, deps) in self.graph.iter() {
+        for (id, deps) in self.deps.iter() {
             if deps.is_empty() {
                 no_deps.push(*id);
             }
@@ -238,11 +264,16 @@ impl<'a> Graph<'a> {
     }
 
     #[inline]
-    fn del_node(&mut self, id: InstID) {
-        self.graph.remove(&id);
-        for deps in self.graph.values_mut() {
-            deps.remove(&id);
+    fn del_node(&mut self, id: InstID) -> Result<()> {
+        let use_insts = self.anti.get(&id).ok_or(anyhow!("id not found"))?;
+        for use_inst in use_insts.iter() {
+            self.deps
+                .get_mut(use_inst)
+                .ok_or(anyhow!("id not found"))?
+                .remove(&id);
         }
+        self.anti.remove(&id);
+        Ok(())
     }
 }
 
@@ -348,6 +379,8 @@ impl<'a> Graph<'a> {
                         let wrap = WrapOperand::PreInst(pre);
                         uses.entry(wrap).or_default().insert(id);
                     }
+                    // beq xx, xx, label
+                    // jmp
                 }
                 Inst::Ld(_) | Inst::Lw(_) => {
                     insert_defs!(inst, defs, id);
@@ -483,7 +516,7 @@ mod tests {
         let bb = f.entry();
         let insts = bb.insts();
         let graph = Graph::new(insts);
-        dbg!(&graph.graph);
+        dbg!(&graph.deps);
         println!("{}", f.entry().ordered_insts_text());
         dbg!(&graph.collect_no_deps());
     }
@@ -495,5 +528,6 @@ mod tests {
         let graph = Graph::new(insts);
         let dot = graph.gen_inst_dependency_graph_dot();
         println!("{}", dot);
+        println!("{}", f.entry().gen_asm());
     }
 }
