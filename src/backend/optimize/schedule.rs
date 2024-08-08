@@ -38,8 +38,6 @@ fn handle_block_scheduling(insts: &[Inst]) -> Result<Vec<Inst>> {
         let (inst1, inst2) = graph.select2_inst(&no_deps);
         if let Some(inst1) = inst1 {
             // 5. emit 两条指令
-            let inst1 = &graph.insts[inst1];
-            new_insts.push(inst1.inst.clone());
             // 6. 初始化状态并加入到队列中
         }
         // 6. 加入队列中
@@ -74,8 +72,9 @@ struct WrapInst {
 }
 
 enum InstType {
-    Arithmetic,
-    MulDivRem,
+    Integer,
+    Mul,
+    DivRem,
     MemAccess,
     FloatPoint,
     /// 直接跳转/间接跳转
@@ -83,6 +82,7 @@ enum InstType {
 }
 
 impl WrapInst {
+    #[inline]
     fn character(&self) -> Result<(usize /* latency */, InstType)> {
         macro_rules! arithmn_char {
             ($add:ident) => {
@@ -92,13 +92,14 @@ impl WrapInst {
                     .ok_or(anyhow!("arithmn's dst is not reg"))?
                     .is_usual()
                 {
-                    Ok((1, InstType::Arithmetic))
+                    Ok((1, InstType::Integer))
                 } else {
                     Ok((4, InstType::FloatPoint))
                 }
             };
         }
         match &self.inst {
+            /* int or float */
             Inst::Add(add) => arithmn_char!(add),
             Inst::Sub(sub) => arithmn_char!(sub),
             Inst::Sll(sll) => arithmn_char!(sll),
@@ -115,32 +116,34 @@ impl WrapInst {
             Inst::Seqz(seqz) => arithmn_char!(seqz),
             Inst::Snez(snez) => arithmn_char!(snez),
             Inst::Mv(mv) => arithmn_char!(mv),
-            Inst::Li(_) | Inst::Lla(_) => Ok((1, InstType::Arithmetic)),
+            /* int */
+            Inst::LocalAddr(_) => Ok((1, InstType::Integer)),
+            Inst::Li(_) | Inst::Lla(_) => Ok((1, InstType::Integer)),
+            /* mem access */
             Inst::F2i(_) | Inst::Fles(_) | Inst::Feqs(_) | Inst::Flts(_) | Inst::I2f(_) => {
                 Ok((4, InstType::FloatPoint))
             }
-            Inst::Ld(_) => todo!(),
-            Inst::Sd(_) => todo!(),
-            Inst::Lw(_) => todo!(),
-            Inst::Sw(_) => todo!(),
-            Inst::Load(_) => todo!(),
-            Inst::Store(_) => todo!(),
-            Inst::LocalAddr(_) => todo!(),
-
-            Inst::Jmp(_) => todo!(),
-            Inst::Beq(_) => todo!(),
-            Inst::Bne(_) => todo!(),
-            Inst::Blt(_) => todo!(),
-            Inst::Ble(_) => todo!(),
-            Inst::Bgt(_) => todo!(),
-            Inst::Bge(_) => todo!(),
-            Inst::Call(_) => todo!(),
-            Inst::Tail(_) => todo!(),
-            Inst::Ret => todo!(),
-            Inst::Mul(_) => todo!(),
-            Inst::Div(_) => todo!(),
-            Inst::UDiv(_) => todo!(),
-            Inst::Rem(_) => todo!(),
+            /* mem access */
+            Inst::Ld(_)
+            | Inst::Sd(_)
+            | Inst::Lw(_)
+            | Inst::Sw(_)
+            | Inst::Load(_)
+            | Inst::Store(_) => Ok((3, InstType::MemAccess)),
+            /* jmp */
+            Inst::Jmp(_)
+            | Inst::Beq(_)
+            | Inst::Bne(_)
+            | Inst::Blt(_)
+            | Inst::Ble(_)
+            | Inst::Bgt(_)
+            | Inst::Bge(_)
+            | Inst::Call(_)
+            | Inst::Ret
+            | Inst::Tail(_) => Ok((1, InstType::Jmp)),
+            /* div mul */
+            Inst::Mul(_) => Ok((5, InstType::Mul)),
+            Inst::Div(_) | Inst::UDiv(_) | Inst::Rem(_) => Ok((6, InstType::DivRem)),
         }
     }
 }
@@ -159,7 +162,7 @@ struct Graph {
 
 impl Graph {
     /// 选择两条指令出来
-    fn select2_inst(&self, avail: &[InstID]) -> (Option<InstID>, Option<InstID>) {
+    fn select2_inst(&self, avail: &[InstID]) -> (Option<StateOperand>, Option<StateOperand>) {
         todo!()
     }
 }
