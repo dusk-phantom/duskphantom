@@ -41,6 +41,14 @@ impl Block {
         }
         live_def
     }
+
+    pub fn ordered_insts_text(&self) -> String {
+        self.insts()
+            .iter()
+            .enumerate()
+            .map(|(i, inst)| format!("{}:\n{}", i, inst.gen_asm()))
+            .fold(String::new(), |acc, x| acc + &x)
+    }
 }
 
 /// impl Some functionality for reg alloc
