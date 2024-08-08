@@ -45,16 +45,17 @@ pub fn optimize(program: &mut prog::Program) -> Result<()> {
 
 #[allow(unused)]
 pub fn optimize_func(func: &mut Func) -> Result<()> {
-    // inst split? 将一条指令拆分成多条
-    inst_split::handle_mul_div_opt(func)?;
-    phisicalize::handle_illegal_inst(func)?;
-    // inst_split::handle_li(func)?;
-
     // inst combine? 匹配一些模式,将多条指令合并成一条
+    fprintln!("log/before_inst_combine.s", "{}", func.gen_asm());
     inst_combine::handle_inst_combine(func)?;
 
+    // inst split? 将一条指令拆分成多条
+    inst_split::handle_mul_div_opt(func)?;
+
+    phisicalize::handle_illegal_inst(func)?;
+
     // inst scheduling
-    schedule::handle_inst_scheduling(func)?;
+    // schedule::handle_inst_scheduling(func)?;
 
     phisicalize::handle_long_jump(func, &REG_T0, 20_0000);
 
