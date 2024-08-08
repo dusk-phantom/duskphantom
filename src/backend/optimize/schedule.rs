@@ -73,9 +73,6 @@ impl Graph {
         for (operand, use_insts) in uses.iter() {
             if let WrapOperand::PreInst(pre_mem_inst_id) = operand {
                 // sw/sd/lw/ld
-                if *pre_mem_inst_id == usize::MAX {
-                    continue; // 说明是当前基本块的第一个 mem access
-                }
                 for use_id in use_insts {
                     if use_id != pre_mem_inst_id {
                         graph.entry(*use_id).or_default().insert(*pre_mem_inst_id);
@@ -98,6 +95,25 @@ impl Graph {
             defs,
             uses,
             insts,
+        }
+    }
+
+    #[inline]
+    fn collect_no_deps(&self) -> Vec<InstID> {
+        let mut no_deps = Vec::new();
+        for (id, deps) in self.graph.iter() {
+            if deps.is_empty() {
+                no_deps.push(*id);
+            }
+        }
+        no_deps
+    }
+
+    #[inline]
+    fn del_node(&mut self, id: InstID) {
+        self.graph.remove(&id);
+        for deps in self.graph.values_mut() {
+            deps.remove(&id);
         }
     }
 }
@@ -139,7 +155,7 @@ impl Graph {
         let mut uses: HashMap<WrapOperand, HashSet<InstID>> = HashMap::new();
 
         // 上一条 sw/lw/sd/ld 指令的 id
-        let mut pre_mem_inst: InstID = usize::MAX;
+        let mut pre_mem_inst: InstID = 0;
 
         for (id, inst) in insts.iter().enumerate() {
             // 添加 wrap_insts
@@ -238,17 +254,6 @@ impl Graph {
             }
         }
         (wrap_insts, defs, uses)
-    }
-
-    #[inline]
-    fn collect_no_deps(&self) -> Vec<InstID> {
-        let mut no_deps = Vec::new();
-        for (id, deps) in self.graph.iter() {
-            if deps.is_empty() {
-                no_deps.push(*id);
-            }
-        }
-        no_deps
     }
 }
 
