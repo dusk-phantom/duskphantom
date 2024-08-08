@@ -31,16 +31,22 @@ fn handle_block_scheduling(insts: &[Inst]) -> Result<Vec<Inst>> {
                 queue.remove(i);
             }
         }
-
         // 3. 搜集 indegree == 0 的节点
         let no_deps = graph.collect_no_deps();
         // 4. 选取两条指令
         let (inst1, inst2) = graph.select2_inst(&no_deps);
-        if let Some(inst1) = inst1 {
+        if let Some((state_operand, inst)) = inst1 {
             // 5. emit 两条指令
+            new_insts.push(inst);
             // 6. 初始化状态并加入到队列中
+            queue.push(state_operand);
         }
-        // 6. 加入队列中
+        if let Some((state_operand, inst)) = inst2 {
+            // 5. emit 两条指令
+            new_insts.push(inst);
+            // 6. 初始化状态并加入到队列中
+            queue.push(state_operand);
+        }
     }
 
     Ok(new_insts)
@@ -84,12 +90,12 @@ enum InstType {
 impl WrapInst {
     #[inline]
     fn character(&self) -> Result<(usize /* latency */, InstType)> {
-        macro_rules! arithmn_char {
+        macro_rules! arithmetic_char {
             ($add:ident) => {
                 if $add
                     .dst()
                     .reg()
-                    .ok_or(anyhow!("arithmn's dst is not reg"))?
+                    .ok_or(anyhow!("arithmetic's dst is not reg"))?
                     .is_usual()
                 {
                     Ok((1, InstType::Integer))
@@ -100,22 +106,22 @@ impl WrapInst {
         }
         match &self.inst {
             /* int or float */
-            Inst::Add(add) => arithmn_char!(add),
-            Inst::Sub(sub) => arithmn_char!(sub),
-            Inst::Sll(sll) => arithmn_char!(sll),
-            Inst::Srl(srl) => arithmn_char!(srl),
-            Inst::SRA(sra) => arithmn_char!(sra),
-            Inst::Not(not_) => arithmn_char!(not_),
-            Inst::And(and_) => arithmn_char!(and_),
-            Inst::Or(or_) => arithmn_char!(or_),
-            Inst::Xor(xor) => arithmn_char!(xor),
-            Inst::Neg(neg) => arithmn_char!(neg),
-            Inst::Slt(slt) => arithmn_char!(slt),
-            Inst::Sltu(sltu) => arithmn_char!(sltu),
-            Inst::Sgtu(sgtu) => arithmn_char!(sgtu),
-            Inst::Seqz(seqz) => arithmn_char!(seqz),
-            Inst::Snez(snez) => arithmn_char!(snez),
-            Inst::Mv(mv) => arithmn_char!(mv),
+            Inst::Add(add) => arithmetic_char!(add),
+            Inst::Sub(sub) => arithmetic_char!(sub),
+            Inst::Sll(sll) => arithmetic_char!(sll),
+            Inst::Srl(srl) => arithmetic_char!(srl),
+            Inst::SRA(sra) => arithmetic_char!(sra),
+            Inst::Not(not_) => arithmetic_char!(not_),
+            Inst::And(and_) => arithmetic_char!(and_),
+            Inst::Or(or_) => arithmetic_char!(or_),
+            Inst::Xor(xor) => arithmetic_char!(xor),
+            Inst::Neg(neg) => arithmetic_char!(neg),
+            Inst::Slt(slt) => arithmetic_char!(slt),
+            Inst::Sltu(sltu) => arithmetic_char!(sltu),
+            Inst::Sgtu(sgtu) => arithmetic_char!(sgtu),
+            Inst::Seqz(seqz) => arithmetic_char!(seqz),
+            Inst::Snez(snez) => arithmetic_char!(snez),
+            Inst::Mv(mv) => arithmetic_char!(mv),
             /* int */
             Inst::LocalAddr(_) => Ok((1, InstType::Integer)),
             Inst::Li(_) | Inst::Lla(_) => Ok((1, InstType::Integer)),
@@ -185,7 +191,11 @@ impl<'a> Graph<'a> {
 
 impl<'a> Graph<'a> {
     /// 选择两条指令出来
-    fn select2_inst(&self, avail: &[InstID]) -> (Option<StateOperand>, Option<StateOperand>) {
+    #[allow(clippy::type_complexity)]
+    fn select2_inst(
+        &self,
+        avail: &[InstID],
+    ) -> (Option<(StateOperand, Inst)>, Option<(StateOperand, Inst)>) {
         todo!()
     }
 }
@@ -352,7 +362,7 @@ impl<'a> Graph<'a> {
                     uses.entry(wrap).or_default().insert(id);
                     /* ----- 不要忘了 use ----- */
                     insert_uses!(inst, uses, id);
-                    pre_store = id;
+                    // pre_store = id;
                 }
                 Inst::Sd(_) | Inst::Sw(_) => {
                     insert_uses!(inst, uses, id);
