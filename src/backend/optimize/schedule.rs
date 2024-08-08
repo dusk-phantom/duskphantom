@@ -71,12 +71,6 @@ enum WrapOperand {
     Reg(Reg),
 }
 
-#[derive(Debug)]
-struct WrapInst {
-    id: InstID,
-    inst: Inst,
-}
-
 enum InstType {
     Integer,
     Mul,
@@ -87,7 +81,7 @@ enum InstType {
     Jmp,
 }
 
-impl WrapInst {
+impl Inst {
     #[inline]
     fn character(&self) -> Result<(usize /* latency */, InstType)> {
         macro_rules! arithmetic_char {
@@ -104,7 +98,7 @@ impl WrapInst {
                 }
             };
         }
-        match &self.inst {
+        match self {
             /* int or float */
             Inst::Add(add) => arithmetic_char!(add),
             Inst::Sub(sub) => arithmetic_char!(sub),
