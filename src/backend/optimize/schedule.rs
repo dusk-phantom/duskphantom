@@ -54,6 +54,7 @@ struct WrapInst {
     inst: Inst,
 }
 
+#[derive(Debug)]
 struct Graph {
     /// 依赖图, 指向所依赖的指令
     graph: HashMap<InstID /* use */, HashSet<InstID> /* def */>,
@@ -196,12 +197,16 @@ impl Graph {
                 }
                 Inst::Ld(_) | Inst::Lw(_) => {
                     insert_defs!(inst, defs, id);
+                    /* ----- 这是为了确保 mem access 指令顺序一致 ----- */
                     let wrap = WrapOperand::Global(pre_mem_inst);
                     uses.entry(wrap).or_default().insert(id);
+                    /* ----- 不要忘了 use ----- */
+                    insert_uses!(inst, uses, id);
                     pre_mem_inst = id;
                 }
                 Inst::Sd(_) | Inst::Sw(_) => {
                     insert_uses!(inst, uses, id);
+                    /* ----- 这是为了确保 mem access 指令顺序一致 ----- */
                     let wrap = WrapOperand::Global(pre_mem_inst);
                     defs.insert(wrap, id);
                     pre_mem_inst = id;
@@ -219,5 +224,111 @@ impl Graph {
             }
         }
         (wrap_insts, defs, uses)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn consturct_func() -> Func {
+        let mut entry = Block::new("entry".to_string());
+        let ssa = StackAllocator::new();
+        let mut rg = RegGenerator::new();
+
+        // lla x33, sum
+        let x32 = rg.gen_virtual_usual_reg();
+        let addr = rg.gen_virtual_usual_reg();
+        let lla = LlaInst::new(addr, "sum".into());
+        entry.push_inst(lla.into());
+
+        // lw x32, 0(x33)
+        let lw = LwInst::new(x32, (0).into(), addr);
+        entry.push_inst(lw.into());
+
+        // lla x35, a
+        let x34 = rg.gen_virtual_usual_reg();
+        let addr = rg.gen_virtual_usual_reg();
+        let lla = LlaInst::new(addr, "a".into());
+        entry.push_inst(lla.into());
+
+        // lw x34, 0(x35)
+        let lw = LwInst::new(x34, (0).into(), addr);
+        entry.push_inst(lw.into());
+
+        // addw x36, x34, x32
+        let x36 = rg.gen_virtual_usual_reg();
+        let add = AddInst::new(x36.into(), x34.into(), x32.into());
+        entry.push_inst(add.into());
+
+        // lla x37, sum
+        let addr = rg.gen_virtual_usual_reg();
+        let lla = LlaInst::new(addr, "sum".into());
+        entry.push_inst(lla.into());
+
+        // sw x36, 0(x37)
+        let sw = SwInst::new(x36, (0).into(), addr);
+        entry.push_inst(sw.into());
+
+        // call getA
+        let mut call = CallInst::new("getA".into());
+        call.add_def(REG_A0);
+        entry.push_inst(call.into());
+
+        // mv x38, a0
+        let x38 = rg.gen_virtual_usual_reg();
+        let mv = MvInst::new(x38.into(), REG_A0.into());
+        entry.push_inst(mv.into());
+
+        // lla x40, sum
+        let x39 = rg.gen_virtual_usual_reg();
+        let addr = rg.gen_virtual_usual_reg();
+        let lla = LlaInst::new(addr, "sum".into());
+        entry.push_inst(lla.into());
+
+        // lw x39, 0(x40)
+        let lw = LwInst::new(x39, (0).into(), addr);
+        entry.push_inst(lw.into());
+
+        // lla x42, a
+        let x41 = rg.gen_virtual_usual_reg();
+        let addr = rg.gen_virtual_usual_reg();
+        let lla = LlaInst::new(addr, "a".into());
+        entry.push_inst(lla.into());
+
+        // lw x41, 0(x42)
+        let lw = LwInst::new(x41, (0).into(), addr);
+        entry.push_inst(lw.into());
+
+        // addw x43, x41, x39
+        let x43 = rg.gen_virtual_usual_reg();
+        let add = AddInst::new(x43.into(), x41.into(), x39.into());
+        entry.push_inst(add.into());
+
+        // lla x44, sum
+        let addr = rg.gen_virtual_usual_reg();
+        let lla = LlaInst::new(addr, "sum".into());
+        entry.push_inst(lla.into());
+
+        // sw x43, 0(x44)
+        let sw = SwInst::new(x43, (0).into(), addr);
+        entry.push_inst(sw.into());
+
+        entry.push_inst(Inst::Ret);
+
+        let mut f = Func::new("f2".to_string(), vec![], entry);
+        f.stack_allocator_mut().replace(ssa);
+        f.reg_gener_mut().replace(rg);
+        f
+    }
+
+    #[test]
+    fn construct_graph_test() {
+        let f = consturct_func();
+        let bb = f.entry();
+        let insts = bb.insts();
+        let graph = Graph::new(insts);
+        dbg!(graph);
+        println!("{}", f.gen_asm());
     }
 }
