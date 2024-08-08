@@ -23,7 +23,7 @@ fn handle_block_scheduling(insts: &[Inst]) -> Result<Vec<Inst>> {
             state.cnt -= 1;
         }
         // 2. 找到 cnt == 0 的指令, 从队列中删除, 并且删除依赖
-        for i in (0..queue.len()) {
+        for i in 0..queue.len() {
             if queue[i].cnt == 0 {
                 let def_rdy = queue[i].def; // def -> ready
                 graph.del_node(def_rdy);
@@ -116,14 +116,14 @@ impl Inst {
                 Ok((4, InstType::FloatPoint))
             }
             /* mem access */
-            Inst::Ld(_)
+            | Inst::Ld(_)
             | Inst::Sd(_)
             | Inst::Lw(_)
             | Inst::Sw(_)
             | Inst::Load(_)
             | Inst::Store(_) => Ok((3, InstType::MemAccess)),
             /* jmp */
-            Inst::Jmp(_)
+            | Inst::Jmp(_)
             | Inst::Beq(_)
             | Inst::Bne(_)
             | Inst::Blt(_)
@@ -157,10 +157,7 @@ impl<'a> Graph<'a> {
         // gen node id
         for (id, inst) in self.insts.iter().enumerate() {
             let inst_str = inst.gen_asm();
-            dot.push_str(&format!(
-                "node{} [label=\"[{}]:  {}\"];\n",
-                id, id, inst_str
-            ));
+            dot.push_str(&format!("node{} [label=\"[{}]:  {}\"];\n", id, id, inst_str));
         }
 
         for (id, deps) in self.deps.iter() {
@@ -178,7 +175,7 @@ impl<'a> Graph<'a> {
     #[allow(clippy::type_complexity)]
     fn select2_inst(
         &self,
-        avail: &[InstID],
+        avail: &[InstID]
     ) -> Result<(Option<(StateOperand, Inst)>, Option<(StateOperand, Inst)>)> {
         // 空的情况
         if avail.is_empty() {
@@ -186,13 +183,14 @@ impl<'a> Graph<'a> {
         }
         // 有两个的情况
         for i in 0..avail.len() {
-            for j in (i + 1)..avail.len() {
+            for j in i + 1..avail.len() {
                 let inst1 = &self.insts[avail[i]];
                 let (latency1, inst_type1) = inst1.character().with_context(|| context!())?;
                 let inst2 = &self.insts[avail[j]];
                 let (latency2, inst_type2) = inst2.character().with_context(|| context!())?;
-                if inst_type1 != inst_type2
-                    || (inst_type1 == inst_type2 && inst_type1 == InstType::Integer)
+                if
+                    inst_type1 != inst_type2 ||
+                    (inst_type1 == inst_type2 && inst_type1 == InstType::Integer)
                 {
                     todo!();
                 }
@@ -267,10 +265,7 @@ impl<'a> Graph<'a> {
     fn del_node(&mut self, id: InstID) -> Result<()> {
         let use_insts = self.anti.get(&id).ok_or(anyhow!("id not found"))?;
         for use_inst in use_insts.iter() {
-            self.deps
-                .get_mut(use_inst)
-                .ok_or(anyhow!("id not found"))?
-                .remove(&id);
+            self.deps.get_mut(use_inst).ok_or(anyhow!("id not found"))?.remove(&id);
         }
         self.anti.remove(&id);
         Ok(())
@@ -280,11 +275,8 @@ impl<'a> Graph<'a> {
 impl<'a> Graph<'a> {
     #[allow(clippy::type_complexity)]
     fn construct_defs_uses(
-        insts: &[Inst],
-    ) -> (
-        HashMap<WrapOperand, InstID>,
-        HashMap<WrapOperand, HashSet<InstID>>,
-    ) {
+        insts: &[Inst]
+    ) -> (HashMap<WrapOperand, InstID>, HashMap<WrapOperand, HashSet<InstID>>) {
         /* ---------- 辅助宏 ---------- */
         macro_rules! insert_defs {
             ($inst:ident, $defs:ident, $id:ident) => {
@@ -385,8 +377,19 @@ impl<'a> Graph<'a> {
                 Inst::Ld(_) | Inst::Lw(_) => {
                     insert_defs!(inst, defs, id);
                     /* ----- 这是为了确保 mem access 指令顺序一致 ----- */
-                    let wrap = WrapOperand::PreInst(pre_store);
-                    uses.entry(wrap).or_default().insert(id);
+                    if pre_store == 0 {
+                        let first = &insts[pre_store];
+                        match first {
+                            Inst::Sd(_) | Inst::Sw(_) => {
+                                let wrap = WrapOperand::PreInst(pre_store);
+                                uses.entry(wrap).or_default().insert(id);
+                            }
+                            _ => {}
+                        }
+                    } else {
+                        let wrap = WrapOperand::PreInst(pre_store);
+                        uses.entry(wrap).or_default().insert(id);
+                    }
                     /* ----- 不要忘了 use ----- */
                     insert_uses!(inst, uses, id);
                     // pre_store = id;
@@ -529,5 +532,6 @@ mod tests {
         let dot = graph.gen_inst_dependency_graph_dot();
         println!("{}", dot);
         println!("{}", f.entry().gen_asm());
+        dbg!(&graph.deps);
     }
 }
