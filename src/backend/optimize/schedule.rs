@@ -29,9 +29,9 @@ type InstID = usize;
 /// mem and reg
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum WrapOperand {
-    /// global 是为了标识: lw, ld, sw, sd
-    /// 用于标识上一条 mem access 的 id
-    Global(InstID),
+    /// lw, ld, sw, sd 会用这个, 保证相对顺序
+    /// jmp, ret 会用这个, 保证在倒数第二条指令之后
+    PreInst(InstID),
     Stack(StackSlot),
     Reg(Reg),
 }
@@ -71,7 +71,7 @@ impl Graph {
         let (insts, defs, uses) = Self::construct_defs_uses(insts);
         let mut graph: HashMap<InstID, HashSet<InstID>> = HashMap::new();
         for (operand, use_insts) in uses.iter() {
-            if let WrapOperand::Global(pre_mem_inst_id) = operand {
+            if let WrapOperand::PreInst(pre_mem_inst_id) = operand {
                 // sw/sd/lw/ld
                 if *pre_mem_inst_id == usize::MAX {
                     continue; // 说明是当前基本块的第一个 mem access
@@ -106,25 +106,25 @@ impl Graph {
         /* ---------- 辅助宏 ---------- */
         macro_rules! insert_defs {
             ($inst:ident, $defs:ident, $id:ident) => {
-            for _d in $inst.defs() {
-                if (_d.eq(&REG_ZERO)) {
-                    continue;
+                for _d in $inst.defs() {
+                    if (_d.eq(&REG_ZERO)) {
+                        continue;
+                    }
+                    let _wrap = WrapOperand::Reg(*_d);
+                    $defs.insert(_wrap, $id);
                 }
-                let _wrap = WrapOperand::Reg(*_d);
-                $defs.insert(_wrap, $id);
-            }
             };
         }
 
         macro_rules! insert_uses {
             ($inst:ident, $uses:ident, $id:ident) => {
-            for _u in $inst.uses() {
-                if (_u.eq(&REG_ZERO)) {
-                    continue;
+                for _u in $inst.uses() {
+                    if (_u.eq(&REG_ZERO)) {
+                        continue;
+                    }
+                    let _wrap = WrapOperand::Reg(*_u);
+                    $uses.entry(_wrap).or_default().insert($id);
                 }
-                let _wrap = WrapOperand::Reg(*_u);
-                $uses.entry(_wrap).or_default().insert($id);
-            }
             };
         }
 
@@ -179,26 +179,36 @@ impl Graph {
                 /* convert */
                 | Inst::I2f(_)
                 | Inst::F2i(_)
+                /* use 参数列表, def A0 / FA0 */
+                | Inst::Call(_) => {
+                    insert_defs!(inst, defs, id);
+                    insert_uses!(inst, uses, id);
+                }
+                /* 无条件跳转 */
+                Inst::Tail(_) | Inst::Ret | Inst::Jmp(_) => {
+                    // 最后的跳转, 依赖于前面所有指令执行完
+                    for pre in 0..id {
+                        let wrap = WrapOperand::PreInst(pre);
+                        uses.entry(wrap).or_default().insert(id);
+                    }
+                }
                 /* 条件跳转 */
                 | Inst::Beq(_)
                 | Inst::Bne(_)
                 | Inst::Blt(_)
                 | Inst::Ble(_)
                 | Inst::Bgt(_)
-                | Inst::Bge(_)
-                /* 无条件跳转 */
-                | Inst::Jmp(_)
-                /* use 参数列表, def A0 / FA0 */
-                | Inst::Call(_)
-                | Inst::Tail(_)
-                | Inst::Ret => {
-                    insert_defs!(inst, defs, id);
+                | Inst::Bge(_) => {
                     insert_uses!(inst, uses, id);
+                    for pre in 0..id {
+                        let wrap = WrapOperand::PreInst(pre);
+                        uses.entry(wrap).or_default().insert(id);
+                    }
                 }
                 Inst::Ld(_) | Inst::Lw(_) => {
                     insert_defs!(inst, defs, id);
                     /* ----- 这是为了确保 mem access 指令顺序一致 ----- */
-                    let wrap = WrapOperand::Global(pre_mem_inst);
+                    let wrap = WrapOperand::PreInst(pre_mem_inst);
                     uses.entry(wrap).or_default().insert(id);
                     /* ----- 不要忘了 use ----- */
                     insert_uses!(inst, uses, id);
@@ -207,8 +217,8 @@ impl Graph {
                 Inst::Sd(_) | Inst::Sw(_) => {
                     insert_uses!(inst, uses, id);
                     /* ----- 这是为了确保 mem access 指令顺序一致 ----- */
-                    let wrap = WrapOperand::Global(pre_mem_inst);
-                    defs.insert(wrap, id);
+                    let wrap = WrapOperand::PreInst(pre_mem_inst);
+                    uses.entry(wrap).or_default().insert(id); // sw 也要保证顺序
                     pre_mem_inst = id;
                 }
                 Inst::Load(ld) => {
@@ -224,6 +234,17 @@ impl Graph {
             }
         }
         (wrap_insts, defs, uses)
+    }
+
+    #[inline]
+    fn collect_no_deps(&self) -> Vec<InstID> {
+        let mut no_deps = Vec::new();
+        for (id, deps) in self.graph.iter() {
+            if deps.is_empty() {
+                no_deps.push(*id);
+            }
+        }
+        no_deps
     }
 }
 
@@ -328,7 +349,8 @@ mod tests {
         let bb = f.entry();
         let insts = bb.insts();
         let graph = Graph::new(insts);
-        dbg!(graph);
+        dbg!(&graph.graph);
         println!("{}", f.gen_asm());
+        dbg!(&graph.collect_no_deps());
     }
 }
