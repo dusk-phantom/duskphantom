@@ -1,25 +1,22 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use crate::{
     backend::from_self::downcast_ref,
-    middle::{
-        ir::{
-            instruction::{memory_op_inst::GetElementPtr, misc_inst::Call, InstType},
-            FunPtr, InstPtr, Operand, ValueType,
-        },
-        Program,
+    middle::ir::{
+        instruction::{memory_op_inst::GetElementPtr, InstType},
+        Operand, ValueType,
     },
-    utils::traverse::{Node, POIterator},
 };
 
-/// Check if two GEP instructions can alias.
-pub fn can_gep_alias(a: InstPtr, b: InstPtr) -> bool {
+/// Check if two operands (maybe with GEP) can alias.
+pub fn can_alias(a: Operand, b: Operand) -> bool {
     let (ptr_a, offset_a) = split_gep(a);
     let (ptr_b, offset_b) = split_gep(b);
+    can_ptr_alias(ptr_a, ptr_b) && can_offset_overlap(offset_a, offset_b)
 }
 
 /// Check if two operands (without GEP) can alias.
-pub fn can_ptr_alias(a: Operand, b: Operand) -> bool {
+fn can_ptr_alias(a: Operand, b: Operand) -> bool {
     // If any of them is param, they can alias
     if let Operand::Parameter(_) = a {
         return true;
@@ -47,7 +44,7 @@ pub fn can_ptr_alias(a: Operand, b: Operand) -> bool {
 }
 
 /// Check if two sets of GEP offsets can overlap.
-pub fn can_offset_overlap(a: HashMap<ValueType, Operand>, b: HashMap<ValueType, Operand>) -> bool {
+fn can_offset_overlap(a: HashMap<ValueType, Operand>, b: HashMap<ValueType, Operand>) -> bool {
     for (key, a_op) in a.iter() {
         if let Some(b_op) = b.get(key) {
             if !can_equal(a_op.clone(), b_op.clone()) {
@@ -59,8 +56,8 @@ pub fn can_offset_overlap(a: HashMap<ValueType, Operand>, b: HashMap<ValueType, 
 }
 
 /// Split GEP instruction into base pointer and offset.
-pub fn split_gep(inst: InstPtr) -> (Operand, HashMap<ValueType, Operand>) {
-    let mut base = Operand::Instruction(inst);
+fn split_gep(op: Operand) -> (Operand, HashMap<ValueType, Operand>) {
+    let mut base = op;
     let mut offset = HashMap::new();
     while let Operand::Instruction(inst) = base {
         if inst.get_type() != InstType::GetElementPtr {
@@ -82,7 +79,7 @@ pub fn split_gep(inst: InstPtr) -> (Operand, HashMap<ValueType, Operand>) {
 }
 
 /// Check if two indexing operands can equal.
-pub fn can_equal(a: Operand, b: Operand) -> bool {
+fn can_equal(a: Operand, b: Operand) -> bool {
     match (a, b) {
         // Constants only equal when they're the same
         (Operand::Constant(a), Operand::Constant(b)) => a == b,
