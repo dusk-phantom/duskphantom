@@ -4,7 +4,7 @@ use transform::{
     block_fuse, func_inline, inst_combine, mem2reg, simple_gvn, unreachable_block_elim,
 };
 
-mod analysis;
+pub mod analysis;
 pub mod ir;
 pub mod irgen;
 pub mod transform;

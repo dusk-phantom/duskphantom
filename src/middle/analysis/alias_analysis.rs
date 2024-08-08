@@ -120,7 +120,9 @@ fn split_gep(op: &Operand) -> (Operand, HashMap<ValueType, Operand>) {
         let mut element_type = gep.element_type.clone();
         for op in inst.get_operand().iter().skip(1) {
             offset.insert(element_type.clone(), op.clone());
-            element_type = element_type.get_sub_type().unwrap().clone();
+            if let Some(subtype) = element_type.get_sub_type() {
+                element_type = subtype.clone();
+            }
         }
     }
     (base, offset)

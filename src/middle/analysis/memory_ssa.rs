@@ -13,12 +13,15 @@ use super::{alias_analysis::EffectRange, effect_analysis::EffectAnalysis};
 
 pub type NodePtr = ObjPtr<Node>;
 
+/// MemorySSA analyzer.
+/// Reference: https://llvm.org/docs/MemorySSA.html
+/// My version is different by analyzing the effect of function calls.
 pub struct MemorySSA<'a> {
     builder: MemorySSABuilder,
     inst_to_node: HashMap<InstPtr, NodePtr>,
     block_to_node: HashMap<BBPtr, NodePtr>,
     node_to_user: HashMap<NodePtr, HashSet<NodePtr>>,
-    effect_analysis: &'a EffectAnalysis,
+    effect_analysis: &'a EffectAnalysis<'a>,
     program: &'a Program,
 }
 
@@ -75,7 +78,7 @@ impl<'a> MemorySSA<'a> {
 
     pub fn gen_llvm_ir_node(&self, node: NodePtr) -> String {
         match node.as_ref() {
-            Node::Entry(_) => "; 0".to_string(),
+            Node::Entry(id) => format!("; {} (liveOnEntry)", id),
             Node::Normal(id, use_node, def_node, _) => {
                 let mut result: Vec<String> = Vec::new();
                 if let Some(use_node) = use_node {
@@ -87,12 +90,11 @@ impl<'a> MemorySSA<'a> {
                 result.join("\n")
             }
             Node::Phi(id, arg, _) => {
-                let mut result = format!("; {} = MemoryPhi(", id);
+                let mut args: Vec<String> = Vec::new();
                 for (bb, node) in arg {
-                    result.push_str(&format!("[{}, {}]", node.get_id(), bb.name));
+                    args.push(format!("[{}, {}]", node.get_id(), bb.name));
                 }
-                result.push(')');
-                result
+                format!("; {} = MemoryPhi({})", id, args.join(", "))
             }
         }
     }
@@ -102,14 +104,14 @@ impl<'a> MemorySSA<'a> {
             return;
         };
 
-        // Insert empty phi nodes
-        let phi_insertions = self.insert_empty_phi(func);
-
         // Add entry node
         let mut range_to_node = RangeToNode::new();
         let entry_node = self.builder.get_entry();
         self.block_to_node.insert(entry, entry_node);
         range_to_node.insert(EffectRange::All, entry_node);
+
+        // Insert empty phi nodes
+        let phi_insertions = self.insert_empty_phi(func);
 
         // Add other nodes
         self.add_node_start_from(
@@ -227,6 +229,7 @@ impl<'a> MemorySSA<'a> {
     }
 }
 
+/// Memory pool for MemorySSA nodes.
 struct MemorySSABuilder {
     node_pool: ObjPool<Node>,
     counter: usize,
@@ -264,17 +267,15 @@ impl MemorySSABuilder {
     }
 }
 
-type PhiArg = (BBPtr, NodePtr);
-
-#[allow(unused)]
+/// Memory SSA node.
 pub enum Node {
     Entry(usize),
     Normal(usize, Option<NodePtr>, Option<NodePtr>, InstPtr),
-    Phi(usize, Vec<PhiArg>, EffectRange),
+    Phi(usize, Vec<(BBPtr, NodePtr)>, EffectRange),
 }
 
 impl Node {
-    fn add_phi_arg(&mut self, arg: PhiArg) {
+    fn add_phi_arg(&mut self, arg: (BBPtr, NodePtr)) {
         match self {
             Node::Phi(_, args, _) => args.push(arg),
             _ => panic!("not a phi node"),
@@ -304,6 +305,7 @@ impl Node {
     }
 }
 
+/// Phi insertion for a block. (Some(Node) or None)
 pub struct PhiInsertion(Option<NodePtr>);
 
 impl PhiInsertion {
@@ -334,27 +336,7 @@ impl Default for PhiInsertion {
     }
 }
 
-#[derive(Default)]
-pub struct RangeToNodeFrame(Vec<(EffectRange, NodePtr)>);
-
-impl RangeToNodeFrame {
-    pub fn insert(&mut self, k: EffectRange, v: NodePtr) {
-        self.0.push((k, v));
-    }
-
-    pub fn get(&self, k: &EffectRange) -> Option<NodePtr> {
-        self.0.iter().rev().find_map(
-            |(key, value)| {
-                if key.can_alias(k) {
-                    Some(*value)
-                } else {
-                    None
-                }
-            },
-        )
-    }
-}
-
+/// Framed mapping from range to node.
 pub enum RangeToNode<'a> {
     Root(RangeToNodeFrame),
     Leaf(RangeToNodeFrame, &'a RangeToNode<'a>),
@@ -412,5 +394,27 @@ impl<'a> RangeToNode<'a> {
     /// This is useful when implementing scopes.
     pub fn branch(&'a self) -> Self {
         Self::Leaf(RangeToNodeFrame::default(), self)
+    }
+}
+
+/// One frame of range to node mapping.
+#[derive(Default)]
+pub struct RangeToNodeFrame(Vec<(EffectRange, NodePtr)>);
+
+impl RangeToNodeFrame {
+    pub fn insert(&mut self, k: EffectRange, v: NodePtr) {
+        self.0.push((k, v));
+    }
+
+    pub fn get(&self, k: &EffectRange) -> Option<NodePtr> {
+        self.0.iter().rev().find_map(
+            |(key, value)| {
+                if key.can_alias(k) {
+                    Some(*value)
+                } else {
+                    None
+                }
+            },
+        )
     }
 }

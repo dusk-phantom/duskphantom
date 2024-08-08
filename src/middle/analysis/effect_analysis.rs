@@ -20,26 +20,28 @@ pub struct Effect {
 }
 
 #[allow(unused)]
-pub struct EffectAnalysis {
-    pub def_range: HashMap<FunPtr, HashSet<Operand>>,
-    pub use_range: HashMap<FunPtr, HashSet<Operand>>,
+pub struct EffectAnalysis<'a> {
     pub inst_effect: HashMap<InstPtr, Effect>,
     pub impure: HashSet<FunPtr>,
+    program: &'a Program,
+    def_range: HashMap<FunPtr, HashSet<Operand>>,
+    use_range: HashMap<FunPtr, HashSet<Operand>>,
 }
 
 #[allow(unused)]
-impl EffectAnalysis {
-    pub fn new(program: &Program) -> Self {
+impl<'a> EffectAnalysis<'a> {
+    pub fn new(program: &'a Program) -> Self {
         let mut worklist: HashSet<FunPtr> = HashSet::new();
         let def_range = HashMap::new();
         let use_range = HashMap::new();
         let inst_effect = HashMap::new();
         let impure = HashSet::new();
         let mut effect = Self {
-            def_range,
-            use_range,
             inst_effect,
             impure,
+            program,
+            def_range,
+            use_range,
         };
 
         // Set all library functions as impure
@@ -47,6 +49,7 @@ impl EffectAnalysis {
             if func.is_lib() {
                 effect.impure.insert(*func);
             }
+            worklist.insert(*func);
         }
 
         // Postorder iterate on call graph until unchanged
@@ -54,7 +57,7 @@ impl EffectAnalysis {
         loop {
             let mut changed = false;
             for node in call_graph.po_iter() {
-                if !worklist.contains(&node.fun) {
+                if node.fun.is_lib() || !worklist.contains(&node.fun) {
                     continue;
                 }
                 worklist.remove(&node.fun);
@@ -67,6 +70,38 @@ impl EffectAnalysis {
                 break effect;
             }
         }
+    }
+
+    pub fn dump(&self) -> String {
+        let mut res = String::new();
+        for func in self.program.module.functions.iter() {
+            if func.is_lib() {
+                continue;
+            }
+            for bb in func.dfs_iter() {
+                for inst in bb.iter() {
+                    let Some(effect) = self.inst_effect.get(&inst) else {
+                        continue;
+                    };
+                    res += &format!("{}:\n", inst.gen_llvm_ir());
+                    let mut def_range = effect
+                        .def_range
+                        .iter()
+                        .map(|op| op.to_string())
+                        .collect::<Vec<_>>();
+                    let mut use_range = effect
+                        .use_range
+                        .iter()
+                        .map(|op| op.to_string())
+                        .collect::<Vec<_>>();
+                    def_range.sort();
+                    use_range.sort();
+                    res += &format!("  def: {}\n", def_range.join(", "));
+                    res += &format!("  use: {}\n\n", use_range.join(", "));
+                }
+            }
+        }
+        res
     }
 
     /// Process function, return changed or not
