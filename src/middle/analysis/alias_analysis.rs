@@ -8,7 +8,7 @@ use crate::{
     },
 };
 
-#[allow(unused)]
+#[derive(Clone)]
 pub enum EffectRange {
     All,
     Some(HashSet<Operand>),
@@ -25,6 +25,21 @@ impl EffectRange {
             (EffectRange::Some(a), EffectRange::Some(b)) => a
                 .iter()
                 .any(|a_op| b.iter().any(|b_op| can_op_alias(a_op, b_op))),
+        }
+    }
+
+    pub fn merge(&mut self, another: &EffectRange) {
+        if let EffectRange::All = another {
+            *self = EffectRange::All;
+        } else if let (EffectRange::Some(a), EffectRange::Some(b)) = (self, another) {
+            a.extend(b.iter().cloned());
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        match self {
+            EffectRange::All => false,
+            EffectRange::Some(set) => set.is_empty(),
         }
     }
 }
