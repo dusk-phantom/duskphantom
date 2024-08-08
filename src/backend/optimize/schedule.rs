@@ -149,7 +149,7 @@ impl WrapInst {
 }
 
 #[derive(Debug)]
-struct Graph {
+struct Graph<'a> {
     /// 依赖图, 指向所依赖的指令
     graph: HashMap<InstID /* use */, HashSet<InstID> /* def */>,
     /// 一个 bb 中只有一个 def, 即使是中端来的 phi, 在一个 bb 中也只有一个 def
@@ -157,19 +157,42 @@ struct Graph {
     /// 注意, 这个 uses 会出现 : 来自其他 bb 的寄存器
     uses: HashMap<WrapOperand, HashSet<InstID>>,
     /// <id, WrapInst>
-    insts: Vec<WrapInst>,
+    insts: &'a [Inst],
+}
+impl<'a> Graph<'a> {
+    pub fn gen_inst_dependency_graph_dot(&self) -> String {
+        let mut dot = String::new();
+        dot.push_str("digraph G {\n");
+
+        // gen node id
+        for (id, inst) in self.insts.iter().enumerate() {
+            let inst_str = inst.gen_asm();
+            dot.push_str(&format!(
+                "node{} [label=\"[{}]:  {}\"];\n",
+                id, id, inst_str
+            ));
+        }
+
+        for (id, deps) in self.graph.iter() {
+            for dep in deps.iter() {
+                dot.push_str(&format!("node{} -> node{};\n", dep, id));
+            }
+        }
+        dot.push_str("}\n");
+        dot
+    }
 }
 
-impl Graph {
+impl<'a> Graph<'a> {
     /// 选择两条指令出来
     fn select2_inst(&self, avail: &[InstID]) -> (Option<StateOperand>, Option<StateOperand>) {
         todo!()
     }
 }
 
-impl Graph {
-    fn new(insts: &[Inst]) -> Self {
-        let (insts, defs, uses) = Self::construct_defs_uses(insts);
+impl<'a> Graph<'a> {
+    fn new(insts: &'a [Inst]) -> Self {
+        let (defs, uses) = Self::construct_defs_uses(insts);
         let mut graph: HashMap<InstID, HashSet<InstID>> = HashMap::new();
         for (operand, use_insts) in uses.iter() {
             if let WrapOperand::PreInst(pre_mem_inst_id) = operand {
@@ -188,8 +211,8 @@ impl Graph {
             }
         }
         // 还剩下一些指令, 比方说 lla/li 只有 def 没有 use
-        for inst in insts.iter() {
-            graph.entry(inst.id).or_default();
+        for (id, inst) in insts.iter().enumerate() {
+            graph.entry(id).or_default();
         }
         Self {
             graph,
@@ -219,12 +242,11 @@ impl Graph {
     }
 }
 
-impl Graph {
+impl<'a> Graph<'a> {
     #[allow(clippy::type_complexity)]
     fn construct_defs_uses(
         insts: &[Inst],
     ) -> (
-        Vec<WrapInst>,
         HashMap<WrapOperand, InstID>,
         HashMap<WrapOperand, HashSet<InstID>>,
     ) {
@@ -255,7 +277,6 @@ impl Graph {
 
         /* ---------- 函数正文 ---------- */
 
-        let mut wrap_insts = Vec::new();
         let mut defs: HashMap<WrapOperand, InstID> = HashMap::new();
         let mut uses: HashMap<WrapOperand, HashSet<InstID>> = HashMap::new();
 
@@ -263,15 +284,6 @@ impl Graph {
         let mut pre_store: InstID = 0;
 
         for (id, inst) in insts.iter().enumerate() {
-            // 添加 wrap_insts
-            wrap_insts.insert(
-                id,
-                WrapInst {
-                    id,
-                    inst: inst.clone(),
-                },
-            ); // id 就是 index, 尾插
-
             // 添加 defs 和 uses
             match inst {
                 /* 算术指令, 注意一下, 这里面会有浮点, 注意 zero 不算是依赖 */
@@ -362,7 +374,7 @@ impl Graph {
                 }
             }
         }
-        (wrap_insts, defs, uses)
+        (defs, uses)
     }
 }
 
@@ -370,7 +382,7 @@ impl Graph {
 mod tests {
     use super::*;
 
-    fn consturct_func() -> Func {
+    fn construct_func() -> Func {
         let mut entry = Block::new("entry".to_string());
         let ssa = StackAllocator::new();
         let mut rg = RegGenerator::new();
@@ -463,12 +475,21 @@ mod tests {
 
     #[test]
     fn construct_graph_test() {
-        let f = consturct_func();
+        let f = construct_func();
         let bb = f.entry();
         let insts = bb.insts();
         let graph = Graph::new(insts);
         dbg!(&graph.graph);
-        println!("{}", f.gen_asm());
+        println!("{}", f.entry().ordered_insts_text());
         dbg!(&graph.collect_no_deps());
+    }
+    #[test]
+    fn test_gen_dot_graph_for_inst_dependency_graph() {
+        let f = construct_func();
+        let bb = f.entry();
+        let insts = bb.insts();
+        let graph = Graph::new(insts);
+        let dot = graph.gen_inst_dependency_graph_dot();
+        println!("{}", dot);
     }
 }
