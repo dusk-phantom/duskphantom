@@ -176,6 +176,22 @@ impl Inst {
             Inst::Flts(flts) => flts.gen_asm(),
         }
     }
+
+    pub fn is_control_flow(&self) -> bool {
+        matches!(
+            self,
+            Inst::Jmp(_)
+                | Inst::Beq(_)
+                | Inst::Bne(_)
+                | Inst::Bge(_)
+                | Inst::Blt(_)
+                | Inst::Bgt(_)
+                | Inst::Ble(_)
+                | Inst::Call(_)
+                | Inst::Ret
+                | Inst::Tail(_)
+        )
+    }
 }
 
 //*********************************************************************************
