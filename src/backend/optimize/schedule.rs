@@ -3,7 +3,6 @@ use super::*;
 pub fn handle_inst_scheduling(func: &mut Func) -> Result<()> {
     for block in func.iter_bbs_mut() {
         let old_insts = block.insts();
-        println!("{}", block.gen_asm());
         let new_insts = handle_block_scheduling(old_insts).with_context(|| context!())?;
         *block.insts_mut() = new_insts;
     }
@@ -14,6 +13,8 @@ fn handle_block_scheduling(insts: &[Inst]) -> Result<Vec<Inst>> {
     let mut new_insts = Vec::new();
     let mut queue: Vec<StateOperand> = Vec::new();
 
+    let mut cnt = 0;
+
     // 1. 构造依赖图
     let mut graph = Graph::new(insts);
     // TODO while 循环, 进行指令调度
@@ -21,17 +22,16 @@ fn handle_block_scheduling(insts: &[Inst]) -> Result<Vec<Inst>> {
         // 1. 队列中所有的 cnt --
         for state in queue.iter_mut() {
             state.cnt -= 1;
-        }
-        // 2. 找到 cnt == 0 的指令, 从队列中删除, 并且删除依赖
-        for i in 0..queue.len() {
-            if queue[i].cnt == 0 {
-                let def_rdy = queue[i].def; // def -> ready
-                graph.del_node(def_rdy);
-                queue.remove(i);
+            if state.cnt == 0 {
+                graph.del_node(state.def).with_context(|| context!());
             }
         }
-        // 3. 搜集 indegree == 0 的节点
-        let no_deps = graph.collect_no_deps();
+
+        // 2. 找到 cnt == 0 的指令, 从队列中删除, 并且删除依赖
+        queue.retain(|state| state.cnt != 0);
+
+        // 3. 搜集 indegree == 0 的节点, 还要排除在 queue 中的
+        let mut no_deps = graph.collect_no_deps();
         // 4. 选取两条指令
         let (inst1, inst2) = graph.select2_inst(&no_deps).with_context(|| context!())?;
         if let Some((state_operand, inst)) = inst1 {
@@ -46,6 +46,21 @@ fn handle_block_scheduling(insts: &[Inst]) -> Result<Vec<Inst>> {
             // 6. 初始化状态并加入到队列中
             queue.push(state_operand);
         }
+
+        let dot = graph.gen_inst_dependency_graph_dot();
+        let dot_name = format!("dot/{}.dot", cnt);
+        fprintln!(&dot_name, "{}", dot);
+
+        let asm_name = format!("asm/{}.s", cnt);
+        fprintln!(
+            &asm_name,
+            "{}",
+            new_insts
+                .iter()
+                .map(|inst| inst.gen_asm())
+                .collect::<Vec<String>>()
+                .join("\n")
+        );
     }
 
     Ok(new_insts)
@@ -56,13 +71,14 @@ fn handle_block_scheduling(insts: &[Inst]) -> Result<Vec<Inst>> {
 type InstID = usize;
 
 /// 看看 operand 准备的咋样了
+#[derive(Debug)]
 struct StateOperand {
     /// 定义的指令
     def: InstID,
     cnt: usize,
 }
 
-#[derive(Eq, PartialEq, Debug, Hash)]
+#[derive(Eq, PartialEq, Debug)]
 enum InstType {
     Integer,
     Mul,
@@ -192,15 +208,38 @@ impl<'a> Graph<'a> {
                     inst_type1 != inst_type2 ||
                     (inst_type1 == inst_type2 && inst_type1 == InstType::Integer)
                 {
-                    todo!();
+                    return Ok((
+                        Some((
+                            StateOperand {
+                                def: avail[i],
+                                cnt: latency1,
+                            },
+                            inst1.clone(),
+                        )),
+                        Some((
+                            StateOperand {
+                                def: avail[j],
+                                cnt: latency2,
+                            },
+                            inst2.clone(),
+                        )),
+                    ));
                 }
             }
         }
         // 只有一个的情况
         let inst1 = &self.insts[avail[0]];
-        let (latency1, inst_type1) = inst1.character().with_context(|| context!())?;
-
-        todo!()
+        let (latency1, _) = inst1.character().with_context(|| context!())?;
+        Ok((
+            Some((
+                StateOperand {
+                    def: avail[0],
+                    cnt: latency1,
+                },
+                inst1.clone(),
+            )),
+            None,
+        ))
     }
 }
 
@@ -267,7 +306,8 @@ impl<'a> Graph<'a> {
         for use_inst in use_insts.iter() {
             self.deps.get_mut(use_inst).ok_or(anyhow!("id not found"))?.remove(&id);
         }
-        self.anti.remove(&id);
+        self.deps.remove(&id).with_context(|| context!())?;
+        self.anti.remove(&id).with_context(|| context!())?;
         Ok(())
     }
 }
@@ -533,5 +573,13 @@ mod tests {
         println!("{}", dot);
         println!("{}", f.entry().gen_asm());
         dbg!(&graph.deps);
+    }
+
+    #[test]
+    fn debug_schedule() {
+        let f = construct_func();
+        let bb = f.entry();
+        let insts = bb.insts();
+        handle_block_scheduling(insts);
     }
 }
