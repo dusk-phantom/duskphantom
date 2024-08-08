@@ -89,6 +89,10 @@ impl Graph {
                 }
             }
         }
+        // 还剩下一些指令, 比方说 lla/li 只有 def 没有 use
+        for inst in insts.iter() {
+            graph.entry(inst.id).or_default();
+        }
         Self {
             graph,
             defs,
