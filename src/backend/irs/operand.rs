@@ -76,6 +76,20 @@ impl Reg {
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Imm(i64);
+
+impl TryInto<u32> for Imm {
+    type Error = BackendError;
+    fn try_into(self) -> Result<u32, Self::Error> {
+        if self.0 >= 0 && self.0 <= u32::MAX as i64 {
+            Ok(self.0 as u32)
+        } else {
+            Err(BackendError::InternalConsistencyError(
+                "Imm is not a valid u32".to_string(),
+            ))
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Fmm(f64);
 
@@ -111,6 +125,26 @@ impl std::ops::Neg for Imm {
     type Output = Self;
     fn neg(self) -> Self::Output {
         Self(-self.0)
+    }
+}
+
+impl std::ops::Shl<u32> for Imm {
+    type Output = Self;
+    fn shl(self, rhs: u32) -> Self::Output {
+        Self(self.0 << rhs)
+    }
+}
+impl std::ops::Add for Imm {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self::Output {
+        Self(self.0 + rhs.0)
+    }
+}
+
+impl std::ops::Mul for Imm {
+    type Output = Self;
+    fn mul(self, rhs: Self) -> Self::Output {
+        Self(self.0 * rhs.0)
     }
 }
 
@@ -625,6 +659,19 @@ impl TryInto<Imm> for Operand {
         }
     }
 }
+
+impl TryInto<Imm> for &Operand {
+    type Error = BackendError;
+    fn try_into(self) -> Result<Imm, Self::Error> {
+        match self {
+            Operand::Imm(imm) => Ok(imm.clone()),
+            _ => Err(BackendError::InternalConsistencyError(
+                "Operand is not a Imm".to_string(),
+            )),
+        }
+    }
+}
+
 impl TryInto<Fmm> for Operand {
     type Error = BackendError;
     fn try_into(self) -> Result<Fmm, Self::Error> {
