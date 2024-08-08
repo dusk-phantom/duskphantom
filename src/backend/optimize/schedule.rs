@@ -83,40 +83,50 @@ enum InstType {
 }
 
 impl WrapInst {
-    fn character(&self) -> (usize, InstType) {
+    fn character(&self) -> Result<(usize /* latency */, InstType)> {
+        macro_rules! arithmn_char {
+            ($add:ident) => {
+                if $add
+                    .dst()
+                    .reg()
+                    .ok_or(anyhow!("arithmn's dst is not reg"))?
+                    .is_usual()
+                {
+                    Ok((1, InstType::Arithmetic))
+                } else {
+                    Ok((4, InstType::FloatPoint))
+                }
+            };
+        }
         match &self.inst {
-            Inst::Add(add) => {
-                todo!()
+            Inst::Add(add) => arithmn_char!(add),
+            Inst::Sub(sub) => arithmn_char!(sub),
+            Inst::Sll(sll) => arithmn_char!(sll),
+            Inst::Srl(srl) => arithmn_char!(srl),
+            Inst::SRA(sra) => arithmn_char!(sra),
+            Inst::Not(not_) => arithmn_char!(not_),
+            Inst::And(and_) => arithmn_char!(and_),
+            Inst::Or(or_) => arithmn_char!(or_),
+            Inst::Xor(xor) => arithmn_char!(xor),
+            Inst::Neg(neg) => arithmn_char!(neg),
+            Inst::Slt(slt) => arithmn_char!(slt),
+            Inst::Sltu(sltu) => arithmn_char!(sltu),
+            Inst::Sgtu(sgtu) => arithmn_char!(sgtu),
+            Inst::Seqz(seqz) => arithmn_char!(seqz),
+            Inst::Snez(snez) => arithmn_char!(snez),
+            Inst::Mv(mv) => arithmn_char!(mv),
+            Inst::Li(_) | Inst::Lla(_) => Ok((1, InstType::Arithmetic)),
+            Inst::F2i(_) | Inst::Fles(_) | Inst::Feqs(_) | Inst::Flts(_) | Inst::I2f(_) => {
+                Ok((4, InstType::FloatPoint))
             }
-            Inst::Sub(_) => todo!(),
-            Inst::Sll(_) => todo!(),
-            Inst::Srl(_) => todo!(),
-            Inst::SRA(_) => todo!(),
-            Inst::Not(_) => todo!(),
-            Inst::And(_) => todo!(),
-            Inst::Or(_) => todo!(),
-            Inst::Xor(_) => todo!(),
-            Inst::Neg(_) => todo!(),
-            Inst::Slt(_) => todo!(),
-            Inst::Sltu(_) => todo!(),
-            Inst::Sgtu(_) => todo!(),
-            Inst::Seqz(_) => todo!(),
-            Inst::Snez(_) => todo!(),
-            Inst::Feqs(_) => todo!(),
-            Inst::Fles(_) => todo!(),
-            Inst::Flts(_) => todo!(),
-            Inst::Mv(_) => todo!(),
-            Inst::Li(_) => todo!(),
             Inst::Ld(_) => todo!(),
             Inst::Sd(_) => todo!(),
             Inst::Lw(_) => todo!(),
             Inst::Sw(_) => todo!(),
-            Inst::Lla(_) => todo!(),
             Inst::Load(_) => todo!(),
             Inst::Store(_) => todo!(),
             Inst::LocalAddr(_) => todo!(),
-            Inst::I2f(_) => todo!(),
-            Inst::F2i(_) => todo!(),
+
             Inst::Jmp(_) => todo!(),
             Inst::Beq(_) => todo!(),
             Inst::Bne(_) => todo!(),
@@ -247,7 +257,7 @@ impl Graph {
         let mut uses: HashMap<WrapOperand, HashSet<InstID>> = HashMap::new();
 
         // 上一条 sw/lw/sd/ld 指令的 id
-        let mut pre_mem_inst: InstID = 0;
+        let mut pre_store: InstID = 0;
 
         for (id, inst) in insts.iter().enumerate() {
             // 添加 wrap_insts
@@ -323,18 +333,19 @@ impl Graph {
                 Inst::Ld(_) | Inst::Lw(_) => {
                     insert_defs!(inst, defs, id);
                     /* ----- 这是为了确保 mem access 指令顺序一致 ----- */
-                    let wrap = WrapOperand::PreInst(pre_mem_inst);
+                    let wrap = WrapOperand::PreInst(pre_store);
                     uses.entry(wrap).or_default().insert(id);
                     /* ----- 不要忘了 use ----- */
                     insert_uses!(inst, uses, id);
-                    pre_mem_inst = id;
+                    pre_store = id;
                 }
                 Inst::Sd(_) | Inst::Sw(_) => {
                     insert_uses!(inst, uses, id);
-                    /* ----- 这是为了确保 mem access 指令顺序一致 ----- */
-                    let wrap = WrapOperand::PreInst(pre_mem_inst);
-                    uses.entry(wrap).or_default().insert(id); // sw 也要保证顺序
-                    pre_mem_inst = id;
+                    // raw
+                    defs.insert(WrapOperand::PreInst(id), id); // sw 也要保证顺序
+                    // waw
+                    uses.entry(WrapOperand::PreInst(pre_store)).or_default().insert(id);
+                    pre_store = id;
                 }
                 Inst::Load(ld) => {
                     insert_defs!(inst, defs, id);
