@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     backend::from_self::downcast_ref,
@@ -8,15 +8,48 @@ use crate::{
     },
 };
 
+#[allow(unused)]
+pub enum EffectRange {
+    All,
+    Some(HashSet<Operand>),
+}
+
+/// Check if two effect range can alias.
+#[allow(unused)]
+impl EffectRange {
+    pub fn can_alias(&self, another: &EffectRange) -> bool {
+        match (self, another) {
+            (EffectRange::All, EffectRange::All) => true,
+            (EffectRange::All, EffectRange::Some(_)) => true,
+            (EffectRange::Some(_), EffectRange::All) => true,
+            (EffectRange::Some(a), EffectRange::Some(b)) => a
+                .iter()
+                .any(|a_op| b.iter().any(|b_op| can_op_alias(a_op, b_op))),
+        }
+    }
+}
+
+impl From<Operand> for EffectRange {
+    fn from(op: Operand) -> Self {
+        EffectRange::Some([op].into_iter().collect())
+    }
+}
+
+impl From<HashSet<Operand>> for EffectRange {
+    fn from(set: HashSet<Operand>) -> Self {
+        EffectRange::Some(set)
+    }
+}
+
 /// Check if two operands (maybe with GEP) can alias.
-pub fn can_alias(a: Operand, b: Operand) -> bool {
+fn can_op_alias(a: &Operand, b: &Operand) -> bool {
     let (ptr_a, offset_a) = split_gep(a);
     let (ptr_b, offset_b) = split_gep(b);
-    can_ptr_alias(ptr_a, ptr_b) && can_offset_overlap(offset_a, offset_b)
+    can_ptr_alias(&ptr_a, &ptr_b) && can_offset_overlap(offset_a, offset_b)
 }
 
 /// Check if two operands (without GEP) can alias.
-fn can_ptr_alias(a: Operand, b: Operand) -> bool {
+fn can_ptr_alias(a: &Operand, b: &Operand) -> bool {
     // If any of them is param, they can alias
     if let Operand::Parameter(_) = a {
         return true;
@@ -56,8 +89,8 @@ fn can_offset_overlap(a: HashMap<ValueType, Operand>, b: HashMap<ValueType, Oper
 }
 
 /// Split GEP instruction into base pointer and offset.
-fn split_gep(op: Operand) -> (Operand, HashMap<ValueType, Operand>) {
-    let mut base = op;
+fn split_gep(op: &Operand) -> (Operand, HashMap<ValueType, Operand>) {
+    let mut base = op.clone();
     let mut offset = HashMap::new();
     while let Operand::Instruction(inst) = base {
         if inst.get_type() != InstType::GetElementPtr {
