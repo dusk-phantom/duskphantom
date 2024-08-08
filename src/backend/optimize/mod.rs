@@ -1,7 +1,7 @@
 use crate::fprintln;
 
 use super::irs::*;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{ HashMap, HashSet, VecDeque };
 
 pub mod analysis;
 #[allow(unused)]
