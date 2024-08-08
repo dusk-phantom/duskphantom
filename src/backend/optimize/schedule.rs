@@ -11,22 +11,53 @@ pub fn handle_inst_scheduling(func: &mut Func) -> Result<()> {
 }
 
 fn handle_block_scheduling(insts: &[Inst]) -> Result<Vec<Inst>> {
-    // TODO 构造指令之间的依赖图
-    construct_dependence_graph(insts).with_context(|| context!())?;
-    // TODO while 循环, 进行指令调度
-    Ok(insts.to_vec())
-}
+    let mut new_insts = Vec::new();
+    let mut queue: Vec<StateOperand> = Vec::new();
 
-fn construct_dependence_graph(insts: &[Inst]) -> Result<()> {
-    // 1. 为指令分配 id 并且建立: operand 与 id 的反向映射
-    Ok(())
+    // 1. 构造依赖图
+    let mut graph = Graph::new(insts);
+    // TODO while 循环, 进行指令调度
+    while !graph.graph.is_empty() {
+        // 1. 队列中所有的 cnt --
+        for state in queue.iter_mut() {
+            state.cnt -= 1;
+        }
+        // 2. 找到 cnt == 0 的指令, 从队列中删除, 并且删除依赖
+        for i in (0..queue.len()) {
+            if queue[i].cnt == 0 {
+                let ready = &queue[i].op; // def -> ready
+                let def_inst = *graph.defs.get(ready).ok_or(anyhow!("not found in defs"))?;
+                graph.del_node(def_inst);
+                queue.remove(i);
+            }
+        }
+
+        // 3. 搜集 indegree == 0 的节点
+        let no_deps = graph.collect_no_deps();
+        // 4. 选取两条指令
+        let (inst1, inst2) = graph.select2_inst(&no_deps);
+        if let Some(inst1) = inst1 {
+            // 5. emit 两条指令
+            let inst1 = &graph.insts[inst1];
+            new_insts.push(inst1.inst.clone());
+            // 6. 初始化状态并加入到队列中
+        }
+        // 6. 加入队列中
+    }
+
+    Ok(new_insts)
 }
 
 /* ---------- ---------- 数据结构 ---------- ---------- */
 
+/// 看看 operand 准备的咋样了
+struct StateOperand {
+    op: WrapOperand,
+    cnt: usize,
+}
+
 type InstID = usize;
 
-/// mem and reg
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum WrapOperand {
     /// lw, ld, sw, sd 会用这个, 保证相对顺序
@@ -36,22 +67,72 @@ enum WrapOperand {
     Reg(Reg),
 }
 
-// impl WrapOperand {
-//     fn wrap_operand(op: &Operand) -> Result<Self> {
-//         match op {
-//             Operand::Reg(_) => todo!(),
-//             Operand::Imm(_) => todo!(),
-//             Operand::Fmm(_) => todo!(),
-//             Operand::StackSlot(_) => todo!(),
-//             Operand::Label(_) => todo!(),
-//         }
-//     }
-// }
-
 #[derive(Debug)]
 struct WrapInst {
     id: InstID,
     inst: Inst,
+}
+
+enum InstType {
+    Arithmetic,
+    MulDivRem,
+    MemAccess,
+    FloatPoint,
+    /// 直接跳转/间接跳转
+    Jmp,
+}
+
+impl WrapInst {
+    fn character(&self) -> (usize, InstType) {
+        match &self.inst {
+            Inst::Add(add) => {
+                todo!()
+            }
+            Inst::Sub(_) => todo!(),
+            Inst::Sll(_) => todo!(),
+            Inst::Srl(_) => todo!(),
+            Inst::SRA(_) => todo!(),
+            Inst::Not(_) => todo!(),
+            Inst::And(_) => todo!(),
+            Inst::Or(_) => todo!(),
+            Inst::Xor(_) => todo!(),
+            Inst::Neg(_) => todo!(),
+            Inst::Slt(_) => todo!(),
+            Inst::Sltu(_) => todo!(),
+            Inst::Sgtu(_) => todo!(),
+            Inst::Seqz(_) => todo!(),
+            Inst::Snez(_) => todo!(),
+            Inst::Feqs(_) => todo!(),
+            Inst::Fles(_) => todo!(),
+            Inst::Flts(_) => todo!(),
+            Inst::Mv(_) => todo!(),
+            Inst::Li(_) => todo!(),
+            Inst::Ld(_) => todo!(),
+            Inst::Sd(_) => todo!(),
+            Inst::Lw(_) => todo!(),
+            Inst::Sw(_) => todo!(),
+            Inst::Lla(_) => todo!(),
+            Inst::Load(_) => todo!(),
+            Inst::Store(_) => todo!(),
+            Inst::LocalAddr(_) => todo!(),
+            Inst::I2f(_) => todo!(),
+            Inst::F2i(_) => todo!(),
+            Inst::Jmp(_) => todo!(),
+            Inst::Beq(_) => todo!(),
+            Inst::Bne(_) => todo!(),
+            Inst::Blt(_) => todo!(),
+            Inst::Ble(_) => todo!(),
+            Inst::Bgt(_) => todo!(),
+            Inst::Bge(_) => todo!(),
+            Inst::Call(_) => todo!(),
+            Inst::Tail(_) => todo!(),
+            Inst::Ret => todo!(),
+            Inst::Mul(_) => todo!(),
+            Inst::Div(_) => todo!(),
+            Inst::UDiv(_) => todo!(),
+            Inst::Rem(_) => todo!(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -64,6 +145,13 @@ struct Graph {
     uses: HashMap<WrapOperand, HashSet<InstID>>,
     /// <id, WrapInst>
     insts: Vec<WrapInst>,
+}
+
+impl Graph {
+    /// 选择两条指令出来
+    fn select2_inst(&self, avail: &[InstID]) -> (Option<InstID>, Option<InstID>) {
+        todo!()
+    }
 }
 
 impl Graph {
@@ -121,8 +209,12 @@ impl Graph {
 impl Graph {
     #[allow(clippy::type_complexity)]
     fn construct_defs_uses(
-        insts: &[Inst]
-    ) -> (Vec<WrapInst>, HashMap<WrapOperand, InstID>, HashMap<WrapOperand, HashSet<InstID>>) {
+        insts: &[Inst],
+    ) -> (
+        Vec<WrapInst>,
+        HashMap<WrapOperand, InstID>,
+        HashMap<WrapOperand, HashSet<InstID>>,
+    ) {
         /* ---------- 辅助宏 ---------- */
         macro_rules! insert_defs {
             ($inst:ident, $defs:ident, $id:ident) => {
@@ -159,10 +251,13 @@ impl Graph {
 
         for (id, inst) in insts.iter().enumerate() {
             // 添加 wrap_insts
-            wrap_insts.insert(id, WrapInst {
+            wrap_insts.insert(
                 id,
-                inst: inst.clone(),
-            }); // id 就是 index, 尾插
+                WrapInst {
+                    id,
+                    inst: inst.clone(),
+                },
+            ); // id 就是 index, 尾插
 
             // 添加 defs 和 uses
             match inst {
