@@ -56,7 +56,7 @@ pub fn optimize_func(func: &mut Func) -> Result<()> {
     // inst scheduling
     schedule::handle_inst_scheduling(func)?;
 
-    phisicalize::handle_long_jump(func, &REG_T0, 5);
+    phisicalize::handle_long_jump(func, &REG_T0, 20_0000);
 
     fprintln!("log/after_inst_scheduling.s", "{}", func.gen_asm());
     // register allocation

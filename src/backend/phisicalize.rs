@@ -23,6 +23,8 @@ pub fn phisicalize_func(func: &mut Func) -> Result<()> {
 
     handle_illegal_inst(func)?;
 
+    handle_long_jump(func, &REG_T3, 20_0000)?;
+
     fprintln!("log/before_phisicalize.log", "{}", func.gen_asm());
 
     phisicalize_reg(func)?;
