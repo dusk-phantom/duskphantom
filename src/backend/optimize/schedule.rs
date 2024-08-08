@@ -134,5 +134,5 @@ fn construct_defs_uses(insts: &[Inst]) -> Result<(Vec<WrapInst>, Defs, Uses)> {
             },
         }
     }
-    Ok((Vec::new(), defs, uses))
+    Ok((wrap_insts, defs, uses))
 }
