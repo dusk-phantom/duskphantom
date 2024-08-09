@@ -8,7 +8,7 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
         fmms: &mut HashMap<Fmm, FloatVar>,
-        insert_back_for_remove_phi: &mut HashMap<String, Vec<(middle::ir::Operand, Reg)>>,
+        insert_back_for_remove_phi: &mut HashMap<String, Vec<(middle::ir::Operand, Reg)>>
     ) -> Result<Vec<Inst>> {
         match inst.get_type() {
             middle::ir::instruction::InstType::Head => {
@@ -16,13 +16,13 @@ impl IRBuilder {
             } // 应该是不能有 Head 出现的
             middle::ir::instruction::InstType::Alloca => {
                 let alloca = downcast_ref::<middle::ir::instruction::memory_op_inst::Alloca>(
-                    inst.as_ref().as_ref(),
+                    inst.as_ref().as_ref()
                 );
                 Self::build_alloca_inst(alloca, stack_allocator, stack_slots)
             }
             middle::ir::instruction::InstType::Store => {
                 let store = downcast_ref::<middle::ir::instruction::memory_op_inst::Store>(
-                    inst.as_ref().as_ref(),
+                    inst.as_ref().as_ref()
                 );
                 Self::build_store_inst(store, stack_slots, reg_gener, regs, fmms)
             }
@@ -94,42 +94,45 @@ impl IRBuilder {
             }
             middle::ir::instruction::InstType::Ret => {
                 let ret = downcast_ref::<middle::ir::instruction::terminator_inst::Ret>(
-                    inst.as_ref().as_ref(),
+                    inst.as_ref().as_ref()
                 );
                 Self::build_ret_inst(ret, reg_gener, regs, fmms)
             }
             middle::ir::instruction::InstType::Br => {
                 let br = downcast_ref::<middle::ir::instruction::terminator_inst::Br>(
-                    inst.as_ref().as_ref(),
+                    inst.as_ref().as_ref()
                 );
                 Self::build_br_inst(br, regs)
             }
             middle::ir::instruction::InstType::Load => {
                 let load = downcast_ref::<middle::ir::instruction::memory_op_inst::Load>(
-                    inst.as_ref().as_ref(),
+                    inst.as_ref().as_ref()
                 );
                 Self::build_load_inst(load, stack_slots, reg_gener, regs)
             }
             middle::ir::instruction::InstType::GetElementPtr => {
                 let gep = downcast_ref::<middle::ir::instruction::memory_op_inst::GetElementPtr>(
-                    inst.as_ref().as_ref(),
+                    inst.as_ref().as_ref()
                 );
                 Self::build_gep_inst(gep, reg_gener, regs, stack_slots)
             }
             middle::ir::instruction::InstType::ZextTo => {
                 let zext = downcast_ref::<middle::ir::instruction::extend_inst::ZextTo>(
-                    inst.as_ref().as_ref(),
+                    inst.as_ref().as_ref()
                 );
                 Self::build_zext_inst(zext, reg_gener, regs)
             }
             middle::ir::instruction::InstType::SextTo => todo!(),
             middle::ir::instruction::InstType::ItoFp => {
                 let i2fp = downcast_ref::<middle::ir::instruction::extend_inst::ItoFp>(
-                    inst.as_ref().as_ref(),
+                    inst.as_ref().as_ref()
                 );
                 let mut ret = Vec::new();
-                let (src, prepare) = Self::prepare_rs1_i(i2fp.get_src(), reg_gener, regs)
-                    .with_context(|| context!())?;
+                let (src, prepare) = Self::prepare_rs1_i(
+                    i2fp.get_src(),
+                    reg_gener,
+                    regs
+                ).with_context(|| context!())?;
                 ret.extend(prepare);
                 let dst = reg_gener.gen_virtual_float_reg();
                 let fcvtsw = I2fInst::new(dst.into(), src.into());
@@ -139,7 +142,7 @@ impl IRBuilder {
             }
             middle::ir::instruction::InstType::FpToI => {
                 let fptoi = downcast_ref::<middle::ir::instruction::extend_inst::FpToI>(
-                    inst.as_ref().as_ref(),
+                    inst.as_ref().as_ref()
                 );
                 let src = Self::no_load_from(fptoi.get_src(), regs).with_context(|| context!())?;
                 let dst = reg_gener.gen_virtual_usual_reg();
@@ -149,27 +152,28 @@ impl IRBuilder {
             }
             middle::ir::instruction::InstType::ICmp => {
                 let icmp = downcast_ref::<middle::ir::instruction::misc_inst::ICmp>(
-                    inst.as_ref().as_ref(),
+                    inst.as_ref().as_ref()
                 );
                 Self::build_icmp_inst(icmp, reg_gener, regs)
             }
             middle::ir::instruction::InstType::FCmp => {
                 let fcmp = downcast_ref::<middle::ir::instruction::misc_inst::FCmp>(
-                    inst.as_ref().as_ref(),
+                    inst.as_ref().as_ref()
                 );
                 Self::build_fcmp_inst(fcmp, reg_gener, regs, fmms)
             }
             middle::ir::instruction::InstType::Phi => {
-                let phi =
-                    downcast_ref::<middle::ir::instruction::misc_inst::Phi>(inst.as_ref().as_ref());
+                let phi = downcast_ref::<middle::ir::instruction::misc_inst::Phi>(
+                    inst.as_ref().as_ref()
+                );
                 Self::build_phi_inst(phi, reg_gener, regs, insert_back_for_remove_phi)
             }
             middle::ir::instruction::InstType::Call => {
                 let call = downcast_ref::<middle::ir::instruction::misc_inst::Call>(
-                    inst.as_ref().as_ref(),
+                    inst.as_ref().as_ref()
                 );
                 // Self::build_call_inst(call, stack_allocator, stack_slots, reg_gener, regs)
-                Self::build_call_inst(call, reg_gener, regs, fmms)
+                Self::build_call_inst(call, stack_slots, reg_gener, regs, fmms)
             }
         }
     }
@@ -178,7 +182,7 @@ impl IRBuilder {
         fcmp: &middle::ir::instruction::misc_inst::FCmp,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
-        fmms: &mut HashMap<Fmm, FloatVar>,
+        fmms: &mut HashMap<Fmm, FloatVar>
     ) -> Result<Vec<Inst>> {
         /* ---------- 辅助函数 ---------- */
         fn __prepare_normal_op0_op1(
@@ -186,7 +190,7 @@ impl IRBuilder {
             reg_gener: &mut RegGenerator,
             regs: &HashMap<Address, Reg>,
             insts: &mut Vec<Inst>,
-            fmms: &mut HashMap<Fmm, FloatVar>,
+            fmms: &mut HashMap<Fmm, FloatVar>
         ) -> Result<(Operand, Operand)> {
             let lhs = fcmp.get_lhs();
             let rhs = fcmp.get_rhs();
@@ -201,7 +205,7 @@ impl IRBuilder {
             reg_gener: &mut RegGenerator,
             regs: &HashMap<Address, Reg>,
             insts: &mut Vec<Inst>,
-            fmms: &mut HashMap<Fmm, FloatVar>,
+            fmms: &mut HashMap<Fmm, FloatVar>
         ) -> Result<(Operand, Operand)> {
             let lhs = fcmp.get_lhs();
             let rhs = fcmp.get_rhs();
@@ -220,13 +224,13 @@ impl IRBuilder {
         let mut ret = Vec::new();
 
         match fcmp.op {
-            middle::ir::instruction::misc_inst::FCmpOp::Oeq
+            | middle::ir::instruction::misc_inst::FCmpOp::Oeq
             | middle::ir::instruction::misc_inst::FCmpOp::Ueq => {
                 let (op0, op1) = __prepare_normal_op0_op1(fcmp, reg_gener, regs, &mut ret, fmms)?;
                 let feqs = FeqsInst::new(flag.into(), op0, op1);
                 ret.push(feqs.into());
             }
-            middle::ir::instruction::misc_inst::FCmpOp::One
+            | middle::ir::instruction::misc_inst::FCmpOp::One
             | middle::ir::instruction::misc_inst::FCmpOp::Une => {
                 // a != b <=> !(a == b) <=> (a == b) == 0
                 let (op0, op1) = __prepare_normal_op0_op1(fcmp, reg_gener, regs, &mut ret, fmms)?;
@@ -236,26 +240,26 @@ impl IRBuilder {
                 let seqz = SeqzInst::new(flag.into(), _mid.into());
                 ret.push(seqz.into());
             }
-            middle::ir::instruction::misc_inst::FCmpOp::Olt
+            | middle::ir::instruction::misc_inst::FCmpOp::Olt
             | middle::ir::instruction::misc_inst::FCmpOp::Ult => {
                 let (op0, op1) = __prepare_normal_op0_op1(fcmp, reg_gener, regs, &mut ret, fmms)?;
                 let flts = FltsInst::new(flag.into(), op0, op1);
                 ret.push(flts.into());
             }
-            middle::ir::instruction::misc_inst::FCmpOp::Ole
+            | middle::ir::instruction::misc_inst::FCmpOp::Ole
             | middle::ir::instruction::misc_inst::FCmpOp::Ule => {
                 let (op0, op1) = __prepare_normal_op0_op1(fcmp, reg_gener, regs, &mut ret, fmms)?;
                 let fles = FlesInst::new(flag.into(), op0, op1);
                 ret.push(fles.into());
             }
-            middle::ir::instruction::misc_inst::FCmpOp::Ogt
+            | middle::ir::instruction::misc_inst::FCmpOp::Ogt
             | middle::ir::instruction::misc_inst::FCmpOp::Ugt => {
                 // a > b <=> b < a <=> op0 < op1
                 let (op0, op1) = __prepare_rev_op0_op1(fcmp, reg_gener, regs, &mut ret, fmms)?;
                 let flts = FltsInst::new(flag.into(), op0, op1);
                 ret.push(flts.into());
             }
-            middle::ir::instruction::misc_inst::FCmpOp::Oge
+            | middle::ir::instruction::misc_inst::FCmpOp::Oge
             | middle::ir::instruction::misc_inst::FCmpOp::Uge => {
                 // a >= b <=> b <= a
                 let (op0, op1) = __prepare_rev_op0_op1(fcmp, reg_gener, regs, &mut ret, fmms)?;
@@ -265,11 +269,11 @@ impl IRBuilder {
             middle::ir::instruction::misc_inst::FCmpOp::Ord => todo!(),
             middle::ir::instruction::misc_inst::FCmpOp::Uno => todo!(),
             middle::ir::instruction::misc_inst::FCmpOp::False => {
-                let li = LiInst::new(flag.into(), 0.into());
+                let li = LiInst::new(flag.into(), (0).into());
                 ret.push(li.into());
             }
             middle::ir::instruction::misc_inst::FCmpOp::True => {
-                let li = LiInst::new(flag.into(), 1.into());
+                let li = LiInst::new(flag.into(), (1).into());
                 ret.push(li.into());
             }
         }
@@ -281,7 +285,7 @@ impl IRBuilder {
         phi: &middle::ir::instruction::misc_inst::Phi,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
-        insert_back_for_remove_phi: &mut HashMap<String, Vec<(middle::ir::Operand, Reg)>>,
+        insert_back_for_remove_phi: &mut HashMap<String, Vec<(middle::ir::Operand, Reg)>>
     ) -> Result<Vec<Inst>> {
         let dst_reg = Self::new_var(&phi.get_value_type(), reg_gener)?;
         regs.insert(phi as *const _ as Address, dst_reg);
@@ -301,11 +305,12 @@ impl IRBuilder {
     fn build_zext_inst(
         zext: &middle::ir::instruction::extend_inst::ZextTo,
         reg_gener: &mut RegGenerator,
-        regs: &mut HashMap<Address, Reg>,
+        regs: &mut HashMap<Address, Reg>
     ) -> Result<Vec<Inst>> {
         let mut ret = Vec::new();
-        let (src, prepare) =
-            Self::prepare_rs1_i(zext.get_src(), reg_gener, regs).with_context(|| context!())?;
+        let (src, prepare) = Self::prepare_rs1_i(zext.get_src(), reg_gener, regs).with_context(
+            || context!()
+        )?;
         ret.extend(prepare);
         regs.insert(zext as *const _ as Address, src);
         Ok(ret)
@@ -314,14 +319,14 @@ impl IRBuilder {
     fn build_icmp_inst(
         icmp: &middle::ir::instruction::misc_inst::ICmp,
         reg_gener: &mut RegGenerator,
-        regs: &mut HashMap<Address, Reg>,
+        regs: &mut HashMap<Address, Reg>
     ) -> Result<Vec<Inst>> {
         /* ---------- 辅助函数 ---------- */
         fn __prepare_normal_op0_op1(
             icmp: &middle::ir::instruction::misc_inst::ICmp,
             reg_gener: &mut RegGenerator,
             regs: &HashMap<Address, Reg>,
-            insts: &mut Vec<Inst>,
+            insts: &mut Vec<Inst>
         ) -> Result<(Operand, Operand)> {
             let lhs = icmp.get_lhs();
             let rhs = icmp.get_rhs();
@@ -335,7 +340,7 @@ impl IRBuilder {
             icmp: &middle::ir::instruction::misc_inst::ICmp,
             reg_gener: &mut RegGenerator,
             regs: &HashMap<Address, Reg>,
-            insts: &mut Vec<Inst>,
+            insts: &mut Vec<Inst>
         ) -> Result<(Operand, Operand)> {
             let lhs = icmp.get_lhs();
             let rhs = icmp.get_rhs();
@@ -415,17 +420,17 @@ impl IRBuilder {
     fn build_alloca_inst(
         alloca: &middle::ir::instruction::memory_op_inst::Alloca,
         stack_allocator: &mut StackAllocator,
-        stack_slots: &mut HashMap<Address, StackSlot>,
+        stack_slots: &mut HashMap<Address, StackSlot>
     ) -> Result<Vec<Inst>> {
         let ty = alloca.value_type.clone();
         let bytes: u32 = match ty {
-            middle::ir::ValueType::Int
+            | middle::ir::ValueType::Int
             | middle::ir::ValueType::Float
             | middle::ir::ValueType::Bool
             | middle::ir::ValueType::SignedChar
             | middle::ir::ValueType::Pointer(_) => 8,
             middle::ir::ValueType::Void => {
-                return Err(anyhow!("it can't alloca void")).with_context(|| context!())
+                return Err(anyhow!("it can't alloca void")).with_context(|| context!());
             }
             middle::ir::ValueType::Array(_, _) => {
                 let cap = Self::_cal_capas_factor(&ty).with_context(|| context!())?;
@@ -434,8 +439,8 @@ impl IRBuilder {
         };
         let ss = stack_allocator.alloc(bytes);
         stack_slots.insert(
-            alloca as *const _ as Address, /* alloca 的目的寄存器, 里面存放有栈上变量的地址 */
-            ss,                            /* 栈上分配的地址 */
+            alloca as *const _ as Address /* alloca 的目的寄存器, 里面存放有栈上变量的地址 */,
+            ss /* 栈上分配的地址 */
         ); /* 将 栈上地址 与 目的寄存器 关联起来 */
         Ok(vec![])
     }
@@ -447,12 +452,17 @@ impl IRBuilder {
         stack_slots: &HashMap<Address, StackSlot>,
         reg_gener: &mut RegGenerator,
         regs: &HashMap<Address, Reg>,
-        fmms: &mut HashMap<Fmm, FloatVar>,
+        fmms: &mut HashMap<Fmm, FloatVar>
     ) -> Result<Vec<Inst>> {
-        let addr =
-            Self::address_from(store.get_ptr(), regs, stack_slots).with_context(|| context!())?;
-        let (val, prepare) = Self::prepare_store_rs2(store.get_value(), reg_gener, regs, fmms)
-            .with_context(|| context!())?;
+        let addr = Self::address_from(store.get_ptr(), regs, stack_slots).with_context(
+            || context!()
+        )?;
+        let (val, prepare) = Self::prepare_store_rs2(
+            store.get_value(),
+            reg_gener,
+            regs,
+            fmms
+        ).with_context(|| context!())?;
 
         let Operand::Reg(val) = val else {
             return Err(anyhow!("store value is not reg")).with_context(|| context!());
@@ -463,7 +473,7 @@ impl IRBuilder {
         match addr {
             Operand::Reg(base) => {
                 // load/store Reg 的来源只能是 gep ->
-                let sw = SwInst::new(val, 0.into(), base);
+                let sw = SwInst::new(val, (0).into(), base);
                 ret.push(sw.into());
             }
             Operand::StackSlot(slot) => {
@@ -475,12 +485,11 @@ impl IRBuilder {
                 let addr = reg_gener.gen_virtual_usual_reg();
                 let lla = LlaInst::new(addr, label);
                 ret.push(lla.into());
-                let sw = SwInst::new(val, 0.into(), addr);
+                let sw = SwInst::new(val, (0).into(), addr);
                 ret.push(sw.into());
             }
             _ => {
-                return Err(anyhow!("impossible to store from imm/fmm"))
-                    .with_context(|| context!());
+                return Err(anyhow!("impossible to store from imm/fmm")).with_context(|| context!());
             }
         }
         Ok(ret)
@@ -490,7 +499,7 @@ impl IRBuilder {
         load: &middle::ir::instruction::memory_op_inst::Load,
         stack_slots: &HashMap<Address, StackSlot>,
         reg_gener: &mut RegGenerator,
-        regs: &mut HashMap<Address, Reg>,
+        regs: &mut HashMap<Address, Reg>
     ) -> Result<Vec<Inst>> {
         // dbg!(load);
         let mut ret: Vec<Inst> = Vec::new();
@@ -499,7 +508,7 @@ impl IRBuilder {
         // }
         let dst_reg = match load.get_value_type() {
             middle::ir::ValueType::Float => reg_gener.gen_virtual_float_reg(),
-            middle::ir::ValueType::Int
+            | middle::ir::ValueType::Int
             | middle::ir::ValueType::Bool
             | middle::ir::ValueType::Pointer(_) => reg_gener.gen_virtual_usual_reg(),
             _ => {
@@ -508,11 +517,12 @@ impl IRBuilder {
         };
         regs.insert(load as *const _ as Address, dst_reg);
         // 两种情况: 1. 从栈上获取(之前 alloca 过一次), 2. 从非栈上获取(parameter-pointer, global)
-        let addr =
-            Self::address_from(load.get_ptr(), regs, stack_slots).with_context(|| context!())?;
+        let addr = Self::address_from(load.get_ptr(), regs, stack_slots).with_context(
+            || context!()
+        )?;
         match addr {
             Operand::Reg(base) => {
-                let lw = LwInst::new(dst_reg, 0.into(), base);
+                let lw = LwInst::new(dst_reg, (0).into(), base);
                 ret.push(lw.into());
             }
             Operand::StackSlot(slot) => {
@@ -523,7 +533,7 @@ impl IRBuilder {
                 let addr = reg_gener.gen_virtual_usual_reg();
                 let lla = LlaInst::new(addr, label);
                 ret.push(lla.into());
-                let lw = LwInst::new(dst_reg, 0.into(), addr);
+                let lw = LwInst::new(dst_reg, (0).into(), addr);
                 ret.push(lw.into());
             }
             _ => {
@@ -537,7 +547,7 @@ impl IRBuilder {
         ret: &middle::ir::instruction::terminator_inst::Ret,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
-        fmms: &mut HashMap<Fmm, FloatVar>,
+        fmms: &mut HashMap<Fmm, FloatVar>
     ) -> Result<Vec<Inst>> {
         let mut ret_insts: Vec<Inst> = Vec::new();
 
@@ -545,106 +555,113 @@ impl IRBuilder {
         if !ret.is_void() {
             let op = ret.get_return_value();
             match op {
-                middle::ir::Operand::Constant(c) => match c {
-                    middle::ir::Constant::SignedChar(c) => {
-                        let imm: Operand = (*c as i64).into();
-                        let li = AddInst::new(REG_A0.into(), REG_ZERO.into(), imm);
-                        ret_insts.push(li.into());
-                    }
-                    middle::ir::Constant::Int(i) => {
-                        let imm: Operand = (*i as i64).into();
-                        let li = AddInst::new(REG_A0.into(), REG_ZERO.into(), imm);
-                        ret_insts.push(li.into());
-                    }
-                    middle::ir::Constant::Bool(b) => {
-                        let imm: Operand = (*b as i64).into();
-                        let li = AddInst::new(REG_A0.into(), REG_ZERO.into(), imm);
-                        ret_insts.push(li.into());
-                    }
-                    middle::ir::Constant::Float(f) => {
-                        let fmm: Fmm = f.into();
-                        let n = if let Some(f_var) = fmms.get(&fmm) {
-                            f_var.name.clone() // 这个 name 是我们自己加进去的
-                        } else {
-                            let name = Self::fmm_lit_label_from(&fmm);
-                            fmms.insert(
-                                fmm.clone(),
-                                FloatVar {
+                middle::ir::Operand::Constant(c) =>
+                    match c {
+                        middle::ir::Constant::SignedChar(c) => {
+                            let imm: Operand = (*c as i64).into();
+                            let li = AddInst::new(REG_A0.into(), REG_ZERO.into(), imm);
+                            ret_insts.push(li.into());
+                        }
+                        middle::ir::Constant::Int(i) => {
+                            let imm: Operand = (*i as i64).into();
+                            let li = AddInst::new(REG_A0.into(), REG_ZERO.into(), imm);
+                            ret_insts.push(li.into());
+                        }
+                        middle::ir::Constant::Bool(b) => {
+                            let imm: Operand = (*b as i64).into();
+                            let li = AddInst::new(REG_A0.into(), REG_ZERO.into(), imm);
+                            ret_insts.push(li.into());
+                        }
+                        middle::ir::Constant::Float(f) => {
+                            let fmm: Fmm = f.into();
+                            let n = if let Some(f_var) = fmms.get(&fmm) {
+                                f_var.name.clone() // 这个 name 是我们自己加进去的
+                            } else {
+                                let name = Self::fmm_lit_label_from(&fmm);
+                                fmms.insert(fmm.clone(), FloatVar {
                                     name: name.clone(),
                                     init: Some(fmm.try_into()?),
                                     is_const: true,
-                                },
+                                });
+                                name
+                            };
+                            let addr = reg_gener.gen_virtual_usual_reg();
+                            let la = LlaInst::new(addr, n.into());
+                            ret_insts.push(la.into());
+                            // 不过这里没有 double
+                            let loadf = LwInst::new(REG_FA0, (0).into(), addr);
+                            ret_insts.push(loadf.into());
+                        }
+                        middle::ir::Constant::Array(_) | middle::ir::Constant::Zero(_) => {
+                            return Err(anyhow!("return array is not allow:{}", op)).with_context(
+                                || context!()
                             );
-                            name
-                        };
-                        let addr = reg_gener.gen_virtual_usual_reg();
-                        let la = LlaInst::new(addr, n.into());
-                        ret_insts.push(la.into());
-                        // 不过这里没有 double
-                        let loadf = LwInst::new(REG_FA0, 0.into(), addr);
-                        ret_insts.push(loadf.into());
+                        }
                     }
-                    middle::ir::Constant::Array(_) | middle::ir::Constant::Zero(_) => {
-                        return Err(anyhow!("return array is not allow:{}", op))
-                            .with_context(|| context!())
-                    }
-                },
                 middle::ir::Operand::Instruction(instr) => {
                     // let addr = instr.as_ref().as_ref() as *const dyn middle::ir::Instruction
                     //     as *const () as Address;
                     // let reg = regs
                     //     .get(&addr)
                     //     .ok_or(anyhow!("could not get {} from map", &addr).context(context!()))?; // 获取返回值对应的虚拟寄存器
-                    let reg = Self::local_var_except_param_from(instr, regs)
-                        .with_context(|| context!())?;
+                    let reg = Self::local_var_except_param_from(instr, regs).with_context(
+                        || context!()
+                    )?;
                     let mv_inst = match instr.get_value_type() {
-                        middle::ir::ValueType::Int
+                        | middle::ir::ValueType::Int
                         | middle::ir::ValueType::Bool
                         | middle::ir::ValueType::SignedChar => {
                             MvInst::new(REG_A0.into(), reg.into())
                         }
                         middle::ir::ValueType::Float => MvInst::new(REG_FA0.into(), reg.into()),
                         middle::ir::ValueType::Void => {
-                            return Err(anyhow!("return not is_void, but get void type"))
-                                .with_context(|| context!())
+                            return Err(
+                                anyhow!("return not is_void, but get void type")
+                            ).with_context(|| context!());
                         }
                         middle::ir::ValueType::Array(_, _) => {
-                            return Err(anyhow!("return array is not allow for sysy"))
-                                .with_context(|| context!())
+                            return Err(anyhow!("return array is not allow for sysy")).with_context(
+                                || context!()
+                            );
                         }
                         middle::ir::ValueType::Pointer(_) => {
                             // NOTE 注意一下这里 可能可以返回指针
-                            return Err(anyhow!("return pointer is not allow for sysy"))
-                                .with_context(|| context!());
+                            return Err(
+                                anyhow!("return pointer is not allow for sysy")
+                            ).with_context(|| context!());
                         }
                     };
                     ret_insts.push(mv_inst.into());
                 }
                 middle::ir::Operand::Global(glo) => {
-                    return Err(anyhow!("return global should be load first :{}", glo))
-                        .with_context(|| context!())
+                    return Err(anyhow!("return global should be load first :{}", glo)).with_context(
+                        || context!()
+                    );
                 }
                 middle::ir::Operand::Parameter(param) => {
                     let addr = param.as_ref() as *const _ as Address;
                     let reg = regs.get(&addr).ok_or(anyhow!("").context(context!()))?;
                     let mv_inst = match param.value_type {
                         middle::ir::ValueType::Void => {
-                            return Err(anyhow!("return not is_void, but get void type"))
-                                .with_context(|| context!())
+                            return Err(
+                                anyhow!("return not is_void, but get void type")
+                            ).with_context(|| context!());
                         }
-                        middle::ir::ValueType::Int
+                        | middle::ir::ValueType::Int
                         | middle::ir::ValueType::Bool
                         | middle::ir::ValueType::SignedChar => {
                             MvInst::new(REG_A0.into(), (*reg).into())
                         }
                         middle::ir::ValueType::Float => MvInst::new(REG_FA0.into(), (*reg).into()),
                         middle::ir::ValueType::Array(_, _) => {
-                            return Err(anyhow!("return array is not allow for sysy"))
-                                .with_context(|| context!())
+                            return Err(anyhow!("return array is not allow for sysy")).with_context(
+                                || context!()
+                            );
                         }
                         middle::ir::ValueType::Pointer(_) => {
-                            return Err(anyhow!("return pointer is not allow for sysy"))
-                                .with_context(|| context!())
+                            return Err(
+                                anyhow!("return pointer is not allow for sysy")
+                            ).with_context(|| context!());
                         }
                     };
                     ret_insts.push(mv_inst.into());
@@ -661,7 +678,7 @@ impl IRBuilder {
     /// 既包含: 条件跳转, 也包含: 无条件跳转
     pub fn build_br_inst(
         br: &middle::ir::instruction::terminator_inst::Br,
-        regs: &mut HashMap<Address, Reg>,
+        regs: &mut HashMap<Address, Reg>
     ) -> Result<Vec<Inst>> {
         let parent_bb = br
             .get_parent_bb()
@@ -675,7 +692,8 @@ impl IRBuilder {
                     middle::ir::Constant::Bool(bo) => *bo,
                     middle::ir::Constant::SignedChar(ch) => *ch != 0,
                     middle::ir::Constant::Int(i) => *i != 0,
-                    _ => todo!(), /* middle::ir::Constant::Float(_) middle::ir::Constant::Array(_) middle::ir::Constant::Zero(_)  */
+                    _ =>
+                        todo!() /* middle::ir::Constant::Float(_) middle::ir::Constant::Array(_) middle::ir::Constant::Zero(_)  */,
                 };
                 if cond {
                     let true_bb = parent_bb
