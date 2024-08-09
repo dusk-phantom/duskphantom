@@ -74,7 +74,7 @@ impl Reg {
         !self.is_usual
     }
 }
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Copy)]
 pub struct Imm(i64);
 
 impl TryInto<u32> for Imm {
@@ -134,6 +134,7 @@ impl std::ops::Shl<u32> for Imm {
         Self(self.0 << rhs)
     }
 }
+
 impl std::ops::Add for Imm {
     type Output = Self;
     fn add(self, rhs: Self) -> Self::Output {
@@ -238,7 +239,7 @@ impl From<Imm> for Operand {
 }
 impl From<&Imm> for Operand {
     fn from(val: &Imm) -> Self {
-        Self::Imm(val.clone())
+        Self::Imm(*val)
     }
 }
 impl From<Fmm> for Operand {
@@ -582,7 +583,7 @@ impl Operand {
     #[inline]
     pub fn imm(&self) -> Option<Imm> {
         match self {
-            Self::Imm(imm) => Some(imm.clone()),
+            Self::Imm(imm) => Some(*imm),
             _ => None,
         }
     }
@@ -664,7 +665,7 @@ impl TryInto<Imm> for &Operand {
     type Error = BackendError;
     fn try_into(self) -> Result<Imm, Self::Error> {
         match self {
-            Operand::Imm(imm) => Ok(imm.clone()),
+            Operand::Imm(imm) => Ok(*imm),
             _ => Err(BackendError::InternalConsistencyError(
                 "Operand is not a Imm".to_string(),
             )),
