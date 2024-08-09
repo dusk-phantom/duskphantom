@@ -163,6 +163,19 @@ impl BasicBlock {
         }
     }
 
+    pub fn replace_succ_bb_only(&mut self, mut from: BBPtr, to: BBPtr) {
+        if let Some(index) = self.succ_bbs.iter().enumerate().find_map(|(index, bb)| {
+            if bb.id == from.id {
+                Some(index)
+            } else {
+                None
+            }
+        }) {
+            from.pred_bbs.retain(|x| x.id != self.id);
+            self.succ_bbs[index] = to;
+        }
+    }
+
     /// Sets which `BasicBlock` to jump to when the condition is true.
     pub fn set_true_bb(&mut self, mut bb: BBPtr) {
         let self_ptr = ObjPtr::new(self);
