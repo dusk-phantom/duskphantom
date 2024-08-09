@@ -6,7 +6,6 @@ pub fn handle_inst_scheduling(func: &mut Func) -> Result<()> {
     for block in func.iter_bbs_mut() {
         let old_insts = block.insts();
         println!("{}", block.gen_asm());
-        // TODO 以控制流为边界, 要拆分 bb 后调度, 万一 call 指令中间有 write 全局变量, 结果 read 全局变量跑到了 call 前面, 就有问题了
         let new_insts = handle_block_scheduling(old_insts).with_context(|| context!())?;
         *block.insts_mut() = new_insts;
     }
@@ -55,20 +54,20 @@ fn handle_block_scheduling(insts: &[Inst]) -> Result<Vec<Inst>> {
             queue.push(state_operand);
         }
 
-        // let dot = graph.gen_inst_dependency_graph_dot();
-        // let dot_name = format!("dot/{}.dot", 0);
-        // fprintln!(&dot_name, "{}", dot);
+        let dot = graph.gen_inst_dependency_graph_dot();
+        let dot_name = format!("dot/{}.dot", 0);
+        fprintln!(&dot_name, "{}", dot);
 
-        // let asm_name = format!("asm/{}.s", 0);
-        // fprintln!(
-        //     &asm_name,
-        //     "{}",
-        //     new_insts
-        //         .iter()
-        //         .map(|inst| inst.gen_asm())
-        //         .collect::<Vec<String>>()
-        //         .join("\n")
-        // );
+        let asm_name = format!("asm/{}.s", 0);
+        fprintln!(
+            &asm_name,
+            "{}",
+            new_insts
+                .iter()
+                .map(|inst| inst.gen_asm())
+                .collect::<Vec<String>>()
+                .join("\n")
+        );
     }
 
     for last in graph.control.iter().flatten() {
@@ -269,7 +268,7 @@ impl<'a> Graph<'a> {
         let last = if !insts.is_empty() {
             // 判断最后一条指令
             match insts[insts.len() - 1] {
-                Inst::Ret | Inst::Tail(_) /* | Inst::Call(_) */ | Inst::Jmp(_) => {
+                Inst::Ret | Inst::Tail(_) | Inst::Jmp(_) => {
                     inst_len = insts.len() - 1;
                     Some(inst_len)
                 }
@@ -352,6 +351,17 @@ impl<'a> Graph<'a> {
             }
         }
 
+        for id in (0..inst_len).filter(|id| matches!(insts[*id], Inst::Call(_))) {
+            // call 依赖于前面所有指令的指令
+            for i in 0..id {
+                use_defs.entry(id).or_default().insert(i);
+            }
+            // 后面所有指令依赖于这条 call
+            for i in id + 1..inst_len {
+                use_defs.entry(i).or_default().insert(id);
+            }
+        }
+
         // 建立反向依赖
         let mut def_uses: HashMap<InstID, HashSet<InstID>> = HashMap::new();
         for (u, d) in use_defs.iter() {
@@ -413,7 +423,6 @@ impl<'a> Graph<'a> {
         for (id, inst) in insts.iter().enumerate() {
             match inst {
                 /* 无条件跳转 */
-                /* | Inst::Call(_) */
                 | Inst::Beq(_)
                 | Inst::Bne(_)
                 | Inst::Blt(_)
@@ -437,6 +446,7 @@ impl<'a> Graph<'a> {
                 Inst::Load(ld) => {
                     bucket.entry(WrapOperand::Stack(*ld.src())).or_default().push((id, false));
                 }
+                Inst::Call(_) => {}
                 _ => {/* 算术指令, 不用做特殊处理 */}
             }
             for reg in inst.defs() {
@@ -584,7 +594,5 @@ mod tests {
             let insts = bb1.insts().clone();
             handle_block_scheduling(&insts).unwrap()
         };
-        // let graph = Graph::new(insts).unwrap();
-        // dbg!(&graph);
     }
 }
