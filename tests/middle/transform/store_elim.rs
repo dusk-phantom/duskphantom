@@ -518,21 +518,25 @@ pub mod tests_store_elim {
         [+] call void @putint(i32 1)
         [+] call void @putint(i32 8)
         call void @putch(i32 10)
-        %load_113 = load i32, ptr @b
-        call void @putint(i32 %load_113)
+        [-] %load_113 = load i32, ptr @b
+        [-] call void @putint(i32 %load_113)
+        [+] call void @putint(i32 5)
         call void @putch(i32 10)
-        %getelementptr_116 = getelementptr [4 x i32], ptr @c, i32 0, i32 0
-        %load_117 = load i32, ptr %getelementptr_116
-        call void @putint(i32 %load_117)
-        %getelementptr_119 = getelementptr [4 x i32], ptr @c, i32 0, i32 1
-        %load_120 = load i32, ptr %getelementptr_119
-        call void @putint(i32 %load_120)
+        [-] %getelementptr_116 = getelementptr [4 x i32], ptr @c, i32 0, i32 0
+        [-] %load_117 = load i32, ptr %getelementptr_116
+        [-] call void @putint(i32 %load_117)
+        [-] %getelementptr_119 = getelementptr [4 x i32], ptr @c, i32 0, i32 1
+        [-] %load_120 = load i32, ptr %getelementptr_119
+        [-] call void @putint(i32 %load_120)
         [-] %load_123 = load i32, ptr %getelementptr_43
         [-] call void @putint(i32 %load_123)
+        [-] %getelementptr_125 = getelementptr [4 x i32], ptr @c, i32 0, i32 3
+        [-] %load_126 = load i32, ptr %getelementptr_125
+        [-] call void @putint(i32 %load_126)
+        [+] call void @putint(i32 6)
+        [+] call void @putint(i32 7)
         [+] call void @putint(i32 1)
-        %getelementptr_125 = getelementptr [4 x i32], ptr @c, i32 0, i32 3
-        %load_126 = load i32, ptr %getelementptr_125
-        call void @putint(i32 %load_126)
+        [+] call void @putint(i32 9)
         call void @putch(i32 10)
         ret i32 0
 

@@ -13,6 +13,165 @@ pub mod tests_load_elim {
     };
 
     #[test]
+    fn test_entry_load() {
+        let code = r#"
+        int a = 6;
+        int main() {
+            return a;
+        }
+        "#;
+
+        // Check before optimization
+        let parsed = parse(code).unwrap();
+        let mut program = gen(&parsed).unwrap();
+        mem2reg::optimize_program(&mut program).unwrap();
+        simple_gvn::optimize_program(&mut program).unwrap();
+        dead_code_elim::optimize_program(&mut program).unwrap();
+        let effect_analysis = EffectAnalysis::new(&program);
+        let mut memory_ssa = MemorySSA::new(&program, &effect_analysis);
+        let llvm_before = program.module.gen_llvm_ir();
+
+        // Check after optimization
+        load_elim::optimize_program(&mut program, &mut memory_ssa).unwrap();
+        let llvm_after = program.module.gen_llvm_ir();
+        assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
+        @a = dso_local global i32 6
+        declare i32 @getint()
+        declare i32 @getch()
+        declare float @getfloat()
+        declare void @putint(i32 %p0)
+        declare void @putch(i32 %p0)
+        declare void @putfloat(float %p0)
+        declare i32 @getarray(i32* %p0)
+        declare i32 @getfarray(float* %p0)
+        declare void @putarray(i32 %p0, i32* %p1)
+        declare void @putfarray(i32 %p0, float* %p1)
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
+        declare void @putf()
+        declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
+        define i32 @main() {
+        entry:
+        [-] %load_5 = load i32, ptr @a
+        br label %exit
+
+        exit:
+        [-] ret i32 %load_5
+        [+] ret i32 6
+
+
+        }
+        "###);
+    }
+
+    #[test]
+    fn test_entry_load_array() {
+        let code = r#"
+        int a[4] = {1, 2};
+        int main() {
+            return a[1];
+        }
+        "#;
+
+        // Check before optimization
+        let parsed = parse(code).unwrap();
+        let mut program = gen(&parsed).unwrap();
+        mem2reg::optimize_program(&mut program).unwrap();
+        simple_gvn::optimize_program(&mut program).unwrap();
+        dead_code_elim::optimize_program(&mut program).unwrap();
+        let effect_analysis = EffectAnalysis::new(&program);
+        let mut memory_ssa = MemorySSA::new(&program, &effect_analysis);
+        let llvm_before = program.module.gen_llvm_ir();
+
+        // Check after optimization
+        load_elim::optimize_program(&mut program, &mut memory_ssa).unwrap();
+        let llvm_after = program.module.gen_llvm_ir();
+        assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
+        @a = dso_local global [4 x i32] [i32 1, i32 2, i32 0, i32 0]
+        declare i32 @getint()
+        declare i32 @getch()
+        declare float @getfloat()
+        declare void @putint(i32 %p0)
+        declare void @putch(i32 %p0)
+        declare void @putfloat(float %p0)
+        declare i32 @getarray(i32* %p0)
+        declare i32 @getfarray(float* %p0)
+        declare void @putarray(i32 %p0, i32* %p1)
+        declare void @putfarray(i32 %p0, float* %p1)
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
+        declare void @putf()
+        declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
+        define i32 @main() {
+        entry:
+        %getelementptr_5 = getelementptr [4 x i32], ptr @a, i32 0, i32 1
+        [-] %load_6 = load i32, ptr %getelementptr_5
+        br label %exit
+
+        exit:
+        [-] ret i32 %load_6
+        [+] ret i32 2
+
+
+        }
+        "###);
+    }
+
+    #[test]
+    fn test_entry_refuse_load_array() {
+        let code = r#"
+        int a[4] = {1, 2};
+        int main() {
+            int x = getint();
+            return a[x];
+        }
+        "#;
+
+        // Check before optimization
+        let parsed = parse(code).unwrap();
+        let mut program = gen(&parsed).unwrap();
+        mem2reg::optimize_program(&mut program).unwrap();
+        simple_gvn::optimize_program(&mut program).unwrap();
+        dead_code_elim::optimize_program(&mut program).unwrap();
+        let effect_analysis = EffectAnalysis::new(&program);
+        let mut memory_ssa = MemorySSA::new(&program, &effect_analysis);
+        let llvm_before = program.module.gen_llvm_ir();
+
+        // Check after optimization
+        load_elim::optimize_program(&mut program, &mut memory_ssa).unwrap();
+        let llvm_after = program.module.gen_llvm_ir();
+        assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
+        @a = dso_local global [4 x i32] [i32 1, i32 2, i32 0, i32 0]
+        declare i32 @getint()
+        declare i32 @getch()
+        declare float @getfloat()
+        declare void @putint(i32 %p0)
+        declare void @putch(i32 %p0)
+        declare void @putfloat(float %p0)
+        declare i32 @getarray(i32* %p0)
+        declare i32 @getfarray(float* %p0)
+        declare void @putarray(i32 %p0, i32* %p1)
+        declare void @putfarray(i32 %p0, float* %p1)
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
+        declare void @putf()
+        declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
+        define i32 @main() {
+        entry:
+        %call_6 = call i32 @getint()
+        %getelementptr_9 = getelementptr [4 x i32], ptr @a, i32 0, i32 %call_6
+        %load_10 = load i32, ptr %getelementptr_9
+        br label %exit
+
+        exit:
+        ret i32 %load_10
+
+
+        }
+        "###);
+    }
+
+    #[test]
     fn test_trivial_load() {
         let code = r#"
         int a;
