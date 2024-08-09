@@ -242,7 +242,7 @@ mod tests {
                 (id.parse::<u32>()? + 32, true)
             } else if let Some(id) = s.strip_prefix("vf") {
                 (id.parse::<u32>()? + 32, false)
-            } else if let Some(id) = s.strip_prefix("v") {
+            } else if let Some(id) = s.strip_prefix('v') {
                 (id.parse::<u32>()? + 32, true)
             } else {
                 return Err(anyhow!("invalid to parse reg from str {}", s));
