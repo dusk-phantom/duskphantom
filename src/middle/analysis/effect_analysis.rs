@@ -47,7 +47,10 @@ impl EffectAnalysis {
             if func.is_lib() {
                 if func.name.contains("get") {
                     effect.has_io_input.insert(*func);
-                } else if func.name.contains("put") {
+                } else if func.name.contains("put")
+                    || func.name.contains("starttime")
+                    || func.name.contains("stoptime")
+                {
                     effect.has_io_output.insert(*func);
                 }
             }
