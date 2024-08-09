@@ -3,21 +3,34 @@ use std::collections::BTreeSet;
 use super::*;
 /// 处理指令调度,将指令重新排序,以便于后续的优化
 pub fn handle_inst_scheduling(func: &mut Func) -> Result<()> {
-    for block in func.iter_bbs_mut() {
-        let old_insts = block.insts();
-        // println!("{}", block.gen_asm());
-        let new_order = handle_block_scheduling(old_insts).with_context(|| context!())?;
-
-        let mut new_insts = new_order
-            .into_iter()
-            .map(|id| old_insts[id].clone())
-            .collect::<Vec<_>>();
-        *block.insts_mut() = new_insts;
+    if CONFIG.num_parallel_for_block_gen_asm <= 1 {
+        func.iter_bbs_mut()
+            .try_for_each(handle_inst_scheduling_block)?;
+    } else {
+        let thread_pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(CONFIG.num_parallel_for_block_gen_asm)
+            .build()
+            .with_context(|| context!())?;
+        thread_pool.install(|| {
+            func.iter_bbs_mut()
+                .try_for_each(handle_inst_scheduling_block)
+        })?;
     }
     Ok(())
 }
 
-fn handle_block_scheduling(insts: &[Inst]) -> Result<Vec<InstID>> {
+fn handle_inst_scheduling_block(bb: &mut Block) -> Result<()> {
+    let insts = bb.insts();
+    let new_order = insts_scheduling(insts).with_context(|| context!())?;
+    let new_insts = new_order
+        .into_iter()
+        .map(|id| insts[id].clone())
+        .collect::<Vec<_>>();
+    *bb.insts_mut() = new_insts;
+    Ok(())
+}
+
+fn insts_scheduling(insts: &[Inst]) -> Result<Vec<InstID>> {
     let mut new_insts = Vec::new();
     let mut queue: Vec<StateOperand> = Vec::new();
 
@@ -619,7 +632,7 @@ mod tests {
         let bb1 = f.entry();
         let new_insts = {
             let insts = bb1.insts().clone();
-            handle_block_scheduling(&insts).unwrap()
+            insts_scheduling(&insts).unwrap()
         };
     }
 }
