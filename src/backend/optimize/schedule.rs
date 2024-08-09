@@ -13,8 +13,6 @@ fn handle_block_scheduling(insts: &[Inst]) -> Result<Vec<Inst>> {
     let mut new_insts = Vec::new();
     let mut queue: Vec<StateOperand> = Vec::new();
 
-    let mut cnt = 0;
-
     // 1. 构造依赖图
     let mut graph = Graph::new(insts);
     // TODO while 循环, 进行指令调度
@@ -29,9 +27,19 @@ fn handle_block_scheduling(insts: &[Inst]) -> Result<Vec<Inst>> {
 
         // 2. 找到 cnt == 0 的指令, 从队列中删除, 并且删除依赖
         queue.retain(|state| state.cnt != 0);
+        let remain_queue: Vec<InstID> = queue
+            .iter()
+            .map(|state| state.def)
+            .collect();
 
         // 3. 搜集 indegree == 0 的节点, 还要排除在 queue 中的
         let mut no_deps = graph.collect_no_deps();
+        no_deps.retain(|id| !remain_queue.contains(id));
+
+        let dot = graph.gen_inst_dependency_graph_dot();
+        let dot_name = format!("dot/{}.dot", 1);
+        fprintln!(&dot_name, "{}", dot);
+
         // 4. 选取两条指令
         let (inst1, inst2) = graph.select2_inst(&no_deps).with_context(|| context!())?;
         if let Some((state_operand, inst)) = inst1 {
@@ -48,10 +56,10 @@ fn handle_block_scheduling(insts: &[Inst]) -> Result<Vec<Inst>> {
         }
 
         let dot = graph.gen_inst_dependency_graph_dot();
-        let dot_name = format!("dot/{}.dot", cnt);
+        let dot_name = format!("dot/{}.dot", 0);
         fprintln!(&dot_name, "{}", dot);
 
-        let asm_name = format!("asm/{}.s", cnt);
+        let asm_name = format!("asm/{}.s", 0);
         fprintln!(
             &asm_name,
             "{}",
