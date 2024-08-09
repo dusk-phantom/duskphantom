@@ -147,7 +147,7 @@ impl<'a> InstCombine<'a> {
             _ => (),
         }
 
-        // Useless instruction elimination: x / x
+        // Useless instruction elimination: x / x, x - x, x + x (to x * 2)
         match inst_type {
             InstType::SDiv | InstType::UDiv => {
                 let lhs = inst.get_operand()[0].clone();
@@ -162,6 +162,24 @@ impl<'a> InstCombine<'a> {
                 let rhs = inst.get_operand()[1].clone();
                 if lhs == rhs {
                     inst.replace_self(&Constant::Float(1.0).into());
+                    return;
+                }
+            }
+            InstType::Sub => {
+                let lhs = inst.get_operand()[0].clone();
+                let rhs = inst.get_operand()[1].clone();
+                if lhs == rhs {
+                    inst.replace_self(&Constant::Int(0).into());
+                    return;
+                }
+            }
+            InstType::Add => {
+                let lhs = inst.get_operand()[0].clone();
+                let rhs = inst.get_operand()[1].clone();
+                if lhs == rhs {
+                    let new_inst = self.program.mem_pool.get_mul(lhs, Constant::Int(2).into());
+                    inst.insert_after(new_inst);
+                    inst.replace_self(&new_inst.into());
                     return;
                 }
             }
@@ -230,16 +248,38 @@ impl<'a> InstCombine<'a> {
             _ => (),
         }
 
-        // Replace self add with multiplication by 2
-        if inst_type == InstType::Add {
-            let lhs = inst.get_operand()[0].clone();
-            let rhs = inst.get_operand()[1].clone();
-            if lhs == rhs {
-                let new_inst = self.program.mem_pool.get_mul(lhs, Constant::Int(2).into());
-                inst.insert_after(new_inst);
-                inst.replace_self(&new_inst.into());
-                return;
+        // Inst combine: (x * n) + x = x * (n + 1), (x * n) - x = x * (n - 1)
+        match inst_type {
+            InstType::Add | InstType::Sub => {
+                let lhs = inst.get_operand()[0].clone();
+                let rhs = inst.get_operand()[1].clone();
+
+                // Check if "lhs is mul", "rhs is same as lhs_lhs" and "lhs_rhs is int constant"
+                if let Operand::Instruction(lhs) = lhs {
+                    if lhs.get_type() == InstType::Mul {
+                        let lhs_lhs = lhs.get_operand()[0].clone();
+                        let lhs_rhs = lhs.get_operand()[1].clone();
+
+                        if lhs_lhs == rhs {
+                            if let Operand::Constant(Constant::Int(lhs_rhs)) = lhs_rhs {
+                                let new_rhs = if inst_type == InstType::Add {
+                                    lhs_rhs + 1
+                                } else {
+                                    lhs_rhs - 1
+                                };
+                                let new_inst = self
+                                    .program
+                                    .mem_pool
+                                    .get_mul(lhs_lhs, Constant::Int(new_rhs).into());
+                                inst.insert_after(new_inst);
+                                inst.replace_self(&new_inst.into());
+                                return;
+                            }
+                        }
+                    }
+                }
             }
+            _ => (),
         }
 
         // Inst combine: x + 1 - 6 -> x - 5, x * 2 * 3 -> x * 6, x / 2 / 3 -> x / 6
