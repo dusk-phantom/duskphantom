@@ -372,6 +372,15 @@ mod tests {
         [-] lw x39,0(x38)
         [+] lw x39,16(x37)
         "###);
+
+        Block::rm_useless_def_reg(&mut bb, &vec![x39].into_iter().collect()).unwrap();
+        let asm_after2 = bb.gen_asm();
+        assert_snapshot!(diff(&asm_after, &asm_after2),@r###"
+        test:
+        load_addr x37,[0-40]
+        [-] addiw x38,x37,16
+        lw x39,16(x37)
+        "###);
     }
 
     #[test]
