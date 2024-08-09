@@ -1,9 +1,15 @@
 use anyhow::Result;
 
-use crate::middle::{
-    analysis::memory_ssa::{MemorySSA, Node},
-    ir::{instruction::InstType, InstPtr},
-    Program,
+use crate::{
+    backend::from_self::downcast_ref,
+    middle::{
+        analysis::memory_ssa::{MemorySSA, Node},
+        ir::{
+            instruction::{misc_inst::Call, InstType},
+            InstPtr, Operand,
+        },
+        Program,
+    },
 };
 
 pub fn optimize_program<'a>(program: &'a mut Program, memory_ssa: &'a mut MemorySSA) -> Result<()> {
@@ -48,9 +54,11 @@ impl<'a, 'b> LoadElim<'a, 'b> {
             return;
         };
 
-        // It should be a linear normal node (not entry or phi)
-        // Linear node means this MemoryUse is predictable
-        // (when `a[1] = 3`, `load a[x]` is not linear because `x` may or may not be `1`, but `load a[1]` is linear)
+        // It should be a predictable normal node (not entry or phi)
+        // - when `a[1] = 3`, `load a[x]` is not predictable
+        //   - because `x` may or may not be `1`
+        // - `load a[1]` is predictable
+        // - when `int a[3] = {}` (memset), `load a[x]` is predictable
         let Node::Normal(_, used_node, _, _, true) = load_node.as_ref() else {
             return;
         };
@@ -61,18 +69,26 @@ impl<'a, 'b> LoadElim<'a, 'b> {
         };
 
         // The node used by MemoryUse should be a MemoryDef
-        let Node::Normal(_, _, _, store_inst, _) = store_node.as_ref() else {
+        let Node::Normal(_, _, _, def_inst, _) = store_node.as_ref() else {
             return;
         };
 
-        // The MemoryDef should be store (instead of function call), otherwise it can't be optimized
-        if store_inst.get_type() != InstType::Store {
-            return;
+        // If MemoryDef is store, replace with store operand
+        if def_inst.get_type() == InstType::Store {
+            let store_op = def_inst.get_operand().first().unwrap();
+            load_inst.replace_self(store_op);
+            self.memory_ssa.remove_node(load_node);
         }
 
-        // Replace load with operand of store
-        let store_op = store_inst.get_operand().first().unwrap();
-        load_inst.replace_self(store_op);
-        self.memory_ssa.remove_node(load_node);
+        // If MemoryDef is memset, replace with constant
+        // (we assume this memset sets 0 and is large enough)
+        if def_inst.get_type() == InstType::Call {
+            let call = downcast_ref::<Call>(def_inst.as_ref().as_ref());
+            if call.func.is_memset() {
+                let memset_op = &Operand::Constant(0.into());
+                load_inst.replace_self(memset_op);
+                self.memory_ssa.remove_node(load_node);
+            }
+        }
     }
 }

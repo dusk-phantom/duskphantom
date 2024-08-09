@@ -1,7 +1,9 @@
 use crate::{errors::MiddleError, frontend, utils::mem::ObjPtr};
+use analysis::{effect_analysis::EffectAnalysis, memory_ssa::MemorySSA};
 use ir::ir_builder::IRBuilder;
 use transform::{
-    block_fuse, func_inline, inst_combine, mem2reg, simple_gvn, unreachable_block_elim,
+    block_fuse, constant_fold, func_inline, inst_combine, load_elim, mem2reg, simple_gvn,
+    store_elim, unreachable_block_elim,
 };
 
 pub mod analysis;
@@ -10,8 +12,6 @@ pub mod irgen;
 pub mod transform;
 
 use std::pin::Pin;
-
-use self::transform::{constant_fold, dead_code_elim};
 
 pub struct Program {
     pub module: ir::Module,
@@ -26,24 +26,27 @@ pub fn gen(program: &frontend::Program) -> Result<Program, MiddleError> {
 }
 
 pub fn optimize(program: &mut Program) {
-    // Convert program to SSA and prune unused alloc
+    // Convert program to SSA and inline functions
     mem2reg::optimize_program(program).unwrap();
-    dead_code_elim::optimize_program(program).unwrap();
-
-    // Weaken instructions
-    constant_fold::optimize_program(program).unwrap();
-    inst_combine::optimize_program(program).unwrap();
-
-    // Inline functions, weaken inlined functions and remove redundant blocks
     func_inline::optimize_program(program).unwrap();
-    constant_fold::optimize_program(program).unwrap();
-    inst_combine::optimize_program(program).unwrap();
-    unreachable_block_elim::optimize_program(program).unwrap();
-    block_fuse::optimize_program(program).unwrap();
 
-    // Do global value numbering to remove redundancy further
-    simple_gvn::optimize_program(program).unwrap();
-    dead_code_elim::optimize_program(program).unwrap();
+    // Further optimize
+    for _ in 0..3 {
+        // Weaken instructions
+        constant_fold::optimize_program(program).unwrap();
+        inst_combine::optimize_program(program).unwrap();
+        simple_gvn::optimize_program(program).unwrap();
+
+        // Remove unused code
+        let effect_analysis = EffectAnalysis::new(program);
+        let mut memory_ssa = MemorySSA::new(program, &effect_analysis);
+        load_elim::optimize_program(program, &mut memory_ssa).unwrap();
+        store_elim::optimize_program(program, &mut memory_ssa, &effect_analysis).unwrap();
+
+        // Remove unreachable block
+        unreachable_block_elim::optimize_program(program).unwrap();
+        block_fuse::optimize_program(program).unwrap();
+    }
 }
 
 impl Default for Program {

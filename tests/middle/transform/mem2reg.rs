@@ -493,15 +493,14 @@ pub mod tests_mem2reg {
         entry:
         %alloca_2 = alloca i32
         %alloca_5 = alloca [1 x i32]
-        %getelementptr_6 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
-        call void @llvm.memset.p0.i32(i32* %getelementptr_6, i8 0, i32 4, i1 false)
-        %getelementptr_8 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
-        %getelementptr_9 = getelementptr i32, ptr %getelementptr_8, i32 0
-        store i32 8, ptr %getelementptr_9
-        %getelementptr_11 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
-        %call_12 = call i32 @f(i32* %getelementptr_11)
-        %getelementptr_13 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
-        call void @putarray(i32 1, i32* %getelementptr_13)
+        call void @llvm.memset.p0.i32([1 x i32]* %alloca_5, i8 0, i32 4, i1 false)
+        %getelementptr_7 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
+        %getelementptr_8 = getelementptr i32, ptr %getelementptr_7, i32 0
+        store i32 8, ptr %getelementptr_8
+        %getelementptr_10 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
+        %call_11 = call i32 @f(i32* %getelementptr_10)
+        %getelementptr_12 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
+        call void @putarray(i32 1, i32* %getelementptr_12)
         [-] store i32 0, ptr %alloca_2
         br label %exit
 
@@ -514,24 +513,24 @@ pub mod tests_mem2reg {
         }
         define i32 @f(i32* %a) {
         entry:
-        %alloca_19 = alloca i32
-        %alloca_22 = alloca i32*
-        [-] store i32* %a, ptr %alloca_22
-        [-] %load_24 = load i32*, ptr %alloca_22
-        [-] %getelementptr_25 = getelementptr i32, ptr %load_24, i32 0
-        [+] %getelementptr_25 = getelementptr i32, ptr %a, i32 0
-        store i32 1, ptr %getelementptr_25
-        [-] %load_27 = load i32*, ptr %alloca_22
-        [-] %getelementptr_28 = getelementptr i32, ptr %load_27, i32 0
-        [+] %getelementptr_28 = getelementptr i32, ptr %a, i32 0
-        %load_29 = load i32, ptr %getelementptr_28
-        [-] store i32 %load_29, ptr %alloca_19
+        %alloca_18 = alloca i32
+        %alloca_21 = alloca i32*
+        [-] store i32* %a, ptr %alloca_21
+        [-] %load_23 = load i32*, ptr %alloca_21
+        [-] %getelementptr_24 = getelementptr i32, ptr %load_23, i32 0
+        [+] %getelementptr_24 = getelementptr i32, ptr %a, i32 0
+        store i32 1, ptr %getelementptr_24
+        [-] %load_26 = load i32*, ptr %alloca_21
+        [-] %getelementptr_27 = getelementptr i32, ptr %load_26, i32 0
+        [+] %getelementptr_27 = getelementptr i32, ptr %a, i32 0
+        %load_28 = load i32, ptr %getelementptr_27
+        [-] store i32 %load_28, ptr %alloca_18
         br label %exit
 
         exit:
-        [-] %load_20 = load i32, ptr %alloca_19
-        [-] ret i32 %load_20
-        [+] ret i32 %load_29
+        [-] %load_19 = load i32, ptr %alloca_18
+        [-] ret i32 %load_19
+        [+] ret i32 %load_28
 
 
         }

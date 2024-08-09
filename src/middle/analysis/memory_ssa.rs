@@ -1,9 +1,13 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
+    backend::from_self::downcast_ref,
     middle::{
         analysis::dominator_tree::DominatorTree,
-        ir::{BBPtr, FunPtr, InstPtr},
+        ir::{
+            instruction::{misc_inst::Call, InstType},
+            BBPtr, FunPtr, InstPtr,
+        },
         Program,
     },
     utils::mem::{ObjPool, ObjPtr},
@@ -25,7 +29,6 @@ pub struct MemorySSA<'a> {
     effect_analysis: &'a EffectAnalysis,
 }
 
-#[allow(unused)]
 impl<'a> MemorySSA<'a> {
     /// Build MemorySSA for program.
     pub fn new(program: &Program, effect_analysis: &'a EffectAnalysis) -> Self {
@@ -214,6 +217,9 @@ impl<'a> MemorySSA<'a> {
         if let Some(used_node) = used_node {
             self.node_to_user.entry(used_node).or_default().insert(node);
         }
+        if let Some(def_node) = def_node {
+            self.node_to_user.entry(def_node).or_default().insert(node);
+        }
         node
     }
 
@@ -346,10 +352,31 @@ impl Node {
     /// Get used nodes.
     pub fn get_used_node(&self) -> Vec<NodePtr> {
         match self {
-            Node::Normal(_, used_node, _, _, _) => used_node.iter().cloned().collect(),
+            Node::Normal(_, use_node, def_node, _, _) => {
+                let mut result = Vec::new();
+                if let Some(node) = use_node {
+                    result.push(*node);
+                }
+                if let Some(node) = def_node {
+                    result.push(*node);
+                }
+                result
+            }
             Node::Phi(_, args, _) => args.iter().map(|(_, node)| *node).collect(),
             _ => Vec::new(),
         }
+    }
+
+    /// Check if node is memset.
+    fn is_memset(&self) -> bool {
+        self.get_inst()
+            .map(|inst| {
+                inst.get_type() == InstType::Call
+                    && downcast_ref::<Call>(inst.as_ref().as_ref())
+                        .func
+                        .is_memset()
+            })
+            .unwrap_or(false)
     }
 
     /// Add an argument to a phi node.
@@ -485,7 +512,7 @@ impl RangeToNodeFrame {
     pub fn get(&self, k: &EffectRange) -> (Option<NodePtr>, bool) {
         for (key, value) in self.0.iter().rev() {
             if key.can_alias(k) {
-                return (Some(*value), key == k);
+                return (Some(*value), key == k || value.is_memset());
             }
         }
         (None, false)

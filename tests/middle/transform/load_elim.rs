@@ -67,6 +67,63 @@ pub mod tests_load_elim {
     }
 
     #[test]
+    fn test_memset() {
+        let code = r#"
+        int main() {
+            int a[3] = {};
+            return a[a[2]];
+        }
+        "#;
+
+        // Check before optimization
+        let parsed = parse(code).unwrap();
+        let mut program = gen(&parsed).unwrap();
+        mem2reg::optimize_program(&mut program).unwrap();
+        simple_gvn::optimize_program(&mut program).unwrap();
+        dead_code_elim::optimize_program(&mut program).unwrap();
+        let effect_analysis = EffectAnalysis::new(&program);
+        let mut memory_ssa = MemorySSA::new(&program, &effect_analysis);
+        let llvm_before = program.module.gen_llvm_ir();
+
+        // Check after optimization
+        load_elim::optimize_program(&mut program, &mut memory_ssa).unwrap();
+        let llvm_after = program.module.gen_llvm_ir();
+        assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
+        declare i32 @getint()
+        declare i32 @getch()
+        declare float @getfloat()
+        declare void @putint(i32 %p0)
+        declare void @putch(i32 %p0)
+        declare void @putfloat(float %p0)
+        declare i32 @getarray(i32* %p0)
+        declare i32 @getfarray(float* %p0)
+        declare void @putarray(i32 %p0, i32* %p1)
+        declare void @putfarray(i32 %p0, float* %p1)
+        declare void @_sysy_starttime(i32 %p0)
+        declare void @_sysy_stoptime(i32 %p0)
+        declare void @putf()
+        declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
+        define i32 @main() {
+        entry:
+        %alloca_5 = alloca [3 x i32]
+        call void @llvm.memset.p0.i32([3 x i32]* %alloca_5, i8 0, i32 12, i1 false)
+        %getelementptr_8 = getelementptr [3 x i32], ptr %alloca_5, i32 0, i32 2
+        [-] %load_9 = load i32, ptr %getelementptr_8
+        [-] %getelementptr_10 = getelementptr [3 x i32], ptr %alloca_5, i32 0, i32 %load_9
+        [-] %load_11 = load i32, ptr %getelementptr_10
+        [+] %getelementptr_10 = getelementptr [3 x i32], ptr %alloca_5, i32 0, i32 0
+        br label %exit
+
+        exit:
+        [-] ret i32 %load_11
+        [+] ret i32 0
+
+
+        }
+        "###);
+    }
+
+    #[test]
     fn test_array_non_overlap() {
         let code = r#"
         int a[3][3];
