@@ -180,8 +180,8 @@ impl<'a> MemorySSA<'a> {
         // Build MemorySSA for each node
         for inst in current_bb.iter() {
             if let Some(effect) = self.effect_analysis.inst_effect.get(&inst) {
-                let def_range = effect.def_range.clone().into();
-                let use_range = effect.use_range.clone().into();
+                let def_range = effect.def_range.clone();
+                let use_range = effect.use_range.clone();
                 let (def_node, _) = range_to_node.get(&def_range);
                 let (used_node, linear) = range_to_node.get(&use_range);
                 let new_node = self.create_normal_node(used_node, def_node, inst, linear);
@@ -242,7 +242,7 @@ impl<'a> MemorySSA<'a> {
                     // Insert phi with DFS on dominance frontier tree
                     let mut visited = HashSet::new();
                     let mut positions: Vec<(BBPtr, EffectRange)> = Vec::new();
-                    positions.push((bb, effect.def_range.clone().into()));
+                    positions.push((bb, effect.def_range.clone()));
                     while let Some((position, range)) = positions.pop() {
                         if visited.contains(&position) {
                             continue;

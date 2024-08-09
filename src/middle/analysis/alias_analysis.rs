@@ -30,9 +30,19 @@ impl PartialEq for EffectRange {
     }
 }
 
+impl Default for EffectRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Check if two effect range can alias.
 #[allow(unused)]
 impl EffectRange {
+    pub fn new() -> Self {
+        EffectRange::Some(HashSet::new())
+    }
+
     pub fn can_alias(&self, another: &EffectRange) -> bool {
         match (self, another) {
             (EffectRange::All, EffectRange::All) => true,
@@ -56,6 +66,17 @@ impl EffectRange {
         match self {
             EffectRange::All => false,
             EffectRange::Some(set) => set.is_empty(),
+        }
+    }
+
+    pub fn dump(&self) -> String {
+        match self {
+            EffectRange::All => "all".to_string(),
+            EffectRange::Some(set) => {
+                let mut set: Vec<_> = set.iter().map(Operand::to_string).collect();
+                set.sort();
+                set.join(", ")
+            }
         }
     }
 }
