@@ -54,7 +54,7 @@ pub fn optimize_func(func: &mut Func) -> Result<()> {
     phisicalize::handle_illegal_inst(func)?;
 
     // inst scheduling
-    // schedule::handle_inst_scheduling(func)?;
+    schedule::handle_inst_scheduling(func)?;
 
     phisicalize::handle_long_jump(func, &REG_T0, 20_0000);
 
