@@ -1,7 +1,7 @@
-use crate::fprintln;
+use crate::{config::CONFIG, fprintln};
 
 use super::irs::*;
-use std::collections::{ HashMap, HashSet, VecDeque };
+use std::collections::{HashMap, HashSet, VecDeque};
 
 pub mod analysis;
 #[allow(unused)]
@@ -30,8 +30,15 @@ pub fn optimize(program: &mut prog::Program) -> Result<()> {
     #[cfg(feature = "backend_opt")]
     {
         for m in program.modules.iter_mut() {
-            for f in m.funcs.iter_mut() {
-                optimize_func(f)?;
+            if CONFIG.num_parallel_for_func_gen_asm <= 1 {
+                println!("num_parallel_for_func_gen_asm <= 1,run in single thread");
+                m.funcs.iter_mut().try_for_each(optimize_func)?;
+            } else {
+                let thread_pool = rayon::ThreadPoolBuilder::new()
+                    .num_threads(CONFIG.num_parallel_for_func_gen_asm)
+                    .build()
+                    .unwrap();
+                thread_pool.install(|| m.funcs.par_iter_mut().try_for_each(optimize_func))?;
             }
         }
     }
