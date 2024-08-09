@@ -7,7 +7,7 @@ impl IRBuilder {
         call: &llvm_ir::instruction::Call,
         stack_slots: &mut HashMap<Name, StackSlot>,
         reg_gener: &mut RegGenerator,
-        regs: &mut HashMap<Name, Reg>,
+        regs: &mut HashMap<Name, Reg>
     ) -> Result<Vec<Inst>> {
         dbg!(call);
         dbg!(call.to_string());
@@ -39,7 +39,7 @@ impl IRBuilder {
                     let mv = MvInst::new(reg.into(), r.into());
                     ret.push(mv.into());
                     i_arg += 1;
-                } else if (!r.is_usual()) && f_arg < 8 {
+                } else if !r.is_usual() && f_arg < 8 {
                     let reg = Reg::new(REG_FA0.id() + f_arg, false);
                     phisic_arg_regs.push(reg);
                     let mv = MvInst::new(reg.into(), r.into());
@@ -82,7 +82,7 @@ impl IRBuilder {
                         let sd = SdInst::new(reg, extra_arg_stack.into(), REG_SP);
                         extra_arg_stack += 8;
                         ret.push(sd.into());
-                    };
+                    }
                 } else if let Some(label) = v.label() {
                     let dst: Operand = if i_arg < 8 {
                         let reg = Reg::new(REG_A0.id() + i_arg, true);
@@ -144,11 +144,7 @@ impl IRBuilder {
             // dbg!(dest);
             let func_ty = &call.function_ty;
             let dst_reg: Reg = match func_ty.as_ref() {
-                llvm_ir::Type::FuncType {
-                    result_type,
-                    param_types: _,
-                    is_var_arg: _,
-                } => {
+                llvm_ir::Type::FuncType { result_type, param_types: _, is_var_arg: _ } => {
                     let (is_usual, ret_reg) = if Self::is_ty_float(result_type.as_ref()) {
                         (false, REG_FA0)
                     } else if Self::is_ty_int(result_type.as_ref()) {
@@ -185,7 +181,7 @@ impl IRBuilder {
     fn build_memset_inst(
         call: &llvm_ir::instruction::Call,
         stack_slots: &mut HashMap<Name, StackSlot>,
-        regs: &mut HashMap<Name, Reg>,
+        regs: &mut HashMap<Name, Reg>
     ) -> Result<Vec<Inst>> {
         let f_name = match &call.function {
             rayon::iter::Either::Left(_) => todo!(),
@@ -245,7 +241,7 @@ impl IRBuilder {
     fn build_call_smax_i32(
         call: &llvm_ir::instruction::Call,
         reg_gener: &mut RegGenerator,
-        regs: &mut HashMap<Name, Reg>,
+        regs: &mut HashMap<Name, Reg>
     ) -> Result<Vec<Inst>> {
         let f_name = match &call.function {
             rayon::iter::Either::Left(_) => todo!(),

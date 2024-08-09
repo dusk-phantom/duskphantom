@@ -4,13 +4,13 @@ impl IRBuilder {
     pub fn build_call_inst(
         call: &middle::ir::instruction::misc_inst::Call,
         // stack_allocator: &mut StackAllocator,
-        // stack_slots: &HashMap<Address, StackSlot>,
+        stack_slots: &HashMap<Address, StackSlot>,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
-        fmms: &mut HashMap<Fmm, FloatVar>,
+        fmms: &mut HashMap<Fmm, FloatVar>
     ) -> Result<Vec<Inst>> {
         if call.func.name.contains("llvm.memset") {
-            return Self::build_memset_inst(call, regs);
+            return Self::build_memset_inst(call, stack_slots, regs);
         }
 
         let mut ret_insts: Vec<Inst> = Vec::new(); // build_call_inst 的返回值
@@ -33,7 +33,7 @@ impl IRBuilder {
                         let mv = MvInst::new(reg.into(), ope);
                         ret_insts.push(mv.into());
                         i_arg_num += 1;
-                    } else if (!r.is_usual()) && f_arg_num < 8 {
+                    } else if !r.is_usual() && f_arg_num < 8 {
                         // f reg
                         let reg = Reg::new(REG_FA0.id() + f_arg_num, false);
                         phisic_arg_regs.push(reg);
@@ -70,16 +70,22 @@ impl IRBuilder {
                         // fmm
                         let p_reg = Reg::new(REG_FA0.id() + f_arg_num, false);
                         phisic_arg_regs.push(p_reg);
-                        let (v_reg, prepare) = Self::_prepare_fmm(&fmm, reg_gener, fmms)
-                            .with_context(|| context!())?;
+                        let (v_reg, prepare) = Self::_prepare_fmm(
+                            &fmm,
+                            reg_gener,
+                            fmms
+                        ).with_context(|| context!())?;
                         ret_insts.extend(prepare);
                         let mv = MvInst::new(p_reg.into(), v_reg.into());
                         ret_insts.push(mv.into());
                         f_arg_num += 1;
                     } else {
                         // fmm 额外参数
-                        let (v_reg, prepare) = Self::_prepare_fmm(&fmm, reg_gener, fmms)
-                            .with_context(|| context!())?;
+                        let (v_reg, prepare) = Self::_prepare_fmm(
+                            &fmm,
+                            reg_gener,
+                            fmms
+                        ).with_context(|| context!())?;
                         ret_insts.extend(prepare);
                         let sd = SdInst::new(v_reg, extra_arg_stack.into(), REG_SP);
                         extra_arg_stack += 8;
@@ -104,8 +110,9 @@ impl IRBuilder {
                 }
                 _ => {
                     /*  Operand::Label(_) */
-                    return Err(anyhow!("argument can't be a label".to_string()))
-                        .with_context(|| context!());
+                    return Err(anyhow!("argument can't be a label".to_string())).with_context(
+                        || context!()
+                    );
                 }
             }
         }
@@ -127,11 +134,12 @@ impl IRBuilder {
             middle::ir::ValueType::Void => {
                 ret_insts.push(call_inst.into());
             }
-            middle::ir::ValueType::Int
+            | middle::ir::ValueType::Int
             | middle::ir::ValueType::Float
             | middle::ir::ValueType::Bool => {
-                let (dst, ret_a0) = if func.return_type == middle::ir::ValueType::Int
-                    || func.return_type == middle::ir::ValueType::Bool
+                let (dst, ret_a0) = if
+                    func.return_type == middle::ir::ValueType::Int ||
+                    func.return_type == middle::ir::ValueType::Bool
                 {
                     (reg_gener.gen_virtual_usual_reg(), REG_A0)
                 } else {
@@ -144,17 +152,19 @@ impl IRBuilder {
                 ret_insts.push(mv.into());
             }
             _ => {
-                return Err(anyhow!("sysy only return: void | float | int".to_string()))
-                    .with_context(|| context!())
+                return Err(
+                    anyhow!("sysy only return: void | float | int".to_string())
+                ).with_context(|| context!());
             }
-        };
+        }
 
         Ok(ret_insts)
     }
 
     fn build_memset_inst(
         call: &middle::ir::instruction::misc_inst::Call,
-        regs: &mut HashMap<Address, Reg>,
+        stack_slots: &HashMap<Address, StackSlot>,
+        regs: &mut HashMap<Address, Reg>
     ) -> Result<Vec<Inst>> {
         assert!(call.func.name.contains("llvm.memset"));
         let mut ret: Vec<Inst> = Vec::new();
@@ -163,22 +173,43 @@ impl IRBuilder {
         let mut phisic_arg_regs: Vec<Reg> = Vec::new();
         for (i_arg, arg) in args.iter().enumerate().take(3) {
             let i_arg = i_arg as u32; // 第几个参数
-            let ope = Self::no_load_from(arg, regs).with_context(|| context!())?;
-            match ope {
-                Operand::Reg(reg) => {
-                    assert!(reg.is_usual());
-                    let a_n = Reg::new(REG_A0.id() + i_arg, true);
-                    phisic_arg_regs.push(a_n);
-                    let mv = MvInst::new(a_n.into(), reg.into());
-                    ret.push(mv.into());
-                }
-                Operand::Imm(imm) => {
+            match arg {
+                middle::ir::Operand::Constant(con) => {
+                    let imm: i64 = match con {
+                        middle::ir::Constant::SignedChar(ch) => *ch as i64,
+                        middle::ir::Constant::Int(i) => *i as i64,
+                        middle::ir::Constant::Bool(b) => *b as i64,
+                        _ => unimplemented!(),
+                    };
                     let a_n = Reg::new(REG_A0.id() + i_arg, true);
                     phisic_arg_regs.push(a_n);
                     let li = LiInst::new(a_n.into(), imm.into());
                     ret.push(li.into());
                 }
-                _ => unimplemented!(), /* Operand::Fmm(_) Operand::StackSlot(_) Operand::Label(_) */
+                middle::ir::Operand::Parameter(param) => {
+                    let reg = Self::param_from(param, regs).with_context(|| context!())?;
+                    let a_n = Reg::new(REG_A0.id() + i_arg, true);
+                    phisic_arg_regs.push(a_n);
+                    let mv = MvInst::new(a_n.into(), reg.into());
+                    ret.push(mv.into());
+                }
+                middle::ir::Operand::Instruction(instr) => {
+                    if let Ok(slot) = Self::stack_slot_from(arg, stack_slots) {
+                        let a_n = Reg::new(REG_A0.id() + i_arg, true);
+                        phisic_arg_regs.push(a_n);
+                        let laddr = LocalAddr::new(a_n, slot);
+                        ret.push(laddr.into());
+                    } else {
+                        let reg = Self::local_var_except_param_from(instr, regs).with_context(
+                            || context!()
+                        )?;
+                        let a_n = Reg::new(REG_A0.id() + i_arg, true);
+                        phisic_arg_regs.push(a_n);
+                        let mv = MvInst::new(a_n.into(), reg.into());
+                        ret.push(mv.into());
+                    }
+                }
+                middle::ir::Operand::Global(_) => unimplemented!(),
             }
         }
         let mut call_inst = CallInst::new("memset".to_string().into());
