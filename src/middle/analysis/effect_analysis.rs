@@ -21,10 +21,10 @@ pub struct Effect {
 
 pub struct EffectAnalysis {
     pub inst_effect: HashMap<InstPtr, Effect>,
-    has_io_input: HashSet<FunPtr>,
-    has_io_output: HashSet<FunPtr>,
-    has_load: HashSet<FunPtr>,
-    has_store: HashSet<FunPtr>,
+    pub has_io_input: HashSet<FunPtr>,
+    pub has_io_output: HashSet<FunPtr>,
+    pub has_mem_input: HashSet<FunPtr>,
+    pub has_mem_output: HashSet<FunPtr>,
     functions: Vec<FunPtr>,
 }
 
@@ -33,17 +33,12 @@ impl EffectAnalysis {
     /// Run effect analysis on program.
     pub fn new(program: &Program) -> Self {
         let mut worklist: HashSet<FunPtr> = HashSet::new();
-        let inst_effect = HashMap::new();
-        let has_io_input = HashSet::new();
-        let has_io_output = HashSet::new();
-        let has_load = HashSet::new();
-        let has_store = HashSet::new();
         let mut effect = Self {
-            inst_effect,
-            has_io_input,
-            has_io_output,
-            has_load,
-            has_store,
+            inst_effect: HashMap::new(),
+            has_io_input: HashSet::new(),
+            has_io_output: HashSet::new(),
+            has_mem_input: HashSet::new(),
+            has_mem_output: HashSet::new(),
             functions: program.module.functions.clone(),
         };
 
@@ -89,8 +84,8 @@ impl EffectAnalysis {
         }
     }
 
-    /// Dump effect analysis result to string.
-    pub fn dump(&self) -> String {
+    /// Dump effect analysis result on instruction to string.
+    pub fn dump_inst(&self) -> String {
         let mut res = String::new();
         for func in self.functions.iter() {
             if func.is_lib() {
@@ -144,7 +139,9 @@ impl EffectAnalysis {
                     }
                     InstType::Store => {
                         let target = inst.get_operand()[1].clone();
-                        changed |= self.has_store.insert(func);
+                        if check_effect(&target) {
+                            changed |= self.has_mem_output.insert(func);
+                        }
 
                         // Add store as an effective inst
                         self.inst_effect.insert(
@@ -157,7 +154,9 @@ impl EffectAnalysis {
                     }
                     InstType::Load => {
                         let target = inst.get_operand()[0].clone();
-                        changed |= self.has_load.insert(func);
+                        if check_effect(&target) {
+                            changed |= self.has_mem_input.insert(func);
+                        }
 
                         // Add load as an effective inst
                         self.inst_effect.insert(
@@ -185,32 +184,28 @@ impl EffectAnalysis {
         if self.has_io_output.contains(&src) {
             changed |= self.has_io_output.insert(dst);
         }
-        if self.has_load.contains(&src) {
-            changed |= self.has_load.insert(dst);
+        if self.has_mem_input.contains(&src) {
+            changed |= self.has_mem_input.insert(dst);
         }
-        if self.has_store.contains(&src) {
-            changed |= self.has_store.insert(dst);
+        if self.has_mem_output.contains(&src) {
+            changed |= self.has_mem_output.insert(dst);
         }
         changed
     }
+}
 
-    fn make_global(op: Operand) -> Option<Operand> {
-        if let Operand::Instruction(inst) = op {
-            // Trace source of GEP
+/// Check if operand as store / load position causes outside effect.
+fn check_effect(operand: &Operand) -> bool {
+    match operand {
+        Operand::Instruction(inst) => {
             if inst.get_type() == InstType::GetElementPtr {
-                return Self::make_global(inst.get_operand()[0].clone());
+                check_effect(inst.get_operand().first().unwrap())
+            } else {
+                false
             }
-
-            // Otherwise it's alloca (local variable) and can't be made global
-            return None;
         }
-
-        // "Global", "Parameter" and "Constant" are all global
-        Some(op)
-    }
-
-    /// Set has_io_input of function, return changed or not
-    fn set_has_io_input(&mut self, func: FunPtr) -> bool {
-        self.has_io_input.insert(func)
+        Operand::Global(_) => true,
+        Operand::Parameter(_) => true,
+        Operand::Constant(_) => false,
     }
 }
