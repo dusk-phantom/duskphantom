@@ -54,20 +54,20 @@ fn handle_block_scheduling(insts: &[Inst]) -> Result<Vec<Inst>> {
             queue.push(state_operand);
         }
 
-        let dot = graph.gen_inst_dependency_graph_dot();
-        let dot_name = format!("dot/{}.dot", 0);
-        fprintln!(&dot_name, "{}", dot);
+        // let dot = graph.gen_inst_dependency_graph_dot();
+        // let dot_name = format!("dot/{}.dot", 0);
+        // fprintln!(&dot_name, "{}", dot);
 
-        let asm_name = format!("asm/{}.s", 0);
-        fprintln!(
-            &asm_name,
-            "{}",
-            new_insts
-                .iter()
-                .map(|inst| inst.gen_asm())
-                .collect::<Vec<String>>()
-                .join("\n")
-        );
+        // let asm_name = format!("asm/{}.s", 0);
+        // fprintln!(
+        //     &asm_name,
+        //     "{}",
+        //     new_insts
+        //         .iter()
+        //         .map(|inst| inst.gen_asm())
+        //         .collect::<Vec<String>>()
+        //         .join("\n")
+        // );
     }
 
     for last in graph.control.iter().flatten() {
@@ -172,26 +172,6 @@ struct Graph<'a> {
     def_uses: HashMap<InstID /* def */, HashSet<InstID> /* use */>,
     insts: &'a [Inst],
     control: [Option<InstID>; 2],
-}
-impl<'a> Graph<'a> {
-    pub fn gen_inst_dependency_graph_dot(&self) -> String {
-        let mut dot = String::new();
-        dot.push_str("digraph G {\n");
-
-        // gen node id
-        for (id, inst) in self.insts.iter().enumerate() {
-            let inst_str = inst.gen_asm();
-            dot.push_str(&format!("node{} [label=\"[{}]:  {}\"];\n", id, id, inst_str));
-        }
-
-        for (use_, defs) in self.use_defs.iter() {
-            for def in defs.iter() {
-                dot.push_str(&format!("node{} -> node{};\n", use_, def));
-            }
-        }
-        dot.push_str("}\n");
-        dot
-    }
 }
 
 impl<'a> Graph<'a> {
@@ -393,9 +373,9 @@ impl<'a> Graph<'a> {
         // id当且仅当它依赖的指令都执行完了, 才能被删除
         assert!(self.use_defs.get(&id).unwrap().is_empty());
 
-        dbg!("--- before ---");
-        dbg!(&self.def_uses);
-        dbg!(&self.use_defs);
+        // dbg!("--- before ---");
+        // dbg!(&self.def_uses);
+        // dbg!(&self.use_defs);
 
         let use_insts = self.def_uses.remove(&id).unwrap_or_default();
         for use_inst in use_insts.iter() {
@@ -405,9 +385,9 @@ impl<'a> Graph<'a> {
         }
         self.use_defs.remove(&id).with_context(|| context!())?;
 
-        dbg!("--- after ---");
-        dbg!(&self.def_uses);
-        dbg!(&self.use_defs);
+        // dbg!("--- after ---");
+        // dbg!(&self.def_uses);
+        // dbg!(&self.use_defs);
 
         Ok(())
     }
@@ -466,6 +446,28 @@ impl<'a> Graph<'a> {
         }
 
         Ok(bucket)
+    }
+}
+
+#[cfg(test)]
+impl<'a> Graph<'a> {
+    pub fn gen_inst_dependency_graph_dot(&self) -> String {
+        let mut dot = String::new();
+        dot.push_str("digraph G {\n");
+
+        // gen node id
+        for (id, inst) in self.insts.iter().enumerate() {
+            let inst_str = inst.gen_asm();
+            dot.push_str(&format!("node{} [label=\"[{}]:  {}\"];\n", id, id, inst_str));
+        }
+
+        for (use_, defs) in self.use_defs.iter() {
+            for def in defs.iter() {
+                dot.push_str(&format!("node{} -> node{};\n", use_, def));
+            }
+        }
+        dot.push_str("}\n");
+        dot
     }
 }
 
