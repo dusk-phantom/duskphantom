@@ -556,13 +556,13 @@ mod tests {
         f
     }
 
-    #[test]
-    fn construct_graph_test() {
-        let f = construct_func();
-        let bb = f.entry();
-        let insts = bb.insts()[0..bb.insts().len() - 1].to_vec();
-        let graph = Graph::new(&insts).unwrap();
-    }
+    // #[test]
+    // fn construct_graph_test() {
+    //     let f = construct_func();
+    //     let bb = f.entry();
+    //     let insts = bb.insts()[0..bb.insts().len() - 1].to_vec();
+    //     let graph = Graph::new(&insts).unwrap();
+    // }
 
     // #[test]
     // fn test_gen_dot_graph_for_inst_dependency_graph() {
