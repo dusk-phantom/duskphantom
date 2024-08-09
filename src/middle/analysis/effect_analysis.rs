@@ -83,33 +83,10 @@ impl EffectAnalysis {
     pub fn inst_has_io(&self, inst: InstPtr) -> bool {
         if inst.get_type() == InstType::Call {
             let call = downcast_ref::<Call>(inst.as_ref().as_ref());
-            self.has_io(call.func)
+            self.has_io_input.contains(&call.func) || self.has_io_output.contains(&call.func)
         } else {
             false
         }
-    }
-
-    /// Get if function has IO.
-    pub fn has_io(&self, func: FunPtr) -> bool {
-        self.has_io_input.contains(&func) || self.has_io_output.contains(&func)
-    }
-
-    /// Get if function is pure function (no IO / load / store).
-    pub fn is_pure(&self, func: FunPtr) -> bool {
-        !self.has_io_input.contains(&func)
-            && !self.has_io_output.contains(&func)
-            && !self.has_load.contains(&func)
-            && !self.has_store.contains(&func)
-    }
-
-    /// Get if function is constant function (no IO input / load).
-    pub fn is_constant(&self, func: FunPtr) -> bool {
-        !self.has_io_input.contains(&func) && !self.has_load.contains(&func)
-    }
-
-    /// Get if function is silent function (no IO output / store).
-    pub fn is_silent(&self, func: FunPtr) -> bool {
-        !self.has_io_output.contains(&func) && !self.has_store.contains(&func)
     }
 
     /// Dump effect analysis result to string.
