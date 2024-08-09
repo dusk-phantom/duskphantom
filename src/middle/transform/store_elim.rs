@@ -47,7 +47,7 @@ impl<'a> StoreElim<'a> {
         };
 
         // It should be a normal node (not entry or phi)
-        let Node::Normal(_, _, _, _) = node.as_ref() else {
+        let Node::Normal(_, _, _, _, _) = node.as_ref() else {
             return;
         };
 

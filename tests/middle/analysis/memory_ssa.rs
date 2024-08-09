@@ -26,7 +26,7 @@ pub mod tests_memory_ssa {
         dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
         let memory_ssa = MemorySSA::new(&program, &effect_analysis);
-        assert_snapshot!(memory_ssa.gen_llvm_ir(), @r###"
+        assert_snapshot!(memory_ssa.dump(), @r###"
         MemorySSA for function: main
         entry:
         ; 0 (liveOnEntry)
@@ -59,7 +59,7 @@ pub mod tests_memory_ssa {
         dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
         let memory_ssa = MemorySSA::new(&program, &effect_analysis);
-        assert_snapshot!(memory_ssa.gen_llvm_ir(), @r###"
+        assert_snapshot!(memory_ssa.dump(), @r###"
         MemorySSA for function: main
         entry:
         ; 0 (liveOnEntry)
@@ -110,7 +110,7 @@ pub mod tests_memory_ssa {
         dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
         let memory_ssa = MemorySSA::new(&program, &effect_analysis);
-        assert_snapshot!(memory_ssa.gen_llvm_ir(), @r###"
+        assert_snapshot!(memory_ssa.dump(), @r###"
         MemorySSA for function: main
         entry:
         ; 0 (liveOnEntry)
@@ -151,7 +151,7 @@ pub mod tests_memory_ssa {
         dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
         let memory_ssa = MemorySSA::new(&program, &effect_analysis);
-        assert_snapshot!(memory_ssa.gen_llvm_ir(), @r###"
+        assert_snapshot!(memory_ssa.dump(), @r###"
         MemorySSA for function: main
         entry:
         ; 0 (liveOnEntry)
@@ -195,7 +195,7 @@ pub mod tests_memory_ssa {
         dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
         let memory_ssa = MemorySSA::new(&program, &effect_analysis);
-        assert_snapshot!(memory_ssa.gen_llvm_ir(), @r###"
+        assert_snapshot!(memory_ssa.dump(), @r###"
         MemorySSA for function: f
         entry:
         ; 0 (liveOnEntry)
@@ -246,7 +246,7 @@ pub mod tests_memory_ssa {
         dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
         let memory_ssa = MemorySSA::new(&program, &effect_analysis);
-        assert_snapshot!(memory_ssa.gen_llvm_ir(), @r###"
+        assert_snapshot!(memory_ssa.dump(), @r###"
         MemorySSA for function: f
         entry:
         ; 0 (liveOnEntry)

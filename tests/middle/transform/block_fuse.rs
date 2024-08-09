@@ -1,5 +1,5 @@
 #[cfg(test)]
-pub mod tests_func_inline {
+pub mod tests_block_fuse {
     use insta::assert_snapshot;
 
     use compiler::{
@@ -38,8 +38,6 @@ pub mod tests_func_inline {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        constant_fold::optimize_program(&mut program).unwrap();
-        inst_combine::optimize_program(&mut program).unwrap();
         unreachable_block_elim::optimize_program(&mut program).unwrap();
         block_fuse::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
@@ -109,8 +107,6 @@ pub mod tests_func_inline {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        constant_fold::optimize_program(&mut program).unwrap();
-        inst_combine::optimize_program(&mut program).unwrap();
         unreachable_block_elim::optimize_program(&mut program).unwrap();
         block_fuse::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();

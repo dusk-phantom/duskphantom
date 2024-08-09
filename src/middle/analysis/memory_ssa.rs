@@ -18,16 +18,17 @@ pub type NodePtr = ObjPtr<Node>;
 /// My version is different by analyzing the effect of function calls.
 pub struct MemorySSA<'a> {
     builder: MemorySSABuilder,
+    functions: Vec<FunPtr>,
     inst_to_node: HashMap<InstPtr, NodePtr>,
     block_to_node: HashMap<BBPtr, NodePtr>,
     node_to_user: HashMap<NodePtr, HashSet<NodePtr>>,
-    effect_analysis: &'a EffectAnalysis<'a>,
-    program: &'a Program,
+    effect_analysis: &'a EffectAnalysis,
 }
 
 #[allow(unused)]
 impl<'a> MemorySSA<'a> {
-    pub fn new(program: &'a Program, effect_analysis: &'a EffectAnalysis) -> Self {
+    /// Build MemorySSA for program.
+    pub fn new(program: &Program, effect_analysis: &'a EffectAnalysis) -> Self {
         let mut memory_ssa = Self {
             builder: MemorySSABuilder {
                 node_pool: ObjPool::new(),
@@ -37,7 +38,7 @@ impl<'a> MemorySSA<'a> {
             block_to_node: HashMap::new(),
             node_to_user: HashMap::new(),
             effect_analysis,
-            program,
+            functions: program.module.functions.clone(),
         };
         for func in program.module.functions.iter() {
             memory_ssa.run(*func);
@@ -45,21 +46,25 @@ impl<'a> MemorySSA<'a> {
         memory_ssa
     }
 
+    /// Get node from instruction.
     pub fn get_inst_node(&self, inst: InstPtr) -> Option<NodePtr> {
         self.inst_to_node.get(&inst).cloned()
     }
 
+    /// Get node from block.
     pub fn get_block_node(&self, bb: BBPtr) -> Option<NodePtr> {
         self.block_to_node.get(&bb).cloned()
     }
 
+    /// Get all users of a node.
     pub fn get_user(&self, node: NodePtr) -> HashSet<NodePtr> {
         self.node_to_user.get(&node).cloned().unwrap_or_default()
     }
 
-    pub fn gen_llvm_ir(&self) -> String {
+    /// Dump MemorySSA result to string.
+    pub fn dump(&self) -> String {
         let mut result = String::new();
-        for func in self.program.module.functions.iter() {
+        for func in self.functions.iter() {
             if func.is_lib() {
                 continue;
             }
@@ -67,12 +72,12 @@ impl<'a> MemorySSA<'a> {
             for bb in func.dfs_iter() {
                 result += &format!("{}:\n", bb.name);
                 if let Some(node) = self.block_to_node.get(&bb) {
-                    result += &self.gen_llvm_ir_node(*node);
+                    result += &self.dump_node(*node);
                     result += "\n";
                 }
                 for inst in bb.iter() {
                     if let Some(node) = self.inst_to_node.get(&inst) {
-                        result += &self.gen_llvm_ir_node(*node);
+                        result += &self.dump_node(*node);
                         result += "\n";
                     }
                     result += &inst.gen_llvm_ir();
@@ -84,13 +89,14 @@ impl<'a> MemorySSA<'a> {
         result
     }
 
-    pub fn gen_llvm_ir_node(&self, node: NodePtr) -> String {
+    /// Dump a node to string.
+    pub fn dump_node(&self, node: NodePtr) -> String {
         match node.as_ref() {
             Node::Entry(id) => format!("; {} (liveOnEntry)", id),
-            Node::Normal(id, use_node, def_node, _) => {
+            Node::Normal(id, used_node, def_node, _, _) => {
                 let mut result: Vec<String> = Vec::new();
-                if let Some(use_node) = use_node {
-                    result.push(format!("; MemoryUse({})", use_node.get_id()));
+                if let Some(used_node) = used_node {
+                    result.push(format!("; MemoryUse({})", used_node.get_id()));
                 }
                 if let Some(def_node) = def_node {
                     result.push(format!("; {} = MemoryDef({})", id, def_node.get_id()));
@@ -114,7 +120,7 @@ impl<'a> MemorySSA<'a> {
     /// If the node is not a normal node, it will panic.
     pub fn replace_node(&mut self, node: NodePtr, op: &Operand) {
         // Check if node is normal
-        let Node::Normal(_, use_node, _, mut inst) = *node else {
+        let Node::Normal(_, used_node, _, mut inst, _) = *node else {
             panic!("not a normal node");
         };
 
@@ -128,8 +134,8 @@ impl<'a> MemorySSA<'a> {
         inst.replace_self(op);
 
         // Update use-def chain
-        if let Some(use_node) = use_node {
-            self.node_to_user.get_mut(&use_node).unwrap().remove(&node);
+        if let Some(used_node) = used_node {
+            self.node_to_user.get_mut(&used_node).unwrap().remove(&node);
         }
     }
 
@@ -165,6 +171,7 @@ impl<'a> MemorySSA<'a> {
         }
     }
 
+    /// Build MemorySSA for function.
     fn run(&mut self, func: FunPtr) {
         let Some(entry) = func.entry else {
             return;
@@ -189,6 +196,7 @@ impl<'a> MemorySSA<'a> {
         )
     }
 
+    /// Add nodes starting from `current_bb`.
     fn add_node_start_from(
         &mut self,
         parent_bb: Option<BBPtr>,
@@ -199,7 +207,7 @@ impl<'a> MemorySSA<'a> {
     ) {
         // Add argument for "phi" instruction
         if let Some(mut phi) = phi_insertions.get(&current_bb).and_then(|p| p.get()) {
-            let value = range_to_node.get(phi.get_effect_range()).unwrap();
+            let value = range_to_node.get(phi.get_effect_range()).0.unwrap();
             phi.add_phi_arg((parent_bb.unwrap(), value));
             self.node_to_user.entry(value).or_default().insert(phi);
             range_to_node.insert(phi.get_effect_range().clone(), phi);
@@ -218,9 +226,9 @@ impl<'a> MemorySSA<'a> {
             if let Some(effect) = self.effect_analysis.inst_effect.get(&inst) {
                 let def_range = effect.def_range.clone().into();
                 let use_range = effect.use_range.clone().into();
-                let def_node = range_to_node.get(&def_range);
-                let use_node = range_to_node.get(&use_range);
-                let new_node = self.create_normal_node(use_node, def_node, inst);
+                let (def_node, _) = range_to_node.get(&def_range);
+                let (used_node, linear) = range_to_node.get(&use_range);
+                let new_node = self.create_normal_node(used_node, def_node, inst, linear);
                 range_to_node.insert(def_range, new_node);
             }
         }
@@ -238,16 +246,20 @@ impl<'a> MemorySSA<'a> {
         }
     }
 
+    /// Create a normal node.
     fn create_normal_node(
         &mut self,
-        use_node: Option<NodePtr>,
+        used_node: Option<NodePtr>,
         def_node: Option<NodePtr>,
         inst: InstPtr,
+        linear: bool,
     ) -> NodePtr {
-        let node = self.builder.get_normal_node(use_node, def_node, inst);
+        let node = self
+            .builder
+            .get_normal_node(used_node, def_node, inst, linear);
         self.inst_to_node.insert(inst, node);
-        if let Some(use_node) = use_node {
-            self.node_to_user.entry(use_node).or_default().insert(node);
+        if let Some(used_node) = used_node {
+            self.node_to_user.entry(used_node).or_default().insert(node);
         }
         node
     }
@@ -303,31 +315,43 @@ struct MemorySSABuilder {
 }
 
 impl MemorySSABuilder {
+    /// Allocate a new node.
     fn new_node(&mut self, node: Node) -> NodePtr {
         self.node_pool.alloc(node)
     }
 
+    /// Returns a unique ID.
     fn next_counter(&mut self) -> usize {
         let counter = self.counter;
         self.counter += 1;
         counter
     }
 
+    /// Get an entry node.
     fn get_entry(&mut self) -> NodePtr {
         let next_counter = self.next_counter();
         self.new_node(Node::Entry(next_counter))
     }
 
+    /// Get a normal node.
     fn get_normal_node(
         &mut self,
-        use_node: Option<NodePtr>,
+        used_node: Option<NodePtr>,
         def_node: Option<NodePtr>,
         inst: InstPtr,
+        linear: bool,
     ) -> NodePtr {
         let next_counter = self.next_counter();
-        self.new_node(Node::Normal(next_counter, use_node, def_node, inst))
+        self.new_node(Node::Normal(
+            next_counter,
+            used_node,
+            def_node,
+            inst,
+            linear,
+        ))
     }
 
+    /// Get a phi node.
     fn get_phi(&mut self, range: EffectRange) -> NodePtr {
         let next_counter = self.next_counter();
         self.new_node(Node::Phi(next_counter, Vec::new(), range))
@@ -335,36 +359,47 @@ impl MemorySSABuilder {
 }
 
 /// Memory SSA node.
+/// Function in Node does not maintain use-def chain.
 pub enum Node {
+    /// Entry(id) represents the memory state at the beginning of the function.
     Entry(usize),
-    Normal(usize, Option<NodePtr>, Option<NodePtr>, InstPtr),
+
+    /// Normal(id, used_node, def_node, inst, linear) represents a memory state after an instruction.
+    /// For a MemoryUse, if linear flag is true, it guarantees using used_node.
+    Normal(usize, Option<NodePtr>, Option<NodePtr>, InstPtr, bool),
+
+    /// Phi(id, args, range) represents a phi node.
     Phi(usize, Vec<(BBPtr, NodePtr)>, EffectRange),
 }
 
 impl Node {
+    /// Get instruction if it's a normal node.
     pub fn get_inst(&self) -> Option<InstPtr> {
         match self {
-            Node::Normal(_, _, _, inst) => Some(*inst),
+            Node::Normal(_, _, _, inst, _) => Some(*inst),
             _ => None,
         }
     }
 
+    /// Get ID of the node.
     pub fn get_id(&self) -> usize {
         match self {
             Node::Entry(id) => *id,
-            Node::Normal(id, _, _, _) => *id,
+            Node::Normal(id, _, _, _, _) => *id,
             Node::Phi(id, _, _) => *id,
         }
     }
 
+    /// Get used nodes.
     pub fn get_used_node(&self) -> Vec<NodePtr> {
         match self {
-            Node::Normal(_, use_node, _, _) => use_node.iter().cloned().collect(),
+            Node::Normal(_, used_node, _, _, _) => used_node.iter().cloned().collect(),
             Node::Phi(_, args, _) => args.iter().map(|(_, node)| *node).collect(),
             _ => Vec::new(),
         }
     }
 
+    /// Add an argument to a phi node.
     fn add_phi_arg(&mut self, arg: (BBPtr, NodePtr)) {
         match self {
             Node::Phi(_, args, _) => args.push(arg),
@@ -372,6 +407,7 @@ impl Node {
         }
     }
 
+    /// Get effect range of a phi node.
     fn get_effect_range(&self) -> &EffectRange {
         match self {
             Node::Phi(_, _, range) => range,
@@ -379,6 +415,7 @@ impl Node {
         }
     }
 
+    /// Merge effect range of a phi node.
     fn merge_effect_range(&mut self, another: &EffectRange) {
         match self {
             Node::Phi(_, _, range) => range.merge(another),
@@ -391,6 +428,7 @@ impl Node {
 pub struct PhiInsertion(Option<NodePtr>);
 
 impl PhiInsertion {
+    /// Initialize an empty phi insertion.
     pub fn new() -> Self {
         Self(None)
     }
@@ -453,17 +491,18 @@ impl<'a> RangeToNode<'a> {
     }
 
     /// Get an element from all frames.
-    pub fn get(&self, k: &EffectRange) -> Option<NodePtr> {
+    /// Returns the element, and if the hit is exact hit.
+    pub fn get(&self, k: &EffectRange) -> (Option<NodePtr>, bool) {
         if k.is_empty() {
-            return None;
+            return (None, false);
         }
         let mut map = self;
         loop {
             match map {
                 Self::Root(m) => return m.get(k),
                 Self::Leaf(m, parent) => {
-                    if let Some(v) = m.get(k) {
-                        return Some(v);
+                    if let (Some(v), l) = m.get(k) {
+                        return (Some(v), l);
                     }
                     map = parent;
                 }
@@ -488,15 +527,14 @@ impl RangeToNodeFrame {
         self.0.push((k, v));
     }
 
-    pub fn get(&self, k: &EffectRange) -> Option<NodePtr> {
-        self.0.iter().rev().find_map(
-            |(key, value)| {
-                if key.can_alias(k) {
-                    Some(*value)
-                } else {
-                    None
-                }
-            },
-        )
+    /// Get an element from the frame.
+    /// Returns the element, and if the hit is exact hit.
+    pub fn get(&self, k: &EffectRange) -> (Option<NodePtr>, bool) {
+        for (key, value) in self.0.iter().rev() {
+            if key.can_alias(k) {
+                return (Some(*value), key == k);
+            }
+        }
+        (None, false)
     }
 }
