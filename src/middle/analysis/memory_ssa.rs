@@ -163,7 +163,7 @@ impl<'a> MemorySSA<'a> {
     ) {
         // Add argument for "phi" instruction
         if let Some(mut phi) = phi_insertions.get(&current_bb).and_then(|p| p.get()) {
-            let value = range_to_node.get(phi.get_effect_range()).0.unwrap();
+            let value = range_to_node.get_def(phi.get_effect_range()).unwrap();
             phi.add_phi_arg((parent_bb.unwrap(), value));
             self.node_to_user.entry(value).or_default().insert(phi);
             range_to_node.insert(phi.get_effect_range().clone(), phi);
@@ -182,8 +182,8 @@ impl<'a> MemorySSA<'a> {
             if let Some(effect) = self.effect_analysis.inst_effect.get(&inst) {
                 let def_range = effect.def_range.clone();
                 let use_range = effect.use_range.clone();
-                let (def_node, _) = range_to_node.get(&def_range);
-                let (used_node, linear) = range_to_node.get(&use_range);
+                let def_node = range_to_node.get_def(&def_range);
+                let (used_node, linear) = range_to_node.get_use(&use_range);
                 let new_node = self.create_normal_node(used_node, def_node, inst, linear);
                 range_to_node.insert(def_range, new_node);
             }
@@ -475,18 +475,38 @@ impl<'a> RangeToNode<'a> {
         self.last_frame().insert(k, v);
     }
 
-    /// Get an element from all frames.
+    /// Get an element from all frames with def range.
+    /// Returns the element.
+    pub fn get_def(&self, def_range: &EffectRange) -> Option<NodePtr> {
+        if def_range.is_empty() {
+            return None;
+        }
+        let mut map = self;
+        loop {
+            match map {
+                Self::Root(m) => return m.get_def(),
+                Self::Leaf(m, parent) => {
+                    if let Some(v) = m.get_def() {
+                        return Some(v);
+                    }
+                    map = parent;
+                }
+            }
+        }
+    }
+
+    /// Get an element from all frames with use range.
     /// Returns the element, and if the hit is exact hit.
-    pub fn get(&self, k: &EffectRange) -> (Option<NodePtr>, bool) {
-        if k.is_empty() {
+    pub fn get_use(&self, use_range: &EffectRange) -> (Option<NodePtr>, bool) {
+        if use_range.is_empty() {
             return (None, false);
         }
         let mut map = self;
         loop {
             match map {
-                Self::Root(m) => return m.get(k),
+                Self::Root(m) => return m.get_use(use_range),
                 Self::Leaf(m, parent) => {
-                    if let (Some(v), l) = m.get(k) {
+                    if let (Some(v), l) = m.get_use(use_range) {
                         return (Some(v), l);
                     }
                     map = parent;
@@ -512,19 +532,24 @@ impl RangeToNodeFrame {
         self.0.push((k, v));
     }
 
-    /// Get an element from the frame.
+    /// Get the last definition.
+    pub fn get_def(&self) -> Option<NodePtr> {
+        self.0.last().map(|(_, n)| *n)
+    }
+
+    /// Get an element from the frame with given use range.
     /// Returns the element, and if the hit is predictable.
     ///
     /// Criterion for predictable is:
     /// - If effect range features only one variable, it's predictable.
     /// - If store node is memset, it's predictable because we assume memset makes everything zero.
     /// - If store node is entry, it's predictable so that load gvar in main function can reduce to constant.
-    pub fn get(&self, k: &EffectRange) -> (Option<NodePtr>, bool) {
+    pub fn get_use(&self, use_range: &EffectRange) -> (Option<NodePtr>, bool) {
         for (key, value) in self.0.iter().rev() {
-            if key.can_alias(k) {
+            if key.can_alias(use_range) {
                 return (
                     Some(*value),
-                    key == k || value.is_memset() || value.is_entry(),
+                    key == use_range || value.is_memset() || value.is_entry(),
                 );
             }
         }

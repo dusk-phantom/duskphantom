@@ -160,7 +160,7 @@ impl EffectAnalysis {
                                 inst,
                                 Effect {
                                     def_range: EffectRange::All,
-                                    use_range: EffectRange::All,
+                                    use_range: EffectRange::new(),
                                 },
                             );
                         }

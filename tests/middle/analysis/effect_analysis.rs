@@ -92,7 +92,7 @@ pub mod tests_effect_analysis {
 
         %call_18 = call i32 @f(i32* %getelementptr_17):
             def: all
-            use: all
+            use: 
 
         "###);
     }
@@ -130,7 +130,7 @@ pub mod tests_effect_analysis {
 
         %call_14 = call i32 @f():
             def: all
-            use: all
+            use: 
 
         store i32 3, ptr @y:
             def: @y
@@ -167,7 +167,7 @@ pub mod tests_effect_analysis {
 
         %call_6 = call i32 @main():
             def: all
-            use: all
+            use: 
 
         "###);
     }
@@ -207,7 +207,7 @@ pub mod tests_effect_analysis {
 
         %call_7 = call i32 @g():
             def: all
-            use: all
+            use: 
 
         %load_15 = load i32, ptr @x:
             def: 
@@ -219,11 +219,11 @@ pub mod tests_effect_analysis {
 
         %call_17 = call i32 @f():
             def: all
-            use: all
+            use: 
 
         %call_25 = call i32 @f():
             def: all
-            use: all
+            use: 
 
         "###);
     }
