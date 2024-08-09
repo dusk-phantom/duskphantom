@@ -18,9 +18,12 @@ fn handle_block_scheduling(insts: &[Inst]) -> Result<Vec<Inst>> {
     let mut queue: Vec<StateOperand> = Vec::new();
 
     // 最后 1/2 条指令不进行调度
+    let insts_strip = insts[0..insts.len() - 1].to_vec();
 
     // 1. 构造依赖图
-    let mut graph = Graph::new(insts).with_context(|| context!())?;
+    let mut graph = Graph::new(&insts_strip).with_context(|| context!())?;
+
+    dbg!(&graph);
 
     // TODO while 循环, 进行指令调度
     while !graph.use_defs.is_empty() {
@@ -58,20 +61,20 @@ fn handle_block_scheduling(insts: &[Inst]) -> Result<Vec<Inst>> {
             queue.push(state_operand);
         }
 
-        let dot = graph.gen_inst_dependency_graph_dot();
-        let dot_name = format!("dot/{}.dot", 0);
-        fprintln!(&dot_name, "{}", dot);
+        // let dot = graph.gen_inst_dependency_graph_dot();
+        // let dot_name = format!("dot/{}.dot", 0);
+        // fprintln!(&dot_name, "{}", dot);
 
-        let asm_name = format!("asm/{}.s", 0);
-        fprintln!(
-            &asm_name,
-            "{}",
-            new_insts
-                .iter()
-                .map(|inst| inst.gen_asm())
-                .collect::<Vec<String>>()
-                .join("\n")
-        );
+        // let asm_name = format!("asm/{}.s", 0);
+        // fprintln!(
+        //     &asm_name,
+        //     "{}",
+        //     new_insts
+        //         .iter()
+        //         .map(|inst| inst.gen_asm())
+        //         .collect::<Vec<String>>()
+        //         .join("\n")
+        // );
     }
 
     Ok(new_insts)
@@ -262,36 +265,46 @@ enum WrapOperand {
 impl<'a> Graph<'a> {
     fn new(insts: &'a [Inst]) -> Result<Self> {
         let bucket = Self::construct_bucket(insts).with_context(|| context!())?;
+
+        fprintln!("bucket.txt", "{}", format!("{:?}", bucket));
+
         let mut use_defs: HashMap<InstID, HashSet<InstID>> = HashMap::new();
 
-        for insts_flag in bucket.iter() {
+        for (_, insts_flag) in bucket.iter() {
             // 几种情况, 滑动窗口, 建立依赖, win_l, win_r 是闭区间
             // r r r r r r r r r
             // w w w w w w w w w
             // r w r r w w r w r
-            // r(w) r r r w r r w r
+            // r r r r w r r w r
 
-            let first = insts_flag.first().ok_or(anyhow!("empty"))?.0;
-            let win_l = first;
+            let mut win_l = usize::MAX; // dummy, 搞一个假的 def
             // 边界: 只有一个元素, 自然没依赖
-            for win_r in 1..insts_flag.len() {
+
+            for win_r in 0..insts_flag.len() {
                 if insts_flag[win_r].1 {
                     // is write
-                    for i in win_l..win_r {
-                        let def = insts_flag[i].0;
-                        let use_ = insts_flag[win_r].0;
-                        use_defs.entry(use_).or_default().insert(def);
-                    }
-                } else {
-                    // is read
-                    if win_l == first {
-                        // 没依赖
+                    if win_l == usize::MAX {
+                        for i in 0..win_r {
+                            let def = insts_flag[i].0;
+                            let use_ = insts_flag[win_r].0;
+                            use_defs.entry(use_).or_default().insert(def);
+                        }
                     } else {
-                        // 出现了 read after write
-                        let def = insts_flag[win_l].0;
-                        let use_ = insts_flag[win_r].0;
-                        use_defs.entry(use_).or_default().insert(def);
+                        for i in win_l..win_r {
+                            let def = insts_flag[i].0;
+                            let use_ = insts_flag[win_r].0;
+                            use_defs.entry(use_).or_default().insert(def);
+                        }
                     }
+                    win_l = win_r;
+                } else {
+                    if win_l == usize::MAX {
+                        continue;
+                    }
+                    // 出现了 read after write
+                    let def = insts_flag[win_l].0;
+                    let use_ = insts_flag[win_r].0;
+                    use_defs.entry(use_).or_default().insert(def);
                 }
             }
         }
@@ -349,7 +362,7 @@ type IsW = bool;
 
 impl<'a> Graph<'a> {
     #[allow(clippy::type_complexity)]
-    fn construct_bucket(insts: &[Inst]) -> Result<Vec<Vec<(InstID, IsW)>>> {
+    fn construct_bucket(insts: &[Inst]) -> Result<HashMap<WrapOperand, Vec<(InstID, IsW)>>> {
         /* ---------- 函数正文 ---------- */
 
         let mut bucket: HashMap<WrapOperand, Vec<(InstID, IsW)>> = HashMap::new();
@@ -432,14 +445,14 @@ impl<'a> Graph<'a> {
             }
         }
 
-        let bucket = bucket.values().cloned().collect();
-
         Ok(bucket)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use insta::assert_debug_snapshot;
+
     use super::*;
 
     fn construct_func() -> Func {
@@ -537,29 +550,27 @@ mod tests {
     fn construct_graph_test() {
         let f = construct_func();
         let bb = f.entry();
-        let insts = bb.insts();
-        let graph = Graph::new(insts).unwrap();
-        dbg!(&graph.use_defs);
-        println!("{}", f.entry().ordered_insts_text());
-        dbg!(&graph.collect_no_deps());
-    }
-    #[test]
-    fn test_gen_dot_graph_for_inst_dependency_graph() {
-        let f = construct_func();
-        let bb = f.entry();
-        let insts = bb.insts();
-        let graph = Graph::new(insts).unwrap();
-        let dot = graph.gen_inst_dependency_graph_dot();
-        println!("{}", dot);
-        println!("{}", f.entry().gen_asm());
-        dbg!(&graph.use_defs);
+        let insts = bb.insts()[0..bb.insts().len() - 1].to_vec();
+        let graph = Graph::new(&insts).unwrap();
     }
 
-    #[test]
-    fn debug_schedule() {
-        let f = construct_func();
-        let bb = f.entry();
-        let insts = bb.insts();
-        handle_block_scheduling(insts);
-    }
+    // #[test]
+    // fn test_gen_dot_graph_for_inst_dependency_graph() {
+    //     let f = construct_func();
+    //     let bb = f.entry();
+    //     let insts = bb.insts();
+    //     let graph = Graph::new(insts).unwrap();
+    //     let dot = graph.gen_inst_dependency_graph_dot();
+    //     println!("{}", dot);
+    //     println!("{}", f.entry().gen_asm());
+    //     dbg!(&graph.use_defs);
+    // }
+
+    // #[test]
+    // fn debug_schedule() {
+    //     let f = construct_func();
+    //     let bb = f.entry();
+    //     let insts = bb.insts();
+    //     handle_block_scheduling(insts);
+    // }
 }
