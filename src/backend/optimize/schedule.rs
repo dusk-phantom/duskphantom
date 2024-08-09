@@ -27,10 +27,7 @@ fn handle_block_scheduling(insts: &[Inst]) -> Result<Vec<Inst>> {
 
         // 2. 找到 cnt == 0 的指令, 从队列中删除, 并且删除依赖
         queue.retain(|state| state.cnt != 0);
-        let remain_queue: Vec<InstID> = queue
-            .iter()
-            .map(|state| state.def)
-            .collect();
+        let remain_queue: Vec<InstID> = queue.iter().map(|state| state.def).collect();
 
         // 3. 搜集 indegree == 0 的节点, 还要排除在 queue 中的
         let mut no_deps = graph.collect_no_deps();
@@ -136,14 +133,14 @@ impl Inst {
                 Ok((4, InstType::FloatPoint))
             }
             /* mem access */
-            | Inst::Ld(_)
+            Inst::Ld(_)
             | Inst::Sd(_)
             | Inst::Lw(_)
             | Inst::Sw(_)
             | Inst::Load(_)
             | Inst::Store(_) => Ok((3, InstType::MemAccess)),
             /* jmp */
-            | Inst::Jmp(_)
+            Inst::Jmp(_)
             | Inst::Beq(_)
             | Inst::Bne(_)
             | Inst::Blt(_)
@@ -174,7 +171,10 @@ impl<'a> Graph<'a> {
         // gen node id
         for (id, inst) in self.insts.iter().enumerate() {
             let inst_str = inst.gen_asm();
-            dot.push_str(&format!("node{} [label=\"[{}]:  {}\"];\n", id, id, inst_str));
+            dot.push_str(&format!(
+                "node{} [label=\"[{}]:  {}\"];\n",
+                id, id, inst_str
+            ));
         }
 
         for (use_, defs) in self.use_defs.iter() {
@@ -192,7 +192,7 @@ impl<'a> Graph<'a> {
     #[allow(clippy::type_complexity)]
     fn select2_inst(
         &self,
-        avail: &[InstID]
+        avail: &[InstID],
     ) -> Result<(Option<(StateOperand, Inst)>, Option<(StateOperand, Inst)>)> {
         // 空的情况
         if avail.is_empty() {
@@ -205,9 +205,8 @@ impl<'a> Graph<'a> {
                 let (latency1, inst_type1) = inst1.character().with_context(|| context!())?;
                 let inst2 = &self.insts[avail[j]];
                 let (latency2, inst_type2) = inst2.character().with_context(|| context!())?;
-                if
-                    inst_type1 != inst_type2 ||
-                    (inst_type1 == inst_type2 && inst_type1 == InstType::Integer)
+                if inst_type1 != inst_type2
+                    || (inst_type1 == inst_type2 && inst_type1 == InstType::Integer)
                 {
                     return Ok((
                         Some((
@@ -287,7 +286,11 @@ impl<'a> Graph<'a> {
             }
         }
 
-        Self { use_defs: deps, def_uses: anti, insts }
+        Self {
+            use_defs: deps,
+            def_uses: anti,
+            insts,
+        }
     }
 
     #[inline]
@@ -301,14 +304,17 @@ impl<'a> Graph<'a> {
         no_deps
     }
 
-    #[inline]
     fn del_node(&mut self, id: InstID) -> Result<()> {
-        let use_insts = self.def_uses.get(&id).ok_or(anyhow!("id not found"))?;
+        // id当且仅当它依赖的指令都执行完了, 才能被删除
+        assert!(self.use_defs.get(&id).unwrap().is_empty());
+
+        let use_insts = self.def_uses.remove(&id).unwrap_or_default();
         for use_inst in use_insts.iter() {
-            self.use_defs.get_mut(use_inst).ok_or(anyhow!("id not found"))?.remove(&id);
+            if let Some(defs) = self.use_defs.get_mut(use_inst) {
+                defs.remove(&id);
+            }
         }
         self.use_defs.remove(&id).with_context(|| context!())?;
-        self.def_uses.remove(&id).with_context(|| context!())?;
         Ok(())
     }
 }
@@ -316,8 +322,11 @@ impl<'a> Graph<'a> {
 impl<'a> Graph<'a> {
     #[allow(clippy::type_complexity)]
     fn construct_defs_uses(
-        insts: &[Inst]
-    ) -> (HashMap<WrapOperand, InstID>, HashMap<WrapOperand, HashSet<InstID>>) {
+        insts: &[Inst],
+    ) -> (
+        HashMap<WrapOperand, InstID>,
+        HashMap<WrapOperand, HashSet<InstID>>,
+    ) {
         /* ---------- 辅助宏 ---------- */
         macro_rules! insert_defs {
             ($inst:ident, $defs:ident, $id:ident) => {
