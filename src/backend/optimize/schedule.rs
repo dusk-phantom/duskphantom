@@ -16,7 +16,7 @@ fn handle_block_scheduling(insts: &[Inst]) -> Result<Vec<Inst>> {
     // 1. 构造依赖图
     let mut graph = Graph::new(insts);
     // TODO while 循环, 进行指令调度
-    while !graph.deps.is_empty() {
+    while !graph.use_defs.is_empty() {
         // 1. 队列中所有的 cnt --
         for state in queue.iter_mut() {
             state.cnt -= 1;
@@ -35,10 +35,6 @@ fn handle_block_scheduling(insts: &[Inst]) -> Result<Vec<Inst>> {
         // 3. 搜集 indegree == 0 的节点, 还要排除在 queue 中的
         let mut no_deps = graph.collect_no_deps();
         no_deps.retain(|id| !remain_queue.contains(id));
-
-        let dot = graph.gen_inst_dependency_graph_dot();
-        let dot_name = format!("dot/{}.dot", 1);
-        fprintln!(&dot_name, "{}", dot);
 
         // 4. 选取两条指令
         let (inst1, inst2) = graph.select2_inst(&no_deps).with_context(|| context!())?;
@@ -166,11 +162,8 @@ impl Inst {
 
 #[derive(Debug)]
 struct Graph<'a> {
-    /// 依赖图, 指向所依赖的指令
-    deps: HashMap<InstID /* use */, HashSet<InstID> /* def */>,
-    /// 反向依赖图
-    anti: HashMap<InstID /* def */, HashSet<InstID> /* use */>,
-    /// <id, WrapInst>
+    use_defs: HashMap<InstID /* use */, HashSet<InstID> /* def */>,
+    def_uses: HashMap<InstID /* def */, HashSet<InstID> /* use */>,
     insts: &'a [Inst],
 }
 impl<'a> Graph<'a> {
@@ -184,9 +177,9 @@ impl<'a> Graph<'a> {
             dot.push_str(&format!("node{} [label=\"[{}]:  {}\"];\n", id, id, inst_str));
         }
 
-        for (id, deps) in self.deps.iter() {
-            for dep in deps.iter() {
-                dot.push_str(&format!("node{} -> node{};\n", dep, id));
+        for (use_, defs) in self.use_defs.iter() {
+            for def in defs.iter() {
+                dot.push_str(&format!("node{} -> node{};\n", use_, def));
             }
         }
         dot.push_str("}\n");
@@ -294,13 +287,13 @@ impl<'a> Graph<'a> {
             }
         }
 
-        Self { deps, anti, insts }
+        Self { use_defs: deps, def_uses: anti, insts }
     }
 
     #[inline]
     fn collect_no_deps(&self) -> Vec<InstID> {
         let mut no_deps = Vec::new();
-        for (id, deps) in self.deps.iter() {
+        for (id, deps) in self.use_defs.iter() {
             if deps.is_empty() {
                 no_deps.push(*id);
             }
@@ -310,12 +303,12 @@ impl<'a> Graph<'a> {
 
     #[inline]
     fn del_node(&mut self, id: InstID) -> Result<()> {
-        let use_insts = self.anti.get(&id).ok_or(anyhow!("id not found"))?;
+        let use_insts = self.def_uses.get(&id).ok_or(anyhow!("id not found"))?;
         for use_inst in use_insts.iter() {
-            self.deps.get_mut(use_inst).ok_or(anyhow!("id not found"))?.remove(&id);
+            self.use_defs.get_mut(use_inst).ok_or(anyhow!("id not found"))?.remove(&id);
         }
-        self.deps.remove(&id).with_context(|| context!())?;
-        self.anti.remove(&id).with_context(|| context!())?;
+        self.use_defs.remove(&id).with_context(|| context!())?;
+        self.def_uses.remove(&id).with_context(|| context!())?;
         Ok(())
     }
 }
@@ -567,7 +560,7 @@ mod tests {
         let bb = f.entry();
         let insts = bb.insts();
         let graph = Graph::new(insts);
-        dbg!(&graph.deps);
+        dbg!(&graph.use_defs);
         println!("{}", f.entry().ordered_insts_text());
         dbg!(&graph.collect_no_deps());
     }
@@ -580,7 +573,7 @@ mod tests {
         let dot = graph.gen_inst_dependency_graph_dot();
         println!("{}", dot);
         println!("{}", f.entry().gen_asm());
-        dbg!(&graph.deps);
+        dbg!(&graph.use_defs);
     }
 
     #[test]
