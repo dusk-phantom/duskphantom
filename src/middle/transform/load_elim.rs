@@ -1,35 +1,23 @@
 use anyhow::Result;
 
-use crate::{
-    backend::from_self::downcast_ref,
-    middle::{
-        analysis::{
-            effect_analysis::EffectAnalysis,
-            memory_ssa::{MemorySSA, Node},
-        },
-        ir::{
-            instruction::{misc_inst::Call, InstType},
-            InstPtr, Operand,
-        },
-        Program,
-    },
+use crate::middle::{
+    analysis::memory_ssa::{MemorySSA, Node},
+    ir::{instruction::InstType, InstPtr},
+    Program,
 };
 
-pub fn optimize_program<'a>(
-    program: &'a mut Program,
-    memory_ssa: &'a mut MemorySSA<'a>,
-) -> Result<()> {
+pub fn optimize_program<'a>(program: &'a mut Program, memory_ssa: &'a mut MemorySSA) -> Result<()> {
     LoadElim::new(program, memory_ssa).run();
     Ok(())
 }
 
-struct LoadElim<'a> {
+struct LoadElim<'a, 'b> {
     program: &'a mut Program,
-    memory_ssa: &'a mut MemorySSA<'a>,
+    memory_ssa: &'a mut MemorySSA<'b>,
 }
 
-impl<'a> LoadElim<'a> {
-    fn new(program: &'a mut Program, memory_ssa: &'a mut MemorySSA<'a>) -> Self {
+impl<'a, 'b> LoadElim<'a, 'b> {
+    fn new(program: &'a mut Program, memory_ssa: &'a mut MemorySSA<'b>) -> Self {
         Self {
             program,
             memory_ssa,
@@ -49,7 +37,7 @@ impl<'a> LoadElim<'a> {
         }
     }
 
-    fn process_inst(&mut self, load_inst: InstPtr) {
+    fn process_inst(&mut self, mut load_inst: InstPtr) {
         // Instruction must be load (instead of function call), otherwise it can't be optimized
         if load_inst.get_type() != InstType::Load {
             return;
@@ -61,6 +49,8 @@ impl<'a> LoadElim<'a> {
         };
 
         // It should be a linear normal node (not entry or phi)
+        // Linear node means this MemoryUse is predictable
+        // (when `a[1] = 3`, `load a[x]` is not linear because `x` may or may not be `1`, but `load a[1]` is linear)
         let Node::Normal(_, used_node, _, _, true) = load_node.as_ref() else {
             return;
         };
@@ -82,6 +72,7 @@ impl<'a> LoadElim<'a> {
 
         // Replace load with operand of store
         let store_op = store_inst.get_operand().first().unwrap();
-        self.memory_ssa.replace_node(load_node, store_op);
+        load_inst.replace_self(store_op);
+        self.memory_ssa.remove_node(load_node);
     }
 }

@@ -60,7 +60,6 @@ fn dead_code_elim_inst(mut inst: InstPtr) {
 }
 
 fn has_side_effect(inst: InstPtr) -> bool {
-    // TODO pure function analysis
     matches!(
         inst.get_type(),
         InstType::Store | InstType::Call | InstType::Ret | InstType::Br

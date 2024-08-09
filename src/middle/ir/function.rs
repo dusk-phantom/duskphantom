@@ -23,9 +23,14 @@ pub struct Function {
 }
 
 impl Function {
-    /// return True if it is a function that is not defined in this module.
+    /// Return true if it is a function that is not defined in this module.
     pub fn is_lib(&self) -> bool {
         self.entry.is_none()
+    }
+
+    /// Return true if it is main function.
+    pub fn is_main(&self) -> bool {
+        self.name == "main"
     }
 
     /// Create a depth-first iterator to traverse the graph structure of basicblocks.
