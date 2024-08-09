@@ -4,6 +4,8 @@ pub mod dead_code_elim;
 pub mod func_inline;
 pub mod inst_combine;
 pub mod load_elim;
+pub mod loop_optimization;
+pub mod loop_simplify;
 pub mod mem2reg;
 pub mod simple_gvn;
 pub mod store_elim;

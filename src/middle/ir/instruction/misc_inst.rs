@@ -265,7 +265,7 @@ impl Phi {
     pub fn get_incoming_values(&self) -> &[(Operand, BBPtr)] {
         &self.incoming_values
     }
-    pub fn get_incoming_values_mut(&mut self) -> &mut [(Operand, BBPtr)] {
+    pub fn get_incoming_values_mut(&mut self) -> &mut Vec<(Operand, BBPtr)> {
         &mut self.incoming_values
     }
     pub fn add_incoming_value(&mut self, val: Operand, pred: BBPtr) {
