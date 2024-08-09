@@ -6,18 +6,21 @@ use crate::middle::{
     Program,
 };
 
-pub fn optimize_program(program: &mut Program, memory_ssa: &MemorySSA) -> Result<()> {
+pub fn optimize_program<'a>(
+    program: &'a mut Program,
+    memory_ssa: &'a mut MemorySSA<'a>,
+) -> Result<()> {
     LoadElim::new(program, memory_ssa).run();
     Ok(())
 }
 
 struct LoadElim<'a> {
     program: &'a mut Program,
-    memory_ssa: &'a MemorySSA<'a>,
+    memory_ssa: &'a mut MemorySSA<'a>,
 }
 
 impl<'a> LoadElim<'a> {
-    fn new(program: &'a mut Program, memory_ssa: &'a MemorySSA<'a>) -> Self {
+    fn new(program: &'a mut Program, memory_ssa: &'a mut MemorySSA<'a>) -> Self {
         Self {
             program,
             memory_ssa,
@@ -37,7 +40,7 @@ impl<'a> LoadElim<'a> {
         }
     }
 
-    fn process_inst(&mut self, mut load_inst: InstPtr) {
+    fn process_inst(&mut self, load_inst: InstPtr) {
         // Instruction must be load
         if load_inst.get_type() != InstType::Load {
             return;
@@ -59,7 +62,7 @@ impl<'a> LoadElim<'a> {
         };
 
         // The node used by MemoryUse should be a MemoryDef
-        let Some(store_inst) = node.get_inst() else {
+        let Node::Normal(_, _, _, store_inst) = node.as_ref() else {
             return;
         };
 
@@ -69,6 +72,7 @@ impl<'a> LoadElim<'a> {
         }
 
         // Replace load with operand of store
-        load_inst.replace_self(store_inst.get_operand().first().unwrap());
+        let store_op = store_inst.get_operand().first().unwrap();
+        self.memory_ssa.replace_node(*node, store_op);
     }
 }

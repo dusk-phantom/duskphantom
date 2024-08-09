@@ -11,7 +11,7 @@ pub mod transform;
 
 use std::pin::Pin;
 
-use self::transform::{constant_fold, deadcode_elimination};
+use self::transform::{constant_fold, dead_code_elim};
 
 pub struct Program {
     pub module: ir::Module,
@@ -28,7 +28,7 @@ pub fn gen(program: &frontend::Program) -> Result<Program, MiddleError> {
 pub fn optimize(program: &mut Program) {
     // Convert program to SSA and prune unused alloc
     mem2reg::optimize_program(program).unwrap();
-    deadcode_elimination::optimize_program(program).unwrap();
+    dead_code_elim::optimize_program(program).unwrap();
 
     // Weaken instructions
     constant_fold::optimize_program(program).unwrap();
@@ -43,7 +43,7 @@ pub fn optimize(program: &mut Program) {
 
     // Do global value numbering to remove redundancy further
     simple_gvn::optimize_program(program).unwrap();
-    deadcode_elimination::optimize_program(program).unwrap();
+    dead_code_elim::optimize_program(program).unwrap();
 }
 
 impl Default for Program {

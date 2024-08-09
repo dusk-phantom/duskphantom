@@ -1,6 +1,6 @@
 pub mod block_fuse;
 pub mod constant_fold;
-pub mod deadcode_elimination;
+pub mod dead_code_elim;
 pub mod func_inline;
 pub mod inst_combine;
 pub mod load_elim;

@@ -6,27 +6,27 @@ use crate::middle::Program;
 
 #[allow(unused)]
 pub fn optimize_program(program: &mut Program) -> Result<()> {
-    DeadCodeElimination::new(program).deadcode_elimination();
+    DeadCodeElim::new(program).dead_code_elim();
     Ok(())
 }
 
-struct DeadCodeElimination<'a> {
+struct DeadCodeElim<'a> {
     program: &'a mut Program,
 }
 
-impl<'a> DeadCodeElimination<'a> {
+impl<'a> DeadCodeElim<'a> {
     fn new(program: &'a mut Program) -> Self {
         Self { program }
     }
 
-    fn deadcode_elimination(&mut self) {
+    fn dead_code_elim(&mut self) {
         self.program
             .module
             .functions
             .clone()
             .iter()
             .filter(|f| !f.is_lib())
-            .for_each(deadcode_elimination_func);
+            .for_each(dead_code_elim_func);
 
         // Global variable does not require revisit, remove unused variables at the end
         self.program
@@ -36,17 +36,17 @@ impl<'a> DeadCodeElimination<'a> {
     }
 }
 
-fn deadcode_elimination_func(func: &FunPtr) {
+fn dead_code_elim_func(func: &FunPtr) {
     // Use post order traversal to reduce revisits
-    func.po_iter().for_each(deadcode_elimination_block);
+    func.po_iter().for_each(dead_code_elim_block);
 }
 
-fn deadcode_elimination_block(bb: BBPtr) {
+fn dead_code_elim_block(bb: BBPtr) {
     // Iterate forward so that next instruction is always valid
-    bb.iter().for_each(deadcode_elimination_inst);
+    bb.iter().for_each(dead_code_elim_inst);
 }
 
-fn deadcode_elimination_inst(mut inst: InstPtr) {
+fn dead_code_elim_inst(mut inst: InstPtr) {
     if !inst.get_user().is_empty() || has_side_effect(inst) {
         return;
     }
@@ -54,7 +54,7 @@ fn deadcode_elimination_inst(mut inst: InstPtr) {
     inst.remove_self();
     for op in operands {
         if let Operand::Instruction(inst) = op {
-            deadcode_elimination_inst(inst);
+            dead_code_elim_inst(inst);
         }
     }
 }

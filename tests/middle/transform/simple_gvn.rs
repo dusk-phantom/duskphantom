@@ -6,7 +6,7 @@ pub mod tests_constant_fold {
         frontend::parse,
         middle::{
             irgen::gen,
-            transform::{constant_fold, deadcode_elimination, mem2reg, simple_gvn},
+            transform::{constant_fold, dead_code_elim, mem2reg, simple_gvn},
         },
         utils::diff::diff,
     };
@@ -29,7 +29,7 @@ pub mod tests_constant_fold {
         let parsed = parse(code).unwrap();
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
-        deadcode_elimination::optimize_program(&mut program).unwrap();
+        dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
@@ -90,9 +90,9 @@ pub mod tests_constant_fold {
         let parsed = parse(code).unwrap();
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
-        deadcode_elimination::optimize_program(&mut program).unwrap();
+        dead_code_elim::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
-        deadcode_elimination::optimize_program(&mut program).unwrap();
+        dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
