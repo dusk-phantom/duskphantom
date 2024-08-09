@@ -54,6 +54,9 @@ impl EffectAnalysis {
                     effect.has_io_input.insert(*func);
                 } else if func.name.contains("put") {
                     effect.has_io_output.insert(*func);
+                } else if func.name.contains("memset") {
+                    let def_range: HashSet<Operand> = [func.params[0].into()].into_iter().collect();
+                    effect.def_range.insert(*func, def_range);
                 }
             }
             worklist.insert(*func);
@@ -153,8 +156,8 @@ impl EffectAnalysis {
                         .collect::<Vec<_>>();
                     def_range.sort();
                     use_range.sort();
-                    res += &format!("  def: {}\n", def_range.join(", "));
-                    res += &format!("  use: {}\n\n", use_range.join(", "));
+                    res += &format!("    def: {}\n", def_range.join(", "));
+                    res += &format!("    use: {}\n\n", use_range.join(", "));
                 }
             }
         }
@@ -172,6 +175,19 @@ impl EffectAnalysis {
                         let def_range = self.def_range.get(&call.func).cloned().unwrap_or_default();
                         let use_range = self.use_range.get(&call.func).cloned().unwrap_or_default();
                         let has_io = self.has_io_input.contains(&call.func);
+
+                        // Fill parameter in ranges
+                        let fill = |op: Operand| {
+                            if let Operand::Parameter(param) = op {
+                                let mut params = call.func.params.iter();
+                                if let Some(index) = params.position(|p| *p == param) {
+                                    return inst.get_operand()[index].clone();
+                                }
+                            }
+                            op
+                        };
+                        let def_range: HashSet<Operand> = def_range.into_iter().map(fill).collect();
+                        let use_range: HashSet<Operand> = use_range.into_iter().map(fill).collect();
 
                         // Merge into function effect
                         changed |= self.add_batch_to_func(
@@ -225,7 +241,8 @@ impl EffectAnalysis {
         changed
     }
 
-    /// Merge effect of two functions, return changed or not
+    /// Merge effect of two functions, return changed or not.
+    /// This attempts to change effect target from local variable to parameter.
     fn add_batch_to_func(
         &mut self,
         dst: FunPtr,
@@ -234,11 +251,11 @@ impl EffectAnalysis {
         has_io: bool,
     ) -> bool {
         let mut changed = false;
-        for def in def_range {
-            changed |= self.add_def_to_func(dst, def.clone());
+        for def_op in def_range {
+            changed |= self.add_def_to_func(dst, def_op.clone());
         }
-        for use_ in use_range {
-            changed |= self.add_use_to_func(dst, use_.clone());
+        for used_op in use_range {
+            changed |= self.add_use_to_func(dst, used_op.clone());
         }
         if has_io {
             changed |= self.set_has_io(dst);
@@ -246,13 +263,34 @@ impl EffectAnalysis {
         changed
     }
 
+    fn make_global(op: Operand) -> Option<Operand> {
+        if let Operand::Instruction(inst) = op {
+            // Trace source of GEP
+            if inst.get_type() == InstType::GetElementPtr {
+                return Self::make_global(inst.get_operand()[0].clone());
+            }
+
+            // Otherwise it's alloca (local variable) and can't be made global
+            return None;
+        }
+
+        // "Global", "Parameter" and "Constant" are all global
+        Some(op)
+    }
+
     /// Add memory def to function, return changed or not
     fn add_def_to_func(&mut self, func: FunPtr, target: Operand) -> bool {
+        let Some(target) = Self::make_global(target) else {
+            return false;
+        };
         self.def_range.entry(func).or_default().insert(target)
     }
 
     /// Add memory use to function, return changed or not
     fn add_use_to_func(&mut self, func: FunPtr, target: Operand) -> bool {
+        let Some(target) = Self::make_global(target) else {
+            return false;
+        };
         self.use_range.entry(func).or_default().insert(target)
     }
 

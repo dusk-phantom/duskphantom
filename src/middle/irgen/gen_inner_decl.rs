@@ -58,7 +58,10 @@ impl<'a> FunctionKit<'a> {
 
                     // Memset 0 if `rhs` is array
                     if let Value::Array(_) = rhs {
-                        let ptr = lhs.clone().load_uncast(self)?.0;
+                        let Value::ReadWrite(ref ptr) = lhs else {
+                            return Err(anyhow!("allocated variable must be read-write"))
+                                .with_context(|| context!());
+                        };
                         let memset_func = self
                             .fun_env
                             .get(&"llvm.memset.p0.i32".to_string())
@@ -67,7 +70,7 @@ impl<'a> FunctionKit<'a> {
                         let memset_call = self.program.mem_pool.get_call(
                             memset_func,
                             vec![
-                                ptr,
+                                ptr.clone(),
                                 Operand::Constant(Constant::SignedChar(0)),
                                 Operand::Constant(Constant::Int(ty.size() as i32 * 4)),
                                 Operand::Constant(Constant::Bool(false)),

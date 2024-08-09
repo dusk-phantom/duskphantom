@@ -29,12 +29,70 @@ pub mod tests_effect_analysis {
         let effect_analysis = EffectAnalysis::new(&program);
         assert_snapshot!(effect_analysis.dump(), @r###"
         store i32 6, ptr @a:
-          def: @a
-          use: 
+            def: @a
+            use: 
 
         %load_6 = load i32, ptr @a:
-          def: 
-          use: @a
+            def: 
+            use: @a
+
+        "###);
+    }
+
+    #[test]
+    fn test_memset() {
+        let code = r#"
+        int main() {
+            int a[3] = {};
+            return a[0];
+        }
+        "#;
+        let parsed = parse(code).unwrap();
+        let mut program = gen(&parsed).unwrap();
+        mem2reg::optimize_program(&mut program).unwrap();
+        constant_fold::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
+        dead_code_elim::optimize_program(&mut program).unwrap();
+        let effect_analysis = EffectAnalysis::new(&program);
+        assert_snapshot!(effect_analysis.dump(), @r###"
+        call void @llvm.memset.p0.i32([3 x i32]* %alloca_5, i8 0, i32 12, i1 false):
+            def: %alloca_5
+            use: 
+
+        %load_9 = load i32, ptr %getelementptr_8:
+            def: 
+            use: %getelementptr_8
+
+        "###);
+    }
+
+    #[test]
+    fn test_function_param() {
+        let code = r#"
+        int f(int x[]) {
+            x[2] = 3;
+        }
+        int main() {
+            int a[3];
+            f(a);
+            return 0;
+        }
+        "#;
+        let parsed = parse(code).unwrap();
+        let mut program = gen(&parsed).unwrap();
+        mem2reg::optimize_program(&mut program).unwrap();
+        constant_fold::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
+        dead_code_elim::optimize_program(&mut program).unwrap();
+        let effect_analysis = EffectAnalysis::new(&program);
+        assert_snapshot!(effect_analysis.dump(), @r###"
+        store i32 3, ptr %getelementptr_8:
+            def: %getelementptr_8
+            use: 
+
+        %call_18 = call i32 @f(i32* %getelementptr_17):
+            def: %getelementptr_17
+            use: 
 
         "###);
     }
@@ -63,28 +121,28 @@ pub mod tests_effect_analysis {
         let effect_analysis = EffectAnalysis::new(&program);
         assert_snapshot!(effect_analysis.dump(), @r###"
         %load_5 = load i32, ptr @y:
-          def: 
-          use: @y
+            def: 
+            use: @y
 
         store i32 2, ptr @y:
-          def: @y
-          use: 
+            def: @y
+            use: 
 
         %call_14 = call i32 @f():
-          def: 
-          use: @y
+            def: 
+            use: @y
 
         call void @putint(i32 %call_14):
-          def: 
-          use: 
+            def: 
+            use: 
 
         store i32 3, ptr @y:
-          def: @y
-          use: 
+            def: @y
+            use: 
 
         %load_17 = load i32, ptr @y:
-          def: 
-          use: @y
+            def: 
+            use: @y
 
         "###);
     }
@@ -108,12 +166,12 @@ pub mod tests_effect_analysis {
         let effect_analysis = EffectAnalysis::new(&program);
         assert_snapshot!(effect_analysis.dump(), @r###"
         store i32 1, ptr @x:
-          def: @x
-          use: 
+            def: @x
+            use: 
 
         %call_6 = call i32 @main():
-          def: @x
-          use: 
+            def: @x
+            use: 
 
         "###);
     }
@@ -144,32 +202,32 @@ pub mod tests_effect_analysis {
         let effect_analysis = EffectAnalysis::new(&program);
         assert_snapshot!(effect_analysis.dump(), @r###"
         %load_5 = load i32, ptr @y:
-          def: 
-          use: @y
+            def: 
+            use: @y
 
         store i32 %load_5, ptr @x:
-          def: @x
-          use: 
+            def: @x
+            use: 
 
         %call_7 = call i32 @g():
-          def: @x, @y
-          use: @x, @y
+            def: @x, @y
+            use: @x, @y
 
         %load_15 = load i32, ptr @x:
-          def: 
-          use: @x
+            def: 
+            use: @x
 
         store i32 %load_15, ptr @y:
-          def: @y
-          use: 
+            def: @y
+            use: 
 
         %call_17 = call i32 @f():
-          def: @x, @y
-          use: @x, @y
+            def: @x, @y
+            use: @x, @y
 
         %call_25 = call i32 @f():
-          def: @x, @y
-          use: @x, @y
+            def: @x, @y
+            use: @x, @y
 
         "###);
     }
