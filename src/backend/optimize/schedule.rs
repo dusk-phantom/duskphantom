@@ -17,15 +17,9 @@ fn handle_block_scheduling(insts: &[Inst]) -> Result<Vec<Inst>> {
     let mut new_insts = Vec::new();
     let mut queue: Vec<StateOperand> = Vec::new();
 
-    // 最后 1/2 条指令不进行调度
-    let insts_strip = insts[0..insts.len() - 1].to_vec();
-
     // 1. 构造依赖图
-    let mut graph = Graph::new(&insts_strip).with_context(|| context!())?;
+    let mut graph = Graph::new(insts).with_context(|| context!())?;
 
-    dbg!(&graph);
-
-    // TODO while 循环, 进行指令调度
     while !graph.use_defs.is_empty() {
         // 1. 队列中所有的 cnt --
         for state in queue.iter_mut() {
@@ -77,6 +71,10 @@ fn handle_block_scheduling(insts: &[Inst]) -> Result<Vec<Inst>> {
         // );
     }
 
+    for last in graph.control.iter().flatten() {
+        new_insts.push(insts[*last].clone());
+    }
+
     Ok(new_insts)
 }
 
@@ -104,7 +102,6 @@ enum InstType {
 }
 
 impl Inst {
-    #[inline]
     fn character(&self) -> Result<(usize /* latency */, InstType)> {
         macro_rules! arithmetic_char {
             ($add:ident) => {
@@ -175,6 +172,7 @@ struct Graph<'a> {
     use_defs: HashMap<InstID /* use */, HashSet<InstID> /* def */>,
     def_uses: HashMap<InstID /* def */, HashSet<InstID> /* use */>,
     insts: &'a [Inst],
+    control: [Option<InstID>; 2],
 }
 impl<'a> Graph<'a> {
     pub fn gen_inst_dependency_graph_dot(&self) -> String {
@@ -264,11 +262,52 @@ enum WrapOperand {
 
 impl<'a> Graph<'a> {
     fn new(insts: &'a [Inst]) -> Result<Self> {
-        let bucket = Self::construct_bucket(insts).with_context(|| context!())?;
+        // 处理控制流指令
+        // branch -> jmp
+        // jmp / call / ret
+        let mut inst_len = insts.len();
+        let last = if !insts.is_empty() {
+            // 判断最后一条指令
+            match insts[insts.len() - 1] {
+                Inst::Ret | Inst::Tail(_) /* | Inst::Call(_) */ | Inst::Jmp(_) => {
+                    inst_len = insts.len() - 1;
+                    Some(inst_len)
+                }
+                _ => {
+                    return Err(anyhow!("last instruction is not a control flow"));
+                }
+            }
+        } else {
+            return Err(anyhow!("build with a empty bb"));
+        };
 
-        fprintln!("bucket.txt", "{}", format!("{:?}", bucket));
+        let last_last = if insts.len() >= 2 {
+            // 判断最后一条指令
+            match insts[insts.len() - 2] {
+                | Inst::Beq(_)
+                | Inst::Bne(_)
+                | Inst::Blt(_)
+                | Inst::Ble(_)
+                | Inst::Bgt(_)
+                | Inst::Bge(_) => {
+                    inst_len = insts.len() - 2;
+                    Some(inst_len)
+                }
+                _ => None,
+            }
+        } else {
+            None
+        };
 
+        let bucket = Self::construct_bucket(&insts[0..inst_len]).with_context(|| context!())?;
+
+        // 初始化图
         let mut use_defs: HashMap<InstID, HashSet<InstID>> = HashMap::new();
+        for (_, insts_flag) in bucket.iter() {
+            for (i, _) in insts_flag.iter() {
+                use_defs.entry(*i).or_default();
+            }
+        }
 
         for (_, insts_flag) in bucket.iter() {
             // 几种情况, 滑动窗口, 建立依赖, win_l, win_r 是闭区间
@@ -278,8 +317,6 @@ impl<'a> Graph<'a> {
             // r r r r w r r w r
 
             let mut win_l = usize::MAX; // dummy, 搞一个假的 def
-            // 边界: 只有一个元素, 自然没依赖
-
             for win_r in 0..insts_flag.len() {
                 if insts_flag[win_r].1 {
                     // is write
@@ -287,13 +324,17 @@ impl<'a> Graph<'a> {
                         for i in 0..win_r {
                             let def = insts_flag[i].0;
                             let use_ = insts_flag[win_r].0;
-                            use_defs.entry(use_).or_default().insert(def);
+                            if def != use_ {
+                                use_defs.entry(use_).or_default().insert(def);
+                            }
                         }
                     } else {
                         for i in win_l..win_r {
                             let def = insts_flag[i].0;
                             let use_ = insts_flag[win_r].0;
-                            use_defs.entry(use_).or_default().insert(def);
+                            if def != use_ {
+                                use_defs.entry(use_).or_default().insert(def);
+                            }
                         }
                     }
                     win_l = win_r;
@@ -304,11 +345,14 @@ impl<'a> Graph<'a> {
                     // 出现了 read after write
                     let def = insts_flag[win_l].0;
                     let use_ = insts_flag[win_r].0;
-                    use_defs.entry(use_).or_default().insert(def);
+                    if def != use_ {
+                        use_defs.entry(use_).or_default().insert(def);
+                    }
                 }
             }
         }
 
+        // 建立反向依赖
         let mut def_uses: HashMap<InstID, HashSet<InstID>> = HashMap::new();
         for (u, d) in use_defs.iter() {
             for dep in d.iter() {
@@ -320,6 +364,7 @@ impl<'a> Graph<'a> {
             use_defs,
             def_uses,
             insts,
+            control: [last_last, last],
         })
     }
 
@@ -363,48 +408,12 @@ type IsW = bool;
 impl<'a> Graph<'a> {
     #[allow(clippy::type_complexity)]
     fn construct_bucket(insts: &[Inst]) -> Result<HashMap<WrapOperand, Vec<(InstID, IsW)>>> {
-        /* ---------- 函数正文 ---------- */
-
         let mut bucket: HashMap<WrapOperand, Vec<(InstID, IsW)>> = HashMap::new();
 
         for (id, inst) in insts.iter().enumerate() {
             match inst {
-                /* 算术指令, 注意一下, 这里面会有浮点, 注意 zero 不算是依赖 */
-                | Inst::Add(_)
-                | Inst::Sub(_)
-                | Inst::Sll(_)
-                | Inst::Srl(_)
-                | Inst::SRA(_)
-                | Inst::Not(_)
-                | Inst::And(_)
-                | Inst::Or(_)
-                | Inst::Xor(_)
-                | Inst::Neg(_)
-                | Inst::Slt(_)
-                | Inst::Sltu(_)
-                | Inst::Sgtu(_)
-                | Inst::Seqz(_)
-                | Inst::Snez(_)
-                | Inst::Mv(_)
-                /* 乘除法 */
-                | Inst::Mul(_)
-                | Inst::Div(_)
-                | Inst::UDiv(_)
-                | Inst::Rem(_)
-                /* 产生立即数 */
-                | Inst::Li(_)
-                | Inst::Lla(_)
-                | Inst::LocalAddr(_)
-                /* 浮点数比较 */
-                | Inst::Feqs(_)
-                | Inst::Fles(_)
-                | Inst::Flts(_)
-                /* convert */
-                | Inst::I2f(_)
-                | Inst::F2i(_)
-                // TODO 暂时和普通指令一样处理 call
-                | Inst::Call(_) => {/* 啥也不干 */}
                 /* 无条件跳转 */
+                /* | Inst::Call(_) */
                 | Inst::Beq(_)
                 | Inst::Bne(_)
                 | Inst::Blt(_)
@@ -428,6 +437,7 @@ impl<'a> Graph<'a> {
                 Inst::Load(ld) => {
                     bucket.entry(WrapOperand::Stack(*ld.src())).or_default().push((id, false));
                 }
+                _ => {/* 算术指令, 不用做特殊处理 */}
             }
             for reg in inst.defs() {
                 let reg = *reg;
@@ -566,11 +576,15 @@ mod tests {
     //     dbg!(&graph.use_defs);
     // }
 
-    // #[test]
-    // fn debug_schedule() {
-    //     let f = construct_func();
-    //     let bb = f.entry();
-    //     let insts = bb.insts();
-    //     handle_block_scheduling(insts);
-    // }
+    #[test]
+    fn debug_schedule() {
+        let f = construct_func();
+        let bb1 = f.entry();
+        let new_insts = {
+            let insts = bb1.insts().clone();
+            handle_block_scheduling(&insts).unwrap()
+        };
+        // let graph = Graph::new(insts).unwrap();
+        // dbg!(&graph);
+    }
 }
