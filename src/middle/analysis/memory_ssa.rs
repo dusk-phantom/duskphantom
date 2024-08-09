@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     middle::{
         analysis::dominator_tree::DominatorTree,
-        ir::{BBPtr, FunPtr, InstPtr},
+        ir::{BBPtr, FunPtr, InstPtr, Operand},
         Program,
     },
     utils::mem::{ObjPool, ObjPtr},
@@ -104,6 +104,25 @@ impl<'a> MemorySSA<'a> {
                 }
                 format!("; {} = MemoryPhi({})", id, args.join(", "))
             }
+        }
+    }
+
+    /// Replace a normal node with a new operand.
+    /// Updates corresponding instruction and use-def chain.
+    ///
+    /// # Panics
+    /// If the node is not a normal node, it will panic.
+    pub fn replace_node(&mut self, node: NodePtr, op: &Operand) {
+        let Node::Normal(_, use_node, _, mut inst) = *node else {
+            panic!("not a normal node");
+        };
+
+        // Update instruction
+        inst.replace_self(op);
+
+        // Update use-def chain
+        if let Some(use_node) = use_node {
+            self.node_to_user.get_mut(&use_node).unwrap().remove(&node);
         }
     }
 
@@ -283,13 +302,6 @@ pub enum Node {
 }
 
 impl Node {
-    pub fn get_inst(&self) -> Option<InstPtr> {
-        match self {
-            Node::Normal(_, _, _, inst) => Some(*inst),
-            _ => None,
-        }
-    }
-
     pub fn get_id(&self) -> usize {
         match self {
             Node::Entry(id) => *id,

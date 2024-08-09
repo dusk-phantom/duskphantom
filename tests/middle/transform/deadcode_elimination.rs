@@ -6,7 +6,7 @@ pub mod tests_dce {
         frontend::parse,
         middle::{
             irgen::gen,
-            transform::{deadcode_elimination, mem2reg},
+            transform::{dead_code_elim, mem2reg},
         },
         utils::diff::diff,
     };
@@ -47,7 +47,7 @@ pub mod tests_dce {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        deadcode_elimination::optimize_program(&mut program).unwrap();
+        dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
         declare i32 @getint()
@@ -182,7 +182,7 @@ pub mod tests_dce {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        deadcode_elimination::optimize_program(&mut program).unwrap();
+        dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
         @x = dso_local global i32 8
@@ -241,7 +241,7 @@ pub mod tests_dce {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        deadcode_elimination::optimize_program(&mut program).unwrap();
+        dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after), @r###"
         declare i32 @getint()
@@ -339,7 +339,7 @@ pub mod tests_dce {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        deadcode_elimination::optimize_program(&mut program).unwrap();
+        dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after), @r###"
         @loopCount = dso_local global i32 0

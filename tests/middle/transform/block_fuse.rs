@@ -7,7 +7,7 @@ pub mod tests_func_inline {
         middle::{
             irgen::gen,
             transform::{
-                block_fuse, constant_fold, deadcode_elimination, inst_combine, mem2reg,
+                block_fuse, constant_fold, dead_code_elim, inst_combine, mem2reg,
                 unreachable_block_elim,
             },
         },
@@ -34,7 +34,7 @@ pub mod tests_func_inline {
         mem2reg::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
         inst_combine::optimize_program(&mut program).unwrap();
-        deadcode_elimination::optimize_program(&mut program).unwrap();
+        dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
@@ -42,7 +42,7 @@ pub mod tests_func_inline {
         inst_combine::optimize_program(&mut program).unwrap();
         unreachable_block_elim::optimize_program(&mut program).unwrap();
         block_fuse::optimize_program(&mut program).unwrap();
-        deadcode_elimination::optimize_program(&mut program).unwrap();
+        dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
         declare i32 @getint()
@@ -105,7 +105,7 @@ pub mod tests_func_inline {
         mem2reg::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
         inst_combine::optimize_program(&mut program).unwrap();
-        deadcode_elimination::optimize_program(&mut program).unwrap();
+        dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
@@ -113,7 +113,7 @@ pub mod tests_func_inline {
         inst_combine::optimize_program(&mut program).unwrap();
         unreachable_block_elim::optimize_program(&mut program).unwrap();
         block_fuse::optimize_program(&mut program).unwrap();
-        deadcode_elimination::optimize_program(&mut program).unwrap();
+        dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
         declare i32 @getint()

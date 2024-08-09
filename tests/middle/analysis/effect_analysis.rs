@@ -7,7 +7,7 @@ pub mod tests_effect_analysis {
         middle::{
             analysis::effect_analysis::EffectAnalysis,
             irgen::gen,
-            transform::{constant_fold, deadcode_elimination, inst_combine, mem2reg},
+            transform::{constant_fold, dead_code_elim, inst_combine, mem2reg},
         },
     };
 
@@ -25,7 +25,7 @@ pub mod tests_effect_analysis {
         mem2reg::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
         inst_combine::optimize_program(&mut program).unwrap();
-        deadcode_elimination::optimize_program(&mut program).unwrap();
+        dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
         assert_snapshot!(effect_analysis.dump(), @r###"
         store i32 6, ptr @a:
@@ -59,7 +59,7 @@ pub mod tests_effect_analysis {
         mem2reg::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
         inst_combine::optimize_program(&mut program).unwrap();
-        deadcode_elimination::optimize_program(&mut program).unwrap();
+        dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
         assert_snapshot!(effect_analysis.dump(), @r###"
         %load_5 = load i32, ptr @y:
@@ -104,7 +104,7 @@ pub mod tests_effect_analysis {
         mem2reg::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
         inst_combine::optimize_program(&mut program).unwrap();
-        deadcode_elimination::optimize_program(&mut program).unwrap();
+        dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
         assert_snapshot!(effect_analysis.dump(), @r###"
         store i32 1, ptr @x:
@@ -140,7 +140,7 @@ pub mod tests_effect_analysis {
         mem2reg::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
         inst_combine::optimize_program(&mut program).unwrap();
-        deadcode_elimination::optimize_program(&mut program).unwrap();
+        dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
         assert_snapshot!(effect_analysis.dump(), @r###"
         %load_5 = load i32, ptr @y:
