@@ -27,7 +27,7 @@ pub mod tests_effect_analysis {
         inst_combine::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
-        assert_snapshot!(effect_analysis.dump(), @r###"
+        assert_snapshot!(effect_analysis.dump_inst(), @r###"
         store i32 6, ptr @a:
             def: @a
             use: 
@@ -54,7 +54,7 @@ pub mod tests_effect_analysis {
         inst_combine::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
-        assert_snapshot!(effect_analysis.dump(), @r###"
+        assert_snapshot!(effect_analysis.dump_inst(), @r###"
         call void @llvm.memset.p0.i32([3 x i32]* %alloca_5, i8 0, i32 12, i1 false):
             def: %alloca_5
             use: 
@@ -85,7 +85,7 @@ pub mod tests_effect_analysis {
         inst_combine::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
-        assert_snapshot!(effect_analysis.dump(), @r###"
+        assert_snapshot!(effect_analysis.dump_inst(), @r###"
         store i32 3, ptr %getelementptr_8:
             def: %getelementptr_8
             use: 
@@ -119,7 +119,7 @@ pub mod tests_effect_analysis {
         inst_combine::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
-        assert_snapshot!(effect_analysis.dump(), @r###"
+        assert_snapshot!(effect_analysis.dump_inst(), @r###"
         %load_5 = load i32, ptr @y:
             def: 
             use: @y
@@ -160,7 +160,7 @@ pub mod tests_effect_analysis {
         inst_combine::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
-        assert_snapshot!(effect_analysis.dump(), @r###"
+        assert_snapshot!(effect_analysis.dump_inst(), @r###"
         store i32 1, ptr @x:
             def: @x
             use: 
@@ -196,7 +196,7 @@ pub mod tests_effect_analysis {
         inst_combine::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
-        assert_snapshot!(effect_analysis.dump(), @r###"
+        assert_snapshot!(effect_analysis.dump_inst(), @r###"
         %load_5 = load i32, ptr @y:
             def: 
             use: @y
