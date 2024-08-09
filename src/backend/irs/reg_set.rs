@@ -1,151 +1,209 @@
-use anyhow::Ok;
-use bitvec::{field::BitField, prelude};
+use bitvec::prelude;
 
 use super::*;
 
 pub struct RegSet {
-    float: prelude::BitArray<[u64; 1000]>,
-    usual: prelude::BitArray<[u64; 1000]>,
+    float: prelude::BitVec,
+    usual: prelude::BitVec,
 }
+
 impl RegSet {
     #[allow(clippy::new_without_default)]
     #[inline]
     pub fn new() -> Self {
         Self {
-            float: prelude::BitArray::new([0; 1000]),
-            usual: prelude::BitArray::new([0; 1000]),
+            float: prelude::BitVec::new(),
+            usual: prelude::BitVec::new(),
         }
     }
     /// NOTICE: This function will panic if reg id is out of range
-    #[inline]
-    pub fn quick_insert(&mut self, reg: &Reg) {
-        let id = reg.id() as usize;
-        if reg.is_usual() {
-            self.usual.set(id, true);
-        } else {
-            self.float.set(id, true);
-        }
-    }
-    #[inline]
-    pub fn insert(&mut self, reg: &Reg) -> Result<()> {
+    pub fn insert(&mut self, reg: &Reg) {
         let id = reg.id() as usize;
         if reg.is_usual() {
             if self.usual.len() <= id {
-                return Err(anyhow!("RegSet::insert: reg id out of range"));
-            } else {
-                self.usual.set(id, true);
+                self.usual.resize(id + 100, false);
             }
-        } else if self.float.len() <= id {
-            return Err(anyhow!("RegSet::insert: reg id out of range"));
+            self.usual.set(id, true);
         } else {
+            if self.float.len() <= id {
+                self.float.resize(id + 100, false);
+            }
             self.float.set(id, true);
         }
-        Ok(())
     }
 
-    #[inline]
     pub fn merge(&mut self, other: &RegSet) {
         self.float |= &other.float;
         self.usual |= &other.usual;
     }
-
-    #[inline]
     pub fn clear(&mut self) {
-        self.float.store(0);
-        self.usual.store(0);
+        self.float.clear();
+        self.usual.clear();
     }
-    #[inline]
+
     // NOTICE: This function will overflow
     // if the number of regs is greater than what usize can hold
     pub fn num_regs(&self) -> usize {
         self.float.count_ones() + self.usual.count_ones()
     }
-    #[inline]
+
     // NOTICE: This function will overflow
     // if the number of regs is greater than what usize can hold
     pub fn num_regs_usual(&self) -> usize {
         self.usual.count_ones()
     }
-    #[inline]
+
     // NOTICE: This function will overflow
     // if the number of regs is greater than what usize can hold
     pub fn num_regs_float(&self) -> usize {
         self.float.count_ones()
     }
-    #[inline]
+
     pub fn is_empty(&self) -> bool {
         self.float.not_any() && self.usual.not_any()
     }
-    #[inline]
-    pub fn is_empty_usual(&self) -> bool {
+
+    pub fn has_none_usual(&self) -> bool {
         self.usual.not_any()
     }
-    #[inline]
-    pub fn is_empty_float(&self) -> bool {
+
+    pub fn has_none_float(&self) -> bool {
         self.float.not_any()
     }
 
-    #[inline]
     pub fn remove(&mut self, reg: &Reg) {
         let id = reg.id() as usize;
         if reg.is_usual() {
+            if self.usual.len() <= id {
+                return;
+            }
             self.usual.set(id, false);
         } else {
+            if self.float.len() <= id {
+                return;
+            }
             self.float.set(id, false);
         }
     }
-    #[inline]
+
     pub fn contains(&self, reg: &Reg) -> bool {
         let id = reg.id() as usize;
         if reg.is_usual() {
+            if self.usual.len() <= id {
+                return false;
+            }
             self.usual[id]
         } else {
+            if self.float.len() <= id {
+                return false;
+            }
             self.float[id]
         }
     }
-}
 
-// impl iter::IntoIterator for RegSet
+    /// An iterator visiting all float regs in id ascending order.
+    pub fn iter_float(&self) -> impl IntoIterator<Item = Reg> + '_ {
+        self.float
+            .iter_ones()
+            .into_iter()
+            .map(|idx| Reg::new(idx as u32, false))
+    }
+
+    /// An iterator visiting all usual regs in id ascending order.
+    pub fn iter_usual(&self) -> impl IntoIterator<Item = Reg> + '_ {
+        self.usual
+            .iter_ones()
+            .into_iter()
+            .map(|idx| Reg::new(idx as u32, true))
+    }
+
+    /// An iterator visiting all regs, first usual then float ,and in id ascending order each part.
+    /// Note that float reg and usual reg may have the same id.
+    pub fn iter(&self) -> impl IntoIterator<Item = Reg> + '_ {
+        let it_u = self.iter_usual();
+        let it_f = self.iter_float();
+        it_u.into_iter().chain(it_f)
+    }
+}
 
 impl IntoIterator for RegSet {
     type Item = Reg;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
+    type IntoIter = std::vec::IntoIter<Reg>;
+
     fn into_iter(self) -> Self::IntoIter {
-        let r: Vec<Reg> = vec![];
-
-        // TODO: Implement this
-
-        r.into_iter()
+        self.iter().into_iter().collect::<Vec<Reg>>().into_iter()
     }
 }
 
 #[cfg(test)]
 mod reg_set_tests {
+
+    use std::collections::HashSet;
+
     use super::*;
     #[test]
     fn test_reg_set() {
         let mut reg_set = RegSet::new();
         let reg = REG_A0;
-        reg_set.quick_insert(&reg);
+        reg_set.insert(&reg);
         assert!(reg_set.contains(&reg));
         reg_set.remove(&reg);
         assert!(!reg_set.contains(&reg));
     }
-    // FIXME
-    // #[test]
-    // fn test_reg_set_iter() {
-        
-    // }
+
+    #[test]
+    /// reg_set iter
+    fn test_reg_set_iter() {
+        let mut reg_set = RegSet::new();
+        reg_set.insert(&REG_A0);
+        reg_set.insert(&REG_A2);
+        reg_set.insert(&REG_A1);
+        reg_set.insert(&REG_FA1);
+        reg_set.insert(&REG_FA0);
+        let iter = reg_set.iter();
+        let regs: HashSet<Reg> = iter.into_iter().collect();
+        assert_eq!(
+            regs,
+            vec![REG_A0, REG_A1, REG_A2, REG_FA0, REG_FA1]
+                .into_iter()
+                .collect()
+        );
+
+        let regs: HashSet<Reg> = reg_set.iter_float().into_iter().collect();
+        assert_eq!(regs, vec![REG_FA0, REG_FA1].into_iter().collect());
+
+        let regs: HashSet<Reg> = reg_set.iter_usual().into_iter().collect();
+        assert_eq!(regs, vec![REG_A0, REG_A1, REG_A2].into_iter().collect());
+    }
+
+    #[test]
+    fn test_into_iter() {
+        let mut reg_set = RegSet::new();
+        reg_set.insert(&REG_A0);
+        reg_set.insert(&REG_A2);
+        reg_set.insert(&REG_A1);
+        reg_set.insert(&REG_FA1);
+        reg_set.insert(&REG_FA0);
+        let regs: HashSet<Reg> = reg_set.into_iter().collect();
+        assert_eq!(
+            regs,
+            vec![REG_A0, REG_A1, REG_A2, REG_FA0, REG_FA1]
+                .into_iter()
+                .collect()
+        );
+    }
 
     #[test]
     fn test_reg_set_merge() {
         let mut reg_set1 = RegSet::new();
         let mut reg_set2 = RegSet::new();
-        reg_set1.quick_insert(&REG_A0);
-        reg_set1.quick_insert(&REG_FA0);
-        reg_set2.quick_insert(&REG_A1);
-        reg_set2.quick_insert(&REG_A2);
-        reg_set2.quick_insert(&REG_A0);
+        reg_set1.insert(&REG_A0);
+        reg_set1.insert(&REG_FA0);
+
+        reg_set2.insert(&REG_A1);
+        reg_set2.insert(&REG_A2);
+        reg_set2.insert(&REG_A0);
+
         reg_set1.merge(&reg_set2);
         assert!(reg_set1.contains(&REG_A0));
         assert!(reg_set1.contains(&REG_A1));
@@ -155,38 +213,41 @@ mod reg_set_tests {
         assert!(reg_set1.num_regs_usual() == 3);
         assert!(reg_set1.num_regs_float() == 1);
     }
-    // FIXME
-    // #[test]
-    // fn test_reg_set_clear() {
-    //     let mut reg_set = RegSet::new();
-    //     reg_set.quick_insert(&REG_A0);
-    //     reg_set.quick_insert(&REG_FA0);
-    //     reg_set.clear();
-    //     assert!(reg_set.is_empty());
-    // }
+
+    #[test]
+    fn test_reg_set_clear() {
+        let mut reg_set = RegSet::new();
+        reg_set.insert(&REG_A0);
+        reg_set.insert(&REG_FA0);
+        reg_set.clear();
+        assert!(reg_set.is_empty());
+    }
+
     #[test]
     fn test_num_regs() {
         let mut reg_set = RegSet::new();
-        reg_set.quick_insert(&REG_A0);
-        reg_set.quick_insert(&REG_FA0);
+        reg_set.insert(&REG_A0);
+        reg_set.insert(&REG_FA0);
         assert!(reg_set.num_regs() == 2);
         assert!(reg_set.num_regs_usual() == 1);
         assert!(reg_set.num_regs_float() == 1);
     }
+
     #[test]
     fn test_reg_set_empty() {
         let reg_set = RegSet::new();
         assert!(reg_set.is_empty());
-        assert!(reg_set.is_empty_usual());
-        assert!(reg_set.is_empty_float());
+        assert!(reg_set.has_none_usual());
+        assert!(reg_set.has_none_float());
     }
+
     #[test]
     fn test_reg_set_insert() {
         let mut reg_set = RegSet::new();
-        reg_set.insert(&REG_A0).unwrap();
-        reg_set.insert(&REG_A1).unwrap();
-        reg_set.insert(&REG_A2).unwrap();
-        reg_set.insert(&REG_FA0).unwrap();
+        reg_set.insert(&REG_A0);
+        reg_set.insert(&REG_A1);
+        reg_set.insert(&REG_A2);
+        reg_set.insert(&REG_FA0);
         assert!(reg_set.contains(&REG_A0));
         assert!(reg_set.contains(&REG_A1));
         assert!(reg_set.contains(&REG_A2));
