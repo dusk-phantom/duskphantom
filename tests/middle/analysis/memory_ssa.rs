@@ -214,9 +214,10 @@ pub mod tests_memory_ssa {
         ; 2 (liveOnEntry)
         ; 3 = MemoryDef(2)
         store i32 2, ptr @a
-        ; 4 = MemoryDef(2)
-        call void @f()
         ; MemoryUse(3)
+        ; 4 = MemoryDef(3)
+        call void @f()
+        ; MemoryUse(4)
         %load_12 = load i32, ptr @a
         br label %exit
 
@@ -267,6 +268,7 @@ pub mod tests_memory_ssa {
         ; 3 (liveOnEntry)
         ; 4 = MemoryDef(3)
         store i32 2, ptr @a
+        ; MemoryUse(4)
         ; 5 = MemoryDef(4)
         call void @f()
         ; MemoryUse(5)
@@ -353,38 +355,32 @@ pub mod tests_memory_ssa {
         MemorySSA for function: main
         cond7:
         ; 0 (liveOnEntry)
-
         call void @putint(i32 3)
-
         call void @putint(i32 3)
-
         call void @putint(i32 1)
-
         call void @putch(i32 10)
-
         call void @putint(i32 1)
-
         call void @putch(i32 10)
         %getelementptr_43 = getelementptr [4 x i32], ptr @c, i32 0, i32 2
-        ; 11 = MemoryDef(0)
+        ; 5 = MemoryDef(0)
         store i32 1, ptr %getelementptr_43
         %alloca_45 = alloca [2 x [8 x i32]]
-        ; 12 = MemoryDef(0)
+        ; 6 = MemoryDef(0)
         call void @llvm.memset.p0.i32([2 x [8 x i32]]* %alloca_45, i8 0, i32 64, i1 false)
         %getelementptr_136 = getelementptr [2 x [8 x i32]], ptr %alloca_45, i32 0, i32 0, i32 0
-        ; 13 = MemoryDef(12)
+        ; 7 = MemoryDef(6)
         store i32 0, ptr %getelementptr_136
         %Add_139 = add i32 0, 1
         %getelementptr_140 = getelementptr [2 x [8 x i32]], ptr %alloca_45, i32 0, i32 0, i32 %Add_139
-        ; 14 = MemoryDef(13)
+        ; 8 = MemoryDef(7)
         store i32 9, ptr %getelementptr_140
         %getelementptr_144 = getelementptr [2 x [8 x i32]], ptr %alloca_45, i32 0, i32 %Add_139, i32 0
-        ; 15 = MemoryDef(14)
+        ; 9 = MemoryDef(8)
         store i32 8, ptr %getelementptr_144
         %getelementptr_148 = getelementptr [2 x [8 x i32]], ptr %alloca_45, i32 0, i32 %Add_139, i32 %Add_139
-        ; 16 = MemoryDef(15)
+        ; 10 = MemoryDef(9)
         store i32 3, ptr %getelementptr_148
-        ; MemoryUse(11)
+        ; MemoryUse(5)
         %load_68 = load i32, ptr %getelementptr_43
         %icmp_69 = icmp ne i32 %load_68, 0
         br i1 %icmp_69, label %then8, label %alt9
@@ -393,66 +389,55 @@ pub mod tests_memory_ssa {
         br label %exit
 
         exit:
-        ; 1 = MemoryPhi([21, then8], [0, alt9])
-
+        ; 1 = MemoryPhi([15, then8], [0, alt9])
         call void @putch(i32 10)
         ; MemoryUse(0)
         %load_113 = load i32, ptr @b
-
         call void @putint(i32 %load_113)
-
         call void @putch(i32 10)
         %getelementptr_116 = getelementptr [4 x i32], ptr @c, i32 0, i32 0
         ; MemoryUse(0)
         %load_117 = load i32, ptr %getelementptr_116
-
         call void @putint(i32 %load_117)
         %getelementptr_119 = getelementptr [4 x i32], ptr @c, i32 0, i32 1
         ; MemoryUse(0)
         %load_120 = load i32, ptr %getelementptr_119
-
         call void @putint(i32 %load_120)
-        ; MemoryUse(11)
+        ; MemoryUse(5)
         %load_123 = load i32, ptr %getelementptr_43
-
         call void @putint(i32 %load_123)
         %getelementptr_125 = getelementptr [4 x i32], ptr @c, i32 0, i32 3
         ; MemoryUse(0)
         %load_126 = load i32, ptr %getelementptr_125
-
         call void @putint(i32 %load_126)
-
         call void @putch(i32 10)
         ret i32 0
 
         then8:
         %alloca_71 = alloca [7 x [1 x [5 x i32]]]
-        ; 18 = MemoryDef(0)
+        ; 12 = MemoryDef(0)
         call void @llvm.memset.p0.i32([7 x [1 x [5 x i32]]]* %alloca_71, i8 0, i32 140, i1 false)
         %Add_157 = add i32 0, 2
         %getelementptr_164 = getelementptr [7 x [1 x [5 x i32]]], ptr %alloca_71, i32 0, i32 %Add_157, i32 0, i32 0
-        ; 19 = MemoryDef(18)
+        ; 13 = MemoryDef(12)
         store i32 2, ptr %getelementptr_164
         %getelementptr_168 = getelementptr [7 x [1 x [5 x i32]]], ptr %alloca_71, i32 0, i32 %Add_157, i32 0, i32 %Add_139
-        ; 20 = MemoryDef(19)
+        ; 14 = MemoryDef(13)
         store i32 1, ptr %getelementptr_168
         %getelementptr_170 = getelementptr [7 x [1 x [5 x i32]]], ptr %alloca_71, i32 0, i32 %Add_157, i32 0, i32 %Add_157
-        ; 21 = MemoryDef(20)
+        ; 15 = MemoryDef(14)
         store i32 8, ptr %getelementptr_170
         %getelementptr_182 = getelementptr [7 x [1 x [5 x i32]]], ptr %alloca_71, i32 0, i32 2, i32 0, i32 0
-        ; MemoryUse(21)
+        ; MemoryUse(15)
         %load_96 = load i32, ptr %getelementptr_182
-
         call void @putint(i32 %load_96)
         %getelementptr_186 = getelementptr [7 x [1 x [5 x i32]]], ptr %alloca_71, i32 0, i32 2, i32 0, i32 1
-        ; MemoryUse(21)
+        ; MemoryUse(15)
         %load_102 = load i32, ptr %getelementptr_186
-
         call void @putint(i32 %load_102)
         %getelementptr_190 = getelementptr [7 x [1 x [5 x i32]]], ptr %alloca_71, i32 0, i32 2, i32 0, i32 2
-        ; MemoryUse(21)
+        ; MemoryUse(15)
         %load_108 = load i32, ptr %getelementptr_190
-
         call void @putint(i32 %load_108)
         br label %exit
 

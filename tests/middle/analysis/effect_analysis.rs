@@ -91,8 +91,8 @@ pub mod tests_effect_analysis {
             use: 
 
         %call_18 = call i32 @f(i32* %getelementptr_17):
-            def: %getelementptr_17
-            use: 
+            def: all
+            use: all
 
         "###);
     }
@@ -129,12 +129,8 @@ pub mod tests_effect_analysis {
             use: 
 
         %call_14 = call i32 @f():
-            def: 
-            use: @y
-
-        call void @putint(i32 %call_14):
-            def: 
-            use: 
+            def: all
+            use: all
 
         store i32 3, ptr @y:
             def: @y
@@ -170,8 +166,8 @@ pub mod tests_effect_analysis {
             use: 
 
         %call_6 = call i32 @main():
-            def: @x
-            use: 
+            def: all
+            use: all
 
         "###);
     }
@@ -210,8 +206,8 @@ pub mod tests_effect_analysis {
             use: 
 
         %call_7 = call i32 @g():
-            def: @x, @y
-            use: @x, @y
+            def: all
+            use: all
 
         %load_15 = load i32, ptr @x:
             def: 
@@ -222,12 +218,12 @@ pub mod tests_effect_analysis {
             use: 
 
         %call_17 = call i32 @f():
-            def: @x, @y
-            use: @x, @y
+            def: all
+            use: all
 
         %call_25 = call i32 @f():
-            def: @x, @y
-            use: @x, @y
+            def: all
+            use: all
 
         "###);
     }
