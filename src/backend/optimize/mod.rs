@@ -3,10 +3,9 @@ use crate::fprintln;
 use super::irs::*;
 use std::collections::{HashMap, HashSet, VecDeque};
 
+pub mod analysis;
 #[allow(unused)]
 pub mod inst_combine;
-
-pub mod analyze;
 
 #[allow(unused)]
 pub mod inst_split;
