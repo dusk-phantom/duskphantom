@@ -107,15 +107,22 @@ impl<'a> MemorySSA<'a> {
         }
     }
 
-    /// Replace a normal node with a new operand.
+    /// Replace a normal node with a new operand if it's unused.
     /// Updates corresponding instruction and use-def chain.
     ///
     /// # Panics
     /// If the node is not a normal node, it will panic.
     pub fn replace_node(&mut self, node: NodePtr, op: &Operand) {
+        // Check if node is normal
         let Node::Normal(_, use_node, _, mut inst) = *node else {
             panic!("not a normal node");
         };
+
+        // Check if node is unused
+        let is_empty = HashSet::is_empty;
+        if self.node_to_user.get(&node).map_or(false, is_empty) {
+            return;
+        }
 
         // Update instruction
         inst.replace_self(op);
@@ -123,6 +130,38 @@ impl<'a> MemorySSA<'a> {
         // Update use-def chain
         if let Some(use_node) = use_node {
             self.node_to_user.get_mut(&use_node).unwrap().remove(&node);
+        }
+    }
+
+    /// Remove a node if it's not used.
+    /// If used node becomes unused, it will be removed recursively.
+    /// Updates corresponding instruction and use-def chain.
+    ///
+    /// # Panics
+    /// If the node is not a normal node, it will panic.
+    pub fn remove_node_recurse(&mut self, node: NodePtr) {
+        // Check if node is unused
+        let is_empty = HashSet::is_empty;
+        if self.node_to_user.get(&node).map_or(false, is_empty) {
+            return;
+        }
+
+        // Update instruction
+        if let Some(mut inst) = node.get_inst() {
+            inst.remove_self();
+        }
+
+        // Update use-def chain
+        let used_nodes = node.get_used_node();
+        for used_node in &used_nodes {
+            self.node_to_user.get_mut(used_node).unwrap().remove(&node);
+            self.remove_node_recurse(*used_node);
+        }
+
+        // Recurse into used nodes
+        for used_node in &used_nodes {
+            self.node_to_user.get_mut(used_node).unwrap().remove(&node);
+            self.remove_node_recurse(*used_node);
         }
     }
 
@@ -162,6 +201,7 @@ impl<'a> MemorySSA<'a> {
         if let Some(mut phi) = phi_insertions.get(&current_bb).and_then(|p| p.get()) {
             let value = range_to_node.get(phi.get_effect_range()).unwrap();
             phi.add_phi_arg((parent_bb.unwrap(), value));
+            self.node_to_user.entry(value).or_default().insert(phi);
             range_to_node.insert(phi.get_effect_range().clone(), phi);
         }
 
@@ -302,11 +342,26 @@ pub enum Node {
 }
 
 impl Node {
+    pub fn get_inst(&self) -> Option<InstPtr> {
+        match self {
+            Node::Normal(_, _, _, inst) => Some(*inst),
+            _ => None,
+        }
+    }
+
     pub fn get_id(&self) -> usize {
         match self {
             Node::Entry(id) => *id,
             Node::Normal(id, _, _, _) => *id,
             Node::Phi(id, _, _) => *id,
+        }
+    }
+
+    pub fn get_used_node(&self) -> Vec<NodePtr> {
+        match self {
+            Node::Normal(_, use_node, _, _) => use_node.iter().cloned().collect(),
+            Node::Phi(_, args, _) => args.iter().map(|(_, node)| *node).collect(),
+            _ => Vec::new(),
         }
     }
 

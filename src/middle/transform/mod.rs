@@ -6,4 +6,5 @@ pub mod inst_combine;
 pub mod load_elim;
 pub mod mem2reg;
 pub mod simple_gvn;
+pub mod store_elim;
 pub mod unreachable_block_elim;
