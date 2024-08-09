@@ -379,6 +379,11 @@ impl Node {
             .unwrap_or(false)
     }
 
+    /// Check if node is entry.
+    fn is_entry(&self) -> bool {
+        matches!(self, Node::Entry(_))
+    }
+
     /// Add an argument to a phi node.
     fn add_phi_arg(&mut self, arg: (BBPtr, NodePtr)) {
         match self {
@@ -508,11 +513,19 @@ impl RangeToNodeFrame {
     }
 
     /// Get an element from the frame.
-    /// Returns the element, and if the hit is exact hit.
+    /// Returns the element, and if the hit is predictable.
+    ///
+    /// Criterion for predictable is:
+    /// - If effect range features only one variable, it's predictable.
+    /// - If store node is memset, it's predictable because we assume memset makes everything zero.
+    /// - If store node is entry, it's predictable so that load gvar in main function can reduce to constant.
     pub fn get(&self, k: &EffectRange) -> (Option<NodePtr>, bool) {
         for (key, value) in self.0.iter().rev() {
             if key.can_alias(k) {
-                return (Some(*value), key == k || value.is_memset());
+                return (
+                    Some(*value),
+                    key == k || value.is_memset() || value.is_entry(),
+                );
             }
         }
         (None, false)
