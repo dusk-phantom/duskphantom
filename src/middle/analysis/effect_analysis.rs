@@ -20,34 +20,42 @@ pub struct Effect {
 }
 
 #[allow(unused)]
-pub struct EffectAnalysis<'a> {
+pub struct EffectAnalysis {
     pub inst_effect: HashMap<InstPtr, Effect>,
-    pub impure: HashSet<FunPtr>,
-    program: &'a Program,
+    pub has_io_input: HashSet<FunPtr>,
+    pub has_io_output: HashSet<FunPtr>,
+    functions: Vec<FunPtr>,
     def_range: HashMap<FunPtr, HashSet<Operand>>,
     use_range: HashMap<FunPtr, HashSet<Operand>>,
 }
 
 #[allow(unused)]
-impl<'a> EffectAnalysis<'a> {
-    pub fn new(program: &'a Program) -> Self {
+impl EffectAnalysis {
+    /// Run effect analysis on program.
+    pub fn new(program: &Program) -> Self {
         let mut worklist: HashSet<FunPtr> = HashSet::new();
         let def_range = HashMap::new();
         let use_range = HashMap::new();
         let inst_effect = HashMap::new();
-        let impure = HashSet::new();
+        let has_io_input = HashSet::new();
+        let has_io_output = HashSet::new();
         let mut effect = Self {
             inst_effect,
-            impure,
-            program,
+            has_io_input,
+            has_io_output,
+            functions: program.module.functions.clone(),
             def_range,
             use_range,
         };
 
-        // Set all library functions as impure
+        // Set all library functions as has_io
         for func in program.module.functions.iter() {
             if func.is_lib() {
-                effect.impure.insert(*func);
+                if func.name.contains("get") {
+                    effect.has_io_input.insert(*func);
+                } else if func.name.contains("put") {
+                    effect.has_io_output.insert(*func);
+                }
             }
             worklist.insert(*func);
         }
@@ -72,9 +80,44 @@ impl<'a> EffectAnalysis<'a> {
         }
     }
 
+    /// Get if function has memory load.
+    pub fn has_load(&self, func: FunPtr) -> bool {
+        self.use_range
+            .get(&func)
+            .map(HashSet::is_empty)
+            .unwrap_or(true)
+    }
+
+    /// Get if function has memory store.
+    pub fn has_store(&self, func: FunPtr) -> bool {
+        self.def_range
+            .get(&func)
+            .map(HashSet::is_empty)
+            .unwrap_or(true)
+    }
+
+    /// Get if function is pure function (no IO / load / store).
+    pub fn is_pure(&self, func: FunPtr) -> bool {
+        !self.has_io_input.contains(&func)
+            && !self.has_io_output.contains(&func)
+            && !self.has_load(func)
+            && !self.has_store(func)
+    }
+
+    /// Get if function is constant function (no IO input / load).
+    pub fn is_constant(&self, func: FunPtr) -> bool {
+        !self.has_io_input.contains(&func) && !self.has_load(func)
+    }
+
+    /// Get if function is silent function (no IO output / store).
+    pub fn is_silent(&self, func: FunPtr) -> bool {
+        !self.has_io_output.contains(&func) && !self.has_store(func)
+    }
+
+    /// Dump effect analysis result to string.
     pub fn dump(&self) -> String {
         let mut res = String::new();
-        for func in self.program.module.functions.iter() {
+        for func in self.functions.iter() {
             if func.is_lib() {
                 continue;
             }
@@ -114,14 +157,14 @@ impl<'a> EffectAnalysis<'a> {
                         let call = downcast_ref::<Call>(inst.as_ref().as_ref());
                         let def_range = self.def_range.get(&call.func).cloned().unwrap_or_default();
                         let use_range = self.use_range.get(&call.func).cloned().unwrap_or_default();
-                        let impure = self.impure.contains(&call.func);
+                        let has_io = self.has_io_input.contains(&call.func);
 
                         // Merge into function effect
                         changed |= self.add_batch_to_func(
                             func,
                             def_range.clone(),
                             use_range.clone(),
-                            impure,
+                            has_io,
                         );
 
                         // Add call as an effective inst
@@ -136,7 +179,7 @@ impl<'a> EffectAnalysis<'a> {
                     InstType::Store => {
                         let target = inst.get_operand()[1].clone();
                         changed |= self.add_def_to_func(func, target.clone());
-                        changed |= self.set_impure(func);
+                        changed |= self.set_has_io(func);
 
                         // Add store as an effective inst
                         self.inst_effect.insert(
@@ -150,7 +193,7 @@ impl<'a> EffectAnalysis<'a> {
                     InstType::Load => {
                         let target = inst.get_operand()[0].clone();
                         changed |= self.add_use_to_func(func, target.clone());
-                        changed |= self.set_impure(func);
+                        changed |= self.set_has_io(func);
 
                         // Add load as an effective inst
                         self.inst_effect.insert(
@@ -174,7 +217,7 @@ impl<'a> EffectAnalysis<'a> {
         dst: FunPtr,
         def_range: HashSet<Operand>,
         use_range: HashSet<Operand>,
-        impure: bool,
+        has_io: bool,
     ) -> bool {
         let mut changed = false;
         for def in def_range {
@@ -183,8 +226,8 @@ impl<'a> EffectAnalysis<'a> {
         for use_ in use_range {
             changed |= self.add_use_to_func(dst, use_.clone());
         }
-        if impure {
-            changed |= self.set_impure(dst);
+        if has_io {
+            changed |= self.set_has_io(dst);
         }
         changed
     }
@@ -199,8 +242,8 @@ impl<'a> EffectAnalysis<'a> {
         self.use_range.entry(func).or_default().insert(target)
     }
 
-    /// Set impureness of function, return changed or not
-    fn set_impure(&mut self, func: FunPtr) -> bool {
-        self.impure.insert(func)
+    /// Set has_ioness of function, return changed or not
+    fn set_has_io(&mut self, func: FunPtr) -> bool {
+        self.has_io_input.insert(func)
     }
 }

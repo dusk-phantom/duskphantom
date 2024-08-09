@@ -14,6 +14,22 @@ pub enum EffectRange {
     Some(HashSet<Operand>),
 }
 
+/// Check if two effect range must be the same.
+impl PartialEq for EffectRange {
+    fn eq(&self, another: &Self) -> bool {
+        match (self, another) {
+            (EffectRange::Some(a), EffectRange::Some(b)) => {
+                if a.len() != 1 || b.len() != 1 {
+                    return false;
+                }
+                // TODO judge equal with GVN
+                a.iter().next().unwrap() == b.iter().next().unwrap()
+            }
+            _ => false,
+        }
+    }
+}
+
 /// Check if two effect range can alias.
 #[allow(unused)]
 impl EffectRange {
