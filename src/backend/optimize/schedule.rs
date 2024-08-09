@@ -1,8 +1,12 @@
+use std::collections::BTreeSet;
+
 use super::*;
 /// 处理指令调度,将指令重新排序,以便于后续的优化
 pub fn handle_inst_scheduling(func: &mut Func) -> Result<()> {
     for block in func.iter_bbs_mut() {
         let old_insts = block.insts();
+        println!("{}", block.gen_asm());
+        // TODO 以控制流为边界, 要拆分 bb 后调度, 万一 call 指令中间有 write 全局变量, 结果 read 全局变量跑到了 call 前面, 就有问题了
         let new_insts = handle_block_scheduling(old_insts).with_context(|| context!())?;
         *block.insts_mut() = new_insts;
     }
@@ -13,8 +17,11 @@ fn handle_block_scheduling(insts: &[Inst]) -> Result<Vec<Inst>> {
     let mut new_insts = Vec::new();
     let mut queue: Vec<StateOperand> = Vec::new();
 
+    // 最后 1/2 条指令不进行调度
+
     // 1. 构造依赖图
-    let mut graph = Graph::new(insts);
+    let mut graph = Graph::new(insts).with_context(|| context!())?;
+
     // TODO while 循环, 进行指令调度
     while !graph.use_defs.is_empty() {
         // 1. 队列中所有的 cnt --
@@ -27,9 +34,12 @@ fn handle_block_scheduling(insts: &[Inst]) -> Result<Vec<Inst>> {
 
         // 2. 找到 cnt == 0 的指令, 从队列中删除, 并且删除依赖
         queue.retain(|state| state.cnt != 0);
-        let remain_queue: Vec<InstID> = queue.iter().map(|state| state.def).collect();
 
-        // 3. 搜集 indegree == 0 的节点, 还要排除在 queue 中的
+        // 3. 搜集 indegree == 0 的节点, 还要排除已经在 queue 中的 node, 防止重复发射
+        let remain_queue: Vec<InstID> = queue
+            .iter()
+            .map(|state| state.def)
+            .collect();
         let mut no_deps = graph.collect_no_deps();
         no_deps.retain(|id| !remain_queue.contains(id));
 
@@ -133,14 +143,14 @@ impl Inst {
                 Ok((4, InstType::FloatPoint))
             }
             /* mem access */
-            Inst::Ld(_)
+            | Inst::Ld(_)
             | Inst::Sd(_)
             | Inst::Lw(_)
             | Inst::Sw(_)
             | Inst::Load(_)
             | Inst::Store(_) => Ok((3, InstType::MemAccess)),
             /* jmp */
-            Inst::Jmp(_)
+            | Inst::Jmp(_)
             | Inst::Beq(_)
             | Inst::Bne(_)
             | Inst::Blt(_)
@@ -171,10 +181,7 @@ impl<'a> Graph<'a> {
         // gen node id
         for (id, inst) in self.insts.iter().enumerate() {
             let inst_str = inst.gen_asm();
-            dot.push_str(&format!(
-                "node{} [label=\"[{}]:  {}\"];\n",
-                id, id, inst_str
-            ));
+            dot.push_str(&format!("node{} [label=\"[{}]:  {}\"];\n", id, id, inst_str));
         }
 
         for (use_, defs) in self.use_defs.iter() {
@@ -192,7 +199,7 @@ impl<'a> Graph<'a> {
     #[allow(clippy::type_complexity)]
     fn select2_inst(
         &self,
-        avail: &[InstID],
+        avail: &[InstID]
     ) -> Result<(Option<(StateOperand, Inst)>, Option<(StateOperand, Inst)>)> {
         // 空的情况
         if avail.is_empty() {
@@ -205,8 +212,9 @@ impl<'a> Graph<'a> {
                 let (latency1, inst_type1) = inst1.character().with_context(|| context!())?;
                 let inst2 = &self.insts[avail[j]];
                 let (latency2, inst_type2) = inst2.character().with_context(|| context!())?;
-                if inst_type1 != inst_type2
-                    || (inst_type1 == inst_type2 && inst_type1 == InstType::Integer)
+                if
+                    inst_type1 != inst_type2 ||
+                    (inst_type1 == inst_type2 && inst_type1 == InstType::Integer)
                 {
                     return Ok((
                         Some((
@@ -245,52 +253,61 @@ impl<'a> Graph<'a> {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum WrapOperand {
-    /// lw, ld, sw, sd 会用这个, 保证相对顺序
-    /// jmp, ret 会用这个, 保证在倒数第二条指令之后
-    PreInst(InstID),
+    /// sw/lw/sd/ld
+    Global,
     Stack(StackSlot),
     Reg(Reg),
 }
 
 impl<'a> Graph<'a> {
-    fn new(insts: &'a [Inst]) -> Self {
-        let (defs, uses) = Self::construct_defs_uses(insts);
-        // 依赖图
-        let mut deps: HashMap<InstID, HashSet<InstID>> = HashMap::new();
-        for (operand, use_insts) in uses.iter() {
-            if let WrapOperand::PreInst(pre_mem_inst_id) = operand {
-                // sw/sd/lw/ld
-                for use_id in use_insts {
-                    if use_id != pre_mem_inst_id {
-                        deps.entry(*use_id).or_default().insert(*pre_mem_inst_id);
+    fn new(insts: &'a [Inst]) -> Result<Self> {
+        let bucket = Self::construct_bucket(insts).with_context(|| context!())?;
+        let mut use_defs: HashMap<InstID, HashSet<InstID>> = HashMap::new();
+
+        for insts_flag in bucket.iter() {
+            // 几种情况, 滑动窗口, 建立依赖, win_l, win_r 是闭区间
+            // r r r r r r r r r
+            // w w w w w w w w w
+            // r w r r w w r w r
+            // r(w) r r r w r r w r
+
+            let first = insts_flag.first().ok_or(anyhow!("empty"))?.0;
+            let win_l = first;
+            // 边界: 只有一个元素, 自然没依赖
+            for win_r in 1..insts_flag.len() {
+                if insts_flag[win_r].1 {
+                    // is write
+                    for i in win_l..win_r {
+                        let def = insts_flag[i].0;
+                        let use_ = insts_flag[win_r].0;
+                        use_defs.entry(use_).or_default().insert(def);
                     }
-                }
-            } else if let Some(def_inst) = defs.get(operand) {
-                for use_id in use_insts {
-                    if use_id != def_inst {
-                        deps.entry(*use_id).or_default().insert(*def_inst);
+                } else {
+                    // is read
+                    if win_l == first {
+                        // 没依赖
+                    } else {
+                        // 出现了 read after write
+                        let def = insts_flag[win_l].0;
+                        let use_ = insts_flag[win_r].0;
+                        use_defs.entry(use_).or_default().insert(def);
                     }
                 }
             }
         }
-        // 还剩下一些指令, 比方说 lla/li 只有 def 没有 use
-        for (id, inst) in insts.iter().enumerate() {
-            deps.entry(id).or_default();
-        }
 
-        // 反向依赖图
-        let mut anti: HashMap<InstID, HashSet<InstID>> = HashMap::new();
-        for (u, d) in deps.iter() {
+        let mut def_uses: HashMap<InstID, HashSet<InstID>> = HashMap::new();
+        for (u, d) in use_defs.iter() {
             for dep in d.iter() {
-                anti.entry(*dep).or_default().insert(*u);
+                def_uses.entry(*dep).or_default().insert(*u);
             }
         }
 
-        Self {
-            use_defs: deps,
-            def_uses: anti,
+        Ok(Self {
+            use_defs,
+            def_uses,
             insts,
-        }
+        })
     }
 
     #[inline]
@@ -308,6 +325,10 @@ impl<'a> Graph<'a> {
         // id当且仅当它依赖的指令都执行完了, 才能被删除
         assert!(self.use_defs.get(&id).unwrap().is_empty());
 
+        dbg!("--- before ---");
+        dbg!(&self.def_uses);
+        dbg!(&self.use_defs);
+
         let use_insts = self.def_uses.remove(&id).unwrap_or_default();
         for use_inst in use_insts.iter() {
             if let Some(defs) = self.use_defs.get_mut(use_inst) {
@@ -315,53 +336,25 @@ impl<'a> Graph<'a> {
             }
         }
         self.use_defs.remove(&id).with_context(|| context!())?;
+
+        dbg!("--- after ---");
+        dbg!(&self.def_uses);
+        dbg!(&self.use_defs);
+
         Ok(())
     }
 }
 
+type IsW = bool;
+
 impl<'a> Graph<'a> {
     #[allow(clippy::type_complexity)]
-    fn construct_defs_uses(
-        insts: &[Inst],
-    ) -> (
-        HashMap<WrapOperand, InstID>,
-        HashMap<WrapOperand, HashSet<InstID>>,
-    ) {
-        /* ---------- 辅助宏 ---------- */
-        macro_rules! insert_defs {
-            ($inst:ident, $defs:ident, $id:ident) => {
-                for _d in $inst.defs() {
-                    if (_d.eq(&REG_ZERO)) {
-                        continue;
-                    }
-                    let _wrap = WrapOperand::Reg(*_d);
-                    $defs.insert(_wrap, $id);
-                }
-            };
-        }
-
-        macro_rules! insert_uses {
-            ($inst:ident, $uses:ident, $id:ident) => {
-                for _u in $inst.uses() {
-                    if (_u.eq(&REG_ZERO)) {
-                        continue;
-                    }
-                    let _wrap = WrapOperand::Reg(*_u);
-                    $uses.entry(_wrap).or_default().insert($id);
-                }
-            };
-        }
-
+    fn construct_bucket(insts: &[Inst]) -> Result<Vec<Vec<(InstID, IsW)>>> {
         /* ---------- 函数正文 ---------- */
 
-        let mut defs: HashMap<WrapOperand, InstID> = HashMap::new();
-        let mut uses: HashMap<WrapOperand, HashSet<InstID>> = HashMap::new();
-
-        // 上一条 sw/lw/sd/ld 指令的 id
-        let mut pre_store: InstID = 0;
+        let mut bucket: HashMap<WrapOperand, Vec<(InstID, IsW)>> = HashMap::new();
 
         for (id, inst) in insts.iter().enumerate() {
-            // 添加 defs 和 uses
             match inst {
                 /* 算术指令, 注意一下, 这里面会有浮点, 注意 zero 不算是依赖 */
                 | Inst::Add(_)
@@ -396,75 +389,52 @@ impl<'a> Graph<'a> {
                 /* convert */
                 | Inst::I2f(_)
                 | Inst::F2i(_)
-                /* use 参数列表, def A0 / FA0 */
-                | Inst::Call(_) => {
-                    insert_defs!(inst, defs, id);
-                    insert_uses!(inst, uses, id);
-                }
+                // TODO 暂时和普通指令一样处理 call
+                | Inst::Call(_) => {/* 啥也不干 */}
                 /* 无条件跳转 */
-                Inst::Tail(_) | Inst::Ret | Inst::Jmp(_) => {
-                    // 最后的跳转, 依赖于前面所有指令执行完
-                    for pre in 0..id {
-                        let wrap = WrapOperand::PreInst(pre);
-                        uses.entry(wrap).or_default().insert(id);
-                    }
-                }
-                /* 条件跳转 */
                 | Inst::Beq(_)
                 | Inst::Bne(_)
                 | Inst::Blt(_)
                 | Inst::Ble(_)
                 | Inst::Bgt(_)
-                | Inst::Bge(_) => {
-                    insert_uses!(inst, uses, id);
-                    for pre in 0..id {
-                        let wrap = WrapOperand::PreInst(pre);
-                        uses.entry(wrap).or_default().insert(id);
-                    }
-                    // beq xx, xx, label
-                    // jmp
+                | Inst::Bge(_)
+                | Inst::Tail(_)
+                | Inst::Ret
+                | Inst::Jmp(_) => {
+                    return Err(anyhow!("control flow instruction"));
                 }
                 Inst::Ld(_) | Inst::Lw(_) => {
-                    insert_defs!(inst, defs, id);
-                    /* ----- 这是为了确保 mem access 指令顺序一致 ----- */
-                    if pre_store == 0 {
-                        let first = &insts[pre_store];
-                        match first {
-                            Inst::Sd(_) | Inst::Sw(_) => {
-                                let wrap = WrapOperand::PreInst(pre_store);
-                                uses.entry(wrap).or_default().insert(id);
-                            }
-                            _ => {}
-                        }
-                    } else {
-                        let wrap = WrapOperand::PreInst(pre_store);
-                        uses.entry(wrap).or_default().insert(id);
-                    }
-                    /* ----- 不要忘了 use ----- */
-                    insert_uses!(inst, uses, id);
-                    // pre_store = id;
+                    bucket.entry(WrapOperand::Global).or_default().push((id, false));
                 }
                 Inst::Sd(_) | Inst::Sw(_) => {
-                    insert_uses!(inst, uses, id);
-                    // raw
-                    defs.insert(WrapOperand::PreInst(id), id); // sw 也要保证顺序
-                    // waw
-                    uses.entry(WrapOperand::PreInst(pre_store)).or_default().insert(id);
-                    pre_store = id;
-                }
-                Inst::Load(ld) => {
-                    insert_defs!(inst, defs, id);
-                    let wrap = WrapOperand::Stack(*ld.src());
-                    uses.entry(wrap).or_default().insert(id);
+                    bucket.entry(WrapOperand::Global).or_default().push((id, true));
                 }
                 Inst::Store(sd) => {
-                    let wrap = WrapOperand::Stack(*sd.dst());
-                    defs.insert(wrap, id);
-                    insert_uses!(inst, uses, id);
+                    bucket.entry(WrapOperand::Stack(*sd.dst())).or_default().push((id, true));
+                }
+                Inst::Load(ld) => {
+                    bucket.entry(WrapOperand::Stack(*ld.src())).or_default().push((id, false));
                 }
             }
+            for reg in inst.defs() {
+                let reg = *reg;
+                if reg == REG_ZERO {
+                    continue;
+                }
+                bucket.entry(WrapOperand::Reg(reg)).or_default().push((id, true));
+            }
+            for reg in inst.uses() {
+                let reg = *reg;
+                if reg == REG_ZERO {
+                    continue;
+                }
+                bucket.entry(WrapOperand::Reg(reg)).or_default().push((id, false));
+            }
         }
-        (defs, uses)
+
+        let bucket = bucket.values().cloned().collect();
+
+        Ok(bucket)
     }
 }
 
@@ -568,7 +538,7 @@ mod tests {
         let f = construct_func();
         let bb = f.entry();
         let insts = bb.insts();
-        let graph = Graph::new(insts);
+        let graph = Graph::new(insts).unwrap();
         dbg!(&graph.use_defs);
         println!("{}", f.entry().ordered_insts_text());
         dbg!(&graph.collect_no_deps());
@@ -578,7 +548,7 @@ mod tests {
         let f = construct_func();
         let bb = f.entry();
         let insts = bb.insts();
-        let graph = Graph::new(insts);
+        let graph = Graph::new(insts).unwrap();
         let dot = graph.gen_inst_dependency_graph_dot();
         println!("{}", dot);
         println!("{}", f.entry().gen_asm());
