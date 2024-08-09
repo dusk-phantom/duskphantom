@@ -5,14 +5,19 @@ use super::*;
 pub fn handle_inst_scheduling(func: &mut Func) -> Result<()> {
     for block in func.iter_bbs_mut() {
         let old_insts = block.insts();
-        println!("{}", block.gen_asm());
-        let new_insts = handle_block_scheduling(old_insts).with_context(|| context!())?;
+        // println!("{}", block.gen_asm());
+        let new_order = handle_block_scheduling(old_insts).with_context(|| context!())?;
+
+        let mut new_insts = new_order
+            .into_iter()
+            .map(|id| old_insts[id].clone())
+            .collect::<Vec<_>>();
         *block.insts_mut() = new_insts;
     }
     Ok(())
 }
 
-fn handle_block_scheduling(insts: &[Inst]) -> Result<Vec<Inst>> {
+fn handle_block_scheduling(insts: &[Inst]) -> Result<Vec<InstID>> {
     let mut new_insts = Vec::new();
     let mut queue: Vec<StateOperand> = Vec::new();
 
@@ -32,10 +37,7 @@ fn handle_block_scheduling(insts: &[Inst]) -> Result<Vec<Inst>> {
         queue.retain(|state| state.cnt != 0);
 
         // 3. 搜集 indegree == 0 的节点, 还要排除已经在 queue 中的 node, 防止重复发射
-        let remain_queue: Vec<InstID> = queue
-            .iter()
-            .map(|state| state.def)
-            .collect();
+        let remain_queue: Vec<InstID> = queue.iter().map(|state| state.def).collect();
         let mut no_deps = graph.collect_no_deps();
         no_deps.retain(|id| !remain_queue.contains(id));
 
@@ -71,7 +73,7 @@ fn handle_block_scheduling(insts: &[Inst]) -> Result<Vec<Inst>> {
     }
 
     for last in graph.control.iter().flatten() {
-        new_insts.push(insts[*last].clone());
+        new_insts.push(*last);
     }
 
     Ok(new_insts)
@@ -142,14 +144,14 @@ impl Inst {
                 Ok((4, InstType::FloatPoint))
             }
             /* mem access */
-            | Inst::Ld(_)
+            Inst::Ld(_)
             | Inst::Sd(_)
             | Inst::Lw(_)
             | Inst::Sw(_)
             | Inst::Load(_)
             | Inst::Store(_) => Ok((3, InstType::MemAccess)),
             /* jmp */
-            | Inst::Jmp(_)
+            Inst::Jmp(_)
             | Inst::Beq(_)
             | Inst::Bne(_)
             | Inst::Blt(_)
@@ -179,8 +181,11 @@ impl<'a> Graph<'a> {
     #[allow(clippy::type_complexity)]
     fn select2_inst(
         &self,
-        avail: &[InstID]
-    ) -> Result<(Option<(StateOperand, Inst)>, Option<(StateOperand, Inst)>)> {
+        avail: &[InstID],
+    ) -> Result<(
+        Option<(StateOperand, InstID)>,
+        Option<(StateOperand, InstID)>,
+    )> {
         // 空的情况
         if avail.is_empty() {
             return Ok((None, None));
@@ -192,9 +197,8 @@ impl<'a> Graph<'a> {
                 let (latency1, inst_type1) = inst1.character().with_context(|| context!())?;
                 let inst2 = &self.insts[avail[j]];
                 let (latency2, inst_type2) = inst2.character().with_context(|| context!())?;
-                if
-                    inst_type1 != inst_type2 ||
-                    (inst_type1 == inst_type2 && inst_type1 == InstType::Integer)
+                if inst_type1 != inst_type2
+                    || (inst_type1 == inst_type2 && inst_type1 == InstType::Integer)
                 {
                     return Ok((
                         Some((
@@ -202,14 +206,14 @@ impl<'a> Graph<'a> {
                                 def: avail[i],
                                 cnt: latency1,
                             },
-                            inst1.clone(),
+                            avail[i],
                         )),
                         Some((
                             StateOperand {
                                 def: avail[j],
                                 cnt: latency2,
                             },
-                            inst2.clone(),
+                            avail[j],
                         )),
                     ));
                 }
@@ -224,7 +228,7 @@ impl<'a> Graph<'a> {
                     def: avail[0],
                     cnt: latency1,
                 },
-                inst1.clone(),
+                avail[0],
             )),
             None,
         ))
@@ -263,7 +267,7 @@ impl<'a> Graph<'a> {
         let last_last = if insts.len() >= 2 {
             // 判断最后一条指令
             match insts[insts.len() - 2] {
-                | Inst::Beq(_)
+                Inst::Beq(_)
                 | Inst::Bne(_)
                 | Inst::Blt(_)
                 | Inst::Ble(_)
@@ -403,7 +407,7 @@ impl<'a> Graph<'a> {
         for (id, inst) in insts.iter().enumerate() {
             match inst {
                 /* 无条件跳转 */
-                | Inst::Beq(_)
+                Inst::Beq(_)
                 | Inst::Bne(_)
                 | Inst::Blt(_)
                 | Inst::Ble(_)
@@ -415,33 +419,51 @@ impl<'a> Graph<'a> {
                     return Err(anyhow!("control flow instruction"));
                 }
                 Inst::Ld(_) | Inst::Lw(_) => {
-                    bucket.entry(WrapOperand::Global).or_default().push((id, false));
+                    bucket
+                        .entry(WrapOperand::Global)
+                        .or_default()
+                        .push((id, false));
                 }
                 Inst::Sd(_) | Inst::Sw(_) => {
-                    bucket.entry(WrapOperand::Global).or_default().push((id, true));
+                    bucket
+                        .entry(WrapOperand::Global)
+                        .or_default()
+                        .push((id, true));
                 }
                 Inst::Store(sd) => {
-                    bucket.entry(WrapOperand::Stack(*sd.dst())).or_default().push((id, true));
+                    bucket
+                        .entry(WrapOperand::Stack(*sd.dst()))
+                        .or_default()
+                        .push((id, true));
                 }
                 Inst::Load(ld) => {
-                    bucket.entry(WrapOperand::Stack(*ld.src())).or_default().push((id, false));
+                    bucket
+                        .entry(WrapOperand::Stack(*ld.src()))
+                        .or_default()
+                        .push((id, false));
                 }
                 Inst::Call(_) => {}
-                _ => {/* 算术指令, 不用做特殊处理 */}
+                _ => { /* 算术指令, 不用做特殊处理 */ }
             }
             for reg in inst.defs() {
                 let reg = *reg;
                 if reg == REG_ZERO {
                     continue;
                 }
-                bucket.entry(WrapOperand::Reg(reg)).or_default().push((id, true));
+                bucket
+                    .entry(WrapOperand::Reg(reg))
+                    .or_default()
+                    .push((id, true));
             }
             for reg in inst.uses() {
                 let reg = *reg;
                 if reg == REG_ZERO {
                     continue;
                 }
-                bucket.entry(WrapOperand::Reg(reg)).or_default().push((id, false));
+                bucket
+                    .entry(WrapOperand::Reg(reg))
+                    .or_default()
+                    .push((id, false));
             }
         }
 
@@ -458,7 +480,10 @@ impl<'a> Graph<'a> {
         // gen node id
         for (id, inst) in self.insts.iter().enumerate() {
             let inst_str = inst.gen_asm();
-            dot.push_str(&format!("node{} [label=\"[{}]:  {}\"];\n", id, id, inst_str));
+            dot.push_str(&format!(
+                "node{} [label=\"[{}]:  {}\"];\n",
+                id, id, inst_str
+            ));
         }
 
         for (use_, defs) in self.use_defs.iter() {
