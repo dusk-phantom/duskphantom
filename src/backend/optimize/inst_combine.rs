@@ -1,8 +1,9 @@
 use super::*;
 /// 处理指令结合,一些指令的组合可能被优化成一条指令
 pub fn handle_inst_combine(func: &mut Func) -> Result<()> {
-    // FIXME
     Func::combine_for_gep(func)?;
+    Func::rm_useless_def_reg(func)?;
+    Func::combine_for_gep2(func)?;
     Func::rm_useless_def_reg(func)?;
 
     Ok(())
@@ -10,6 +11,9 @@ pub fn handle_inst_combine(func: &mut Func) -> Result<()> {
 impl Func {
     pub fn combine_for_gep(func: &mut Func) -> Result<()> {
         func.iter_bbs_mut().try_for_each(Block::combine_for_gep)
+    }
+    pub fn combine_for_gep2(func: &mut Func) -> Result<()> {
+        func.iter_bbs_mut().try_for_each(Block::combine_for_gep2)
     }
 
     pub fn rm_useless_def_reg(func: &mut Func) -> Result<()> {
@@ -19,8 +23,6 @@ impl Func {
     }
 }
 impl Block {
-    /// FIXME
-    ///
     /// this function should be call in abstract asmbly stage
     pub fn combine_for_gep(block: &mut Block) -> Result<()> {
         // 主要处理指令:add,sll,sw,lw
@@ -28,7 +30,7 @@ impl Block {
 
         let get_imm = |op: &Operand, reg_vals: &HashMap<Reg, Imm>| -> Option<Imm> {
             if let Operand::Imm(imm) = op {
-                Some(imm.clone())
+                Some(*imm)
             } else if let Operand::Reg(reg) = op {
                 reg_vals.get(reg).cloned()
             } else {
@@ -46,6 +48,16 @@ impl Block {
                 Inst::Mul(mul) => {
                     if let Some(rhs) = get_imm(mul.rhs(), &reg_imms) {
                         *mul.rhs_mut() = Operand::Imm(rhs);
+                    }
+                }
+                Inst::Div(div) => {
+                    if let Some(rhs) = get_imm(div.rhs(), &reg_imms) {
+                        *div.rhs_mut() = Operand::Imm(rhs);
+                    }
+                }
+                Inst::Sub(sub) => {
+                    if let Some(rhs) = get_imm(sub.rhs(), &reg_imms) {
+                        *sub.rhs_mut() = Operand::Imm(rhs);
                     }
                 }
                 _ => {}
@@ -86,14 +98,141 @@ impl Block {
                 Inst::Li(li) => Some(li.src().try_into()?),
                 _ => None,
             };
-            if let Some(dst_var) = dst_val {
+            if let Some(val) = dst_val {
                 assert_eq!(inst.defs().len(), 1);
                 let dst = inst.defs().first().cloned().unwrap();
-                reg_imms.insert(*dst, dst_var.clone());
-                *inst = LiInst::new(dst.into(), dst_var.into()).into();
+                reg_imms.insert(*dst, val);
+                *inst = LiInst::new(dst.into(), val.into()).into();
             } else {
                 for reg in inst.defs() {
                     reg_imms.remove(reg);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn combine_for_gep2(block: &mut Block) -> Result<()> {
+        #[derive(Debug, Clone, Copy)]
+        enum Loc {
+            Unknown,
+            BaseOff(Reg, Imm),
+            Off(Imm),
+        }
+
+        impl std::ops::Add for Loc {
+            type Output = Self;
+            fn add(self, rhs: Self) -> Self {
+                match (self, rhs) {
+                    (Loc::Unknown, _) | (_, Loc::Unknown) => Loc::Unknown,
+                    (Loc::BaseOff(base1, off1), Loc::BaseOff(base2, off2)) => {
+                        if base1 == base2 {
+                            Loc::BaseOff(base1, off1 + off2)
+                        } else {
+                            Loc::Unknown
+                        }
+                    }
+                    (Loc::BaseOff(base, off), Loc::Off(off2)) => Loc::BaseOff(base, off + off2),
+                    (Loc::Off(off), Loc::BaseOff(base, off2)) => Loc::BaseOff(base, off + off2),
+                    (Loc::Off(off), Loc::Off(off2)) => Loc::Off(off + off2),
+                }
+            }
+        }
+
+        impl std::ops::Shl<Loc> for Loc {
+            type Output = Self;
+            fn shl(self, rhs: Loc) -> Self {
+                match (self, rhs) {
+                    (Loc::Unknown, _) | (_, Loc::Unknown) => Loc::Unknown,
+                    (Loc::BaseOff(_, _), Loc::Off(off2)) => {
+                        if off2 == 0.into() {
+                            self
+                        } else {
+                            Loc::Unknown
+                        }
+                    }
+                    (Loc::Off(off), Loc::Off(off2)) => {
+                        if let Ok(off2) = off2.try_into() {
+                            Loc::Off(off << off2)
+                        } else {
+                            Loc::Unknown
+                        }
+                    }
+                    _ => Loc::Unknown,
+                }
+            }
+        }
+
+        let mut reg_vals: HashMap<Reg, Loc> = HashMap::new();
+        let get_val = |op: &Operand, reg_vals: &HashMap<Reg, Loc>| -> Option<Loc> {
+            if let Operand::Reg(reg) = op {
+                reg_vals.get(reg).cloned()
+            } else if let Operand::Imm(imm) = op {
+                Some(Loc::Off(*imm))
+            } else {
+                None
+            }
+        };
+
+        for inst in block.insts_mut() {
+            // 如果类型是lw/sw/ld/sd, 且地址已经被计算出来,则可以进行优化
+            macro_rules! opt_ls {
+                ($ls_ty:ident,$inst:expr,$get_val:ident,$regs_val:ident) => {
+                    if let Some(addr) = $get_val(&$inst.base().into(), &$regs_val) {
+                        let off = $inst.offset();
+                        let new_addr = addr + Loc::Off(*off);
+                        if let Loc::BaseOff(base, off) = new_addr {
+                            *$inst = $ls_ty::new(*$inst.dst(), off, base);
+                        }
+                    }
+                };
+            }
+            match inst {
+                Inst::Lw(lw) => {
+                    opt_ls!(LwInst, lw, get_val, reg_vals);
+                }
+                Inst::Sw(sw) => {
+                    opt_ls!(SwInst, sw, get_val, reg_vals);
+                }
+                Inst::Ld(ld) => {
+                    opt_ls!(LdInst, ld, get_val, reg_vals);
+                }
+                Inst::Sd(sd) => {
+                    opt_ls!(SdInst, sd, get_val, reg_vals);
+                }
+                _ => {}
+            }
+
+            let dst_val: Option<Loc> = match inst {
+                Inst::LocalAddr(local_addr) => Loc::BaseOff(*local_addr.dst(), 0.into()).into(),
+                Inst::Add(add) => {
+                    if let (Some(lhs), Some(rhs)) =
+                        (get_val(add.lhs(), &reg_vals), get_val(add.rhs(), &reg_vals))
+                    {
+                        (lhs + rhs).into()
+                    } else {
+                        None
+                    }
+                }
+                Inst::Sll(sll) => {
+                    if let (Some(lhs), Some(rhs)) =
+                        (get_val(sll.lhs(), &reg_vals), get_val(sll.rhs(), &reg_vals))
+                    {
+                        (lhs << rhs).into()
+                    } else {
+                        None
+                    }
+                }
+                Inst::Li(li) => Some(Loc::Off(li.src().try_into()?)),
+                _ => None,
+            };
+
+            //刷新值
+            for r in inst.defs() {
+                if let Some(dst_val) = dst_val {
+                    reg_vals.insert(*r, dst_val);
+                } else {
+                    reg_vals.remove(r);
                 }
             }
         }
@@ -145,7 +284,6 @@ mod tests {
         // load_addr x37,[0-40]
         // add x38,x37,x36
         // lw x39,0(x38)
-        // FIXME
         let mut bb = Block::new("test".to_string());
         let mut ssa = StackAllocator::new();
         let x32 = Reg::new(32, true);
@@ -204,6 +342,35 @@ mod tests {
         load_addr x37,[0-40]
         addiw x38,x37,16
         lw x39,0(x38)
+        "###);
+    }
+
+    #[test]
+    fn test_combine_for_gep2() {
+        // load_addr x37,[0-40]
+        // addiw x38,x37,16
+        // lw x39,0(x38)
+
+        // such should be optimized to
+        // load_addr x37,[0-40]
+        // lw x39,14(x37)
+        let mut bb = Block::new("test".to_string());
+        let mut ssa = StackAllocator::new();
+        let x37 = Reg::new(37, true);
+        let x38 = Reg::new(38, true);
+        let x39 = Reg::new(39, true);
+        bb.push_inst(LocalAddr::new(x37, ssa.alloc(40)).into());
+        bb.push_inst(AddInst::new(x38.into(), x37.into(), 16.into()).into());
+        bb.push_inst(LwInst::new(x39, 0.into(), x38).into());
+        let asm_before = bb.gen_asm();
+        Block::combine_for_gep2(&mut bb).unwrap();
+        let asm_after = bb.gen_asm();
+        assert_snapshot!(diff(&asm_before, &asm_after),@r###"
+        test:
+        load_addr x37,[0-40]
+        addiw x38,x37,16
+        [-] lw x39,0(x38)
+        [+] lw x39,16(x37)
         "###);
     }
 

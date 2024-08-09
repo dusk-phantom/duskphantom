@@ -152,7 +152,7 @@ impl IRBuilder {
         reg_gener: &mut RegGenerator,
     ) -> Result<(Operand, Option<Inst>)> {
         if imm.in_limit(12) {
-            Ok((Operand::Imm(imm.clone()), None))
+            Ok((Operand::Imm(*imm), None))
         } else {
             let dst = reg_gener.gen_virtual_usual_reg();
             let li = LiInst::new(dst.into(), imm.into());
