@@ -123,7 +123,7 @@ pub mod tests_memory_ssa {
         ; MemoryUse(0)
         %load_8 = load i32, ptr @b
         %getelementptr_20 = getelementptr [3 x [3 x i32]], ptr @a, i32 0, i32 %load_8, i32 1
-        ; 3 = MemoryDef(0)
+        ; 3 = MemoryDef(1)
         store i32 1, ptr %getelementptr_20
         ; MemoryUse(1)
         %load_14 = load i32, ptr %getelementptr_18
@@ -214,7 +214,6 @@ pub mod tests_memory_ssa {
         ; 2 (liveOnEntry)
         ; 3 = MemoryDef(2)
         store i32 2, ptr @a
-        ; MemoryUse(3)
         ; 4 = MemoryDef(3)
         call void @f()
         ; MemoryUse(4)
@@ -256,7 +255,7 @@ pub mod tests_memory_ssa {
         ; 0 (liveOnEntry)
         ; 1 = MemoryDef(0)
         store i32 9, ptr @a
-        ; 2 = MemoryDef(0)
+        ; 2 = MemoryDef(1)
         store i32 3, ptr @b
         br label %exit
 
@@ -268,7 +267,6 @@ pub mod tests_memory_ssa {
         ; 3 (liveOnEntry)
         ; 4 = MemoryDef(3)
         store i32 2, ptr @a
-        ; MemoryUse(4)
         ; 5 = MemoryDef(4)
         call void @f()
         ; MemoryUse(5)
@@ -365,7 +363,7 @@ pub mod tests_memory_ssa {
         ; 5 = MemoryDef(0)
         store i32 1, ptr %getelementptr_43
         %alloca_45 = alloca [2 x [8 x i32]]
-        ; 6 = MemoryDef(0)
+        ; 6 = MemoryDef(5)
         call void @llvm.memset.p0.i32([2 x [8 x i32]]* %alloca_45, i8 0, i32 64, i1 false)
         %getelementptr_136 = getelementptr [2 x [8 x i32]], ptr %alloca_45, i32 0, i32 0, i32 0
         ; 7 = MemoryDef(6)
@@ -389,7 +387,7 @@ pub mod tests_memory_ssa {
         br label %exit
 
         exit:
-        ; 1 = MemoryPhi([15, then8], [0, alt9])
+        ; 1 = MemoryPhi([15, then8], [10, alt9])
         call void @putch(i32 10)
         ; MemoryUse(0)
         %load_113 = load i32, ptr @b
@@ -415,7 +413,7 @@ pub mod tests_memory_ssa {
 
         then8:
         %alloca_71 = alloca [7 x [1 x [5 x i32]]]
-        ; 12 = MemoryDef(0)
+        ; 12 = MemoryDef(10)
         call void @llvm.memset.p0.i32([7 x [1 x [5 x i32]]]* %alloca_71, i8 0, i32 140, i1 false)
         %Add_157 = add i32 0, 2
         %getelementptr_164 = getelementptr [7 x [1 x [5 x i32]]], ptr %alloca_71, i32 0, i32 %Add_157, i32 0, i32 0
