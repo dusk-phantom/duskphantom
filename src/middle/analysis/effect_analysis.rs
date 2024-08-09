@@ -19,7 +19,6 @@ pub struct Effect {
     pub use_range: HashSet<Operand>,
 }
 
-#[allow(unused)]
 pub struct EffectAnalysis {
     pub inst_effect: HashMap<InstPtr, Effect>,
     pub has_io_input: HashSet<FunPtr>,
@@ -94,6 +93,21 @@ impl EffectAnalysis {
             .get(&func)
             .map(HashSet::is_empty)
             .unwrap_or(true)
+    }
+
+    /// Get if instruction has IO.
+    pub fn inst_has_io(&self, inst: InstPtr) -> bool {
+        if inst.get_type() == InstType::Call {
+            let call = downcast_ref::<Call>(inst.as_ref().as_ref());
+            self.has_io(call.func)
+        } else {
+            false
+        }
+    }
+
+    /// Get if function has IO.
+    pub fn has_io(&self, func: FunPtr) -> bool {
+        self.has_io_input.contains(&func) || self.has_io_output.contains(&func)
     }
 
     /// Get if function is pure function (no IO / load / store).

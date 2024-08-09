@@ -6,3 +6,4 @@ mod inst_combine;
 mod load_elim;
 mod mem2reg;
 mod simple_gvn;
+mod store_elim;

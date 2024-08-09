@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     middle::{
         analysis::dominator_tree::DominatorTree,
-        ir::{BBPtr, FunPtr, InstPtr, Operand},
+        ir::{BBPtr, FunPtr, InstPtr},
         Program,
     },
     utils::mem::{ObjPool, ObjPtr},
@@ -113,61 +113,14 @@ impl<'a> MemorySSA<'a> {
         }
     }
 
-    /// Replace a normal node with a new operand if it's unused.
-    /// Updates corresponding instruction and use-def chain.
+    /// Remove a node, update use-def chain.
     ///
     /// # Panics
-    /// If the node is not a normal node, it will panic.
-    pub fn replace_node(&mut self, node: NodePtr, op: &Operand) {
-        // Check if node is normal
-        let Node::Normal(_, used_node, _, mut inst, _) = *node else {
-            panic!("not a normal node");
-        };
-
-        // Check if node is unused
-        let is_empty = HashSet::is_empty;
-        if self.node_to_user.get(&node).map_or(false, is_empty) {
-            return;
-        }
-
-        // Update instruction
-        inst.replace_self(op);
-
-        // Update use-def chain
-        if let Some(used_node) = used_node {
-            self.node_to_user.get_mut(&used_node).unwrap().remove(&node);
-        }
-    }
-
-    /// Remove a node if it's not used.
-    /// If used node becomes unused, it will be removed recursively.
-    /// Updates corresponding instruction and use-def chain.
-    ///
-    /// # Panics
-    /// If the node is not a normal node, it will panic.
-    pub fn remove_node_recurse(&mut self, node: NodePtr) {
-        // Check if node is unused
-        let is_empty = HashSet::is_empty;
-        if self.node_to_user.get(&node).map_or(false, is_empty) {
-            return;
-        }
-
-        // Update instruction
-        if let Some(mut inst) = node.get_inst() {
-            inst.remove_self();
-        }
-
-        // Update use-def chain
+    /// If the node is used, it will cause undefined behaviour.
+    pub fn remove_node(&mut self, node: NodePtr) {
         let used_nodes = node.get_used_node();
         for used_node in &used_nodes {
             self.node_to_user.get_mut(used_node).unwrap().remove(&node);
-            self.remove_node_recurse(*used_node);
-        }
-
-        // Recurse into used nodes
-        for used_node in &used_nodes {
-            self.node_to_user.get_mut(used_node).unwrap().remove(&node);
-            self.remove_node_recurse(*used_node);
         }
     }
 
