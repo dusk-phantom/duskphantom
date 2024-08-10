@@ -1,4 +1,5 @@
 use graph::UdGraph;
+use reg_set::RegSet;
 
 use crate::fprintln;
 
@@ -7,11 +8,17 @@ use super::*;
 pub fn handle_reg_alloc(func: &mut Func) -> Result<()> {
     // count the interference graph
     let mut reg_graphs = Func::reg_interfere_graph(func)?;
-    fprintln!("f_g.dot", "{}", func.bbs_graph_to_dot());
-    fprintln!("log/reg_graphs.log", "{}", g2txt(&reg_graphs));
-    let dot = UdGraph::<Reg>::from(reg_graphs.clone()).gen_dot("reg_graph", |r| r.gen_asm());
-    fprintln!("graph.dot", "{}", dot);
+    // fprintln!("f_g.dot", "{}", func.bbs_graph_to_dot());
+    // fprintln!("log/reg_graphs.log", "{}", g2txt(&reg_graphs));
+    // let dot = UdGraph::<Reg>::from(reg_graphs.clone()).gen_dot("reg_graph", |r| r.gen_asm());
+    // fprintln!("graph.dot", "{}", dot);
     let (colors, spills) = reg_alloc(&reg_graphs, free_iregs(), free_fregs())?;
+
+    // let reg_graphs2: HashMap<Reg, RegSet> = reg_graphs
+    //     .into_iter()
+    //     .map(|(k, v)| (k, v.into_iter().collect()))
+    //     .collect();
+    // let (colors, spills) = reg_alloc2(&reg_graphs2, free_iregs(), free_fregs())?;
 
     apply_colors(func, colors);
 
@@ -301,6 +308,120 @@ pub fn reg_alloc(
             }
             if let Some(c) = colors.get(v) {
                 used_colors.insert(*c);
+            }
+        }
+        // find the first color that is not used
+        let color = if r.is_usual() {
+            i_colors.iter().find(|c| !used_colors.contains(c))
+        } else {
+            f_colors.iter().find(|c| !used_colors.contains(c))
+        };
+        if let Some(color) = color {
+            colors.insert(r, *color);
+        } else {
+            to_spill.insert(r);
+        }
+    }
+
+    Ok((colors, to_spill))
+}
+
+pub fn reg_alloc2(
+    graph: &HashMap<Reg, RegSet>,
+    i_colors: &[Reg],
+    f_colors: &[Reg],
+) -> Result<(HashMap<Reg, Reg>, HashSet<Reg>)> {
+    fn remove_node(g: &mut HashMap<Reg, RegSet>, r: Reg) -> Result<()> {
+        let nbs = g.remove(&r).unwrap_or_default();
+        for nb in nbs {
+            g.entry(nb)
+                .and_modify(|nbs| {
+                    nbs.remove(&r);
+                })
+                .or_default();
+        }
+        Ok(())
+    }
+    fn num_inters(g: &HashMap<Reg, RegSet>, r: Reg) -> usize {
+        g.get(&r)
+            .map(|nbs| {
+                if r.is_usual() {
+                    nbs.num_regs_usual()
+                } else {
+                    nbs.num_regs_float()
+                }
+            })
+            .unwrap_or(0)
+    }
+
+    let mut graph_to_simplify = graph.clone();
+    let mut later_to_color: VecDeque<Reg> = VecDeque::new();
+    // simpilify the graph
+    // if a node has less than K neighbors, remove it from the graph, and add it to the later_to_color
+    loop {
+        let mut to_remove = vec![];
+        for (k, _) in graph_to_simplify.iter() {
+            if k.is_physical() {
+                continue;
+            }
+            let num_inter = num_inters(&graph_to_simplify, *k);
+            if k.is_float() {
+                if num_inter < f_colors.len() {
+                    to_remove.push(*k);
+                    later_to_color.push_back(*k);
+                }
+            } else if k.is_usual() {
+                if num_inter < i_colors.len() {
+                    to_remove.push(*k);
+                    later_to_color.push_back(*k);
+                }
+            } else {
+                unreachable!("a reg can only be usual or float");
+            }
+        }
+
+        if to_remove.is_empty() {
+            break;
+        }
+        for r in to_remove {
+            remove_node(&mut graph_to_simplify, r)?;
+        }
+    }
+
+    let mut colors: HashMap<Reg, Reg> = HashMap::new();
+    let mut to_spill: HashSet<Reg> = HashSet::new();
+
+    // try to color the rest of the graph
+    let mut first_to_color: Vec<(Reg, usize)> = graph_to_simplify
+        .into_iter()
+        .filter(|(k, _)| k.is_virtual())
+        .map(|(k, v)| {
+            (
+                k,
+                if k.is_usual() {
+                    v.num_regs_usual()
+                } else {
+                    v.num_regs_float()
+                },
+            )
+        })
+        .collect();
+    first_to_color.sort_by_key(|(_, v)| *v);
+    for (k, _) in first_to_color {
+        later_to_color.push_back(k);
+    }
+
+    let ordered_to_color = later_to_color.into_iter().rev();
+
+    for r in ordered_to_color {
+        let mut used_colors: RegSet = RegSet::with_capacity(32);
+        let inter = graph.get(&r).expect("");
+        for v in inter.iter() {
+            if v.is_physical() {
+                used_colors.insert(&v);
+            }
+            if let Some(c) = colors.get(&v) {
+                used_colors.insert(c);
             }
         }
         // find the first color that is not used
