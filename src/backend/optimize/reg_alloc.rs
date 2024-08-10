@@ -65,6 +65,7 @@ pub fn apply_spills(func: &mut Func, spills: HashSet<Reg>) {
     phisicalize::phisicalize_reg(func);
 }
 
+/// FIXME: now have some bug, need more precise analysis for reg lives
 /// 延迟t0-t2的释放的方式来处理spill的虚拟寄存器,
 /// 也就是在使用到spill的虚拟寄存器时,选择t0-t2中一个将其物理化,在使用完后,直到被下一个spill虚拟寄存器使用前,才释放占有的物理寄存器
 pub fn apply_spills2(func: &mut Func, spills: HashSet<Reg>) -> Result<()> {
