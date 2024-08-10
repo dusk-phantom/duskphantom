@@ -33,7 +33,7 @@ mod tests {
     #[test]
     fn test_optimize() {
         let cli = super::Cli::parse_from([BIN, "1.sy", "-S", "-o", "1.s", "-O1"]);
-        dbg!(&cli);
+        // dbg!(&cli);
         assert_eq!(cli.sy, "1.sy");
         assert_eq!(cli.output, "1.s");
         assert_eq!(cli.optimize, 1);

@@ -409,7 +409,7 @@ mod tests {
         graph.insert(i_v2, std::collections::HashSet::from_iter(vec![i_v1, i_v3]));
         graph.insert(i_v3, std::collections::HashSet::from_iter(vec![i_v1, i_v2]));
         let (colors, to_spill) = super::reg_alloc(&graph, free_iregs(), free_fregs()).unwrap();
-        dbg!(&colors);
+        // dbg!(&colors);
         check_alloc(&graph, &colors, &to_spill);
     }
     #[test]
