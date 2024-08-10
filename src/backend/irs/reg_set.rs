@@ -2,13 +2,17 @@ use bitvec::prelude;
 
 use super::*;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RegSet {
     float: prelude::BitVec,
     usual: prelude::BitVec,
 }
-
+impl Default for RegSet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 impl RegSet {
-    #[allow(clippy::new_without_default)]
     #[inline]
     pub fn new() -> Self {
         Self {
@@ -16,7 +20,14 @@ impl RegSet {
             usual: prelude::BitVec::new(),
         }
     }
-    /// NOTICE: This function will panic if reg id is out of range
+
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            float: prelude::BitVec::with_capacity(capacity),
+            usual: prelude::BitVec::with_capacity(capacity),
+        }
+    }
+
     pub fn insert(&mut self, reg: &Reg) {
         let id = reg.id() as usize;
         if reg.is_usual() {
@@ -132,6 +143,16 @@ impl IntoIterator for RegSet {
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter().into_iter().collect::<Vec<Reg>>().into_iter()
+    }
+}
+
+impl std::iter::FromIterator<Reg> for RegSet {
+    fn from_iter<I: IntoIterator<Item = Reg>>(iter: I) -> Self {
+        let mut reg_set = RegSet::new();
+        for reg in iter {
+            reg_set.insert(&reg);
+        }
+        reg_set
     }
 }
 
