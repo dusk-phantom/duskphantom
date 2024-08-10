@@ -2,8 +2,8 @@ use crate::{errors::MiddleError, frontend, utils::mem::ObjPtr};
 use analysis::{effect_analysis::EffectAnalysis, memory_ssa::MemorySSA};
 use ir::ir_builder::IRBuilder;
 use transform::{
-    block_fuse, constant_fold, dead_code_elim, func_inline, inst_combine, load_elim,
-    loop_optimization, mem2reg, simple_gvn, store_elim, unreachable_block_elim,
+    block_fuse, constant_fold, dead_code_elim, func_inline, inst_combine, load_elim, mem2reg,
+    simple_gvn, store_elim, unreachable_block_elim,
 };
 
 pub mod analysis;
@@ -51,7 +51,7 @@ pub fn optimize(program: &mut Program) {
     }
 
     // Loop optimization
-    loop_optimization::optimize_program(program).unwrap();
+    // loop_optimization::optimize_program(program).unwrap();
 }
 
 impl Default for Program {
