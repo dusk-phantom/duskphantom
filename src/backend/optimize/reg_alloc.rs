@@ -8,17 +8,11 @@ use super::*;
 pub fn handle_reg_alloc(func: &mut Func) -> Result<()> {
     // count the interference graph
     let mut reg_graphs = Func::reg_interfere_graph(func)?;
-    // fprintln!("f_g.dot", "{}", func.bbs_graph_to_dot());
-    // fprintln!("log/reg_graphs.log", "{}", g2txt(&reg_graphs));
-    // let dot = UdGraph::<Reg>::from(reg_graphs.clone()).gen_dot("reg_graph", |r| r.gen_asm());
-    // fprintln!("graph.dot", "{}", dot);
     let (colors, spills) = reg_alloc(&reg_graphs, free_iregs(), free_fregs())?;
 
-    // let reg_graphs2: HashMap<Reg, RegSet> = reg_graphs
-    //     .into_iter()
-    //     .map(|(k, v)| (k, v.into_iter().collect()))
-    //     .collect();
-    // let (colors, spills) = reg_alloc2(&reg_graphs2, free_iregs(), free_fregs())?;
+    // FIMXE:, a more quick way to allocate reg
+    // let mut reg_graphs = Func::reg_interfere_graph2(func)?;
+    // let (colors, spills) = reg_alloc2(&reg_graphs, free_iregs(), free_fregs())?;
 
     apply_colors(func, colors);
 
