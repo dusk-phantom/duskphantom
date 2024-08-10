@@ -1,5 +1,6 @@
-use crate::{errors::MiddleError, frontend, utils::mem::ObjPtr};
+use crate::{/* errors::MiddleError, */ frontend, utils::mem::ObjPtr};
 use analysis::{effect_analysis::EffectAnalysis, memory_ssa::MemorySSA};
+use anyhow::Context;
 use ir::ir_builder::IRBuilder;
 use transform::{
     block_fuse, constant_fold, dead_code_elim, func_inline, inst_combine, load_elim, mem2reg,
@@ -18,11 +19,15 @@ pub struct Program {
     pub mem_pool: Pin<Box<IRBuilder>>,
 }
 
-pub fn gen(program: &frontend::Program) -> Result<Program, MiddleError> {
-    match irgen::gen(program) {
-        Ok(program) => Ok(program),
-        Err(_) => Err(MiddleError::GenError),
-    }
+use crate::context;
+use anyhow::Result;
+
+pub fn gen(program: &frontend::Program) -> Result<Program> {
+    irgen::gen(program).with_context(|| context!())
+    // match irgen::gen(program) {
+    //     Ok(program) => Ok(program),
+    //     Err(_) => Err(MiddleError::GenError),
+    // }
 }
 
 pub fn optimize(program: &mut Program) {
