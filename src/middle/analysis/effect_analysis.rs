@@ -129,6 +129,22 @@ impl EffectAnalysis {
                                     use_range: EffectRange::new(),
                                 },
                             );
+                        } else if call.func.name == "putarray" {
+                            self.inst_effect.insert(
+                                inst,
+                                Effect {
+                                    def_range: EffectRange::new(),
+                                    use_range: inst.get_operand()[0].clone().into(),
+                                },
+                            );
+                        } else if call.func.name == "getarray" {
+                            self.inst_effect.insert(
+                                inst,
+                                Effect {
+                                    def_range: inst.get_operand()[0].clone().into(),
+                                    use_range: EffectRange::new(),
+                                },
+                            );
                         } else if !call.func.is_lib() {
                             // Treat other non-library function as impure
                             self.inst_effect.insert(
