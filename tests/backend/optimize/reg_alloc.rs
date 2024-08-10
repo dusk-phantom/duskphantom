@@ -115,6 +115,6 @@ fn test_count_reg_inter_graph() {
     let f = construct_reg_alloc();
     let ig = Func::reg_interfere_graph(&f).unwrap();
     assert!(ig.contains_key(&Reg::new(38, true)));
-    println!("{}", f.gen_asm());
-    dbg!(&f);
+    // println!("{}", f.gen_asm());
+    // dbg!(&f);
 }
