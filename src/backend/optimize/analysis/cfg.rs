@@ -25,22 +25,6 @@ impl Block {
         }
         Ok(tos)
     }
-    pub fn live_use_regs(&self) -> HashSet<Reg> {
-        let mut live_use = HashSet::new();
-        for inst in self.insts().iter().rev() {
-            live_use.retain(|r| !inst.defs().contains(&r));
-            live_use.extend(inst.uses().iter().cloned());
-        }
-        live_use
-    }
-    pub fn live_def_regs(&self) -> HashSet<Reg> {
-        let mut live_def = HashSet::new();
-        for inst in self.insts().iter().rev() {
-            live_def.extend(inst.defs().iter().cloned());
-            live_def.retain(|r| !inst.uses().contains(&r));
-        }
-        live_def
-    }
 
     pub fn ordered_insts_text(&self) -> String {
         self.insts()

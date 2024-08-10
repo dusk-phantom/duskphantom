@@ -2,11 +2,19 @@ use bitvec::prelude;
 
 use super::*;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct RegSet {
     float: prelude::BitVec,
     usual: prelude::BitVec,
 }
+
+impl Eq for RegSet {}
+impl PartialEq for RegSet {
+    fn eq(&self, other: &Self) -> bool {
+        self.float == other.float && self.usual == other.usual
+    }
+}
+
 impl Default for RegSet {
     fn default() -> Self {
         Self::new()
@@ -26,6 +34,22 @@ impl RegSet {
             float: prelude::BitVec::with_capacity(capacity),
             usual: prelude::BitVec::with_capacity(capacity),
         }
+    }
+
+    pub fn retain(&mut self, f: impl Fn(&Reg) -> bool) {
+        let mut float = prelude::BitVec::new();
+        let mut usual = prelude::BitVec::new();
+        for r in self.iter() {
+            if f(&r) {
+                if r.is_usual() {
+                    usual.push(true);
+                } else {
+                    float.push(true);
+                }
+            }
+        }
+        self.float = float;
+        self.usual = usual;
     }
 
     pub fn insert(&mut self, reg: &Reg) {
@@ -274,10 +298,25 @@ mod reg_set_tests {
         assert!(reg_set.contains(&REG_A2));
         assert!(reg_set.contains(&REG_FA0));
     }
-    // FIXME
-    // #[test]
-    // #[should_panic]
-    // fn test_reg_set_insert_out_of_range() {
-    //     let mut reg_set = RegSet::new();
-    // }
+
+    #[test]
+    fn test_reg_set_eq() {
+        let mut reg_set = RegSet::with_capacity(1000);
+        let mut reg_set2 = RegSet::with_capacity(1);
+        reg_set.insert(&REG_A0);
+        reg_set.insert(&REG_A1);
+        reg_set.insert(&REG_A2);
+
+        reg_set2.insert(&REG_A0);
+        reg_set2.insert(&REG_A1);
+        reg_set2.insert(&REG_A2);
+
+        assert_eq!(reg_set, reg_set2);
+
+        reg_set.remove(&REG_A0);
+        assert_ne!(reg_set, reg_set2);
+
+        reg_set2.remove(&REG_A0);
+        assert_eq!(reg_set, reg_set2);
+    }
 }
