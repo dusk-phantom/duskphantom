@@ -4,10 +4,11 @@ use crate::utils::mem::{ObjPool, ObjPtr};
 
 use super::*;
 
-type LoopPtr = ObjPtr<LoopTree>;
+pub type LoopPtr = ObjPtr<LoopTree>;
 
 #[allow(dead_code)]
 pub struct LoopTree {
+    pub pre_header: Option<BBPtr>,
     pub head: BBPtr,
     pub blocks: HashSet<BBPtr>,
     pub parent_loop: Option<LoopPtr>,
@@ -125,6 +126,7 @@ impl LoopForest {
 
         for (head, blocks, parent_loop) in loop_tree_meta.into_iter() {
             let loop_ptr = forest.pool.alloc(LoopTree {
+                pre_header: None,
                 head,
                 blocks,
                 parent_loop: parent_loop.and_then(|x| forest_map.get(&x).cloned()),
