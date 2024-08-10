@@ -7,19 +7,34 @@ use super::*;
 
 pub fn handle_reg_alloc(func: &mut Func) -> Result<()> {
     // count the interference graph
-    let mut reg_graphs = Func::reg_interfere_graph(func)?;
-    let (colors, spills) = reg_alloc(&reg_graphs, free_iregs(), free_fregs())?;
+    let reg_graphs = Func::reg_interfere_graph(func)?;
+    if try_perfect_alloc(func, &reg_graphs).is_ok() {
+        return Ok(());
+    }
 
+    let (colors, spills) = reg_alloc(&reg_graphs, free_iregs(), free_fregs())?;
     // FIMXE:, a more quick way to allocate reg
     // let mut reg_graphs = Func::reg_interfere_graph2(func)?;
     // let (colors, spills) = reg_alloc2(&reg_graphs, free_iregs(), free_fregs())?;
-
     apply_colors(func, colors);
-
     apply_spills(func, spills);
     // apply_spills2(func, spills)?;
 
     Ok(())
+}
+
+pub fn try_perfect_alloc(func: &mut Func, reg_graphs: &HashMap<Reg, HashSet<Reg>>) -> Result<()> {
+    let mut i_regs: Vec<Reg> = free_iregs().to_vec();
+    i_regs.extend(tmp_i_regs().iter().cloned());
+    let mut f_regs: Vec<Reg> = free_fregs().to_vec();
+    f_regs.extend(tmp_f_regs().iter().cloned());
+    let (colors, spills) = reg_alloc(reg_graphs, &i_regs, &f_regs)?;
+    if spills.is_empty() {
+        apply_colors(func, colors);
+        Ok(())
+    } else {
+        Err(anyhow!("spills is not empty,fail to allocate perfectly"))
+    }
 }
 
 pub fn apply_colors(func: &mut Func, colors: HashMap<Reg, Reg>) {
