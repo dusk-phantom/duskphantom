@@ -1,10 +1,7 @@
 use crate::{/* errors::MiddleError, */ frontend, utils::mem::ObjPtr};
 use anyhow::Context;
 use ir::ir_builder::IRBuilder;
-use transform::{
-    block_fuse, constant_fold, dead_code_elim, func_inline, inst_combine, load_store_elim,
-    loop_optimization, mem2reg, redundance_elim, unreachable_block_elim,
-};
+use transform::{loop_optimization, ultimate_pass};
 
 pub mod analysis;
 pub mod ir;
@@ -30,27 +27,7 @@ pub fn gen(program: &frontend::Program) -> Result<Program> {
 }
 
 pub fn optimize(program: &mut Program) {
-    // Convert program to SSA and inline functions
-    mem2reg::optimize_program(program).unwrap();
-    func_inline::optimize_program(program).unwrap();
-    dead_code_elim::optimize_program(program).unwrap();
-
-    // Further optimize
-    for _ in 0..3 {
-        // Weaken instructions
-        constant_fold::optimize_program(program).unwrap();
-        inst_combine::optimize_program(program).unwrap();
-        redundance_elim::optimize_program(program).unwrap();
-
-        // Remove unused code
-        load_store_elim::optimize_program(program).unwrap();
-        dead_code_elim::optimize_program(program).unwrap();
-
-        // Remove unreachable block and instruction
-        unreachable_block_elim::optimize_program(program).unwrap();
-        block_fuse::optimize_program(program).unwrap();
-    }
-
+    ultimate_pass::optimize_program(program).unwrap();
     // Loop optimization
     loop_optimization::optimize_program(program).unwrap();
 }

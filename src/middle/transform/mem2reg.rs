@@ -18,14 +18,13 @@ use crate::{
     utils::frame_map::FrameMap,
 };
 
-#[allow(unused)]
-pub fn optimize_program(program: &mut Program) -> Result<()> {
+pub fn optimize_program(program: &mut Program) -> Result<bool> {
     for func in &program.module.functions {
         if !func.is_lib() {
             mem2reg(*func, &mut program.mem_pool)?;
         }
     }
-    Ok(())
+    Ok(true)
 }
 
 /// A single argument of "phi" instruction

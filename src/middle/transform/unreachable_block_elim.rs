@@ -1,15 +1,16 @@
-use anyhow::Result;
+use anyhow::{anyhow, Context, Result};
 
-use crate::middle::{
-    analysis::reachability::Reachability,
-    ir::{instruction::InstType, Constant, FunPtr, Operand},
-    Program,
+use crate::{
+    context,
+    middle::{
+        analysis::reachability::Reachability,
+        ir::{instruction::InstType, Constant, FunPtr, Operand},
+        Program,
+    },
 };
 
-#[allow(unused)]
-pub fn optimize_program(program: &mut Program) -> Result<()> {
-    UnreachableBlockElim::new(program).run();
-    Ok(())
+pub fn optimize_program(program: &mut Program) -> Result<bool> {
+    UnreachableBlockElim::new(program).run()
 }
 
 struct UnreachableBlockElim<'a> {
@@ -21,7 +22,8 @@ impl<'a> UnreachableBlockElim<'a> {
         Self { program }
     }
 
-    fn run(&mut self) {
+    fn run(&mut self) -> Result<bool> {
+        let mut changed = false;
         for func in self
             .program
             .module
@@ -30,11 +32,14 @@ impl<'a> UnreachableBlockElim<'a> {
             .iter()
             .filter(|f| !f.is_lib())
         {
-            self.process_function(*func);
+            changed |= self.process_function(*func)?;
         }
+        Ok(changed)
     }
 
-    fn process_function(&mut self, func: FunPtr) {
+    fn process_function(&mut self, func: FunPtr) -> Result<bool> {
+        let mut changed = false;
+
         // Simplify "br" with constant condition to unconditional
         let bbs: Vec<_> = func.dfs_iter().collect();
         for bb in bbs.iter() {
@@ -43,7 +48,10 @@ impl<'a> UnreachableBlockElim<'a> {
                     let cond = inst.get_operand().first().cloned();
                     if let Some(Operand::Constant(Constant::Bool(cond))) = cond {
                         // Rewire basic block
-                        let mut parent_bb = inst.get_parent_bb().unwrap();
+                        let mut parent_bb = inst
+                            .get_parent_bb()
+                            .ok_or_else(|| anyhow!("{} should have parent block", inst))
+                            .with_context(|| context!())?;
                         if cond {
                             parent_bb.remove_false_bb();
                         } else {
@@ -54,6 +62,7 @@ impl<'a> UnreachableBlockElim<'a> {
                         let new_inst = self.program.mem_pool.get_br(None);
                         inst.insert_after(new_inst);
                         inst.remove_self();
+                        changed = true;
                     }
                 }
             }
@@ -65,8 +74,10 @@ impl<'a> UnreachableBlockElim<'a> {
             for mut pred in bb.get_pred_bb().clone() {
                 if !reachability.is_reachable(pred) {
                     pred.remove_self();
+                    changed = true;
                 }
             }
         }
+        Ok(changed)
     }
 }

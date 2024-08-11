@@ -2,14 +2,13 @@ use anyhow::Result;
 
 use crate::middle::analysis::effect_analysis::EffectAnalysis;
 use crate::middle::ir::instruction::InstType;
-use crate::middle::ir::{BBPtr, FunPtr, InstPtr, Operand};
+use crate::middle::ir::{InstPtr, Operand};
 use crate::middle::Program;
 
 #[allow(unused)]
-pub fn optimize_program(program: &mut Program) -> Result<()> {
+pub fn optimize_program(program: &mut Program) -> Result<bool> {
     let effect_analysis = EffectAnalysis::new(program);
-    DeadCodeElim::new(program, &effect_analysis).dead_code_elim();
-    Ok(())
+    DeadCodeElim::new(program, &effect_analysis).run()
 }
 
 struct DeadCodeElim<'a> {
@@ -25,43 +24,42 @@ impl<'a> DeadCodeElim<'a> {
         }
     }
 
-    fn dead_code_elim(&mut self) {
-        self.program
-            .module
-            .functions
-            .clone()
-            .iter()
-            .filter(|f| !f.is_lib())
-            .for_each(|f| self.dead_code_elim_func(f));
+    fn run(&mut self) -> Result<bool> {
+        let mut changed = false;
+        for func in self.program.module.functions.clone().iter() {
+            if func.is_lib() {
+                continue;
+            }
+            for bb in func.po_iter() {
+                for inst in bb.iter() {
+                    changed |= self.dead_code_elim_inst(inst)?;
+                }
+            }
+        }
 
         // Global variable does not require revisit, remove unused variables at the end
+        let len0 = self.program.module.global_variables.len();
         self.program
             .module
             .global_variables
-            .retain(|x| !x.get_user().is_empty());
+            .retain(|var| !var.get_user().is_empty());
+        let len1 = self.program.module.global_variables.len();
+        changed |= len0 != len1;
+        Ok(changed)
     }
 
-    fn dead_code_elim_func(&mut self, func: &FunPtr) {
-        // Use post order traversal to reduce revisits
-        func.po_iter().for_each(|bb| self.dead_code_elim_block(bb));
-    }
-
-    fn dead_code_elim_block(&mut self, bb: BBPtr) {
-        // Iterate forward so that next instruction is always valid
-        bb.iter().for_each(|inst| self.dead_code_elim_inst(inst));
-    }
-
-    fn dead_code_elim_inst(&mut self, mut inst: InstPtr) {
+    fn dead_code_elim_inst(&mut self, mut inst: InstPtr) -> Result<bool> {
         if !inst.get_user().is_empty() || self.has_side_effect(inst) {
-            return;
+            return Ok(false);
         }
         let operands: Vec<_> = inst.get_operand().into();
         inst.remove_self();
         for op in operands {
             if let Operand::Instruction(inst) = op {
-                self.dead_code_elim_inst(inst);
+                self.dead_code_elim_inst(inst)?;
             }
         }
+        Ok(true)
     }
 
     fn has_side_effect(&mut self, inst: InstPtr) -> bool {

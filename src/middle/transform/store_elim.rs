@@ -9,9 +9,8 @@ use crate::middle::{
 pub fn optimize_program<'a>(
     program: &'a mut Program,
     memory_ssa: &'a mut MemorySSA<'a>,
-) -> Result<()> {
-    StoreElim::new(program, memory_ssa).run();
-    Ok(())
+) -> Result<bool> {
+    StoreElim::new(program, memory_ssa).run()
 }
 
 struct StoreElim<'a> {
@@ -27,46 +26,50 @@ impl<'a> StoreElim<'a> {
         }
     }
 
-    fn run(&mut self) {
+    fn run(&mut self) -> Result<bool> {
+        let mut changed = false;
         for func in self.program.module.functions.clone().iter() {
             if func.is_main() {
                 for bb in func.po_iter() {
                     for inst in bb.iter() {
-                        self.process_inst(inst);
+                        changed |= self.process_inst(inst)?;
                     }
                 }
             }
         }
+        Ok(changed)
     }
 
     /// Delete instruction and its corresponding MemorySSA node if it's not used.
     /// This recurses into operands of the instruction.
-    fn process_inst(&mut self, inst: InstPtr) {
+    fn process_inst(&mut self, inst: InstPtr) -> Result<bool> {
         if !self.can_delete_inst(inst) {
-            return;
+            return Ok(false);
         }
         if let Some(node) = self.memory_ssa.get_inst_node(inst) {
             if !self.can_delete_node(node) {
-                return;
+                return Ok(false);
             }
-            self.remove_node(node);
+            self.remove_node(node)?;
         };
-        self.remove_inst(inst);
+        self.remove_inst(inst)?;
+        Ok(true)
     }
 
     /// Delete MemorySSA node if unused.
     /// This recurses into used nodes of the node.
-    fn process_node(&mut self, node: NodePtr) {
+    fn process_node(&mut self, node: NodePtr) -> Result<bool> {
         if !self.can_delete_node(node) {
-            return;
+            return Ok(false);
         }
         if let Some(inst) = node.get_inst() {
             if !self.can_delete_inst(inst) {
-                return;
+                return Ok(false);
             }
-            self.remove_inst(inst);
+            self.remove_inst(inst)?;
         }
-        self.remove_node(node);
+        self.remove_node(node)?;
+        Ok(true)
     }
 
     /// Check if instruction can be deleted.
@@ -83,22 +86,24 @@ impl<'a> StoreElim<'a> {
     }
 
     /// Remove instruction and recurse into operands.
-    fn remove_inst(&mut self, mut inst: InstPtr) {
+    fn remove_inst(&mut self, mut inst: InstPtr) -> Result<()> {
         let operands: Vec<_> = inst.get_operand().into();
         inst.remove_self();
         for op in operands {
             if let Operand::Instruction(inst) = op {
-                self.process_inst(inst);
+                self.process_inst(inst)?;
             }
         }
+        Ok(())
     }
 
     /// Remove node and recurse into used nodes.
-    fn remove_node(&mut self, node: NodePtr) {
+    fn remove_node(&mut self, node: NodePtr) -> Result<()> {
         let used_node = node.get_used_node();
         self.memory_ssa.remove_node(node);
         for node in used_node {
-            self.process_node(node);
+            self.process_node(node)?;
         }
+        Ok(())
     }
 }
