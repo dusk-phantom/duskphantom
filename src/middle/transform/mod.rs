@@ -7,6 +7,6 @@ pub mod load_elim;
 pub mod loop_optimization;
 pub mod loop_simplify;
 pub mod mem2reg;
-pub mod simple_gvn;
+pub mod redundance_elim;
 pub mod store_elim;
 pub mod unreachable_block_elim;

@@ -81,7 +81,7 @@ impl<'a> StoreElim<'a> {
 
     /// Check if instruction can be deleted.
     fn can_delete_inst(&self, inst: InstPtr) -> bool {
-        let no_io = !self.effect_analysis.inst_has_io(inst);
+        let no_io = !self.effect_analysis.has_io(inst);
         let no_user = inst.get_user().is_empty();
         let no_control = !matches!(inst.get_type(), InstType::Br | InstType::Ret);
         no_io && no_user && no_control

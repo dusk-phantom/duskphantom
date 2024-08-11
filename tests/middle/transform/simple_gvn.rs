@@ -6,7 +6,7 @@ pub mod tests_constant_fold {
         frontend::parse,
         middle::{
             irgen::gen,
-            transform::{constant_fold, dead_code_elim, mem2reg, simple_gvn},
+            transform::{constant_fold, dead_code_elim, mem2reg, redundance_elim},
         },
         utils::diff::diff,
     };
@@ -33,7 +33,7 @@ pub mod tests_constant_fold {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        simple_gvn::optimize_program(&mut program).unwrap();
+        redundance_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
         declare i32 @getint()
@@ -96,7 +96,7 @@ pub mod tests_constant_fold {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        simple_gvn::optimize_program(&mut program).unwrap();
+        redundance_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
         declare i32 @getint()
