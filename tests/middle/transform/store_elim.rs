@@ -5,7 +5,9 @@ pub mod tests_store_elim {
     use compiler::{
         frontend::parse,
         middle::{
-            analysis::{effect_analysis::EffectAnalysis, memory_ssa::MemorySSA},
+            analysis::{
+                call_graph::CallGraph, effect_analysis::EffectAnalysis, memory_ssa::MemorySSA,
+            },
             irgen::gen,
             transform::{
                 block_fuse, constant_fold, dead_code_elim, func_inline, inst_combine, load_elim,
@@ -160,8 +162,9 @@ pub mod tests_store_elim {
         // Check before optimization
         let parsed = parse(code).unwrap();
         let mut program = gen(&parsed).unwrap();
+        let mut call_graph = CallGraph::new(&program);
         mem2reg::optimize_program(&mut program).unwrap();
-        func_inline::optimize_program(&mut program).unwrap();
+        func_inline::optimize_program(&mut program, &mut call_graph).unwrap();
         simple_gvn::optimize_program(&mut program).unwrap();
         unreachable_block_elim::optimize_program(&mut program).unwrap();
         block_fuse::optimize_program(&mut program).unwrap();
@@ -301,8 +304,9 @@ pub mod tests_store_elim {
         // Check before optimization
         let parsed = parse(code).unwrap();
         let mut program = gen(&parsed).unwrap();
+        let mut call_graph = CallGraph::new(&program);
         mem2reg::optimize_program(&mut program).unwrap();
-        func_inline::optimize_program(&mut program).unwrap();
+        func_inline::optimize_program(&mut program, &mut call_graph).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
         inst_combine::optimize_program(&mut program).unwrap();
         simple_gvn::optimize_program(&mut program).unwrap();

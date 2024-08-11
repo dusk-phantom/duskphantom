@@ -1,5 +1,5 @@
 use crate::{/* errors::MiddleError, */ frontend, utils::mem::ObjPtr};
-use analysis::{effect_analysis::EffectAnalysis, memory_ssa::MemorySSA};
+use analysis::{call_graph::CallGraph, effect_analysis::EffectAnalysis, memory_ssa::MemorySSA};
 use anyhow::Context;
 use ir::ir_builder::IRBuilder;
 use transform::{
@@ -32,8 +32,9 @@ pub fn gen(program: &frontend::Program) -> Result<Program> {
 
 pub fn optimize(program: &mut Program) {
     // Convert program to SSA and inline functions
+    let mut call_graph = CallGraph::new(program);
     mem2reg::optimize_program(program).unwrap();
-    func_inline::optimize_program(program).unwrap();
+    func_inline::optimize_program(program, &mut call_graph).unwrap();
     dead_code_elim::optimize_program(program).unwrap();
 
     // Further optimize

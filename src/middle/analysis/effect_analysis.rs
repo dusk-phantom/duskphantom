@@ -62,13 +62,19 @@ impl EffectAnalysis {
         loop {
             let mut changed = false;
             for node in call_graph.po_iter() {
-                if node.fun.is_lib() || !worklist.contains(&node.fun) {
+                let func = node.func;
+                if func.is_lib() || !worklist.contains(&func) {
                     continue;
                 }
-                worklist.remove(&node.fun);
-                if effect.process_func(node.fun) {
+                worklist.remove(&func);
+                if effect.process_func(func) {
                     changed = true;
-                    worklist.extend(node.get_called_by().iter().map(|edge| edge.func));
+                    worklist.extend(
+                        call_graph
+                            .get_called_by(func)
+                            .iter()
+                            .map(|edge| edge.caller),
+                    );
                 }
             }
             if !changed {

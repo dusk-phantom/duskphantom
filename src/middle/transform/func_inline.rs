@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 
-use anyhow::Result;
+use anyhow::{anyhow, Context, Result};
 
 use crate::{
     backend::from_self::downcast_ref,
+    context,
     middle::{
         analysis::call_graph::CallGraph,
         ir::{
@@ -18,63 +19,62 @@ use crate::{
     },
 };
 
-pub fn optimize_program(program: &mut Program) -> Result<()> {
-    FuncInline::new(program).run();
-    Ok(())
+pub fn optimize_program(program: &mut Program, call_graph: &mut CallGraph) -> Result<bool> {
+    FuncInline::new(program, call_graph).run()
 }
 
 struct FuncInline<'a> {
     program: &'a mut Program,
+    call_graph: &'a mut CallGraph,
     counter: u32,
 }
 
 impl<'a> FuncInline<'a> {
-    fn new(program: &'a mut Program) -> Self {
+    fn new(program: &'a mut Program, call_graph: &'a mut CallGraph) -> Self {
         Self {
             program,
+            call_graph,
             counter: 0,
         }
     }
 
-    fn run(&mut self) {
-        let call_graph = CallGraph::new(self.program);
-        for node in call_graph.po_iter() {
-            self.process_func(node.fun);
+    fn run(&mut self) -> Result<bool> {
+        let mut overall_changed = false;
+        let mut changed = false;
+        while changed {
+            for func in self.program.module.functions.clone() {
+                // Do not process library function
+                if func.is_lib() {
+                    continue;
+                }
+
+                // If functions calls other functions, do not process it
+                if !self.call_graph.get_calls(func).is_empty() {
+                    continue;
+                }
+
+                // Process function
+                changed |= self.process_func(func)?;
+                overall_changed |= changed;
+
+                // Update call graph
+                self.call_graph.remove(func);
+            }
         }
+        Ok(overall_changed)
     }
 
-    fn process_func(&mut self, fun: FunPtr) {
-        // Refuse to process library function
-        if fun.is_lib() {
-            return;
+    fn process_func(&mut self, fun: FunPtr) -> Result<bool> {
+        let mut changed = false;
+        for call in self.call_graph.get_called_by(fun) {
+            changed |= self.process_call(call.inst)?;
         }
-
-        // Collect all calls in the function
-        let calls = fun
-            .dfs_iter()
-            .flat_map(|bb| bb.iter())
-            .filter(|inst| inst.get_type() == InstType::Call)
-            .collect::<Vec<_>>();
-
-        // Process each call
-        for call in calls {
-            self.process_call(call, fun);
-        }
+        Ok(changed)
     }
 
-    fn process_call(&mut self, mut inst: InstPtr, caller: FunPtr) {
+    fn process_call(&mut self, mut inst: InstPtr) -> Result<bool> {
         let call = downcast_ref::<Call>(inst.as_ref().as_ref());
         let func = call.func;
-
-        // Refuse to inline library function
-        if func.is_lib() {
-            return;
-        }
-
-        // If self-recursive, refuse to inline
-        if func == caller {
-            return;
-        }
 
         // Build argument map
         let params = func.params.iter().cloned();
@@ -82,31 +82,40 @@ impl<'a> FuncInline<'a> {
         let arg_map = params.zip(args).collect();
 
         // Mirror function
-        let new_fun = self.mirror_func(func, arg_map);
+        let new_fun = self.mirror_func(func, arg_map)?;
         let mut before_entry = call.get_parent_bb().unwrap();
         let after_exit = self.split_block_at(before_entry, inst);
 
         // Wire before_entry -> fun_entry
-        let fun_entry = new_fun.entry.unwrap();
+        let fun_entry = new_fun
+            .entry
+            .ok_or_else(|| anyhow!("function `{}` has no entry", new_fun.name))
+            .with_context(|| context!())?;
         before_entry.push_back(self.program.mem_pool.get_br(None));
         before_entry.set_true_bb(fun_entry);
 
         // Replace call with operand of return, remove return
-        let mut fun_exit = new_fun.exit.unwrap();
+        let mut fun_exit = new_fun
+            .exit
+            .ok_or_else(|| anyhow!("function `{}` has no exit", new_fun.name))
+            .with_context(|| context!())?;
         let mut ret = fun_exit.get_last_inst();
         if inst.get_value_type() == ValueType::Void {
             inst.remove_self();
         } else {
-            if ret.get_operand().is_empty() {
-                panic!("inst `{}` should be valued return", ret.gen_llvm_ir());
-            }
-            inst.replace_self(&ret.get_operand()[0]);
+            let ret_val = ret
+                .get_operand()
+                .first()
+                .ok_or_else(|| anyhow!("function `{}` has no return value", new_fun.name))
+                .with_context(|| context!())?;
+            inst.replace_self(ret_val);
         }
         ret.remove_self();
 
         // Wire func_exit -> after_exit
         fun_exit.push_back(self.program.mem_pool.get_br(None));
         fun_exit.set_true_bb(after_exit);
+        Ok(true)
     }
 
     /// Split given basic block at the position of given instruction.
@@ -159,16 +168,26 @@ impl<'a> FuncInline<'a> {
 
     /// Mirror a function with given mapping.
     /// The function should not be added to program, please wire entry and exit to existing function.
-    fn mirror_func(&mut self, fun: FunPtr, arg_map: HashMap<ParaPtr, Operand>) -> FunPtr {
+    fn mirror_func(&mut self, func: FunPtr, arg_map: HashMap<ParaPtr, Operand>) -> Result<FunPtr> {
+        let func_entry = func
+            .entry
+            .ok_or_else(|| anyhow!("function `{}` has no entry", func.name))
+            .with_context(|| context!())?;
+        let func_exit = func
+            .exit
+            .ok_or_else(|| anyhow!("function `{}` has no exit", func.name))
+            .with_context(|| context!())?;
+
+        // Initialize inst and block mapping and new function
         let mut inst_map: HashMap<InstPtr, InstPtr> = HashMap::new();
         let mut block_map: HashMap<BBPtr, BBPtr> = HashMap::new();
         let mut new_fun = self
             .program
             .mem_pool
-            .new_function(String::new(), fun.return_type.clone());
+            .new_function(String::new(), func.return_type.clone());
 
         // Copy blocks and instructions
-        for bb in fun.dfs_iter() {
+        for bb in func.dfs_iter() {
             let name = self.unique_name("inline", &bb.name);
             let mut new_bb = self.program.mem_pool.new_basicblock(name);
             block_map.insert(bb, new_bb);
@@ -183,19 +202,29 @@ impl<'a> FuncInline<'a> {
         }
 
         // Set entry and exit for new function
-        new_fun.entry = block_map.get(&fun.entry.unwrap()).cloned();
-        new_fun.exit = block_map.get(&fun.exit.unwrap()).cloned();
+        new_fun.entry = block_map.get(&func_entry).cloned();
+        new_fun.exit = block_map.get(&func_exit).cloned();
 
         // Copy operands from old instruction to new instruction,
         // replace operands to local instruction and inlined argument
-        for bb in fun.dfs_iter() {
+        for bb in func.dfs_iter() {
             for inst in bb.iter() {
-                let mut new_inst = inst_map.get(&inst).cloned().unwrap();
+                let mut new_inst = inst_map
+                    .get(&inst)
+                    .cloned()
+                    .ok_or_else(|| anyhow!("instruction not found in inst_map: {}", inst))
+                    .with_context(|| context!())?;
                 if inst.get_type() == InstType::Phi {
                     let inst = downcast_ref::<Phi>(inst.as_ref().as_ref());
                     let new_inst = downcast_mut::<Phi>(new_inst.as_mut().as_mut());
+
+                    // Replace operand for phi instruction
                     for (old_op, old_bb) in inst.get_incoming_values().iter() {
-                        let new_bb = block_map.get(old_bb).cloned().unwrap();
+                        let new_bb = block_map
+                            .get(old_bb)
+                            .cloned()
+                            .ok_or_else(|| anyhow!("bb not found in block_map: {}", old_bb.name))
+                            .with_context(|| context!())?;
                         if let Operand::Instruction(old_op) = old_op {
                             let new_op = inst_map.get(old_op).cloned().unwrap();
                             new_inst.add_incoming_value(new_op.into(), new_bb);
@@ -208,6 +237,7 @@ impl<'a> FuncInline<'a> {
                         }
                     }
                 } else {
+                    // Replace operand for normal instruction
                     for old_op in inst.get_operand().iter() {
                         if let Operand::Instruction(old_op) = old_op {
                             let new_op = inst_map.get(old_op).cloned().unwrap();
@@ -225,7 +255,7 @@ impl<'a> FuncInline<'a> {
         }
 
         // Replace succ bb
-        for bb in fun.dfs_iter() {
+        for bb in func.dfs_iter() {
             let mut new_bb = block_map.get(&bb).cloned().unwrap();
             let succ_bb = bb.get_succ_bb();
             if !succ_bb.is_empty() {
@@ -239,7 +269,7 @@ impl<'a> FuncInline<'a> {
         }
 
         // Return new function
-        new_fun
+        Ok(new_fun)
     }
 
     fn unique_name(&mut self, meta: &str, base_name: &str) -> String {

@@ -15,7 +15,8 @@ use crate::{
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct CallEdge {
     pub inst: InstPtr,
-    pub func: FunPtr,
+    pub caller: FunPtr,
+    pub callee: FunPtr,
 }
 
 #[allow(unused)]
@@ -41,17 +42,19 @@ impl CallGraph {
                 for inst in bb.iter() {
                     if inst.get_type() == InstType::Call {
                         let call = downcast_ref::<Call>(inst.as_ref().as_ref());
+                        let call_edge = CallEdge {
+                            inst,
+                            caller: call.func,
+                            callee: func,
+                        };
                         calls
                             .entry(func)
                             .or_insert(HashSet::new())
-                            .insert(CallEdge {
-                                inst,
-                                func: call.func,
-                            });
+                            .insert(call_edge);
                         called_by
                             .entry(call.func)
                             .or_insert(HashSet::new())
-                            .insert(CallEdge { inst, func });
+                            .insert(call_edge);
                     }
                 }
             }
@@ -65,22 +68,43 @@ impl CallGraph {
 
     pub fn po_iter(&self) -> impl Iterator<Item = CallGraphNode<'_>> {
         let node = CallGraphNode {
-            fun: self.main,
+            func: self.main,
             context: self,
         };
         POIterator::from(node)
+    }
+
+    pub fn get_calls(&self, func: FunPtr) -> HashSet<CallEdge> {
+        self.calls.get(&func).cloned().unwrap_or_default()
+    }
+
+    pub fn get_called_by(&self, func: FunPtr) -> HashSet<CallEdge> {
+        self.called_by.get(&func).cloned().unwrap_or_default()
+    }
+
+    pub fn remove(&mut self, func: FunPtr) {
+        if let Some(calls) = self.calls.remove(&func) {
+            for call in calls {
+                self.called_by.get_mut(&call.caller).unwrap().remove(&call);
+            }
+        }
+        if let Some(called_by) = self.called_by.remove(&func) {
+            for call in called_by {
+                self.calls.get_mut(&call.caller).unwrap().remove(&call);
+            }
+        }
     }
 }
 
 #[derive(Clone)]
 pub struct CallGraphNode<'a> {
-    pub fun: FunPtr,
+    pub func: FunPtr,
     context: &'a CallGraph,
 }
 
 impl<'a> PartialEq for CallGraphNode<'a> {
     fn eq(&self, other: &Self) -> bool {
-        self.fun == other.fun
+        self.func == other.func
     }
 }
 
@@ -88,7 +112,7 @@ impl<'a> Eq for CallGraphNode<'a> {}
 
 impl<'a> std::hash::Hash for CallGraphNode<'a> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.fun.hash(state);
+        self.func.hash(state);
     }
 }
 
@@ -96,35 +120,13 @@ impl<'a> Node for CallGraphNode<'a> {
     fn get_succ(&mut self) -> Vec<Self> {
         self.context
             .calls
-            .get(&self.fun)
+            .get(&self.func)
             .unwrap_or(&HashSet::new())
             .iter()
             .map(|edge| CallGraphNode {
-                fun: edge.func,
+                func: edge.callee,
                 context: self.context,
             })
-            .collect()
-    }
-}
-
-#[allow(unused)]
-impl<'a> CallGraphNode<'a> {
-    pub fn get_calls(&self) -> Vec<CallEdge> {
-        self.context
-            .calls
-            .get(&self.fun)
-            .unwrap_or(&HashSet::new())
-            .iter()
-            .cloned()
-            .collect()
-    }
-    pub fn get_called_by(&self) -> Vec<CallEdge> {
-        self.context
-            .called_by
-            .get(&self.fun)
-            .unwrap_or(&HashSet::new())
-            .iter()
-            .cloned()
             .collect()
     }
 }
