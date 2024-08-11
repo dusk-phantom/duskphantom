@@ -40,9 +40,7 @@ pub mod tests_func_inline {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        let mut call_graph = CallGraph::new(&program);
-        let counter = ParalCounter::new(0, usize::MAX);
-        func_inline::optimize_program(&mut program, &mut call_graph, counter).unwrap();
+        func_inline::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
         inst_combine::optimize_program(&mut program).unwrap();
         unreachable_block_elim::optimize_program(&mut program).unwrap();
@@ -138,9 +136,7 @@ pub mod tests_func_inline {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        let mut call_graph = CallGraph::new(&program);
-        let counter = ParalCounter::new(0, usize::MAX);
-        func_inline::optimize_program(&mut program, &mut call_graph, counter).unwrap();
+        func_inline::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
         inst_combine::optimize_program(&mut program).unwrap();
         unreachable_block_elim::optimize_program(&mut program).unwrap();
@@ -222,9 +218,7 @@ pub mod tests_func_inline {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        let mut call_graph = CallGraph::new(&program);
-        let counter = ParalCounter::new(0, usize::MAX);
-        func_inline::optimize_program(&mut program, &mut call_graph, counter).unwrap();
+        func_inline::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
         inst_combine::optimize_program(&mut program).unwrap();
         unreachable_block_elim::optimize_program(&mut program).unwrap();

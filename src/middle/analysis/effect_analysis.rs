@@ -84,10 +84,23 @@ impl EffectAnalysis {
     }
 
     /// Get if instruction has IO.
-    pub fn inst_has_io(&self, inst: InstPtr) -> bool {
+    pub fn has_io(&self, inst: InstPtr) -> bool {
         if inst.get_type() == InstType::Call {
             let call = downcast_ref::<Call>(inst.as_ref().as_ref());
             self.has_io_input.contains(&call.func) || self.has_io_output.contains(&call.func)
+        } else {
+            false
+        }
+    }
+
+    /// Get if function has side effect.
+    pub fn has_effect(&self, inst: InstPtr) -> bool {
+        if inst.get_type() == InstType::Call {
+            let call = downcast_ref::<Call>(inst.as_ref().as_ref());
+            self.has_mem_input.contains(&call.func)
+                || self.has_mem_output.contains(&call.func)
+                || self.has_io_input.contains(&call.func)
+                || self.has_io_output.contains(&call.func)
         } else {
             false
         }

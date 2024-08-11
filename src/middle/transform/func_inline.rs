@@ -20,12 +20,10 @@ use crate::{
     utils::paral_counter::ParalCounter,
 };
 
-pub fn optimize_program(
-    program: &mut Program,
-    call_graph: &mut CallGraph,
-    counter: ParalCounter,
-) -> Result<bool> {
-    let mut func_inline = FuncInline::new(program, call_graph, counter);
+pub fn optimize_program(program: &mut Program) -> Result<bool> {
+    let mut call_graph = CallGraph::new(program);
+    let counter = ParalCounter::new(0, usize::MAX);
+    let mut func_inline = FuncInline::new(program, &mut call_graph, counter);
     let mut changed = false;
     loop {
         let result = func_inline.run()?;
