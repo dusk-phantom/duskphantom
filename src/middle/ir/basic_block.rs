@@ -121,9 +121,8 @@ impl BasicBlock {
         &self.succ_bbs
     }
 
-    /// Remove current block. This:
-    /// - removes block from successor's predecessor list
-    /// - removes successor's phi operand
+    /// Remove current block.
+    /// This removes self from successor's predecessor list and phi operand.
     ///
     /// # Panics
     /// Please make sure this block is unreachable!
@@ -131,6 +130,39 @@ impl BasicBlock {
         for succ in self.succ_bbs.iter() {
             succ.clone().remove_pred_bb(ObjPtr::new(self));
         }
+    }
+
+    /// Replace `preds => [ self -> ... ] => succs` with `preds => [ entry -> ... ] => succs`. This:
+    /// - add preds to entry's predecessor list
+    /// - remove preds from self's predecessor list
+    /// - replaces self to entry in predecessor's successor list
+    /// - replaces self to entry in function entry
+    pub fn replace_entry(&mut self, mut entry: BBPtr, mut func: FunPtr) {
+        for pred in self.pred_bbs.iter_mut() {
+            entry.pred_bbs.push(*pred);
+            for pred_succ in pred.succ_bbs.iter_mut() {
+                if pred_succ.id == self.id {
+                    *pred_succ = entry;
+                }
+            }
+        }
+        self.pred_bbs.clear();
+        if func.entry.is_some() && func.entry.unwrap().id == self.id {
+            func.entry = Some(entry);
+        }
+    }
+
+    /// Replace `preds => [ ... -> self ] => succs` with `preds => [ ... -> exit ] => succs`. This:
+    /// - add succs to exit's successor list
+    /// - remove succs from self's successor list
+    /// - replaces self -> exit in successor's predecessor list
+    /// - replaces self -> exit in successor's phi operand
+    pub fn replace_exit(&mut self, mut exit: BBPtr) {
+        for succ in self.succ_bbs.iter() {
+            exit.succ_bbs.push(*succ);
+            succ.clone().replace_pred_bb(ObjPtr::new(self), exit);
+        }
+        self.succ_bbs.clear();
     }
 
     /// Remove a predecessor of this block.
@@ -153,16 +185,26 @@ impl BasicBlock {
         }
     }
 
-    /// Replace successor with given mapping.
-    pub fn replace_succ_bb(&mut self, from: BBPtr, to: BBPtr) {
-        if !self.succ_bbs.is_empty() && self.succ_bbs[0].id == from.id {
-            self.set_true_bb(to);
+    /// Replace a predecessor of this block.
+    pub fn replace_pred_bb(&mut self, from: BBPtr, to: BBPtr) {
+        // Replace pred bb
+        for pred in self.pred_bbs.iter_mut() {
+            if pred.id == from.id {
+                *pred = to;
+            }
         }
-        if self.succ_bbs.len() >= 2 && self.succ_bbs[1].id == from.id {
-            self.set_false_bb(to);
+
+        // Replace phi operand
+        for mut inst in self.iter() {
+            if inst.get_type() == InstType::Phi {
+                let inst = downcast_mut::<Phi>(inst.as_mut().as_mut());
+                inst.replace_incoming_value(from, to);
+            }
         }
     }
 
+    /// Replace successor with given mapping.
+    /// TODO: rename me
     pub fn replace_succ_bb_only(&mut self, mut from: BBPtr, to: BBPtr) {
         if let Some(index) = self.succ_bbs.iter().enumerate().find_map(|(index, bb)| {
             if bb.id == from.id {
@@ -177,14 +219,15 @@ impl BasicBlock {
     }
 
     /// Sets which `BasicBlock` to jump to when the condition is true.
+    ///
+    /// # Panics
+    /// Don't replace existing true `BasicBlock` with this method.
     pub fn set_true_bb(&mut self, mut bb: BBPtr) {
         let self_ptr = ObjPtr::new(self);
         if self.succ_bbs.is_empty() {
             self.succ_bbs.push(bb);
         } else {
-            let mut next = self.succ_bbs[0];
-            next.remove_pred_bb(self_ptr);
-            self.succ_bbs[0] = bb;
+            panic!("The true bb already exists");
         }
         bb.pred_bbs.push(self_ptr);
     }
@@ -193,14 +236,13 @@ impl BasicBlock {
     ///
     /// # Panics
     /// You should set the true `BasicBlock` before use this method.
+    /// Don't replace existing false `BasicBlock` with this method.
     pub fn set_false_bb(&mut self, mut bb: BBPtr) {
         let self_ptr = ObjPtr::new(self);
         if self.succ_bbs.len() == 1 {
             self.succ_bbs.push(bb);
         } else {
-            let mut next = self.succ_bbs[1];
-            next.remove_pred_bb(self_ptr);
-            self.succ_bbs[1] = bb;
+            panic!("The false bb already exists");
         }
         bb.pred_bbs.push(self_ptr);
     }

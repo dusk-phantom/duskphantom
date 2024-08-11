@@ -35,17 +35,28 @@ impl CallGraph {
             if func.name == "main" {
                 main = Some(func);
             }
+
+            // Caller should not be library function
             if func.is_lib() {
                 continue;
             }
+
+            // Iterate all instructions
             for bb in func.dfs_iter() {
                 for inst in bb.iter() {
                     if inst.get_type() == InstType::Call {
                         let call = downcast_ref::<Call>(inst.as_ref().as_ref());
+
+                        // Callee should not be library function
+                        if call.func.is_lib() {
+                            continue;
+                        }
+
+                        // Construct and add call edge
                         let call_edge = CallEdge {
                             inst,
-                            caller: call.func,
-                            callee: func,
+                            caller: func,
+                            callee: call.func,
                         };
                         calls
                             .entry(func)

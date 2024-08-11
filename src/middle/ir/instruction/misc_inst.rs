@@ -287,6 +287,13 @@ impl Phi {
             self.get_manager_mut().remove_operand(index);
         }
     }
+    pub fn replace_incoming_value(&mut self, from: BBPtr, to: BBPtr) {
+        for (_, pred) in &mut self.incoming_values {
+            if *pred == from {
+                *pred = to;
+            }
+        }
+    }
     pub fn get_incoming_value(&self, bb: BBPtr) -> Option<&Operand> {
         for (val, pred) in &self.incoming_values {
             if *pred == bb {

@@ -1,4 +1,7 @@
-use crate::{/* errors::MiddleError, */ frontend, utils::mem::ObjPtr};
+use crate::{
+    /* errors::MiddleError, */ frontend,
+    utils::{mem::ObjPtr, paral_counter::ParalCounter},
+};
 use analysis::{call_graph::CallGraph, effect_analysis::EffectAnalysis, memory_ssa::MemorySSA};
 use anyhow::Context;
 use ir::ir_builder::IRBuilder;
@@ -33,8 +36,9 @@ pub fn gen(program: &frontend::Program) -> Result<Program> {
 pub fn optimize(program: &mut Program) {
     // Convert program to SSA and inline functions
     let mut call_graph = CallGraph::new(program);
+    let counter = ParalCounter::new(0, usize::MAX);
     mem2reg::optimize_program(program).unwrap();
-    func_inline::optimize_program(program, &mut call_graph).unwrap();
+    func_inline::optimize_program(program, &mut call_graph, counter).unwrap();
     dead_code_elim::optimize_program(program).unwrap();
 
     // Further optimize
