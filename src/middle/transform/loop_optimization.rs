@@ -1,13 +1,14 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use super::*;
 use crate::middle::{
-    analysis::loop_tools::{self, LoopForest},
+    analysis::loop_tools::{self, LoopForest, LoopPtr},
     ir::FunPtr,
     transform::inst_combine,
     Program,
 };
-use anyhow::Result;
+use anyhow::{Ok, Result};
+
 pub fn optimize_program(program: &mut Program) -> Result<()> {
     let mut func_loop_map = program
         .module
@@ -16,11 +17,29 @@ pub fn optimize_program(program: &mut Program) -> Result<()> {
         .filter_map(|func| loop_tools::LoopForest::make_forest(*func).map(|forest| (*func, forest)))
         .collect::<HashMap<FunPtr, LoopForest>>();
 
-    let mut simplifier = loop_simplify::LoopSimplifier::new(&mut program.mem_pool);
     for (_, forest) in func_loop_map.iter_mut() {
-        simplifier.loop_simplify(forest)?;
+        loop_simplify::LoopSimplifier::new(&mut program.mem_pool).run(forest)?;
+        licm::LICM::new(&mut program.mem_pool).run(forest)?;
     }
     inst_combine::optimize_program(program)?;
+
+    Ok(())
+}
+
+pub fn loop_forest_post_order<F>(loop_forest: &mut LoopForest, mut f: F) -> Result<()>
+where
+    F: FnMut(LoopPtr) -> Result<()>,
+{
+    let mut stack = Vec::new();
+    let mut queue = VecDeque::from(loop_forest.forest.clone());
+    while let Some(lo) = queue.pop_front() {
+        queue.extend(lo.sub_loops.iter());
+        stack.push(lo);
+    }
+
+    while let Some(lo) = stack.pop() {
+        f(lo)?;
+    }
 
     Ok(())
 }

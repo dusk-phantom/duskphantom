@@ -2,8 +2,8 @@ use crate::{/* errors::MiddleError, */ frontend, utils::mem::ObjPtr};
 use anyhow::Context;
 use ir::ir_builder::IRBuilder;
 use transform::{
-    block_fuse, constant_fold, dead_code_elim, func_inline, inst_combine, load_store_elim, mem2reg,
-    redundance_elim, unreachable_block_elim,
+    block_fuse, constant_fold, dead_code_elim, func_inline, inst_combine, load_store_elim,
+    loop_optimization, mem2reg, redundance_elim, unreachable_block_elim,
 };
 
 pub mod analysis;
@@ -51,8 +51,10 @@ pub fn optimize(program: &mut Program) {
         block_fuse::optimize_program(program).unwrap();
     }
 
+    let _ = std::fs::write("before.ll", program.module.gen_llvm_ir()).with_context(|| context!());
     // Loop optimization
-    // loop_optimization::optimize_program(program).unwrap();
+    loop_optimization::optimize_program(program).unwrap();
+    let _ = std::fs::write("after.ll", program.module.gen_llvm_ir()).with_context(|| context!());
 }
 
 impl Default for Program {
