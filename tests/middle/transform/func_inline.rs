@@ -64,17 +64,16 @@ pub mod tests_func_inline {
         declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
-        define i32 @func(i32 %n) {
+        [-] define i32 @func(i32 %n) {
         [-] entry:
         [-] call void @putint(i32 %n)
         [-] br label %exit
         [-] 
-        exit:
-        [+] call void @putint(i32 %n)
-        ret i32 %n
-
-
-        }
+        [-] exit:
+        [-] ret i32 %n
+        [-] 
+        [-] 
+        [-] }
         define i32 @main() {
         [-] entry:
         [-] %call_18 = call i32 @getint()
@@ -163,35 +162,31 @@ pub mod tests_func_inline {
         declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
-        define i32 @f(i32 %x) {
+        [-] define i32 @f(i32 %x) {
         [-] entry:
         [-] br label %cond0
         [-] 
-        cond0:
-        %icmp_13 = icmp sgt i32 %x, 5
+        [-] cond0:
+        [-] %icmp_13 = icmp sgt i32 %x, 5
         [-] br i1 %icmp_13, label %then1, label %alt2
-        [+] br i1 %icmp_13, label %then1, label %final3
-
-        then1:
-        %Add_16 = add i32 %x, 1
-        br label %exit
-
+        [-] 
+        [-] then1:
+        [-] %Add_16 = add i32 %x, 1
+        [-] br label %exit
+        [-] 
         [-] alt2:
         [-] br label %final3
-        [+] final3:
-        [+] %Add_21 = add i32 %x, 2
-        [+] br label %exit
-
-        exit:
-        %phi_32 = phi i32 [%Add_16, %then1], [%Add_21, %final3]
-        ret i32 %phi_32
-
+        [-] 
+        [-] exit:
+        [-] %phi_32 = phi i32 [%Add_16, %then1], [%Add_21, %final3]
+        [-] ret i32 %phi_32
+        [-] 
         [-] final3:
         [-] %Add_21 = add i32 %x, 2
         [-] br label %exit
-
         [-] 
-        }
+        [-] 
+        [-] }
         define i32 @main() {
         [-] entry:
         [-] %call_29 = call i32 @f(i32 5)
@@ -251,17 +246,16 @@ pub mod tests_func_inline {
         declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
-        define i32 @f(i32 %x) {
+        [-] define i32 @f(i32 %x) {
         [-] entry:
         [-] %Add_8 = add i32 %x, 1
         [-] br label %exit
         [-] 
-        exit:
-        [+] %Add_8 = add i32 %x, 1
-        ret i32 %Add_8
-
-
-        }
+        [-] exit:
+        [-] ret i32 %Add_8
+        [-] 
+        [-] 
+        [-] }
         define i32 @main() {
         [-] entry:
         [-] %call_16 = call i32 @f(i32 5)
