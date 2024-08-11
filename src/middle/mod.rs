@@ -60,10 +60,10 @@ pub fn optimize(program: &mut Program) {
         dead_code_elim::optimize_program(program).unwrap();
     }
 
-    let _ = std::fs::write("before.ll", program.module.gen_llvm_ir()).with_context(|| context!());
+    //let _ = std::fs::write("before.ll", program.module.gen_llvm_ir()).with_context(|| context!());
     // Loop optimization
     loop_optimization::optimize_program(program).unwrap();
-    let _ = std::fs::write("after.ll", program.module.gen_llvm_ir()).with_context(|| context!());
+    //let _ = std::fs::write("after.ll", program.module.gen_llvm_ir()).with_context(|| context!());
 
     // Further optimize after loop optimization
     for _ in 0..3 {
