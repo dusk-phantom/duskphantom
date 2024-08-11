@@ -26,7 +26,7 @@ pub struct MemorySSA<'a> {
     inst_to_node: HashMap<InstPtr, NodePtr>,
     block_to_node: HashMap<BBPtr, NodePtr>,
     node_to_user: HashMap<NodePtr, HashSet<NodePtr>>,
-    effect_analysis: &'a EffectAnalysis,
+    pub effect_analysis: &'a EffectAnalysis,
 }
 
 impl<'a> MemorySSA<'a> {

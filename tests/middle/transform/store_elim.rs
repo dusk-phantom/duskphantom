@@ -5,16 +5,14 @@ pub mod tests_store_elim {
     use compiler::{
         frontend::parse,
         middle::{
-            analysis::{
-                call_graph::CallGraph, effect_analysis::EffectAnalysis, memory_ssa::MemorySSA,
-            },
+            analysis::{effect_analysis::EffectAnalysis, memory_ssa::MemorySSA},
             irgen::gen,
             transform::{
                 block_fuse, constant_fold, dead_code_elim, func_inline, inst_combine, load_elim,
                 mem2reg, redundance_elim, store_elim, unreachable_block_elim,
             },
         },
-        utils::{diff::diff, paral_counter::ParalCounter},
+        utils::diff::diff,
     };
 
     #[test]
@@ -38,7 +36,7 @@ pub mod tests_store_elim {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        store_elim::optimize_program(&mut program, &mut memory_ssa, &effect_analysis).unwrap();
+        store_elim::optimize_program(&mut program, &mut memory_ssa).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
         @a = dso_local global i32 0
@@ -95,7 +93,7 @@ pub mod tests_store_elim {
 
         // Check after optimization
         load_elim::optimize_program(&mut program, &mut memory_ssa).unwrap();
-        store_elim::optimize_program(&mut program, &mut memory_ssa, &effect_analysis).unwrap();
+        store_elim::optimize_program(&mut program, &mut memory_ssa).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
         @a = dso_local global i32 0
@@ -173,7 +171,7 @@ pub mod tests_store_elim {
 
         // Check after optimization
         load_elim::optimize_program(&mut program, &mut memory_ssa).unwrap();
-        store_elim::optimize_program(&mut program, &mut memory_ssa, &effect_analysis).unwrap();
+        store_elim::optimize_program(&mut program, &mut memory_ssa).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
         @a = dso_local global i32 0
@@ -241,7 +239,7 @@ pub mod tests_store_elim {
 
         // Check after optimization
         load_elim::optimize_program(&mut program, &mut memory_ssa).unwrap();
-        store_elim::optimize_program(&mut program, &mut memory_ssa, &effect_analysis).unwrap();
+        store_elim::optimize_program(&mut program, &mut memory_ssa).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
         declare i32 @getint()
@@ -301,7 +299,7 @@ pub mod tests_store_elim {
             let effect_analysis = EffectAnalysis::new(&program);
             let mut memory_ssa = MemorySSA::new(&program, &effect_analysis);
             load_elim::optimize_program(&mut program, &mut memory_ssa).unwrap();
-            store_elim::optimize_program(&mut program, &mut memory_ssa, &effect_analysis).unwrap();
+            store_elim::optimize_program(&mut program, &mut memory_ssa).unwrap();
             constant_fold::optimize_program(&mut program).unwrap();
             inst_combine::optimize_program(&mut program).unwrap();
             redundance_elim::optimize_program(&mut program).unwrap();
