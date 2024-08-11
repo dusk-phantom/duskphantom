@@ -5,5 +5,5 @@ mod func_inline;
 mod inst_combine;
 mod load_elim;
 mod mem2reg;
-mod simple_gvn;
+mod redundance_elim;
 mod store_elim;

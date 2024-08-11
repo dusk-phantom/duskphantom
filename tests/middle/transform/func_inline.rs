@@ -5,14 +5,13 @@ pub mod tests_func_inline {
     use compiler::{
         frontend::parse,
         middle::{
-            analysis::call_graph::CallGraph,
             irgen::gen,
             transform::{
                 block_fuse, constant_fold, dead_code_elim, func_inline, inst_combine, mem2reg,
                 unreachable_block_elim,
             },
         },
-        utils::{diff::diff, paral_counter::ParalCounter},
+        utils::diff::diff,
     };
 
     #[test]

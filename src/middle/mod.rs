@@ -1,10 +1,9 @@
 use crate::{/* errors::MiddleError, */ frontend, utils::mem::ObjPtr};
-use analysis::{effect_analysis::EffectAnalysis, memory_ssa::MemorySSA};
 use anyhow::Context;
 use ir::ir_builder::IRBuilder;
 use transform::{
-    block_fuse, constant_fold, dead_code_elim, func_inline, inst_combine, load_elim, mem2reg,
-    redundance_elim, store_elim, unreachable_block_elim,
+    block_fuse, constant_fold, dead_code_elim, func_inline, inst_combine, load_store_elim, mem2reg,
+    redundance_elim, unreachable_block_elim,
 };
 
 pub mod analysis;
@@ -44,15 +43,12 @@ pub fn optimize(program: &mut Program) {
         redundance_elim::optimize_program(program).unwrap();
 
         // Remove unused code
-        let effect_analysis = EffectAnalysis::new(program);
-        let mut memory_ssa = MemorySSA::new(program, &effect_analysis);
-        load_elim::optimize_program(program, &mut memory_ssa).unwrap();
-        store_elim::optimize_program(program, &mut memory_ssa, &effect_analysis).unwrap();
+        load_store_elim::optimize_program(program).unwrap();
+        dead_code_elim::optimize_program(program).unwrap();
 
         // Remove unreachable block and instruction
         unreachable_block_elim::optimize_program(program).unwrap();
         block_fuse::optimize_program(program).unwrap();
-        dead_code_elim::optimize_program(program).unwrap();
     }
 
     // Loop optimization

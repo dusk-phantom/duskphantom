@@ -1,10 +1,7 @@
 use anyhow::Result;
 
 use crate::middle::{
-    analysis::{
-        effect_analysis::EffectAnalysis,
-        memory_ssa::{MemorySSA, NodePtr},
-    },
+    analysis::memory_ssa::{MemorySSA, NodePtr},
     ir::{instruction::InstType, InstPtr, Operand},
     Program,
 };
@@ -12,28 +9,21 @@ use crate::middle::{
 pub fn optimize_program<'a>(
     program: &'a mut Program,
     memory_ssa: &'a mut MemorySSA<'a>,
-    effect_analysis: &'a EffectAnalysis,
 ) -> Result<()> {
-    StoreElim::new(program, memory_ssa, effect_analysis).run();
+    StoreElim::new(program, memory_ssa).run();
     Ok(())
 }
 
 struct StoreElim<'a> {
     program: &'a mut Program,
     memory_ssa: &'a mut MemorySSA<'a>,
-    effect_analysis: &'a EffectAnalysis,
 }
 
 impl<'a> StoreElim<'a> {
-    fn new(
-        program: &'a mut Program,
-        memory_ssa: &'a mut MemorySSA<'a>,
-        effect_analysis: &'a EffectAnalysis,
-    ) -> Self {
+    fn new(program: &'a mut Program, memory_ssa: &'a mut MemorySSA<'a>) -> Self {
         Self {
             program,
             memory_ssa,
-            effect_analysis,
         }
     }
 
@@ -81,7 +71,7 @@ impl<'a> StoreElim<'a> {
 
     /// Check if instruction can be deleted.
     fn can_delete_inst(&self, inst: InstPtr) -> bool {
-        let no_io = !self.effect_analysis.has_io(inst);
+        let no_io = !self.memory_ssa.effect_analysis.has_io(inst);
         let no_user = inst.get_user().is_empty();
         let no_control = !matches!(inst.get_type(), InstType::Br | InstType::Ret);
         no_io && no_user && no_control
