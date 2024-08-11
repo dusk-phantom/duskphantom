@@ -137,6 +137,9 @@ impl BasicBlock {
     /// - remove preds from self's predecessor list
     /// - replaces self to entry in predecessor's successor list
     /// - replaces self to entry in function entry
+    ///
+    /// # Safety
+    /// Entry should be different from self, and contain no "phi" instructions.
     pub fn replace_entry(&mut self, mut entry: BBPtr, mut func: FunPtr) {
         for pred in self.pred_bbs.iter_mut() {
             entry.pred_bbs.push(*pred);
@@ -157,6 +160,9 @@ impl BasicBlock {
     /// - remove succs from self's successor list
     /// - replaces self -> exit in successor's predecessor list
     /// - replaces self -> exit in successor's phi operand
+    ///
+    /// # Safety
+    /// Exit should be different from self.
     pub fn replace_exit(&mut self, mut exit: BBPtr) {
         for succ in self.succ_bbs.iter() {
             exit.succ_bbs.push(*succ);
