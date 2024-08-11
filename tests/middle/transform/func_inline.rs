@@ -5,6 +5,7 @@ pub mod tests_func_inline {
     use compiler::{
         frontend::parse,
         middle::{
+            analysis::call_graph::CallGraph,
             irgen::gen,
             transform::{
                 block_fuse, constant_fold, dead_code_elim, func_inline, inst_combine, mem2reg,
@@ -39,7 +40,8 @@ pub mod tests_func_inline {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        func_inline::optimize_program(&mut program).unwrap();
+        let mut call_graph = CallGraph::new(&program);
+        func_inline::optimize_program(&mut program, &mut call_graph).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
         inst_combine::optimize_program(&mut program).unwrap();
         unreachable_block_elim::optimize_program(&mut program).unwrap();
@@ -136,7 +138,8 @@ pub mod tests_func_inline {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        func_inline::optimize_program(&mut program).unwrap();
+        let mut call_graph = CallGraph::new(&program);
+        func_inline::optimize_program(&mut program, &mut call_graph).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
         inst_combine::optimize_program(&mut program).unwrap();
         unreachable_block_elim::optimize_program(&mut program).unwrap();
@@ -222,7 +225,8 @@ pub mod tests_func_inline {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        func_inline::optimize_program(&mut program).unwrap();
+        let mut call_graph = CallGraph::new(&program);
+        func_inline::optimize_program(&mut program, &mut call_graph).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
         inst_combine::optimize_program(&mut program).unwrap();
         unreachable_block_elim::optimize_program(&mut program).unwrap();
