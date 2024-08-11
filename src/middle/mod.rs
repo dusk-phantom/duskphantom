@@ -1,13 +1,15 @@
-use crate::{
-    /* errors::MiddleError, */ frontend,
-    utils::{mem::ObjPtr, paral_counter::ParalCounter},
-};
-use analysis::{call_graph::CallGraph, effect_analysis::EffectAnalysis, memory_ssa::MemorySSA};
+use crate::{/* errors::MiddleError, */ frontend, utils::mem::ObjPtr};
+use analysis::{effect_analysis::EffectAnalysis, memory_ssa::MemorySSA};
 use anyhow::Context;
 use ir::ir_builder::IRBuilder;
 use transform::{
+<<<<<<< HEAD
     block_fuse, constant_fold, dead_code_elim, func_inline, inst_combine, load_elim,
     loop_optimization, mem2reg, simple_gvn, store_elim, unreachable_block_elim,
+=======
+    block_fuse, constant_fold, dead_code_elim, func_inline, inst_combine, load_elim, mem2reg,
+    redundance_elim, store_elim, unreachable_block_elim,
+>>>>>>> 3fcab96 (:recycle: split simple gvn as an analysis pass)
 };
 
 pub mod analysis;
@@ -35,10 +37,8 @@ pub fn gen(program: &frontend::Program) -> Result<Program> {
 
 pub fn optimize(program: &mut Program) {
     // Convert program to SSA and inline functions
-    let mut call_graph = CallGraph::new(program);
-    let counter = ParalCounter::new(0, usize::MAX);
     mem2reg::optimize_program(program).unwrap();
-    func_inline::optimize_program(program, &mut call_graph, counter).unwrap();
+    func_inline::optimize_program(program).unwrap();
     dead_code_elim::optimize_program(program).unwrap();
 
     // Further optimize
@@ -46,7 +46,7 @@ pub fn optimize(program: &mut Program) {
         // Weaken instructions
         constant_fold::optimize_program(program).unwrap();
         inst_combine::optimize_program(program).unwrap();
-        simple_gvn::optimize_program(program).unwrap();
+        redundance_elim::optimize_program(program).unwrap();
 
         // Remove unused code
         let effect_analysis = EffectAnalysis::new(program);
@@ -60,29 +60,9 @@ pub fn optimize(program: &mut Program) {
         dead_code_elim::optimize_program(program).unwrap();
     }
 
-    //let _ = std::fs::write("before.ll", program.module.gen_llvm_ir()).with_context(|| context!());
     // Loop optimization
     loop_optimization::optimize_program(program).unwrap();
-    //let _ = std::fs::write("after.ll", program.module.gen_llvm_ir()).with_context(|| context!());
 
-    // Further optimize after loop optimization
-    for _ in 0..3 {
-        // Weaken instructions
-        constant_fold::optimize_program(program).unwrap();
-        inst_combine::optimize_program(program).unwrap();
-        simple_gvn::optimize_program(program).unwrap();
-
-        // Remove unused code
-        let effect_analysis = EffectAnalysis::new(program);
-        let mut memory_ssa = MemorySSA::new(program, &effect_analysis);
-        load_elim::optimize_program(program, &mut memory_ssa).unwrap();
-        store_elim::optimize_program(program, &mut memory_ssa, &effect_analysis).unwrap();
-
-        // Remove unreachable block and instruction
-        unreachable_block_elim::optimize_program(program).unwrap();
-        block_fuse::optimize_program(program).unwrap();
-        dead_code_elim::optimize_program(program).unwrap();
-    }
 }
 
 impl Default for Program {
