@@ -21,7 +21,7 @@ pub struct CallEdge {
 
 #[allow(unused)]
 pub struct CallGraph {
-    main: FunPtr,
+    main: Option<FunPtr>,
     calls: HashMap<FunPtr, HashSet<CallEdge>>,
     called_by: HashMap<FunPtr, HashSet<CallEdge>>,
 }
@@ -71,15 +71,19 @@ impl CallGraph {
             }
         }
         CallGraph {
-            main: main.unwrap(),
+            main,
             calls,
             called_by,
         }
     }
 
+    /// Returns a post order iterate on the call graph.
+    ///
+    /// # Panics
+    /// Please make sure main function exists.
     pub fn po_iter(&self) -> impl Iterator<Item = CallGraphNode<'_>> {
         let node = CallGraphNode {
-            func: self.main,
+            func: self.main.unwrap(),
             context: self,
         };
         POIterator::from(node)
