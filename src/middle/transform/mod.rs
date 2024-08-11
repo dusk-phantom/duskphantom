@@ -3,6 +3,7 @@ pub mod constant_fold;
 pub mod dead_code_elim;
 pub mod func_inline;
 pub mod inst_combine;
+pub mod licm;
 pub mod load_elim;
 pub mod loop_optimization;
 pub mod loop_simplify;
