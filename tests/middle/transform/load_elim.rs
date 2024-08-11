@@ -6,7 +6,7 @@ pub mod tests_load_elim {
         frontend::parse,
         middle::{
             analysis::{
-                effect_analysis::EffectAnalysis, memory_ssa::MemorySSA, simple_gvn::SimpleGVN,
+                effect_analysis::EffectAnalysis, memory_ssa::MemorySSA,
             },
             irgen::gen,
             transform::{dead_code_elim, load_elim, mem2reg, redundance_elim},

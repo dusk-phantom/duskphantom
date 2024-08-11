@@ -6,7 +6,7 @@ pub mod tests_memory_ssa {
         frontend::parse,
         middle::{
             analysis::{
-                effect_analysis::EffectAnalysis, memory_ssa::MemorySSA, simple_gvn::SimpleGVN,
+                effect_analysis::EffectAnalysis, memory_ssa::MemorySSA,
             },
             irgen::gen,
             transform::{dead_code_elim, inst_combine, mem2reg, redundance_elim},
