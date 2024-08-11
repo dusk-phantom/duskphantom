@@ -1,4 +1,8 @@
-use std::hash::{Hash, Hasher};
+use std::{
+    cmp,
+    hash::{Hash, Hasher},
+    ops,
+};
 
 use instruction::InstType;
 
@@ -167,6 +171,172 @@ impl From<Constant> for bool {
             Constant::Float(x) => x != 0.0,
             Constant::Bool(x) => x,
             _ => panic!("Cannot cast {} to bool", val),
+        }
+    }
+}
+
+impl Constant {
+    pub fn cast(self, ty: &ValueType) -> Self {
+        match ty {
+            ValueType::Int => Into::<i32>::into(self).into(),
+            ValueType::Float => Into::<f32>::into(self).into(),
+            ValueType::Bool => Into::<bool>::into(self).into(),
+            ValueType::Array(element_ty, _) => {
+                let arr = match self {
+                    Constant::Array(arr) => arr,
+                    _ => panic!("Cannot convert {} to array", self),
+                };
+                Constant::Array(arr.into_iter().map(|x| x.cast(element_ty)).collect())
+            }
+            _ => self,
+        }
+    }
+}
+
+/// Override operators for constant
+impl ops::Neg for Constant {
+    type Output = Constant;
+
+    fn neg(self) -> Self::Output {
+        let ty = self.get_type();
+        match ty {
+            ValueType::Float => (-Into::<f32>::into(self)).into(),
+            ValueType::Int | ValueType::Bool => (-Into::<i32>::into(self)).into(),
+            _ => todo!(),
+        }
+    }
+}
+
+impl ops::Not for Constant {
+    type Output = Constant;
+
+    fn not(self) -> Self::Output {
+        (!Into::<bool>::into(self)).into()
+    }
+}
+
+impl ops::Add for Constant {
+    type Output = Constant;
+
+    fn add(self, rhs: Constant) -> Self::Output {
+        let ty = self.get_type();
+        match ty {
+            ValueType::Float => (Into::<f32>::into(self) + Into::<f32>::into(rhs)).into(),
+            ValueType::Int | ValueType::Bool => {
+                (Into::<i32>::into(self).wrapping_add(Into::<i32>::into(rhs))).into()
+            }
+            _ => todo!(),
+        }
+    }
+}
+
+impl ops::Sub for Constant {
+    type Output = Constant;
+
+    fn sub(self, rhs: Constant) -> Self::Output {
+        let ty = self.get_type();
+        match ty {
+            ValueType::Float => (Into::<f32>::into(self) - Into::<f32>::into(rhs)).into(),
+            ValueType::Int | ValueType::Bool => {
+                (Into::<i32>::into(self).wrapping_sub(Into::<i32>::into(rhs))).into()
+            }
+            _ => todo!(),
+        }
+    }
+}
+
+impl ops::Mul for Constant {
+    type Output = Constant;
+
+    fn mul(self, rhs: Constant) -> Self::Output {
+        let ty = self.get_type();
+        match ty {
+            ValueType::Float => (Into::<f32>::into(self) * Into::<f32>::into(rhs)).into(),
+            ValueType::Int | ValueType::Bool => {
+                (Into::<i32>::into(self).wrapping_mul(Into::<i32>::into(rhs))).into()
+            }
+            _ => todo!(),
+        }
+    }
+}
+
+impl ops::Div for Constant {
+    type Output = Constant;
+
+    fn div(self, rhs: Constant) -> Self::Output {
+        let ty = self.get_type();
+        match ty {
+            ValueType::Float => (Into::<f32>::into(self) / Into::<f32>::into(rhs)).into(),
+            ValueType::Int | ValueType::Bool => {
+                (Into::<i32>::into(self).wrapping_div(Into::<i32>::into(rhs))).into()
+            }
+            _ => todo!(),
+        }
+    }
+}
+
+impl ops::Rem for Constant {
+    type Output = Constant;
+
+    fn rem(self, rhs: Constant) -> Self::Output {
+        (Into::<i32>::into(self).wrapping_rem(Into::<i32>::into(rhs))).into()
+    }
+}
+
+impl ops::Shl for Constant {
+    type Output = Constant;
+
+    fn shl(self, rhs: Constant) -> Self::Output {
+        (Into::<i32>::into(self).wrapping_shl(Into::<i32>::into(rhs) as u32)).into()
+    }
+}
+
+impl ops::Shr for Constant {
+    type Output = Constant;
+
+    fn shr(self, rhs: Constant) -> Self::Output {
+        (Into::<i32>::into(self).wrapping_shr(Into::<i32>::into(rhs) as u32)).into()
+    }
+}
+
+impl ops::BitAnd for Constant {
+    type Output = Constant;
+
+    fn bitand(self, rhs: Constant) -> Self::Output {
+        (Into::<i32>::into(self) & Into::<i32>::into(rhs)).into()
+    }
+}
+
+impl ops::BitOr for Constant {
+    type Output = Constant;
+
+    fn bitor(self, rhs: Constant) -> Self::Output {
+        (Into::<i32>::into(self) | Into::<i32>::into(rhs)).into()
+    }
+}
+
+impl ops::BitXor for Constant {
+    type Output = Constant;
+
+    fn bitxor(self, rhs: Constant) -> Self::Output {
+        (Into::<i32>::into(self) ^ Into::<i32>::into(rhs)).into()
+    }
+}
+
+impl cmp::PartialOrd for Constant {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        let ty = self.get_type();
+        match ty {
+            ValueType::Float => {
+                Into::<f32>::into(self.clone()).partial_cmp(&Into::<f32>::into(other.clone()))
+            }
+            ValueType::Int => {
+                Into::<i32>::into(self.clone()).partial_cmp(&Into::<i32>::into(other.clone()))
+            }
+            ValueType::Bool => {
+                Into::<bool>::into(self.clone()).partial_cmp(&Into::<bool>::into(other.clone()))
+            }
+            _ => todo!(),
         }
     }
 }

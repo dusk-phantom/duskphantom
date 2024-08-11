@@ -92,21 +92,23 @@ pub mod tests_func_inline {
 
         final5:
         [-] %phi_34 = phi i1 [false, %cond0], [%icmp_32, %alt4]
+        [-] br i1 %phi_34, label %then1, label %alt2
         [+] %phi_34 = phi i1 [false, %cond0], [%icmp_32, %alt4_split2]
-        br i1 %phi_34, label %then1, label %alt2
+        [+] br i1 %phi_34, label %exit, label %alt2
 
-        then1:
+        [-] then1:
         [-] br label %final3
-        [+] br label %exit
+        [+] exit:
+        [+] ret i32 0
 
         alt2:
         [-] br label %final3
         [-] 
         [-] final3:
         br label %exit
-
-        exit:
-        ret i32 0
+        [-] 
+        [-] exit:
+        [-] ret i32 0
 
 
         }
