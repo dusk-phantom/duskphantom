@@ -51,10 +51,10 @@ pub fn optimize(program: &mut Program) {
         block_fuse::optimize_program(program).unwrap();
     }
 
-    let _ = std::fs::write("before.ll", program.module.gen_llvm_ir()).with_context(|| context!());
+    //let _ = std::fs::write("before.ll", program.module.gen_llvm_ir()).with_context(|| context!());
     // Loop optimization
     loop_optimization::optimize_program(program).unwrap();
-    let _ = std::fs::write("after.ll", program.module.gen_llvm_ir()).with_context(|| context!());
+    // let _ = std::fs::write("after.ll", program.module.gen_llvm_ir()).with_context(|| context!());
 }
 
 impl Default for Program {
