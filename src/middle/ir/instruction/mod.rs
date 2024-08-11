@@ -548,17 +548,45 @@ impl InstManager {
         let operand = self.operand.remove(index);
         match operand {
             Operand::Instruction(mut inst) => {
-                inst.get_user_mut().retain(|x| x != &self.self_ptr.unwrap());
+                inst.get_user()
+                    .iter()
+                    .enumerate()
+                    .find_map(|(index, x)| {
+                        if x.get_id() == self.id.unwrap() {
+                            Some(index)
+                        } else {
+                            None
+                        }
+                    })
+                    .map(|index| Some(inst.get_user_mut().remove(index)));
             }
             Operand::Parameter(mut param) => {
                 param
-                    .get_user_mut()
-                    .retain(|x| x != &self.self_ptr.unwrap());
+                    .get_user()
+                    .iter()
+                    .enumerate()
+                    .find_map(|(index, x)| {
+                        if x.get_id() == self.id.unwrap() {
+                            Some(index)
+                        } else {
+                            None
+                        }
+                    })
+                    .map(|index| Some(param.get_user_mut().remove(index)));
             }
             Operand::Global(mut global) => {
                 global
-                    .get_user_mut()
-                    .retain(|x| x != &self.self_ptr.unwrap());
+                    .get_user()
+                    .iter()
+                    .enumerate()
+                    .find_map(|(index, x)| {
+                        if x.get_id() == self.id.unwrap() {
+                            Some(index)
+                        } else {
+                            None
+                        }
+                    })
+                    .map(|index| Some(global.get_user_mut().remove(index)));
             }
             _ => {}
         }
