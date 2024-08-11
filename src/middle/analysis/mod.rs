@@ -9,3 +9,4 @@ pub mod effect_analysis;
 pub mod loop_tools;
 pub mod memory_ssa;
 pub mod reachability;
+pub mod simple_gvn;

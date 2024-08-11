@@ -11,7 +11,7 @@ pub mod tests_store_elim {
             irgen::gen,
             transform::{
                 block_fuse, constant_fold, dead_code_elim, func_inline, inst_combine, load_elim,
-                mem2reg, simple_gvn, store_elim, unreachable_block_elim,
+                mem2reg, redundance_elim, store_elim, unreachable_block_elim,
             },
         },
         utils::{diff::diff, paral_counter::ParalCounter},
@@ -31,7 +31,7 @@ pub mod tests_store_elim {
         let parsed = parse(code).unwrap();
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
-        simple_gvn::optimize_program(&mut program).unwrap();
+        redundance_elim::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
         let mut memory_ssa = MemorySSA::new(&program, &effect_analysis);
@@ -87,7 +87,7 @@ pub mod tests_store_elim {
         let parsed = parse(code).unwrap();
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
-        simple_gvn::optimize_program(&mut program).unwrap();
+        redundance_elim::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
         let mut memory_ssa = MemorySSA::new(&program, &effect_analysis);
@@ -162,11 +162,8 @@ pub mod tests_store_elim {
         // Check before optimization
         let parsed = parse(code).unwrap();
         let mut program = gen(&parsed).unwrap();
-        let mut call_graph = CallGraph::new(&program);
-        let counter = ParalCounter::new(0, usize::MAX);
-        mem2reg::optimize_program(&mut program).unwrap();
-        func_inline::optimize_program(&mut program, &mut call_graph, counter).unwrap();
-        simple_gvn::optimize_program(&mut program).unwrap();
+        func_inline::optimize_program(&mut program).unwrap();
+        redundance_elim::optimize_program(&mut program).unwrap();
         unreachable_block_elim::optimize_program(&mut program).unwrap();
         block_fuse::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
@@ -234,7 +231,7 @@ pub mod tests_store_elim {
         mem2reg::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
         inst_combine::optimize_program(&mut program).unwrap();
-        simple_gvn::optimize_program(&mut program).unwrap();
+        redundance_elim::optimize_program(&mut program).unwrap();
         unreachable_block_elim::optimize_program(&mut program).unwrap();
         block_fuse::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
@@ -290,13 +287,10 @@ pub mod tests_store_elim {
         // Check before optimization
         let parsed = parse(code).unwrap();
         let mut program = gen(&parsed).unwrap();
-        let mut call_graph = CallGraph::new(&program);
-        let counter = ParalCounter::new(0, usize::MAX);
-        mem2reg::optimize_program(&mut program).unwrap();
-        func_inline::optimize_program(&mut program, &mut call_graph, counter).unwrap();
+        func_inline::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
         inst_combine::optimize_program(&mut program).unwrap();
-        simple_gvn::optimize_program(&mut program).unwrap();
+        redundance_elim::optimize_program(&mut program).unwrap();
         unreachable_block_elim::optimize_program(&mut program).unwrap();
         block_fuse::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
@@ -310,7 +304,7 @@ pub mod tests_store_elim {
             store_elim::optimize_program(&mut program, &mut memory_ssa, &effect_analysis).unwrap();
             constant_fold::optimize_program(&mut program).unwrap();
             inst_combine::optimize_program(&mut program).unwrap();
-            simple_gvn::optimize_program(&mut program).unwrap();
+            redundance_elim::optimize_program(&mut program).unwrap();
             unreachable_block_elim::optimize_program(&mut program).unwrap();
             block_fuse::optimize_program(&mut program).unwrap();
         }

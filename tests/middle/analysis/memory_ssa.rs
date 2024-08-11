@@ -5,9 +5,11 @@ pub mod tests_memory_ssa {
     use compiler::{
         frontend::parse,
         middle::{
-            analysis::{effect_analysis::EffectAnalysis, memory_ssa::MemorySSA},
+            analysis::{
+                effect_analysis::EffectAnalysis, memory_ssa::MemorySSA, simple_gvn::SimpleGVN,
+            },
             irgen::gen,
-            transform::{dead_code_elim, inst_combine, mem2reg, simple_gvn},
+            transform::{dead_code_elim, inst_combine, mem2reg, redundance_elim},
         },
     };
 
@@ -106,7 +108,7 @@ pub mod tests_memory_ssa {
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
         inst_combine::optimize_program(&mut program).unwrap();
-        simple_gvn::optimize_program(&mut program).unwrap();
+        redundance_elim::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
         let memory_ssa = MemorySSA::new(&program, &effect_analysis);
@@ -147,7 +149,7 @@ pub mod tests_memory_ssa {
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
         inst_combine::optimize_program(&mut program).unwrap();
-        simple_gvn::optimize_program(&mut program).unwrap();
+        redundance_elim::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
         let memory_ssa = MemorySSA::new(&program, &effect_analysis);
@@ -191,7 +193,7 @@ pub mod tests_memory_ssa {
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
         inst_combine::optimize_program(&mut program).unwrap();
-        simple_gvn::optimize_program(&mut program).unwrap();
+        redundance_elim::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
         let memory_ssa = MemorySSA::new(&program, &effect_analysis);
@@ -242,7 +244,7 @@ pub mod tests_memory_ssa {
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
         inst_combine::optimize_program(&mut program).unwrap();
-        simple_gvn::optimize_program(&mut program).unwrap();
+        redundance_elim::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
         let memory_ssa = MemorySSA::new(&program, &effect_analysis);
