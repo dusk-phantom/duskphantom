@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, pin::Pin};
+use std::pin::Pin;
 
 use anyhow::{Ok, Result};
 
@@ -8,43 +8,31 @@ use crate::middle::{
         instruction::{downcast_mut, misc_inst::Phi, InstType},
         Instruction, Operand,
     },
+    transform::loop_optimization::loop_forest_post_order,
     IRBuilder,
 };
 
 type IRBuilderWraper = Pin<Box<IRBuilder>>;
 
-#[allow(unused)]
 pub struct LoopSimplifier<'a> {
     ir_builder: &'a mut IRBuilderWraper,
 }
 
-#[allow(unused)]
 impl<'a> LoopSimplifier<'a> {
     pub fn new(ir_builder: &'a mut IRBuilderWraper) -> LoopSimplifier {
         Self { ir_builder }
     }
 
-    pub fn loop_simplify(&mut self, loop_forest: &mut LoopForest) -> Result<()> {
-        // post order
-        let mut stack = Vec::new();
-        let mut queue = VecDeque::from(loop_forest.forest.clone());
-        while let Some(lo) = queue.pop_front() {
-            queue.extend(lo.sub_loops.iter());
-            stack.push(lo);
-        }
-
-        while let Some(lo) = stack.pop() {
-            self.simplify_one_loop(lo)?;
-        }
-        Ok(())
+    pub fn run(&mut self, loop_forest: &mut LoopForest) -> Result<()> {
+        loop_forest_post_order(loop_forest, |x| self.simplify_one_loop(x))
     }
 
-    fn simplify_one_loop(&mut self, mut lo: LoopPtr) -> Result<()> {
+    fn simplify_one_loop(&mut self, lo: LoopPtr) -> Result<()> {
         if lo.pre_header.is_none() {
             self.insert_preheader(lo)?;
         }
 
-        self.insert_unique_backedge_block(lo);
+        self.insert_unique_backedge_block(lo)?;
         Ok(())
     }
 
@@ -82,7 +70,7 @@ impl<'a> LoopSimplifier<'a> {
                 .map(|index| phi.get_incoming_values()[*index].clone())
                 .collect::<Vec<_>>();
 
-            let mut new_phi = self
+            let new_phi = self
                 .ir_builder
                 .get_phi(phi.get_value_type(), incoming_values);
 
@@ -114,7 +102,7 @@ impl<'a> LoopSimplifier<'a> {
     }
 
     fn insert_preheader(&mut self, mut lo: LoopPtr) -> Result<()> {
-        let mut header = lo.head;
+        let header = lo.head;
 
         // 获得不在循环中的bb和对应的index
         let out_bb = header
@@ -130,7 +118,7 @@ impl<'a> LoopSimplifier<'a> {
             })
             .collect::<Vec<_>>();
 
-        if (out_bb.len() == 1 && out_bb[0].1.get_succ_bb().len() == 1) {
+        if out_bb.len() == 1 && out_bb[0].1.get_succ_bb().len() == 1 {
             lo.pre_header = Some(out_bb[0].1);
             return Ok(());
         }
@@ -165,9 +153,7 @@ impl<'a> LoopSimplifier<'a> {
             out_bb_index
                 .iter()
                 .enumerate()
-                .for_each(|(i, index)| unsafe {
-                    phi.remove_incoming_value(index - i);
-                });
+                .for_each(|(i, index)| phi.remove_incoming_value(index - i));
 
             let new_phi = self
                 .ir_builder
