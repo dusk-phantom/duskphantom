@@ -76,8 +76,9 @@ impl<'a> LoopSimplifier<'a> {
 
             tail.insert_before(new_phi);
 
-            for (i, &index) in backedge_blocks_index.iter().enumerate() {
+            for (i, index) in backedge_blocks_index.iter().enumerate() {
                 phi.get_incoming_values_mut().remove(index - i);
+                unsafe { phi.get_manager_mut().remove_operand(index - i) };
             }
             phi.add_incoming_value(Operand::Instruction(new_phi), unique_backedge_block);
 
@@ -150,10 +151,10 @@ impl<'a> LoopSimplifier<'a> {
                 .map(|&index| phi.get_incoming_values()[index].clone())
                 .collect::<Vec<_>>();
 
-            out_bb_index
-                .iter()
-                .enumerate()
-                .for_each(|(i, index)| phi.remove_incoming_value(index - i));
+            out_bb_index.iter().enumerate().for_each(|(i, index)| {
+                phi.get_incoming_values_mut().remove(index - i);
+                unsafe { phi.get_manager_mut().remove_operand(index - i) };
+            });
 
             let new_phi = self
                 .ir_builder
