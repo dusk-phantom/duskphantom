@@ -73,10 +73,17 @@ impl<'a> FuncInline<'a> {
         Ok(changed)
     }
 
-    fn process_func(&mut self, fun: FunPtr) -> Result<bool> {
+    fn process_func(&mut self, func: FunPtr) -> Result<bool> {
         let mut changed = false;
-        for call in self.call_graph.get_called_by(fun) {
+
+        // Eliminate call to func
+        for call in self.call_graph.get_called_by(func) {
             changed |= self.process_call(call)?;
+        }
+
+        // Delete func to reduce code size
+        if changed {
+            self.program.module.functions.retain(|&f| f != func);
         }
         Ok(changed)
     }

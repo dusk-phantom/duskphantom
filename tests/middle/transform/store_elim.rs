@@ -195,21 +195,6 @@ pub mod tests_store_elim {
         declare void @_sysy_stoptime(i32 %p0)
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
-        define void @set_b() {
-        exit:
-        %call_3 = call i32 @getint()
-        store i32 %call_3, ptr @b
-        ret void
-
-
-        }
-        define i32 @io() {
-        exit:
-        call void @putint(i32 0)
-        ret i32 3
-
-
-        }
         define i32 @main() {
         exit:
         [-] store i32 2, ptr @a
