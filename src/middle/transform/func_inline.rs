@@ -81,24 +81,24 @@ impl<'a> FuncInline<'a> {
         let args = inst.get_operand().iter().cloned();
         let arg_map = params.zip(args).collect();
 
-        // Mirror function
+        // Mirror function, focus on interface basic blocks
         let new_fun = self.mirror_func(func, arg_map)?;
         let mut before_entry = call.get_parent_bb().unwrap();
         let after_exit = self.split_block_at(before_entry, inst);
-
-        // Wire before_entry -> fun_entry
         let fun_entry = new_fun
             .entry
             .ok_or_else(|| anyhow!("function `{}` has no entry", new_fun.name))
             .with_context(|| context!())?;
-        before_entry.push_back(self.program.mem_pool.get_br(None));
-        before_entry.set_true_bb(fun_entry);
-
-        // Replace call with operand of return, remove return
         let mut fun_exit = new_fun
             .exit
             .ok_or_else(|| anyhow!("function `{}` has no exit", new_fun.name))
             .with_context(|| context!())?;
+
+        // Wire before_entry -> fun_entry
+        before_entry.push_back(self.program.mem_pool.get_br(None));
+        before_entry.set_true_bb(fun_entry);
+
+        // Replace call with operand of return, remove return
         let mut ret = fun_exit.get_last_inst();
         if inst.get_value_type() == ValueType::Void {
             inst.remove_self();
