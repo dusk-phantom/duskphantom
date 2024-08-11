@@ -9,7 +9,6 @@ use crate::{
         },
         Program,
     },
-    utils::traverse::{Node, POIterator},
 };
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -77,18 +76,6 @@ impl CallGraph {
         }
     }
 
-    /// Returns a post order iterate on the call graph.
-    ///
-    /// # Panics
-    /// Please make sure main function exists.
-    pub fn po_iter(&self) -> impl Iterator<Item = CallGraphNode<'_>> {
-        let node = CallGraphNode {
-            func: self.main.unwrap(),
-            context: self,
-        };
-        POIterator::from(node)
-    }
-
     pub fn get_calls(&self, func: FunPtr) -> HashSet<CallEdge> {
         self.calls.get(&func).cloned().unwrap_or_default()
     }
@@ -108,40 +95,5 @@ impl CallGraph {
                 self.calls.get_mut(&call.caller).unwrap().remove(&call);
             }
         }
-    }
-}
-
-#[derive(Clone)]
-pub struct CallGraphNode<'a> {
-    pub func: FunPtr,
-    context: &'a CallGraph,
-}
-
-impl<'a> PartialEq for CallGraphNode<'a> {
-    fn eq(&self, other: &Self) -> bool {
-        self.func == other.func
-    }
-}
-
-impl<'a> Eq for CallGraphNode<'a> {}
-
-impl<'a> std::hash::Hash for CallGraphNode<'a> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.func.hash(state);
-    }
-}
-
-impl<'a> Node for CallGraphNode<'a> {
-    fn get_succ(&mut self) -> Vec<Self> {
-        self.context
-            .calls
-            .get(&self.func)
-            .unwrap_or(&HashSet::new())
-            .iter()
-            .map(|edge| CallGraphNode {
-                func: edge.callee,
-                context: self.context,
-            })
-            .collect()
     }
 }

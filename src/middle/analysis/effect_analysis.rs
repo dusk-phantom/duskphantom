@@ -47,31 +47,37 @@ impl EffectAnalysis {
             if func.is_lib() {
                 if func.name.contains("get") {
                     effect.has_io_input.insert(*func);
-                } else if func.name.contains("put")
+                }
+                if func.name.contains("put")
                     || func.name.contains("starttime")
                     || func.name.contains("stoptime")
                 {
                     effect.has_io_output.insert(*func);
                 }
+                if func.name.contains("memset") || func.name.contains("getarray") {
+                    effect.has_mem_output.insert(*func);
+                }
+                if func.name.contains("putarray") {
+                    effect.has_mem_input.insert(*func);
+                }
             }
             worklist.insert(*func);
         }
 
-        // Postorder iterate on call graph until unchanged
+        // Iterate all functions until unchanged
         let call_graph = CallGraph::new(program);
         loop {
             let mut changed = false;
-            for node in call_graph.po_iter() {
-                let func = node.func;
-                if func.is_lib() || !worklist.contains(&func) {
+            for func in program.module.functions.iter() {
+                if func.is_lib() || !worklist.contains(func) {
                     continue;
                 }
-                worklist.remove(&func);
-                if effect.process_func(func) {
+                worklist.remove(func);
+                if effect.process_func(*func) {
                     changed = true;
                     worklist.extend(
                         call_graph
-                            .get_called_by(func)
+                            .get_called_by(*func)
                             .iter()
                             .map(|edge| edge.caller),
                     );
