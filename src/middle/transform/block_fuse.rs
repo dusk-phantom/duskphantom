@@ -41,7 +41,7 @@ impl<'a> BlockFuse<'a> {
 
     /// If block has only one predecessor, and that predecessor has only one successor,
     /// these two blocks can be fused as one.
-    fn fuse_block(&mut self, mut bb: BBPtr, mut fun: FunPtr) {
+    fn fuse_block(&mut self, mut bb: BBPtr, func: FunPtr) {
         if bb.get_pred_bb().len() == 1 {
             let mut pred = bb.get_pred_bb()[0];
             if pred.get_succ_bb().len() == 1 {
@@ -50,19 +50,8 @@ impl<'a> BlockFuse<'a> {
                     bb.push_front(inst);
                 }
 
-                // Set `pred.pred.succ` from `pred` to `bb`
-                let pred_pred = pred.get_pred_bb().clone();
-                for mut pred_pred_bb in pred_pred {
-                    pred_pred_bb.replace_succ_bb(pred, bb);
-                }
-
-                // If pred is function entry, change function entry
-                if fun.entry == Some(pred) {
-                    fun.entry = Some(bb);
-                }
-
-                // Remove pred
-                pred.remove_self();
+                // Replace `pred -> bb` with `bb`
+                pred.replace_entry(bb, func);
             }
         }
     }

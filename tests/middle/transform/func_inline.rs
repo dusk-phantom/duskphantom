@@ -12,7 +12,7 @@ pub mod tests_func_inline {
                 unreachable_block_elim,
             },
         },
-        utils::diff::diff,
+        utils::{diff::diff, paral_counter::ParalCounter},
     };
 
     #[test]
@@ -41,7 +41,8 @@ pub mod tests_func_inline {
 
         // Check after optimization
         let mut call_graph = CallGraph::new(&program);
-        func_inline::optimize_program(&mut program, &mut call_graph).unwrap();
+        let counter = ParalCounter::new(0, usize::MAX);
+        func_inline::optimize_program(&mut program, &mut call_graph, counter).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
         inst_combine::optimize_program(&mut program).unwrap();
         unreachable_block_elim::optimize_program(&mut program).unwrap();
@@ -139,7 +140,8 @@ pub mod tests_func_inline {
 
         // Check after optimization
         let mut call_graph = CallGraph::new(&program);
-        func_inline::optimize_program(&mut program, &mut call_graph).unwrap();
+        let counter = ParalCounter::new(0, usize::MAX);
+        func_inline::optimize_program(&mut program, &mut call_graph, counter).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
         inst_combine::optimize_program(&mut program).unwrap();
         unreachable_block_elim::optimize_program(&mut program).unwrap();
@@ -226,7 +228,8 @@ pub mod tests_func_inline {
 
         // Check after optimization
         let mut call_graph = CallGraph::new(&program);
-        func_inline::optimize_program(&mut program, &mut call_graph).unwrap();
+        let counter = ParalCounter::new(0, usize::MAX);
+        func_inline::optimize_program(&mut program, &mut call_graph, counter).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
         inst_combine::optimize_program(&mut program).unwrap();
         unreachable_block_elim::optimize_program(&mut program).unwrap();

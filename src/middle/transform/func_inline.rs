@@ -6,7 +6,7 @@ use crate::{
     backend::from_self::downcast_ref,
     context,
     middle::{
-        analysis::call_graph::CallGraph,
+        analysis::call_graph::{CallEdge, CallGraph},
         ir::{
             instruction::{
                 downcast_mut,
@@ -17,74 +17,83 @@ use crate::{
         },
         Program,
     },
+    utils::paral_counter::ParalCounter,
 };
 
-pub fn optimize_program(program: &mut Program, call_graph: &mut CallGraph) -> Result<bool> {
-    FuncInline::new(program, call_graph).run()
+pub fn optimize_program(
+    program: &mut Program,
+    call_graph: &mut CallGraph,
+    counter: ParalCounter,
+) -> Result<bool> {
+    let mut func_inline = FuncInline::new(program, call_graph, counter);
+    let mut changed = false;
+    loop {
+        let result = func_inline.run()?;
+        changed |= result;
+        if !result {
+            break Ok(changed);
+        }
+    }
 }
 
 struct FuncInline<'a> {
     program: &'a mut Program,
     call_graph: &'a mut CallGraph,
-    counter: u32,
+    counter: ParalCounter,
 }
 
 impl<'a> FuncInline<'a> {
-    fn new(program: &'a mut Program, call_graph: &'a mut CallGraph) -> Self {
+    fn new(program: &'a mut Program, call_graph: &'a mut CallGraph, counter: ParalCounter) -> Self {
         Self {
             program,
             call_graph,
-            counter: 0,
+            counter,
         }
     }
 
     fn run(&mut self) -> Result<bool> {
-        let mut overall_changed = false;
         let mut changed = false;
-        while changed {
-            for func in self.program.module.functions.clone() {
-                // Do not process library function
-                if func.is_lib() {
-                    continue;
-                }
-
-                // If functions calls other functions, do not process it
-                if !self.call_graph.get_calls(func).is_empty() {
-                    continue;
-                }
-
-                // Process function
-                changed |= self.process_func(func)?;
-                overall_changed |= changed;
-
-                // Update call graph
-                self.call_graph.remove(func);
+        for func in self.program.module.functions.clone() {
+            // Do not process library function
+            if func.is_lib() {
+                continue;
             }
+
+            // If functions calls other functions, do not process it
+            if !self.call_graph.get_calls(func).is_empty() {
+                continue;
+            }
+
+            // Process function
+            changed |= self.process_func(func)?;
+
+            // Update call graph
+            self.call_graph.remove(func);
         }
-        Ok(overall_changed)
+        Ok(changed)
     }
 
     fn process_func(&mut self, fun: FunPtr) -> Result<bool> {
         let mut changed = false;
         for call in self.call_graph.get_called_by(fun) {
-            changed |= self.process_call(call.inst)?;
+            changed |= self.process_call(call)?;
         }
         Ok(changed)
     }
 
-    fn process_call(&mut self, mut inst: InstPtr) -> Result<bool> {
+    fn process_call(&mut self, edge: CallEdge) -> Result<bool> {
+        let mut inst = edge.inst;
         let call = downcast_ref::<Call>(inst.as_ref().as_ref());
-        let func = call.func;
 
         // Build argument map
-        let params = func.params.iter().cloned();
+        let params = edge.callee.params.iter().cloned();
         let args = inst.get_operand().iter().cloned();
         let arg_map = params.zip(args).collect();
 
         // Mirror function, focus on interface basic blocks
-        let new_fun = self.mirror_func(func, arg_map)?;
+        let new_fun = self.mirror_func(edge.callee, arg_map)?;
         let mut before_entry = call.get_parent_bb().unwrap();
-        let after_exit = self.split_block_at(before_entry, inst);
+        let after_exit = self.split_block_at(before_entry, inst)?;
         let fun_entry = new_fun
             .entry
             .ok_or_else(|| anyhow!("function `{}` has no entry", new_fun.name))
@@ -120,50 +129,27 @@ impl<'a> FuncInline<'a> {
 
     /// Split given basic block at the position of given instruction.
     /// Given instruction and instruction afterwards will be put to exit block.
-    /// Argument block will be entry block, returns exit block.
-    fn split_block_at(&mut self, bb: BBPtr, inst: InstPtr) -> BBPtr {
-        let name = self.unique_name("split", &bb.name);
-        let mut new_bb = self.program.mem_pool.new_basicblock(name);
+    /// Returns new exit block.
+    fn split_block_at(&mut self, mut entry: BBPtr, inst: InstPtr) -> Result<BBPtr> {
+        let exit_name = self.unique_name("split", &entry.name);
+        let mut exit = self.program.mem_pool.new_basicblock(exit_name);
         let mut split = false;
 
         // Copy instructions after found target instruction
-        for bb_inst in bb.iter() {
+        for bb_inst in entry.iter() {
             if bb_inst == inst {
                 split = true;
             }
             if split {
-                new_bb.push_back(bb_inst);
+                exit.push_back(bb_inst);
             }
         }
 
-        // Copy jump destination from bb, handle phi argument changes
-        if !bb.get_succ_bb().is_empty() {
-            let succ = bb.get_succ_bb()[0];
-            new_bb.set_true_bb(succ);
-            self.replace_bb_in_phi(succ, bb, new_bb);
-        }
-        if bb.get_succ_bb().len() >= 2 {
-            let succ = bb.get_succ_bb()[1];
-            new_bb.set_false_bb(succ);
-            self.replace_bb_in_phi(succ, bb, new_bb);
-        }
+        // Replace `entry` with `entry -> exit`
+        entry.replace_exit(exit);
 
         // Return created block
-        new_bb
-    }
-
-    /// Replace basic block in phi instruction with given mapping.
-    fn replace_bb_in_phi(&mut self, bb: BBPtr, from: BBPtr, to: BBPtr) {
-        for mut inst in bb.iter() {
-            if inst.get_type() == InstType::Phi {
-                let inst = downcast_mut::<Phi>(inst.as_mut().as_mut());
-                for (_, bb) in inst.get_incoming_values_mut().iter_mut() {
-                    if *bb == from {
-                        *bb = to;
-                    }
-                }
-            }
-        }
+        Ok(exit)
     }
 
     /// Mirror a function with given mapping.
@@ -254,7 +240,7 @@ impl<'a> FuncInline<'a> {
             }
         }
 
-        // Replace succ bb
+        // Assign mapped basic blocks to successor
         for bb in func.dfs_iter() {
             let mut new_bb = block_map.get(&bb).cloned().unwrap();
             let succ_bb = bb.get_succ_bb();
@@ -273,8 +259,6 @@ impl<'a> FuncInline<'a> {
     }
 
     fn unique_name(&mut self, meta: &str, base_name: &str) -> String {
-        let name = format!("{}_{}{}", base_name, meta, self.counter);
-        self.counter += 1;
-        name
+        format!("{}_{}{}", base_name, meta, self.counter.get_id().unwrap())
     }
 }
