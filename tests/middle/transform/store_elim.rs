@@ -160,6 +160,7 @@ pub mod tests_store_elim {
         // Check before optimization
         let parsed = parse(code).unwrap();
         let mut program = gen(&parsed).unwrap();
+        mem2reg::optimize_program(&mut program).unwrap();
         func_inline::optimize_program(&mut program).unwrap();
         redundance_elim::optimize_program(&mut program).unwrap();
         unreachable_block_elim::optimize_program(&mut program).unwrap();
@@ -285,6 +286,7 @@ pub mod tests_store_elim {
         // Check before optimization
         let parsed = parse(code).unwrap();
         let mut program = gen(&parsed).unwrap();
+        mem2reg::optimize_program(&mut program).unwrap();
         func_inline::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
         inst_combine::optimize_program(&mut program).unwrap();
