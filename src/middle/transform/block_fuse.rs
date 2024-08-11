@@ -52,6 +52,9 @@ impl<'a> BlockFuse<'a> {
 
                 // Replace `pred -> bb` with `bb`
                 pred.replace_entry(bb, func);
+
+                // Remove `pred`
+                pred.remove_self();
             }
         }
     }
