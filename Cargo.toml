@@ -69,6 +69,10 @@ criterion = "0.3.0"
 name = "parse_expr"
 harness = false
 
+[[bench]]
+name = "reg_set"
+harness = false
+
 # 特性管理
 [features]
 default = [
