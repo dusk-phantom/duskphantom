@@ -5,23 +5,22 @@ use crate::middle::ir::instruction::InstType;
 use crate::middle::ir::{InstPtr, Operand};
 use crate::middle::Program;
 
+use super::Transform;
+
 #[allow(unused)]
 pub fn optimize_program(program: &mut Program) -> Result<bool> {
     let effect_analysis = EffectAnalysis::new(program);
-    DeadCodeElim::new(program, &effect_analysis).run()
+    DeadCodeElim::new(program, &effect_analysis).run_and_log()
 }
 
-struct DeadCodeElim<'a> {
+pub struct DeadCodeElim<'a> {
     program: &'a mut Program,
     effect_analysis: &'a EffectAnalysis,
 }
 
-impl<'a> DeadCodeElim<'a> {
-    fn new(program: &'a mut Program, effect_analysis: &'a EffectAnalysis) -> Self {
-        Self {
-            program,
-            effect_analysis,
-        }
+impl<'a> Transform for DeadCodeElim<'a> {
+    fn name() -> String {
+        "dead_code_elim".to_string()
     }
 
     fn run(&mut self) -> Result<bool> {
@@ -46,6 +45,15 @@ impl<'a> DeadCodeElim<'a> {
         let len1 = self.program.module.global_variables.len();
         changed |= len0 != len1;
         Ok(changed)
+    }
+}
+
+impl<'a> DeadCodeElim<'a> {
+    pub fn new(program: &'a mut Program, effect_analysis: &'a EffectAnalysis) -> Self {
+        Self {
+            program,
+            effect_analysis,
+        }
     }
 
     fn dead_code_elim_inst(&mut self, mut inst: InstPtr) -> Result<bool> {

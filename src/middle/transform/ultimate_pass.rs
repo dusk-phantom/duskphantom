@@ -10,8 +10,9 @@ use super::{
 pub fn optimize_program(program: &mut Program) -> Result<bool> {
     mem2reg::optimize_program(program)?;
     loop {
-        // Inline functions
         let mut changed = false;
+
+        // Inline functions
         changed |= func_inline::optimize_program(program)?;
 
         // Weaken instructions

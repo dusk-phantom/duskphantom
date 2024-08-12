@@ -20,55 +20,67 @@ use crate::{
     utils::paral_counter::ParalCounter,
 };
 
+use super::Transform;
+
 pub fn optimize_program(program: &mut Program) -> Result<bool> {
     let mut call_graph = CallGraph::new(program);
     let counter = ParalCounter::new(0, usize::MAX);
     let mut func_inline = FuncInline::new(program, &mut call_graph, counter);
-    let mut changed = false;
-    loop {
-        let result = func_inline.run()?;
-        changed |= result;
-        if !result {
-            break Ok(changed);
-        }
-    }
+    func_inline.run_and_log()
 }
 
-struct FuncInline<'a> {
+pub struct FuncInline<'a> {
     program: &'a mut Program,
     call_graph: &'a mut CallGraph,
     counter: ParalCounter,
 }
 
+impl<'a> Transform for FuncInline<'a> {
+    fn name() -> String {
+        "func_inline".to_string()
+    }
+
+    fn run(&mut self) -> Result<bool> {
+        let mut whole_changed = false;
+        loop {
+            let mut changed = false;
+            for func in self.program.module.functions.clone() {
+                // Do not process library function
+                if func.is_lib() {
+                    continue;
+                }
+
+                // If functions calls other functions, do not process it
+                if !self.call_graph.get_calls(func).is_empty() {
+                    continue;
+                }
+
+                // Process function
+                changed |= self.process_func(func)?;
+                whole_changed |= changed;
+
+                // Update call graph
+                self.call_graph.remove(func);
+            }
+            if !changed {
+                break;
+            }
+        }
+        Ok(whole_changed)
+    }
+}
+
 impl<'a> FuncInline<'a> {
-    fn new(program: &'a mut Program, call_graph: &'a mut CallGraph, counter: ParalCounter) -> Self {
+    pub fn new(
+        program: &'a mut Program,
+        call_graph: &'a mut CallGraph,
+        counter: ParalCounter,
+    ) -> Self {
         Self {
             program,
             call_graph,
             counter,
         }
-    }
-
-    fn run(&mut self) -> Result<bool> {
-        let mut changed = false;
-        for func in self.program.module.functions.clone() {
-            // Do not process library function
-            if func.is_lib() {
-                continue;
-            }
-
-            // If functions calls other functions, do not process it
-            if !self.call_graph.get_calls(func).is_empty() {
-                continue;
-            }
-
-            // Process function
-            changed |= self.process_func(func)?;
-
-            // Update call graph
-            self.call_graph.remove(func);
-        }
-        Ok(changed)
     }
 
     fn process_func(&mut self, func: FunPtr) -> Result<bool> {

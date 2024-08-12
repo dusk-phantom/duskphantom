@@ -1,3 +1,7 @@
+use std::time::Instant;
+
+use anyhow::Result;
+
 pub mod block_fuse;
 pub mod constant_fold;
 pub mod dead_code_elim;
@@ -14,3 +18,22 @@ pub mod redundance_elim;
 pub mod store_elim;
 pub mod ultimate_pass;
 pub mod unreachable_block_elim;
+
+pub trait Transform {
+    fn name() -> String;
+
+    fn run(&mut self) -> Result<bool>;
+
+    fn run_and_log(&mut self) -> Result<bool> {
+        let before_run = Instant::now();
+        let changed = self.run()?;
+        let elapsed = before_run.elapsed().as_millis();
+        println!(
+            "{}: elapsed = {} ms, changed = {}",
+            Self::name(),
+            elapsed,
+            changed
+        );
+        Ok(changed)
+    }
+}
