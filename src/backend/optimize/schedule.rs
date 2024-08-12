@@ -252,6 +252,7 @@ impl<'a> Graph<'a> {
 enum WrapOperand {
     /// sw/lw/sd/ld
     Global,
+    Label(String),
     Stack(StackSlot),
     Reg(Reg),
 }
@@ -299,13 +300,13 @@ impl<'a> Graph<'a> {
 
         // 初始化图
         let mut use_defs: HashMap<InstID, HashSet<InstID>> = HashMap::new();
-        for (_, insts_flag) in bucket.iter() {
+        for insts_flag in bucket.iter() {
             for (i, _) in insts_flag.iter() {
                 use_defs.entry(*i).or_default();
             }
         }
 
-        for (_, insts_flag) in bucket.iter() {
+        for insts_flag in bucket.iter() {
             // 几种情况, 滑动窗口, 建立依赖, win_l, win_r 是闭区间
             // r r r r r r r r r
             // w w w w w w w w w
@@ -414,8 +415,10 @@ type IsW = bool;
 
 impl<'a> Graph<'a> {
     #[allow(clippy::type_complexity)]
-    fn construct_bucket(insts: &[Inst]) -> Result<HashMap<WrapOperand, Vec<(InstID, IsW)>>> {
+    fn construct_bucket(insts: &[Inst]) -> Result<Vec<Vec<(InstID, IsW)>>> {
         let mut bucket: HashMap<WrapOperand, Vec<(InstID, IsW)>> = HashMap::new();
+
+        let mut reg_label: HashMap<Reg, String> = HashMap::new();
 
         for (id, inst) in insts.iter().enumerate() {
             match inst {
@@ -431,17 +434,61 @@ impl<'a> Graph<'a> {
                 | Inst::Jmp(_) => {
                     return Err(anyhow!("control flow instruction"));
                 }
-                Inst::Ld(_) | Inst::Lw(_) => {
-                    bucket
-                        .entry(WrapOperand::Global)
-                        .or_default()
-                        .push((id, false));
+                Inst::Ld(ld) => {
+                    let base = ld.base();
+                    if let Some(label) = reg_label.get(base) {
+                        bucket
+                            .entry(WrapOperand::Label(label.clone()))
+                            .or_default()
+                            .push((id, false));
+                    } else {
+                        bucket
+                            .entry(WrapOperand::Global)
+                            .or_default()
+                            .push((id, false));
+                    }
                 }
-                Inst::Sd(_) | Inst::Sw(_) => {
-                    bucket
-                        .entry(WrapOperand::Global)
-                        .or_default()
-                        .push((id, true));
+                Inst::Lw(lw) => {
+                    let base = lw.base();
+                    if let Some(label) = reg_label.get(base) {
+                        bucket
+                            .entry(WrapOperand::Label(label.clone()))
+                            .or_default()
+                            .push((id, false));
+                    } else {
+                        bucket
+                            .entry(WrapOperand::Global)
+                            .or_default()
+                            .push((id, false));
+                    }
+                }
+                Inst::Sd(sd) => {
+                    let base = sd.base();
+                    if let Some(label) = reg_label.get(base) {
+                        bucket
+                            .entry(WrapOperand::Label(label.clone()))
+                            .or_default()
+                            .push((id, true));
+                    } else {
+                        bucket
+                            .entry(WrapOperand::Global)
+                            .or_default()
+                            .push((id, true));
+                    }
+                }
+                Inst::Sw(sw) => {
+                    let base = sw.base();
+                    if let Some(label) = reg_label.get(base) {
+                        bucket
+                            .entry(WrapOperand::Label(label.clone()))
+                            .or_default()
+                            .push((id, true));
+                    } else {
+                        bucket
+                            .entry(WrapOperand::Global)
+                            .or_default()
+                            .push((id, true));
+                    }
                 }
                 Inst::Store(sd) => {
                     bucket
@@ -456,6 +503,11 @@ impl<'a> Graph<'a> {
                         .push((id, false));
                 }
                 Inst::Call(_) => {}
+                Inst::Lla(lla) => {
+                    let reg = lla.dst();
+                    let label = lla.label().to_string();
+                    reg_label.insert(*reg, label);
+                }
                 _ => { /* 算术指令, 不用做特殊处理 */ }
             }
             for reg in inst.defs() {
@@ -480,7 +532,7 @@ impl<'a> Graph<'a> {
             }
         }
 
-        Ok(bucket)
+        Ok(bucket.into_values().collect())
     }
 }
 
