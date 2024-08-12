@@ -158,14 +158,44 @@ fn bench_clone_then_retain(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_remove(c: &mut Criterion) {
+    let regs = prepare_regs(10000);
+    let mut rg1 = RegSet::new();
+    let mut rg2 = HashSet::new();
+    for reg in regs.iter() {
+        rg1.insert(reg);
+        rg2.insert(*reg);
+    }
+    let regs = black_box(regs);
+    let rg1 = black_box(rg1);
+    let rg2 = black_box(rg2);
+    let remove = || {
+        let mut rg = rg1.clone();
+        for reg in &regs {
+            rg.remove(reg);
+        }
+    };
+    let remove2 = || {
+        let mut rg = rg2.clone();
+        for reg in &regs {
+            rg.remove(reg);
+        }
+    };
+    let mut group = c.benchmark_group("Remove");
+    group.bench_function(BenchmarkId::new("reg_set", 0), |b| b.iter(remove));
+    group.bench_function(BenchmarkId::new("hash_set", 1), |b| b.iter(remove2));
+    group.finish();
+}
+
 criterion_group! {
     name = benches;
     config = Criterion::default().measurement_time(Duration::from_secs(10)).sample_size(10);
     targets =
-        bench_contains,
-        bench_insert,
-        bench_merge,
-        bench_clone,
-        bench_clone_then_retain,
+        // bench_contains,
+        // bench_insert,
+        // bench_merge,
+        bench_remove,
+        // bench_clone,
+        // bench_clone_then_retain,
 }
 criterion_main!(benches);
