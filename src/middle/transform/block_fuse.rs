@@ -1,21 +1,23 @@
 use anyhow::{Ok, Result};
 
 use crate::middle::{
-    ir::{instruction::InstType, BBPtr, FunPtr},
+    ir::{BBPtr, FunPtr},
     Program,
 };
 
+use super::Transform;
+
 pub fn optimize_program(program: &mut Program) -> Result<bool> {
-    BlockFuse::new(program).run()
+    BlockFuse::new(program).run_and_log()
 }
 
-struct BlockFuse<'a> {
+pub struct BlockFuse<'a> {
     program: &'a mut Program,
 }
 
-impl<'a> BlockFuse<'a> {
-    fn new(program: &'a mut Program) -> Self {
-        Self { program }
+impl<'a> Transform for BlockFuse<'a> {
+    fn name() -> String {
+        "block_fuse".to_string()
     }
 
     fn run(&mut self) -> Result<bool> {
@@ -34,6 +36,12 @@ impl<'a> BlockFuse<'a> {
         }
         Ok(changed)
     }
+}
+
+impl<'a> BlockFuse<'a> {
+    pub fn new(program: &'a mut Program) -> Self {
+        Self { program }
+    }
 
     /// If block has only one predecessor, and that predecessor has only one successor,
     /// these two blocks can be fused as one.
@@ -44,27 +52,18 @@ impl<'a> BlockFuse<'a> {
         if func.entry == Some(pred) {
             return Ok(false);
         }
-        if pred.get_succ_bb().len() == 1 {
-            if bb.get_pred_bb().len() == 1 {
-                // Last instruction is "br", move the rest to successor block
-                for inst in pred.iter_rev().skip(1) {
-                    bb.push_front(inst);
-                }
-
-                // Replace `pred -> bb` with `bb`
-                pred.replace_entry(bb, func);
-
-                // Remove `pred`
-                pred.remove_self();
-                return Ok(true);
-            } else if pred.get_first_inst().get_type() == InstType::Br {
-                // Replace `pred -> bb` with `bb`
-                pred.replace_entry(bb, func);
-
-                // Remove `pred`
-                pred.remove_self();
-                return Ok(true);
+        if pred.get_succ_bb().len() == 1 && bb.get_pred_bb().len() == 1 {
+            // Last instruction is "br", move the rest to successor block
+            for inst in pred.iter_rev().skip(1) {
+                bb.push_front(inst);
             }
+
+            // Replace `pred -> bb` with `bb`
+            pred.replace_entry(bb, func);
+
+            // Remove `pred`
+            pred.remove_self();
+            return Ok(true);
         }
         Ok(false)
     }

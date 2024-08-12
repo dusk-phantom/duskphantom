@@ -15,17 +15,19 @@ use crate::{
     },
 };
 
+use super::Transform;
+
 pub fn optimize_program(program: &mut Program) -> Result<bool> {
-    InstCombine::new(program).run()
+    InstCombine::new(program).run_and_log()
 }
 
-struct InstCombine<'a> {
+pub struct InstCombine<'a> {
     program: &'a mut Program,
 }
 
-impl<'a> InstCombine<'a> {
-    fn new(program: &'a mut Program) -> Self {
-        Self { program }
+impl<'a> Transform for InstCombine<'a> {
+    fn name() -> String {
+        "inst_combine".to_string()
     }
 
     fn run(&mut self) -> Result<bool> {
@@ -50,6 +52,12 @@ impl<'a> InstCombine<'a> {
             }
         }
         Ok(changed)
+    }
+}
+
+impl<'a> InstCombine<'a> {
+    pub fn new(program: &'a mut Program) -> Self {
+        Self { program }
     }
 
     fn symbolic_eval(&mut self, mut inst: InstPtr) -> Result<bool> {

@@ -13,24 +13,23 @@ use crate::{
     },
 };
 
+use super::Transform;
+
 pub fn optimize_program<'a>(
     program: &'a mut Program,
     memory_ssa: &'a mut MemorySSA,
 ) -> Result<bool> {
-    LoadElim::new(program, memory_ssa).run()
+    LoadElim::new(program, memory_ssa).run_and_log()
 }
 
-struct LoadElim<'a, 'b> {
+pub struct LoadElim<'a, 'b> {
     program: &'a mut Program,
     memory_ssa: &'a mut MemorySSA<'b>,
 }
 
-impl<'a, 'b> LoadElim<'a, 'b> {
-    fn new(program: &'a mut Program, memory_ssa: &'a mut MemorySSA<'b>) -> Self {
-        Self {
-            program,
-            memory_ssa,
-        }
+impl<'a, 'b> Transform for LoadElim<'a, 'b> {
+    fn name() -> String {
+        "load_elim".to_string()
     }
 
     fn run(&mut self) -> Result<bool> {
@@ -46,6 +45,15 @@ impl<'a, 'b> LoadElim<'a, 'b> {
             }
         }
         Ok(changed)
+    }
+}
+
+impl<'a, 'b> LoadElim<'a, 'b> {
+    pub fn new(program: &'a mut Program, memory_ssa: &'a mut MemorySSA<'b>) -> Self {
+        Self {
+            program,
+            memory_ssa,
+        }
     }
 
     fn process_inst(&mut self, mut load_inst: InstPtr, is_main: bool) -> Result<bool> {

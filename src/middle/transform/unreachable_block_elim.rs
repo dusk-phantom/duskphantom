@@ -9,17 +9,19 @@ use crate::{
     },
 };
 
+use super::Transform;
+
 pub fn optimize_program(program: &mut Program) -> Result<bool> {
-    UnreachableBlockElim::new(program).run()
+    UnreachableBlockElim::new(program).run_and_log()
 }
 
-struct UnreachableBlockElim<'a> {
+pub struct UnreachableBlockElim<'a> {
     program: &'a mut Program,
 }
 
-impl<'a> UnreachableBlockElim<'a> {
-    fn new(program: &'a mut Program) -> Self {
-        Self { program }
+impl<'a> Transform for UnreachableBlockElim<'a> {
+    fn name() -> String {
+        "unreachable_block_elim".to_string()
     }
 
     fn run(&mut self) -> Result<bool> {
@@ -35,6 +37,12 @@ impl<'a> UnreachableBlockElim<'a> {
             changed |= self.process_function(*func)?;
         }
         Ok(changed)
+    }
+}
+
+impl<'a> UnreachableBlockElim<'a> {
+    pub fn new(program: &'a mut Program) -> Self {
+        Self { program }
     }
 
     fn process_function(&mut self, func: FunPtr) -> Result<bool> {

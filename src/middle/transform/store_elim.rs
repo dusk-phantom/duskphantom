@@ -6,24 +6,23 @@ use crate::middle::{
     Program,
 };
 
+use super::Transform;
+
 pub fn optimize_program<'a>(
     program: &'a mut Program,
     memory_ssa: &'a mut MemorySSA<'a>,
 ) -> Result<bool> {
-    StoreElim::new(program, memory_ssa).run()
+    StoreElim::new(program, memory_ssa).run_and_log()
 }
 
-struct StoreElim<'a> {
+pub struct StoreElim<'a> {
     program: &'a mut Program,
     memory_ssa: &'a mut MemorySSA<'a>,
 }
 
-impl<'a> StoreElim<'a> {
-    fn new(program: &'a mut Program, memory_ssa: &'a mut MemorySSA<'a>) -> Self {
-        Self {
-            program,
-            memory_ssa,
-        }
+impl<'a> Transform for StoreElim<'a> {
+    fn name() -> String {
+        "store_elim".to_string()
     }
 
     fn run(&mut self) -> Result<bool> {
@@ -38,6 +37,15 @@ impl<'a> StoreElim<'a> {
             }
         }
         Ok(changed)
+    }
+}
+
+impl<'a> StoreElim<'a> {
+    pub fn new(program: &'a mut Program, memory_ssa: &'a mut MemorySSA<'a>) -> Self {
+        Self {
+            program,
+            memory_ssa,
+        }
     }
 
     /// Delete instruction and its corresponding MemorySSA node if it's not used.

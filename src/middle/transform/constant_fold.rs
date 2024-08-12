@@ -10,18 +10,20 @@ use crate::middle::{
     Program,
 };
 
+use super::Transform;
+
 #[allow(unused)]
 pub fn optimize_program(program: &mut Program) -> Result<bool> {
-    ConstantFold::new(program).run()
+    ConstantFold::new(program).run_and_log()
 }
 
-struct ConstantFold<'a> {
+pub struct ConstantFold<'a> {
     program: &'a mut Program,
 }
 
-impl<'a> ConstantFold<'a> {
-    fn new(program: &'a mut Program) -> Self {
-        Self { program }
+impl<'a> Transform for ConstantFold<'a> {
+    fn name() -> String {
+        "constant_fold".to_string()
     }
 
     fn run(&mut self) -> Result<bool> {
@@ -37,6 +39,12 @@ impl<'a> ConstantFold<'a> {
             }
         }
         Ok(changed)
+    }
+}
+
+impl<'a> ConstantFold<'a> {
+    pub fn new(program: &'a mut Program) -> Self {
+        Self { program }
     }
 
     fn constant_fold_inst(&mut self, mut inst: InstPtr) -> Result<bool> {
