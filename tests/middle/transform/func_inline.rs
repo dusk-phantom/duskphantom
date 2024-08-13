@@ -7,7 +7,7 @@ pub mod tests_func_inline {
         middle::{
             irgen::gen,
             transform::{
-                block_fuse, constant_fold, dead_code_elim, func_inline, mem2reg, symbolic_eval,
+                block_fuse, constant_fold, dead_code_elim, func_inline, inst_combine, mem2reg,
             },
         },
         utils::diff::diff,
@@ -33,14 +33,14 @@ pub mod tests_func_inline {
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
-        symbolic_eval::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
         func_inline::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
-        symbolic_eval::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
         block_fuse::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
@@ -128,14 +128,14 @@ pub mod tests_func_inline {
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
-        symbolic_eval::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
         func_inline::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
-        symbolic_eval::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
         block_fuse::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
@@ -209,14 +209,14 @@ pub mod tests_func_inline {
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
-        symbolic_eval::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
         func_inline::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
-        symbolic_eval::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
         block_fuse::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
