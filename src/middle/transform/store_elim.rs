@@ -27,7 +27,7 @@ impl<'a> Transform for StoreElim<'a> {
 
     fn run(&mut self) -> Result<bool> {
         let mut changed = false;
-        for func in self.program.module.functions.clone().iter() {
+        for func in self.program.module.functions.clone() {
             if func.is_main() {
                 for bb in func.po_iter() {
                     for inst in bb.iter() {

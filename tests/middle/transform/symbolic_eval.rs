@@ -1,12 +1,12 @@
 #[cfg(test)]
-pub mod tests_inst_combine {
+pub mod tests_symbolic_eval {
     use insta::assert_snapshot;
 
     use compiler::{
         frontend::parse,
         middle::{
             irgen::gen,
-            transform::{constant_fold, dead_code_elim, inst_combine, mem2reg},
+            transform::{constant_fold, dead_code_elim, mem2reg, symbolic_eval},
         },
         utils::diff::diff,
     };
@@ -35,7 +35,7 @@ pub mod tests_inst_combine {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        inst_combine::optimize_program(&mut program).unwrap();
+        symbolic_eval::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after), @r###"
@@ -105,7 +105,7 @@ pub mod tests_inst_combine {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        inst_combine::optimize_program(&mut program).unwrap();
+        symbolic_eval::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after), @r###"
@@ -162,7 +162,7 @@ pub mod tests_inst_combine {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        inst_combine::optimize_program(&mut program).unwrap();
+        symbolic_eval::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
@@ -221,7 +221,7 @@ pub mod tests_inst_combine {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        inst_combine::optimize_program(&mut program).unwrap();
+        symbolic_eval::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
@@ -278,7 +278,7 @@ pub mod tests_inst_combine {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        inst_combine::optimize_program(&mut program).unwrap();
+        symbolic_eval::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
@@ -335,7 +335,7 @@ pub mod tests_inst_combine {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        inst_combine::optimize_program(&mut program).unwrap();
+        symbolic_eval::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
@@ -358,12 +358,12 @@ pub mod tests_inst_combine {
         [-] %Mul_9 = mul i32 %x, 2
         [-] %Mul_13 = mul i32 %Mul_9, 2
         [-] %Mul_17 = mul i32 %Mul_13, 2
-        [+] %Shl_26 = shl i32 %x, 3
+        [+] %Mul_23 = mul i32 %x, 8
         br label %exit
 
         exit:
         [-] ret i32 %Mul_17
-        [+] ret i32 %Shl_26
+        [+] ret i32 %Mul_23
 
 
         }
@@ -393,7 +393,7 @@ pub mod tests_inst_combine {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        inst_combine::optimize_program(&mut program).unwrap();
+        symbolic_eval::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
@@ -418,12 +418,12 @@ pub mod tests_inst_combine {
         [-] %SDiv_19 = sdiv i32 %Mul_15, 2
         [-] %SDiv_23 = sdiv i32 %SDiv_19, 2
         [-] %SDiv_27 = sdiv i32 %SDiv_23, 2
-        [+] %AShr_36 = ashr i32 %x, 3
+        [+] %SDiv_33 = sdiv i32 %x, 8
         br label %exit
 
         exit:
         [-] ret i32 %SDiv_27
-        [+] ret i32 %AShr_36
+        [+] ret i32 %SDiv_33
 
 
         }
@@ -453,7 +453,7 @@ pub mod tests_inst_combine {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        inst_combine::optimize_program(&mut program).unwrap();
+        symbolic_eval::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
@@ -513,7 +513,7 @@ pub mod tests_inst_combine {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        inst_combine::optimize_program(&mut program).unwrap();
+        symbolic_eval::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"

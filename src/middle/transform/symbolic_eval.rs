@@ -1,7 +1,8 @@
-use anyhow::Result;
+use anyhow::{anyhow, Context, Result};
 
 use crate::{
     backend::from_self::downcast_ref,
+    context,
     middle::{
         ir::{
             instruction::{
@@ -9,7 +10,7 @@ use crate::{
                 misc_inst::{FCmp, FCmpOp, ICmp, ICmpOp},
                 InstType,
             },
-            Constant, InstPtr, Operand,
+            BBPtr, Constant, InstPtr, Operand,
         },
         Program,
     },
@@ -18,36 +19,32 @@ use crate::{
 use super::Transform;
 
 pub fn optimize_program(program: &mut Program) -> Result<bool> {
-    InstCombine::new(program).run_and_log()
+    SymbolicEval::new(program).run_and_log()
 }
 
-pub struct InstCombine<'a> {
+pub struct SymbolicEval<'a> {
     program: &'a mut Program,
 }
 
-impl<'a> Transform for InstCombine<'a> {
+impl<'a> Transform for SymbolicEval<'a> {
     fn name() -> String {
-        "inst_combine".to_string()
+        "symbolic_eval".to_string()
     }
 
     fn run(&mut self) -> Result<bool> {
         let mut changed = false;
-        for fun in self
-            .program
-            .module
-            .functions
-            .clone()
-            .iter()
-            .filter(|f| !f.is_lib())
-        {
-            for bb in fun.rpo_iter() {
+        for func in self.program.module.functions.clone() {
+            if func.is_lib() {
+                continue;
+            }
+            for bb in func.rpo_iter() {
+                // Skip unreachable block because rpo_iter is eager
+                // but blocks can be rewired in loop
+                if func.entry != Some(bb) && bb.get_pred_bb().is_empty() {
+                    continue;
+                }
                 for inst in bb.iter() {
                     changed |= self.symbolic_eval(inst)?;
-                }
-            }
-            for bb in fun.rpo_iter() {
-                for inst in bb.iter() {
-                    changed |= self.make_shift(inst)?;
                 }
             }
         }
@@ -55,16 +52,28 @@ impl<'a> Transform for InstCombine<'a> {
     }
 }
 
-impl<'a> InstCombine<'a> {
+impl<'a> SymbolicEval<'a> {
     pub fn new(program: &'a mut Program) -> Self {
         Self { program }
     }
 
-    fn symbolic_eval(&mut self, mut inst: InstPtr) -> Result<bool> {
-        let inst_type = inst.get_type();
-
-        // For commutative instructions, move constant to RHS
+    /// Symbolic evaluate instruction to its simplest form.
+    /// It guarantees to simplify any loopless program to its simplest form in one pass,
+    /// so it requires only O(loop_connectedness) calls at most.
+    fn symbolic_eval(&mut self, inst: InstPtr) -> Result<bool> {
         let mut changed = false;
+        changed |= self.canonicalize_binary(inst)?;
+        changed |= self.constant_fold(inst)?
+            || self.useless_elim(inst)?
+            || self.merge_gep(inst)?
+            || self.inst_combine(inst)?;
+        Ok(changed)
+    }
+
+    /// For commutative instructions, move constant to RHS.
+    /// This does not remove instruction.
+    fn canonicalize_binary(&mut self, mut inst: InstPtr) -> Result<bool> {
+        let inst_type = inst.get_type();
         match inst_type {
             InstType::Add | InstType::Mul | InstType::FAdd | InstType::FMul => {
                 let lhs = inst.get_operand()[0].clone();
@@ -74,15 +83,20 @@ impl<'a> InstCombine<'a> {
                     unsafe {
                         let vec = inst.get_operand_mut();
                         vec.swap(0, 1);
-                        changed = true;
+                        return Ok(true);
                     }
                 }
             }
             _ => (),
         }
+        Ok(false)
+    }
 
-        // Constant folding
-        match inst.get_type() {
+    /// Constant folding.
+    /// If changed, original instruction is removed.
+    fn constant_fold(&mut self, mut inst: InstPtr) -> Result<bool> {
+        let inst_type = inst.get_type();
+        match inst_type {
             InstType::Add | InstType::FAdd => {
                 let lhs = inst.get_operand()[0].clone();
                 let rhs = inst.get_operand()[1].clone();
@@ -289,10 +303,51 @@ impl<'a> InstCombine<'a> {
             }
             _ => (),
         }
+        Ok(false)
+    }
 
-        // Useless instruction elimination:
-        // x + 0, x - 0, x * 1, x / 1, x >> 0, x << 0,
-        // 0 / x, x * 0, phi x, ..., x, br true, ...
+    /// Useless instruction elimination.
+    /// If changed, original instruction is removed.
+    fn useless_elim(&mut self, mut inst: InstPtr) -> Result<bool> {
+        let inst_type = inst.get_type();
+
+        // We treat `br` as if-else expression, try to simplify it if condition is constant
+        // Not separating this to unreachable block elim because it increases time complexity
+        if inst_type == InstType::Br {
+            let Some(cond) = inst.get_operand().first().cloned() else {
+                return Ok(false);
+            };
+            if let Operand::Constant(Constant::Bool(cond)) = cond {
+                // Rewire basic block
+                let mut parent_bb = inst
+                    .get_parent_bb()
+                    .ok_or_else(|| anyhow!("{} should have parent block", inst))
+                    .with_context(|| context!())?;
+
+                // Remove unreachable basic block
+                let removed_bb = if cond {
+                    // TODO change remove interface so that it recurse
+                    let bb = parent_bb.get_succ_bb()[1];
+                    parent_bb.remove_false_bb();
+                    bb
+                } else {
+                    let bb = parent_bb.get_succ_bb()[0];
+                    parent_bb.remove_true_bb();
+                    bb
+                };
+                if removed_bb.get_pred_bb().is_empty() {
+                    remove_bb_recurse(removed_bb)?;
+                }
+
+                // Replace instruction with unconditional jump
+                let new_inst = self.program.mem_pool.get_br(None);
+                inst.insert_after(new_inst);
+                inst.remove_self();
+                return Ok(true);
+            }
+        }
+
+        // x + 0, x - 0, x * 1, x / 1, x >> 0, x << 0, 0 / x, x * 0, phi (x, x), ...
         match inst_type {
             InstType::Add | InstType::Sub => {
                 let lhs = inst.get_operand()[0].clone();
@@ -314,33 +369,52 @@ impl<'a> InstCombine<'a> {
                     }
                 }
             }
-            InstType::Mul | InstType::SDiv | InstType::UDiv => {
+            InstType::Mul => {
                 let lhs = inst.get_operand()[0].clone();
                 let rhs = inst.get_operand()[1].clone();
-                if let Operand::Constant(rhs) = rhs {
-                    if rhs == Constant::Int(1) {
-                        inst.replace_self(&lhs);
-                        return Ok(true);
-                    } else if rhs == Constant::Int(0) {
-                        inst.replace_self(&rhs.into());
-                        return Ok(true);
-                    }
+                if let Operand::Constant(Constant::Int(1)) = rhs {
+                    inst.replace_self(&lhs);
+                    return Ok(true);
+                }
+                if let Operand::Constant(Constant::Int(0)) = rhs {
+                    inst.replace_self(&rhs);
+                    return Ok(true);
                 }
             }
-            InstType::FMul | InstType::FDiv => {
+            InstType::SDiv | InstType::UDiv => {
                 let lhs = inst.get_operand()[0].clone();
                 let rhs = inst.get_operand()[1].clone();
-                if let Operand::Constant(rhs) = rhs {
-                    if rhs == Constant::Float(1.0) {
-                        inst.replace_self(&lhs);
-                        return Ok(true);
-                    }
+                if let Operand::Constant(Constant::Int(1)) = rhs {
+                    inst.replace_self(&lhs);
+                    return Ok(true);
                 }
-                if let Operand::Constant(lhs) = lhs {
-                    if lhs == Constant::Float(0.0) {
-                        inst.replace_self(&lhs.into());
-                        return Ok(true);
-                    }
+                if let Operand::Constant(Constant::Int(0)) = lhs {
+                    inst.replace_self(&lhs);
+                    return Ok(true);
+                }
+            }
+            InstType::FMul => {
+                let lhs = inst.get_operand()[0].clone();
+                let rhs = inst.get_operand()[1].clone();
+                if let Operand::Constant(Constant::Float(1.0)) = rhs {
+                    inst.replace_self(&lhs);
+                    return Ok(true);
+                }
+                if let Operand::Constant(Constant::Float(0.0)) = rhs {
+                    inst.replace_self(&rhs);
+                    return Ok(true);
+                }
+            }
+            InstType::FDiv => {
+                let lhs = inst.get_operand()[0].clone();
+                let rhs = inst.get_operand()[1].clone();
+                if let Operand::Constant(Constant::Float(1.0)) = rhs {
+                    inst.replace_self(&lhs);
+                    return Ok(true);
+                }
+                if let Operand::Constant(Constant::Float(0.0)) = lhs {
+                    inst.replace_self(&lhs);
+                    return Ok(true);
                 }
             }
             InstType::AShr | InstType::Shl => {
@@ -370,7 +444,7 @@ impl<'a> InstCombine<'a> {
             _ => (),
         }
 
-        // Useless instruction elimination: x / x, x - x, x + x (to x * 2)
+        // x / x, x - x, x + x (to x * 2)
         match inst_type {
             InstType::SDiv | InstType::UDiv => {
                 let lhs = inst.get_operand()[0].clone();
@@ -403,13 +477,19 @@ impl<'a> InstCombine<'a> {
                     let new_inst = self.program.mem_pool.get_mul(lhs, Constant::Int(2).into());
                     inst.insert_after(new_inst);
                     inst.replace_self(&new_inst.into());
+                    self.symbolic_eval(new_inst)?;
                     return Ok(true);
                 }
             }
             _ => (),
         }
+        Ok(false)
+    }
 
-        // Merge GEP instruction
+    /// Merge `getelementptr` instruction.
+    /// If changed, original instruction is removed.
+    fn merge_gep(&mut self, mut inst: InstPtr) -> Result<bool> {
+        let inst_type = inst.get_type();
         if inst_type == InstType::GetElementPtr {
             let ptr = inst.get_operand()[0].clone();
             if let Operand::Instruction(ptr) = ptr {
@@ -445,12 +525,21 @@ impl<'a> InstCombine<'a> {
                     // Replace outer GEP with new GEP
                     inst.insert_after(new_inst);
                     inst.replace_self(&new_inst.into());
+                    self.symbolic_eval(add)?;
+                    self.symbolic_eval(new_inst)?;
                     return Ok(true);
                 }
             }
         }
+        Ok(false)
+    }
 
-        // Inst combine: (x * n) + x = x * (n + 1), (x * n) - x = x * (n - 1)
+    /// Combine multiple instructions into one.
+    /// If changed, original instruction is removed.
+    fn inst_combine(&mut self, mut inst: InstPtr) -> Result<bool> {
+        let inst_type = inst.get_type();
+
+        // (x * n) + x = x * (n + 1), (x * n) - x = x * (n - 1)
         match inst_type {
             InstType::Add | InstType::Sub => {
                 let lhs = inst.get_operand()[0].clone();
@@ -475,6 +564,7 @@ impl<'a> InstCombine<'a> {
                                     .get_mul(lhs_lhs, Constant::Int(new_rhs).into());
                                 inst.insert_after(new_inst);
                                 inst.replace_self(&new_inst.into());
+                                self.symbolic_eval(new_inst)?;
                                 return Ok(true);
                             }
                         }
@@ -484,7 +574,7 @@ impl<'a> InstCombine<'a> {
             _ => (),
         }
 
-        // Inst combine: x + 1 - 6 -> x - 5, x * 2 * 3 -> x * 6, x / 2 / 3 -> x / 6
+        // x + 1 - 6 -> x - 5, x * 2 * 3 -> x * 6, x / 2 / 3 -> x / 6
         match inst_type {
             InstType::Add | InstType::Sub => {
                 let lhs = inst.get_operand()[0].clone();
@@ -505,6 +595,7 @@ impl<'a> InstCombine<'a> {
                                     self.program.mem_pool.get_add(lhs_lhs, new_rhs.into());
                                 inst.insert_after(new_inst);
                                 inst.replace_self(&new_inst.into());
+                                self.symbolic_eval(new_inst)?;
                                 return Ok(true);
                             }
                         }
@@ -529,6 +620,7 @@ impl<'a> InstCombine<'a> {
                                     self.program.mem_pool.get_mul(lhs_lhs, new_rhs.into());
                                 inst.insert_after(new_inst);
                                 inst.replace_self(&new_inst.into());
+                                self.symbolic_eval(new_inst)?;
                                 return Ok(true);
                             }
                         }
@@ -563,6 +655,7 @@ impl<'a> InstCombine<'a> {
                                     .get_sdiv(lhs_lhs, Constant::Int(new_rhs).into());
                                 inst.insert_after(new_inst);
                                 inst.replace_self(&new_inst.into());
+                                self.symbolic_eval(new_inst)?;
                                 return Ok(true);
                             }
                         }
@@ -571,46 +664,21 @@ impl<'a> InstCombine<'a> {
             }
             _ => (),
         }
-        Ok(changed)
-    }
-
-    fn make_shift(&mut self, mut inst: InstPtr) -> Result<bool> {
-        let inst_type = inst.get_type();
-
-        // Replace mul or div with power of 2 with shift
-        match inst_type {
-            InstType::Mul => {
-                let lhs = inst.get_operand()[0].clone();
-                let rhs = inst.get_operand()[1].clone();
-                if let Operand::Constant(Constant::Int(rhs)) = rhs {
-                    if rhs.count_ones() == 1 {
-                        let new_inst = self
-                            .program
-                            .mem_pool
-                            .get_shl(lhs, Operand::Constant(rhs.trailing_zeros().into()));
-                        inst.insert_after(new_inst);
-                        inst.replace_self(&new_inst.into());
-                        return Ok(true);
-                    }
-                }
-            }
-            InstType::SDiv => {
-                let lhs = inst.get_operand()[0].clone();
-                let rhs = inst.get_operand()[1].clone();
-                if let Operand::Constant(Constant::Int(rhs)) = rhs {
-                    if rhs.count_ones() == 1 {
-                        let new_inst = self
-                            .program
-                            .mem_pool
-                            .get_ashr(lhs, Operand::Constant(rhs.trailing_zeros().into()));
-                        inst.insert_after(new_inst);
-                        inst.replace_self(&new_inst.into());
-                        return Ok(true);
-                    }
-                }
-            }
-            _ => (),
-        }
         Ok(false)
     }
+}
+
+/// Remove unused basic block recursively.
+///
+/// # Panics
+/// Please call the function only when `bb` is unreachable.
+fn remove_bb_recurse(mut bb: BBPtr) -> Result<()> {
+    let succ = bb.get_succ_bb().clone();
+    bb.remove_self();
+    for succ in succ {
+        if succ.get_pred_bb().is_empty() {
+            remove_bb_recurse(succ)?;
+        }
+    }
+    Ok(())
 }

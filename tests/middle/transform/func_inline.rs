@@ -7,8 +7,7 @@ pub mod tests_func_inline {
         middle::{
             irgen::gen,
             transform::{
-                block_fuse, constant_fold, dead_code_elim, func_inline, inst_combine, mem2reg,
-                unreachable_block_elim,
+                block_fuse, constant_fold, dead_code_elim, func_inline, mem2reg, symbolic_eval,
             },
         },
         utils::diff::diff,
@@ -34,15 +33,14 @@ pub mod tests_func_inline {
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
-        inst_combine::optimize_program(&mut program).unwrap();
+        symbolic_eval::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
         func_inline::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
-        inst_combine::optimize_program(&mut program).unwrap();
-        unreachable_block_elim::optimize_program(&mut program).unwrap();
+        symbolic_eval::optimize_program(&mut program).unwrap();
         block_fuse::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
@@ -92,23 +90,21 @@ pub mod tests_func_inline {
 
         final5:
         [-] %phi_34 = phi i1 [false, %cond0], [%icmp_32, %alt4]
-        [-] br i1 %phi_34, label %then1, label %alt2
         [+] %phi_34 = phi i1 [false, %cond0], [%icmp_32, %alt4_split2]
-        [+] br i1 %phi_34, label %exit, label %alt2
+        br i1 %phi_34, label %then1, label %alt2
 
-        [-] then1:
+        then1:
         [-] br label %final3
-        [+] exit:
-        [+] ret i32 0
+        [+] br label %exit
 
         alt2:
         [-] br label %final3
         [-] 
         [-] final3:
         br label %exit
-        [-] 
-        [-] exit:
-        [-] ret i32 0
+
+        exit:
+        ret i32 0
 
 
         }
@@ -132,15 +128,14 @@ pub mod tests_func_inline {
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
-        inst_combine::optimize_program(&mut program).unwrap();
+        symbolic_eval::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
         func_inline::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
-        inst_combine::optimize_program(&mut program).unwrap();
-        unreachable_block_elim::optimize_program(&mut program).unwrap();
+        symbolic_eval::optimize_program(&mut program).unwrap();
         block_fuse::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
@@ -214,14 +209,14 @@ pub mod tests_func_inline {
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
-        inst_combine::optimize_program(&mut program).unwrap();
+        symbolic_eval::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
         func_inline::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
-        inst_combine::optimize_program(&mut program).unwrap();
+        symbolic_eval::optimize_program(&mut program).unwrap();
         unreachable_block_elim::optimize_program(&mut program).unwrap();
         block_fuse::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();

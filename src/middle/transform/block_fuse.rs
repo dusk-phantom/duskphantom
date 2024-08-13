@@ -22,16 +22,12 @@ impl<'a> Transform for BlockFuse<'a> {
 
     fn run(&mut self) -> Result<bool> {
         let mut changed = false;
-        for fun in self
-            .program
-            .module
-            .functions
-            .clone()
-            .iter()
-            .filter(|f| !f.is_lib())
-        {
-            for bb in fun.rpo_iter() {
-                changed |= self.fuse_block(bb, *fun)?;
+        for func in self.program.module.functions.clone() {
+            if func.is_lib() {
+                continue;
+            }
+            for bb in func.rpo_iter() {
+                changed |= self.fuse_block(bb, func)?;
             }
         }
         Ok(changed)
@@ -49,9 +45,6 @@ impl<'a> BlockFuse<'a> {
         let Some(mut pred) = bb.get_pred_bb().first().cloned() else {
             return Ok(false);
         };
-        if func.entry == Some(pred) {
-            return Ok(false);
-        }
         if pred.get_succ_bb().len() == 1 && bb.get_pred_bb().len() == 1 {
             // Last instruction is "br", move the rest to successor block
             for inst in pred.iter_rev().skip(1) {
@@ -59,6 +52,7 @@ impl<'a> BlockFuse<'a> {
             }
 
             // Replace `pred -> bb` with `bb`
+            // TODO remove requirement of func in replace_entry
             pred.replace_entry(bb, func);
 
             // Remove `pred`

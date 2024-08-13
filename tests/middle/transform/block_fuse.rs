@@ -6,10 +6,7 @@ pub mod tests_block_fuse {
         frontend::parse,
         middle::{
             irgen::gen,
-            transform::{
-                block_fuse, constant_fold, dead_code_elim, inst_combine, mem2reg,
-                unreachable_block_elim,
-            },
+            transform::{block_fuse, constant_fold, dead_code_elim, mem2reg, symbolic_eval},
         },
         utils::diff::diff,
     };
@@ -33,12 +30,11 @@ pub mod tests_block_fuse {
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
-        inst_combine::optimize_program(&mut program).unwrap();
+        symbolic_eval::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        unreachable_block_elim::optimize_program(&mut program).unwrap();
         block_fuse::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
@@ -64,11 +60,7 @@ pub mod tests_block_fuse {
         [-] br label %cond0
         [-] 
         [-] cond0:
-        [-] br i1 false, label %then1, label %alt2
-        [-] 
-        [-] then1:
-        [-] call void @putint(i32 2)
-        [-] br label %final3
+        [-] br label %alt2
         [-] 
         [-] alt2:
         call void @putint(i32 3)
@@ -102,12 +94,11 @@ pub mod tests_block_fuse {
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
-        inst_combine::optimize_program(&mut program).unwrap();
+        symbolic_eval::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        unreachable_block_elim::optimize_program(&mut program).unwrap();
         block_fuse::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
@@ -132,11 +123,7 @@ pub mod tests_block_fuse {
         [-] br label %cond0
         [-] 
         [-] cond0:
-        [-] br i1 false, label %then1, label %alt2
-        [-] 
-        [-] then1:
-        [-] call void @putint(i32 2)
-        [-] br label %final3
+        [-] br label %alt2
         [-] 
         [-] alt2:
         [-] br label %final3
