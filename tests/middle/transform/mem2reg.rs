@@ -495,12 +495,11 @@ pub mod tests_mem2reg {
         %alloca_5 = alloca [1 x i32]
         call void @llvm.memset.p0.i32([1 x i32]* %alloca_5, i8 0, i32 4, i1 false)
         %getelementptr_7 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
-        %getelementptr_8 = getelementptr i32, ptr %getelementptr_7, i32 0
-        store i32 8, ptr %getelementptr_8
-        %getelementptr_10 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
-        %call_11 = call i32 @f(i32* %getelementptr_10)
-        %getelementptr_12 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
-        call void @putarray(i32 1, i32* %getelementptr_12)
+        store i32 8, ptr %getelementptr_7
+        %getelementptr_9 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
+        %call_10 = call i32 @f(i32* %getelementptr_9)
+        %getelementptr_11 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
+        call void @putarray(i32 1, i32* %getelementptr_11)
         [-] store i32 0, ptr %alloca_2
         br label %exit
 
@@ -513,24 +512,24 @@ pub mod tests_mem2reg {
         }
         define i32 @f(i32* %a) {
         entry:
-        %alloca_18 = alloca i32
-        %alloca_21 = alloca i32*
-        [-] store i32* %a, ptr %alloca_21
-        [-] %load_23 = load i32*, ptr %alloca_21
-        [-] %getelementptr_24 = getelementptr i32, ptr %load_23, i32 0
-        [+] %getelementptr_24 = getelementptr i32, ptr %a, i32 0
-        store i32 1, ptr %getelementptr_24
-        [-] %load_26 = load i32*, ptr %alloca_21
-        [-] %getelementptr_27 = getelementptr i32, ptr %load_26, i32 0
-        [+] %getelementptr_27 = getelementptr i32, ptr %a, i32 0
-        %load_28 = load i32, ptr %getelementptr_27
-        [-] store i32 %load_28, ptr %alloca_18
+        %alloca_17 = alloca i32
+        %alloca_20 = alloca i32*
+        [-] store i32* %a, ptr %alloca_20
+        [-] %load_22 = load i32*, ptr %alloca_20
+        [-] %getelementptr_23 = getelementptr i32, ptr %load_22, i32 0
+        [+] %getelementptr_23 = getelementptr i32, ptr %a, i32 0
+        store i32 1, ptr %getelementptr_23
+        [-] %load_25 = load i32*, ptr %alloca_20
+        [-] %getelementptr_26 = getelementptr i32, ptr %load_25, i32 0
+        [+] %getelementptr_26 = getelementptr i32, ptr %a, i32 0
+        %load_27 = load i32, ptr %getelementptr_26
+        [-] store i32 %load_27, ptr %alloca_17
         br label %exit
 
         exit:
-        [-] %load_19 = load i32, ptr %alloca_18
-        [-] ret i32 %load_19
-        [+] ret i32 %load_28
+        [-] %load_18 = load i32, ptr %alloca_17
+        [-] ret i32 %load_18
+        [+] ret i32 %load_27
 
 
         }

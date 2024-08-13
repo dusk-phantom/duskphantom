@@ -268,15 +268,15 @@ pub mod tests_load_elim {
         entry:
         %alloca_5 = alloca [3 x i32]
         call void @llvm.memset.p0.i32([3 x i32]* %alloca_5, i8 0, i32 12, i1 false)
-        %getelementptr_8 = getelementptr [3 x i32], ptr %alloca_5, i32 0, i32 2
-        [-] %load_9 = load i32, ptr %getelementptr_8
-        [-] %getelementptr_10 = getelementptr [3 x i32], ptr %alloca_5, i32 0, i32 %load_9
-        [-] %load_11 = load i32, ptr %getelementptr_10
-        [+] %getelementptr_10 = getelementptr [3 x i32], ptr %alloca_5, i32 0, i32 0
+        %getelementptr_7 = getelementptr [3 x i32], ptr %alloca_5, i32 0, i32 2
+        [-] %load_8 = load i32, ptr %getelementptr_7
+        [-] %getelementptr_9 = getelementptr [3 x i32], ptr %alloca_5, i32 0, i32 %load_8
+        [-] %load_10 = load i32, ptr %getelementptr_9
+        [+] %getelementptr_9 = getelementptr [3 x i32], ptr %alloca_5, i32 0, i32 0
         br label %exit
 
         exit:
-        [-] ret i32 %load_11
+        [-] ret i32 %load_10
         [+] ret i32 0
 
 
