@@ -116,16 +116,18 @@ pub mod tests_memory_ssa {
         MemorySSA for function: main
         entry:
         ; 0 (liveOnEntry)
-        %getelementptr_18 = getelementptr [3 x [3 x i32]], ptr @a, i32 0, i32 2, i32 2
+        %getelementptr_5 = getelementptr [3 x [3 x i32]], ptr @a, i32 0, i32 2
+        %getelementptr_6 = getelementptr [3 x i32], ptr %getelementptr_5, i32 0, i32 2
         ; 1 = MemoryDef(0)
-        store i32 2, ptr %getelementptr_18
+        store i32 2, ptr %getelementptr_6
         ; MemoryUse(0)
         %load_8 = load i32, ptr @b
-        %getelementptr_20 = getelementptr [3 x [3 x i32]], ptr @a, i32 0, i32 %load_8, i32 1
+        %getelementptr_9 = getelementptr [3 x [3 x i32]], ptr @a, i32 0, i32 %load_8
+        %getelementptr_10 = getelementptr [3 x i32], ptr %getelementptr_9, i32 0, i32 1
         ; 3 = MemoryDef(1)
-        store i32 1, ptr %getelementptr_20
+        store i32 1, ptr %getelementptr_10
         ; MemoryUse(1)
-        %load_14 = load i32, ptr %getelementptr_18
+        %load_14 = load i32, ptr %getelementptr_6
         br label %exit
 
         exit:
@@ -157,16 +159,18 @@ pub mod tests_memory_ssa {
         MemorySSA for function: main
         entry:
         ; 0 (liveOnEntry)
-        %getelementptr_18 = getelementptr [3 x [3 x i32]], ptr @a, i32 0, i32 2, i32 2
+        %getelementptr_5 = getelementptr [3 x [3 x i32]], ptr @a, i32 0, i32 2
+        %getelementptr_6 = getelementptr [3 x i32], ptr %getelementptr_5, i32 0, i32 2
         ; 1 = MemoryDef(0)
-        store i32 2, ptr %getelementptr_18
+        store i32 2, ptr %getelementptr_6
         ; MemoryUse(0)
         %load_8 = load i32, ptr @b
-        %getelementptr_20 = getelementptr [3 x [3 x i32]], ptr @a, i32 0, i32 %load_8, i32 2
+        %getelementptr_9 = getelementptr [3 x [3 x i32]], ptr @a, i32 0, i32 %load_8
+        %getelementptr_10 = getelementptr [3 x i32], ptr %getelementptr_9, i32 0, i32 2
         ; 3 = MemoryDef(1)
-        store i32 1, ptr %getelementptr_20
+        store i32 1, ptr %getelementptr_10
         ; MemoryUse(3)
-        %load_14 = load i32, ptr %getelementptr_18
+        %load_14 = load i32, ptr %getelementptr_6
         br label %exit
 
         exit:

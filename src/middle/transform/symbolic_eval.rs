@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use anyhow::{anyhow, Context, Result};
 
 use crate::{
@@ -6,11 +8,10 @@ use crate::{
     middle::{
         ir::{
             instruction::{
-                memory_op_inst::GetElementPtr,
                 misc_inst::{FCmp, FCmpOp, ICmp, ICmpOp},
                 InstType,
             },
-            BBPtr, Constant, InstPtr, Operand,
+            BBPtr, Constant, FunPtr, InstPtr, Operand,
         },
         Program,
     },
@@ -24,6 +25,8 @@ pub fn optimize_program(program: &mut Program) -> Result<bool> {
 
 pub struct SymbolicEval<'a> {
     program: &'a mut Program,
+    reachable: HashSet<BBPtr>,
+    func: FunPtr,
 }
 
 impl<'a> Transform for SymbolicEval<'a> {
@@ -37,10 +40,10 @@ impl<'a> Transform for SymbolicEval<'a> {
             if func.is_lib() {
                 continue;
             }
+            self.func = func;
+            self.reachable = self.build_reachable_set()?;
             for bb in func.rpo_iter() {
-                // Skip unreachable block because rpo_iter is eager
-                // but blocks can be rewired in loop
-                if func.entry != Some(bb) && bb.get_pred_bb().is_empty() {
+                if !self.reachable.contains(&bb) {
                     continue;
                 }
                 for inst in bb.iter() {
@@ -54,7 +57,12 @@ impl<'a> Transform for SymbolicEval<'a> {
 
 impl<'a> SymbolicEval<'a> {
     pub fn new(program: &'a mut Program) -> Self {
-        Self { program }
+        let func = program.module.functions[0];
+        Self {
+            program,
+            func,
+            reachable: HashSet::new(),
+        }
     }
 
     /// Symbolic evaluate instruction to its simplest form.
@@ -63,10 +71,8 @@ impl<'a> SymbolicEval<'a> {
     fn symbolic_eval(&mut self, inst: InstPtr) -> Result<bool> {
         let mut changed = false;
         changed |= self.canonicalize_binary(inst)?;
-        changed |= self.constant_fold(inst)?
-            || self.useless_elim(inst)?
-            || self.merge_gep(inst)?
-            || self.inst_combine(inst)?;
+        changed |=
+            self.constant_fold(inst)? || self.useless_elim(inst)? || self.inst_combine(inst)?;
         Ok(changed)
     }
 
@@ -318,26 +324,12 @@ impl<'a> SymbolicEval<'a> {
                 return Ok(false);
             };
             if let Operand::Constant(Constant::Bool(cond)) = cond {
-                // Rewire basic block
-                let mut parent_bb = inst
+                // Rewire basic block and prune unreachable blocks
+                let parent_bb = inst
                     .get_parent_bb()
                     .ok_or_else(|| anyhow!("{} should have parent block", inst))
                     .with_context(|| context!())?;
-
-                // Remove unreachable basic block
-                let removed_bb = if cond {
-                    // TODO change remove interface so that it recurse
-                    let bb = parent_bb.get_succ_bb()[1];
-                    parent_bb.remove_false_bb();
-                    bb
-                } else {
-                    let bb = parent_bb.get_succ_bb()[0];
-                    parent_bb.remove_true_bb();
-                    bb
-                };
-                if removed_bb.get_pred_bb().is_empty() {
-                    remove_bb_recurse(removed_bb)?;
-                }
+                self.remove_edge(parent_bb, cond)?;
 
                 // Replace instruction with unconditional jump
                 let new_inst = self.program.mem_pool.get_br(None);
@@ -486,54 +478,6 @@ impl<'a> SymbolicEval<'a> {
         Ok(false)
     }
 
-    /// Merge `getelementptr` instruction.
-    /// If changed, original instruction is removed.
-    fn merge_gep(&mut self, mut inst: InstPtr) -> Result<bool> {
-        let inst_type = inst.get_type();
-        if inst_type == InstType::GetElementPtr {
-            let ptr = inst.get_operand()[0].clone();
-            if let Operand::Instruction(ptr) = ptr {
-                if ptr.get_type() == InstType::GetElementPtr {
-                    // Outer GEP: getelementptr ty1, inner, i1, ..., in
-                    // Inner GEP: getelementptr ty2, alloc, j1, ..., jm
-                    // Merged GEP: getelementptr ty2, alloc, j1, ..., jm + i1, ..., in
-                    let m = ptr.get_operand().len() - 1;
-
-                    // Create instruction for jm + i1
-                    let add = self
-                        .program
-                        .mem_pool
-                        .get_add(ptr.get_operand()[m].clone(), inst.get_operand()[1].clone());
-                    inst.insert_before(add);
-
-                    // Create a list of all operands
-                    let operands = [
-                        ptr.get_operand()[1..m].to_vec(),
-                        vec![add.into()],
-                        inst.get_operand()[2..].to_vec(),
-                    ]
-                    .concat();
-
-                    // Create new GEP instruction
-                    let gep = downcast_ref::<GetElementPtr>(ptr.as_ref().as_ref());
-                    let new_inst = self.program.mem_pool.get_getelementptr(
-                        gep.element_type.clone(),
-                        ptr.get_operand()[0].clone(),
-                        operands,
-                    );
-
-                    // Replace outer GEP with new GEP
-                    inst.insert_after(new_inst);
-                    inst.replace_self(&new_inst.into());
-                    self.symbolic_eval(add)?;
-                    self.symbolic_eval(new_inst)?;
-                    return Ok(true);
-                }
-            }
-        }
-        Ok(false)
-    }
-
     /// Combine multiple instructions into one.
     /// If changed, original instruction is removed.
     fn inst_combine(&mut self, mut inst: InstPtr) -> Result<bool> {
@@ -666,19 +610,38 @@ impl<'a> SymbolicEval<'a> {
         }
         Ok(false)
     }
-}
 
-/// Remove unused basic block recursively.
-///
-/// # Panics
-/// Please call the function only when `bb` is unreachable.
-fn remove_bb_recurse(mut bb: BBPtr) -> Result<()> {
-    let succ = bb.get_succ_bb().clone();
-    bb.remove_self();
-    for succ in succ {
-        if succ.get_pred_bb().is_empty() {
-            remove_bb_recurse(succ)?;
+    /// Returns the set of all reachable blocks.
+    fn build_reachable_set(&mut self) -> Result<HashSet<BBPtr>> {
+        let mut reachable = HashSet::new();
+        for bb in self.func.dfs_iter() {
+            reachable.insert(bb);
         }
+        Ok(reachable)
     }
-    Ok(())
+
+    /// Remove an edge and remove all unreachable basic blocks.
+    /// TODO: Is there a more efficient implementation?
+    fn remove_edge(&mut self, mut bb: BBPtr, cond: bool) -> Result<()> {
+        // Remove path based on condition
+        if cond {
+            bb.remove_false_bb();
+        } else {
+            bb.remove_true_bb();
+        }
+
+        // Build new reachable set
+        let reachable = self.build_reachable_set()?;
+
+        // Remove all unreachable basic blocks from old reachable set
+        for bb in self.reachable.iter() {
+            if !reachable.contains(bb) {
+                bb.clone().remove_self();
+            }
+        }
+
+        // Update reachable set
+        self.reachable = reachable;
+        Ok(())
+    }
 }
