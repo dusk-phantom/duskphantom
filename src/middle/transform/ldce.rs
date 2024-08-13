@@ -8,7 +8,10 @@ use crate::middle::{
         effect_analysis::EffectAnalysis,
         loop_tools::{LoopForest, LoopPtr},
     },
-    ir::{instruction::InstType, BBPtr, InstPtr},
+    ir::{
+        instruction::{downcast_ref, misc_inst::Call, InstType},
+        BBPtr, InstPtr,
+    },
     IRBuilder,
 };
 use anyhow::{Ok, Result};
@@ -94,7 +97,14 @@ impl<'a> LDCE<'a> {
     }
 
     fn can_delete_inst(&self, inst: InstPtr) -> bool {
-        let call_no_effect = !self.effect_analysis.has_effect(inst);
+        let call_no_effect = if inst.get_type() == InstType::Call {
+            let call = downcast_ref::<Call>(inst.as_ref().as_ref());
+            !(self.effect_analysis.has_mem_output.contains(&call.func)
+                || self.effect_analysis.has_io_input.contains(&call.func)
+                || self.effect_analysis.has_io_output.contains(&call.func))
+        } else {
+            true
+        };
         let no_control_or_store = !matches!(
             inst.get_type(),
             InstType::Br | InstType::Ret | InstType::Store
