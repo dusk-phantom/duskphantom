@@ -282,21 +282,20 @@ impl Func {
 
     /// FIXME test needed
     pub fn reg_interfere_graph2(f: &Func) -> Result<HashMap<Reg, RegSet>> {
-        fn add_inter(g: &mut HashMap<Reg, RegSet>, r1: &Reg, r2: &Reg) {
-            if r1.is_virtual() || r2.is_virtual() {
-                if r1 == r2 {
-                    g.entry(*r1).or_default();
-                    return;
-                }
-                g.entry(*r1).or_default().insert(r2);
-                g.entry(*r2).or_default().insert(r1);
-            }
-        }
         fn add_node(g: &mut HashMap<Reg, RegSet>, r: &Reg) {
             if r.is_virtual() {
                 g.entry(*r).or_default();
             }
         }
+        fn add_inter(g: &mut HashMap<Reg, RegSet>, r1: &Reg, r2: &Reg) {
+            add_node(g, r1);
+            add_node(g, r2);
+            if r1 != r2 && (r1.is_virtual() || r2.is_virtual()) {
+                g.entry(*r1).or_default().insert(r2);
+                g.entry(*r2).or_default().insert(r1);
+            }
+        }
+
         // for each basic block, collect interference between regs
         let mut graph: HashMap<Reg, RegSet> = HashMap::new();
         let reg_lives = Func::reg_lives2(f)?;
