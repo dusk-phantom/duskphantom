@@ -45,7 +45,8 @@ impl<'a> FunctionKit<'a> {
                     return Err(anyhow!("function is not variable")).with_context(|| context!());
                 };
                 let Some(func_ptr) = self.fun_env.get(&func_name).copied() else {
-                    return Err(anyhow!("function not defined")).with_context(|| context!());
+                    return Err(anyhow!("function {} not defined", func_name))
+                        .with_context(|| context!());
                 };
 
                 // Generate arguments
