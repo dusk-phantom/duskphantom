@@ -226,15 +226,12 @@ impl Value {
 
         // If target is array, load each element separately
         if let Value::Array(arr) = val {
-            // Get first sub-pointer
-            let initial_ptr =
-                self.getelementptr(kit, vec![Constant::Int(0).into(), Constant::Int(0).into()])?;
-
             // Iterate all sub-pointers
             for (i, elem) in arr.into_iter().enumerate() {
-                let sub_ptr = initial_ptr
-                    .clone()
-                    .getelementptr(kit, vec![Constant::Int(i as i32).into()])?;
+                let sub_ptr = self.clone().getelementptr(
+                    kit,
+                    vec![Constant::Int(0).into(), Constant::Int(i as i32).into()],
+                )?;
 
                 // Assign element to sub-pointer
                 sub_ptr.assign(kit, elem)?;
