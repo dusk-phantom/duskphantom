@@ -117,10 +117,14 @@ impl<T: GraphNode> UdGraph<T> {
         res.push_str(&format!("graph {} {{\n", graph_name));
 
         let mut showed: HashSet<(u64, u64)> = HashSet::new();
-        for (k, v) in self.edges.iter() {
+        let mut sorted_edges: Vec<(&u64, &HashSet<u64>)> = self.edges.iter().collect();
+        sorted_edges.sort_by_key(|(k, _)| **k);
+        for (k, nbs) in sorted_edges {
             let from = self.get_node(*k).unwrap();
             let from_str = node_shower(from);
-            for to in v {
+            let mut sorted_nbs: Vec<&u64> = nbs.iter().collect();
+            sorted_nbs.sort_by_key(|&&x| x);
+            for to in sorted_nbs {
                 if showed.contains(&(*k, *to)) || showed.contains(&(*to, *k)) {
                     continue;
                 }
