@@ -8,8 +8,8 @@ pub mod tests_store_elim {
             analysis::{effect_analysis::EffectAnalysis, memory_ssa::MemorySSA},
             irgen::gen,
             transform::{
-                block_fuse, constant_fold, dead_code_elim, func_inline, symbolic_eval, load_elim,
-                mem2reg, redundance_elim, store_elim, unreachable_block_elim,
+                block_fuse, constant_fold, dead_code_elim, func_inline, load_elim, load_store_elim,
+                mem2reg, redundance_elim, store_elim, symbolic_eval,
             },
         },
         utils::diff::diff,
@@ -163,7 +163,6 @@ pub mod tests_store_elim {
         mem2reg::optimize_program(&mut program).unwrap();
         func_inline::optimize_program(&mut program).unwrap();
         redundance_elim::optimize_program(&mut program).unwrap();
-        unreachable_block_elim::optimize_program(&mut program).unwrap();
         block_fuse::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
@@ -231,7 +230,6 @@ pub mod tests_store_elim {
         constant_fold::optimize_program(&mut program).unwrap();
         symbolic_eval::optimize_program(&mut program).unwrap();
         redundance_elim::optimize_program(&mut program).unwrap();
-        unreachable_block_elim::optimize_program(&mut program).unwrap();
         block_fuse::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
@@ -291,23 +289,17 @@ pub mod tests_store_elim {
         constant_fold::optimize_program(&mut program).unwrap();
         symbolic_eval::optimize_program(&mut program).unwrap();
         redundance_elim::optimize_program(&mut program).unwrap();
-        unreachable_block_elim::optimize_program(&mut program).unwrap();
         block_fuse::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        for _ in 0..3 {
-            let effect_analysis = EffectAnalysis::new(&program);
-            let mut memory_ssa = MemorySSA::new(&program, &effect_analysis);
-            load_elim::optimize_program(&mut program, &mut memory_ssa).unwrap();
-            store_elim::optimize_program(&mut program, &mut memory_ssa).unwrap();
-            constant_fold::optimize_program(&mut program).unwrap();
-            symbolic_eval::optimize_program(&mut program).unwrap();
-            redundance_elim::optimize_program(&mut program).unwrap();
-            unreachable_block_elim::optimize_program(&mut program).unwrap();
-            block_fuse::optimize_program(&mut program).unwrap();
-        }
+        // TODO this much of load_store_elim is because of consecutive load, it should not happen
+        // we should put load_elim inside symbolic eval, and utilize GVN for alias analysis
+        load_store_elim::optimize_program(&mut program).unwrap();
+        redundance_elim::optimize_program(&mut program).unwrap();
+        load_store_elim::optimize_program(&mut program).unwrap();
+        block_fuse::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
         @a = dso_local global [3 x [3 x i32]] zeroinitializer

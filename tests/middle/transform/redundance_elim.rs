@@ -7,8 +7,8 @@ pub mod tests_constant_fold {
         middle::{
             irgen::gen,
             transform::{
-                block_fuse, constant_fold, dead_code_elim, func_inline, symbolic_eval, mem2reg,
-                redundance_elim, unreachable_block_elim,
+                block_fuse, constant_fold, dead_code_elim, func_inline, mem2reg, redundance_elim,
+                symbolic_eval,
             },
         },
         utils::diff::diff,
@@ -97,7 +97,6 @@ pub mod tests_constant_fold {
         symbolic_eval::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         func_inline::optimize_program(&mut program).unwrap();
-        unreachable_block_elim::optimize_program(&mut program).unwrap();
         block_fuse::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
