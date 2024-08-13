@@ -2,7 +2,10 @@ use anyhow::Result;
 
 use crate::middle::Program;
 
-use super::{block_fuse, func_inline, load_store_elim, mem2reg, redundance_elim, symbolic_eval};
+use super::{
+    block_fuse, dead_code_elim, func_inline, load_store_elim, mem2reg, redundance_elim,
+    symbolic_eval,
+};
 
 pub fn optimize_program(program: &mut Program) -> Result<bool> {
     mem2reg::optimize_program(program)?;
@@ -32,6 +35,7 @@ pub fn optimize_program(program: &mut Program) -> Result<bool> {
         // If we loop load_elim, we can only handle the case without `+ 0`,
         // we should put load elim inside symbolic eval, and utilize GVN for alias analysis
         changed |= load_store_elim::optimize_program(program)?;
+        changed |= dead_code_elim::optimize_program(program)?;
 
         // Fuse blocks
         changed |= block_fuse::optimize_program(program)?;
