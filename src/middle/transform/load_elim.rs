@@ -89,7 +89,7 @@ impl<'a, 'b> LoadElim<'a, 'b> {
                     .first()
                     .ok_or_else(|| anyhow!("{} should be load", load_inst))
                     .with_context(|| context!())?;
-                if let Some(op) = readonly_deref(load_op, vec![]) {
+                if let Some(op) = readonly_deref(load_op, vec![Some(0)]) {
                     load_inst.replace_self(&op);
                     self.memory_ssa.remove_node(load_node);
                     return Ok(true);
@@ -129,17 +129,19 @@ impl<'a, 'b> LoadElim<'a, 'b> {
     }
 }
 
-fn readonly_deref<'a>(op: &'a Operand, mut index: Vec<&'a Operand>) -> Option<Operand> {
+/// Deref readonly array operand with maybe-constant indices.
+fn readonly_deref(op: &Operand, mut index: Vec<Option<i32>>) -> Option<Operand> {
     match op {
         Operand::Global(gvar) => {
             let mut val = &gvar.initializer;
 
-            // For a[0][1][2], it translates to something like `gep (gep a, _, 0), _, 1, 2`
-            // Calling `readonly_deref` on it will first push `2, 1` to index array, and then push `0` (reversed!)
+            // For a[0][1][2], it translates to something like `gep (gep a, 0, 0), 0, 1, 2`
+            // Calling `readonly_deref` on it will first push `2, 1` to index array, and then push `0 + 0, 0` (reversed!)
             // To get the final value, we iterate the index array in reverse order
-            for i in index.iter().rev() {
+            // The last index is skipped because it moves the base pointer, that's not valid for global var
+            for i in index.iter().rev().skip(1) {
                 if let Constant::Array(arr) = val {
-                    if let Operand::Constant(Constant::Int(i)) = i {
+                    if let Some(i) = i {
                         if let Some(element) = arr.get(*i as usize) {
                             val = element;
                         } else {
@@ -158,7 +160,43 @@ fn readonly_deref<'a>(op: &'a Operand, mut index: Vec<&'a Operand>) -> Option<Op
         }
         Operand::Instruction(inst) => {
             if inst.get_type() == InstType::GetElementPtr {
-                index.extend(inst.get_operand().iter().skip(2).rev());
+                // For example, if we have `index = [out_ix1, out_ix0]`, and `inst = gep %ptr, ix0, ix1, ix2`
+                // We would try to combine `ix2` with `out_ix0` first, so that index is `[out_ix1, out_ix0 + ix2]`
+                // The index array is in reverse order, and will be read reversed when indexing array
+                let last_const = if let (Some(Some(i)), Some(Operand::Constant(Constant::Int(j)))) =
+                    (index.last_mut(), inst.get_operand().last())
+                {
+                    *i += *j;
+                    true
+                } else {
+                    false
+                };
+
+                // If there is non-constant in last index, set it to None
+                if !last_const {
+                    if let Some(i) = index.last_mut() {
+                        *i = None;
+                    }
+                }
+
+                // Add `ix1, ix0` to index array, so that it becomes `[out_ix1, out_ix0 + ix2, ix1, ix0]`
+                index.extend(
+                    inst.get_operand()
+                        .iter()
+                        .skip(1)
+                        .rev()
+                        .skip(1)
+                        .cloned()
+                        .map(|op| {
+                            if let Operand::Constant(Constant::Int(i)) = op {
+                                Some(i)
+                            } else {
+                                None
+                            }
+                        }),
+                );
+
+                // Recurse into sub-expression
                 return readonly_deref(inst.get_operand().first().unwrap(), index);
             }
             None

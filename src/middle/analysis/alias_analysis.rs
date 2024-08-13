@@ -4,7 +4,7 @@ use crate::{
     backend::from_self::downcast_ref,
     middle::ir::{
         instruction::{memory_op_inst::GetElementPtr, InstType},
-        Operand, ValueType,
+        Constant, Operand, ValueType,
     },
 };
 
@@ -156,7 +156,14 @@ fn split_gep(op: &Operand) -> (Operand, HashMap<ValueType, Operand>) {
         let gep = downcast_ref::<GetElementPtr>(inst.as_ref().as_ref());
         let mut element_type = gep.element_type.clone();
         for op in inst.get_operand().iter().skip(1) {
-            offset.insert(element_type.clone(), op.clone());
+            if let Some(old_offset) = offset.get_mut(&element_type) {
+                // Handle only +0 or 0+ in this case, UB otherwise
+                if let Operand::Constant(Constant::Int(0)) = old_offset {
+                    *old_offset = op.clone();
+                }
+            } else {
+                offset.insert(element_type.clone(), op.clone());
+            }
             if let Some(subtype) = element_type.get_sub_type() {
                 element_type = subtype.clone();
             }
