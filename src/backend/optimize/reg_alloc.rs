@@ -6,15 +6,24 @@ use crate::fprintln;
 use super::*;
 
 pub fn handle_reg_alloc(func: &mut Func) -> Result<()> {
-    // count the interference graph
-    let reg_graph = Func::reg_interfere_graph2(func)?;
-    if try_perfect_alloc2(func, &reg_graph).is_ok() {
-        return Ok(());
+    if func.line() < 10000 {
+        // count the interference graph
+        let reg_graph = Func::reg_interfere_graph2(func)?;
+        if try_perfect_alloc2(func, &reg_graph).is_ok() {
+            return Ok(());
+        }
+        let (colors, spills) = reg_alloc2(&reg_graph, free_iregs(), free_fregs())?;
+        apply_colors(func, colors);
+        apply_spills(func, spills);
+    } else {
+        let reg_graph = Func::reg_interfere_graph(func)?;
+        if try_perfect_alloc(func, &reg_graph).is_ok() {
+            return Ok(());
+        }
+        let (colors, spills) = reg_alloc(&reg_graph, free_iregs(), free_fregs())?;
+        apply_colors(func, colors);
+        apply_spills(func, spills);
     }
-    let (colors, spills) = reg_alloc2(&reg_graph, free_iregs(), free_fregs())?;
-    apply_colors(func, colors);
-    apply_spills(func, spills);
-    // apply_spills2(func, spills)?;
 
     Ok(())
 }
