@@ -8,6 +8,7 @@ use crate::{
     middle::{
         ir::{
             instruction::{
+                memory_op_inst::GetElementPtr,
                 misc_inst::{FCmp, FCmpOp, ICmp, ICmpOp},
                 InstType,
             },
@@ -607,6 +608,55 @@ impl<'a> SymbolicEval<'a> {
                 }
             }
             _ => (),
+        }
+        Ok(false)
+    }
+
+    /// Merge `getelementptr` instruction.
+    /// If changed, original instruction is removed.
+    #[allow(unused)]
+    fn merge_gep(&mut self, mut inst: InstPtr) -> Result<bool> {
+        let inst_type = inst.get_type();
+        if inst_type == InstType::GetElementPtr {
+            let ptr = inst.get_operand()[0].clone();
+            if let Operand::Instruction(ptr) = ptr {
+                if ptr.get_type() == InstType::GetElementPtr {
+                    // Outer GEP: getelementptr ty1, inner, i1, ..., in
+                    // Inner GEP: getelementptr ty2, alloc, j1, ..., jm
+                    // Merged GEP: getelementptr ty2, alloc, j1, ..., jm + i1, ..., in
+                    let m = ptr.get_operand().len() - 1;
+
+                    // Create instruction for jm + i1
+                    let add = self
+                        .program
+                        .mem_pool
+                        .get_add(ptr.get_operand()[m].clone(), inst.get_operand()[1].clone());
+                    inst.insert_before(add);
+
+                    // Create a list of all operands
+                    let operands = [
+                        ptr.get_operand()[1..m].to_vec(),
+                        vec![add.into()],
+                        inst.get_operand()[2..].to_vec(),
+                    ]
+                    .concat();
+
+                    // Create new GEP instruction
+                    let gep = downcast_ref::<GetElementPtr>(ptr.as_ref().as_ref());
+                    let new_inst = self.program.mem_pool.get_getelementptr(
+                        gep.element_type.clone(),
+                        ptr.get_operand()[0].clone(),
+                        operands,
+                    );
+
+                    // Replace outer GEP with new GEP
+                    inst.insert_after(new_inst);
+                    inst.replace_self(&new_inst.into());
+                    self.symbolic_eval(add)?;
+                    self.symbolic_eval(new_inst)?;
+                    return Ok(true);
+                }
+            }
         }
         Ok(false)
     }

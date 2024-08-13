@@ -160,6 +160,10 @@ fn split_gep(op: &Operand) -> (Operand, HashMap<ValueType, Operand>) {
                 // Handle only +0 or 0+ in this case, UB otherwise
                 if let Operand::Constant(Constant::Int(0)) = old_offset {
                     *old_offset = op.clone();
+                } else if let Operand::Constant(Constant::Int(0)) = op {
+                    // Do nothing
+                } else {
+                    unimplemented!("Unsupported GEP offset: {} + {}", old_offset, op);
                 }
             } else {
                 offset.insert(element_type.clone(), op.clone());
@@ -180,5 +184,45 @@ fn can_equal(a: Operand, b: Operand) -> bool {
 
         // Other operands can always equal (give up predicate analysis)
         _ => true,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use insta::assert_debug_snapshot;
+
+    use crate::middle::Program;
+
+    use super::*;
+
+    #[test]
+    fn test_split_gep() {
+        let mut program = Program::new();
+        let alloc = program.mem_pool.get_alloca(
+            ValueType::Array(ValueType::Array(ValueType::Int.into(), 8).into(), 8),
+            1,
+        );
+        let gep_1 = program.mem_pool.get_getelementptr(
+            ValueType::Array(ValueType::Array(ValueType::Int.into(), 8).into(), 8),
+            alloc.into(),
+            vec![
+                Operand::Constant(Constant::Int(0)),
+                Operand::Constant(Constant::Int(0)),
+            ],
+        );
+        let gep_2 = program.mem_pool.get_getelementptr(
+            ValueType::Array(ValueType::Int.into(), 8),
+            gep_1.into(),
+            vec![Operand::Constant(Constant::Int(3))],
+        );
+        let gep_3 = program.mem_pool.get_getelementptr(
+            ValueType::Array(ValueType::Int.into(), 8),
+            gep_2.into(),
+            vec![
+                Operand::Constant(Constant::Int(0)),
+                Operand::Constant(Constant::Int(2)),
+            ],
+        );
+        let split = split_gep(&gep_3.into()).1;
     }
 }
