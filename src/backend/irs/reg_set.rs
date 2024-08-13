@@ -148,15 +148,9 @@ impl RegSet {
     pub fn remove(&mut self, reg: &Reg) {
         let id = reg.id() as usize;
         if reg.is_usual() {
-            if self.usual.len() <= id {
-                return;
-            }
-            self.usual.set(id, false);
+            self.usual.get_mut(id).iter_mut().for_each(|a| a.set(false));
         } else {
-            if self.float.len() <= id {
-                return;
-            }
-            self.float.set(id, false);
+            self.float.get_mut(id).iter_mut().for_each(|e| e.set(false));
         }
     }
 

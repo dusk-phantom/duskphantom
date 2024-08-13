@@ -9,13 +9,14 @@ fn prepare_regs(n: usize) -> Vec<Reg> {
     // let mut rg = RegGenerator::new();
     for _ in 0..n {
         let is_usual: bool = rand::random();
-        let id: u32 = rand::random::<u16>() as u32;
+        let id: u32 = rand::random::<u32>() as u32 % 10_0000;
         regs.push(Reg::new(id, is_usual));
         // regs.push(rg.gen_virtual_reg(is_usual));
     }
     regs
 }
 
+#[allow(unused)]
 fn bench_insert(c: &mut Criterion) {
     let regs = prepare_regs(10000);
     let insert1 = || {
@@ -158,8 +159,9 @@ fn bench_clone_then_retain(c: &mut Criterion) {
     group.finish();
 }
 
+#[allow(unused)]
 fn bench_remove(c: &mut Criterion) {
-    let regs = prepare_regs(10000);
+    let regs = prepare_regs(100000);
     let mut rg1 = RegSet::new();
     let mut rg2 = HashSet::new();
     for reg in regs.iter() {
@@ -191,8 +193,8 @@ criterion_group! {
     name = benches;
     config = Criterion::default().measurement_time(Duration::from_secs(10)).sample_size(10);
     targets =
-        // bench_contains,
-        // bench_insert,
+        //  bench_contains,
+        //  bench_insert,
         // bench_merge,
         bench_remove,
         // bench_clone,
