@@ -1248,42 +1248,35 @@ mod tests {
         %alloca_5 = alloca [2 x [2 x [2 x float]]]
         call void @llvm.memset.p0.i32([2 x [2 x [2 x float]]]* %alloca_5, i8 0, i32 32, i1 false)
         %getelementptr_7 = getelementptr [2 x [2 x [2 x float]]], ptr %alloca_5, i32 0, i32 0
-        %getelementptr_8 = getelementptr [2 x [2 x float]], ptr %getelementptr_7, i32 0
-        %getelementptr_9 = getelementptr [2 x [2 x float]], ptr %getelementptr_8, i32 0, i32 0
-        %getelementptr_10 = getelementptr [2 x float], ptr %getelementptr_9, i32 0
-        %getelementptr_11 = getelementptr [2 x float], ptr %getelementptr_10, i32 0, i32 0
-        %getelementptr_12 = getelementptr float, ptr %getelementptr_11, i32 0
+        %getelementptr_8 = getelementptr [2 x [2 x float]], ptr %getelementptr_7, i32 0, i32 0
+        %getelementptr_9 = getelementptr [2 x float], ptr %getelementptr_8, i32 0, i32 0
+        %itofp_10 = sitofp i32 1 to float
+        store float %itofp_10, ptr %getelementptr_9
+        %getelementptr_12 = getelementptr [2 x float], ptr %getelementptr_8, i32 0, i32 1
         %itofp_13 = sitofp i32 1 to float
         store float %itofp_13, ptr %getelementptr_12
-        %getelementptr_15 = getelementptr float, ptr %getelementptr_11, i32 1
-        %itofp_16 = sitofp i32 1 to float
-        store float %itofp_16, ptr %getelementptr_15
-        %getelementptr_18 = getelementptr [2 x float], ptr %getelementptr_9, i32 1
-        %getelementptr_19 = getelementptr [2 x float], ptr %getelementptr_18, i32 0, i32 0
-        %getelementptr_20 = getelementptr float, ptr %getelementptr_19, i32 0
-        %itofp_21 = sitofp i32 4 to float
-        store float %itofp_21, ptr %getelementptr_20
-        %getelementptr_23 = getelementptr float, ptr %getelementptr_19, i32 1
-        %itofp_24 = sitofp i32 5 to float
-        store float %itofp_24, ptr %getelementptr_23
-        %getelementptr_26 = getelementptr [2 x [2 x float]], ptr %getelementptr_7, i32 1
-        %getelementptr_27 = getelementptr [2 x [2 x float]], ptr %getelementptr_26, i32 0, i32 0
-        %getelementptr_28 = getelementptr [2 x float], ptr %getelementptr_27, i32 0
-        %getelementptr_29 = getelementptr [2 x float], ptr %getelementptr_28, i32 0, i32 0
-        %getelementptr_30 = getelementptr float, ptr %getelementptr_29, i32 0
-        %itofp_31 = sitofp i32 1 to float
-        store float %itofp_31, ptr %getelementptr_30
-        %getelementptr_33 = getelementptr [2 x float], ptr %getelementptr_27, i32 1
-        %getelementptr_34 = getelementptr [2 x float], ptr %getelementptr_33, i32 0, i32 0
-        %getelementptr_35 = getelementptr float, ptr %getelementptr_34, i32 0
-        %itofp_36 = sitofp i32 4 to float
-        store float %itofp_36, ptr %getelementptr_35
-        %getelementptr_38 = getelementptr [2 x [2 x [2 x float]]], ptr %alloca_5, i32 0, i32 1
-        %getelementptr_39 = getelementptr [2 x [2 x float]], ptr %getelementptr_38, i32 0, i32 1
-        %getelementptr_40 = getelementptr [2 x float], ptr %getelementptr_39, i32 0, i32 1
-        %load_41 = load float, ptr %getelementptr_40
-        %fptoi_42 = fptosi float %load_41 to i32
-        store i32 %fptoi_42, ptr %alloca_2
+        %getelementptr_15 = getelementptr [2 x [2 x float]], ptr %getelementptr_7, i32 0, i32 1
+        %getelementptr_16 = getelementptr [2 x float], ptr %getelementptr_15, i32 0, i32 0
+        %itofp_17 = sitofp i32 4 to float
+        store float %itofp_17, ptr %getelementptr_16
+        %getelementptr_19 = getelementptr [2 x float], ptr %getelementptr_15, i32 0, i32 1
+        %itofp_20 = sitofp i32 5 to float
+        store float %itofp_20, ptr %getelementptr_19
+        %getelementptr_22 = getelementptr [2 x [2 x [2 x float]]], ptr %alloca_5, i32 0, i32 1
+        %getelementptr_23 = getelementptr [2 x [2 x float]], ptr %getelementptr_22, i32 0, i32 0
+        %getelementptr_24 = getelementptr [2 x float], ptr %getelementptr_23, i32 0, i32 0
+        %itofp_25 = sitofp i32 1 to float
+        store float %itofp_25, ptr %getelementptr_24
+        %getelementptr_27 = getelementptr [2 x [2 x float]], ptr %getelementptr_22, i32 0, i32 1
+        %getelementptr_28 = getelementptr [2 x float], ptr %getelementptr_27, i32 0, i32 0
+        %itofp_29 = sitofp i32 4 to float
+        store float %itofp_29, ptr %getelementptr_28
+        %getelementptr_31 = getelementptr [2 x [2 x [2 x float]]], ptr %alloca_5, i32 0, i32 1
+        %getelementptr_32 = getelementptr [2 x [2 x float]], ptr %getelementptr_31, i32 0, i32 1
+        %getelementptr_33 = getelementptr [2 x float], ptr %getelementptr_32, i32 0, i32 1
+        %load_34 = load float, ptr %getelementptr_33
+        %fptoi_35 = fptosi float %load_34 to i32
+        store i32 %fptoi_35, ptr %alloca_2
         br label %exit
 
         exit:
@@ -1328,15 +1321,14 @@ mod tests {
         %alloca_5 = alloca [1 x i32]
         call void @llvm.memset.p0.i32([1 x i32]* %alloca_5, i8 0, i32 4, i1 false)
         %getelementptr_7 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
-        %getelementptr_8 = getelementptr i32, ptr %getelementptr_7, i32 0
-        store i32 0, ptr %getelementptr_8
-        %getelementptr_10 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
-        %load_11 = load i32, ptr %getelementptr_10
-        %getelementptr_12 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 %load_11
-        store i32 1, ptr %getelementptr_12
-        %getelementptr_14 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
-        %load_15 = load i32, ptr %getelementptr_14
-        store i32 %load_15, ptr %alloca_2
+        store i32 0, ptr %getelementptr_7
+        %getelementptr_9 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
+        %load_10 = load i32, ptr %getelementptr_9
+        %getelementptr_11 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 %load_10
+        store i32 1, ptr %getelementptr_11
+        %getelementptr_13 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
+        %load_14 = load i32, ptr %getelementptr_13
+        store i32 %load_14, ptr %alloca_2
         br label %exit
 
         exit:
@@ -1387,12 +1379,11 @@ mod tests {
         %alloca_5 = alloca [1 x i32]
         call void @llvm.memset.p0.i32([1 x i32]* %alloca_5, i8 0, i32 4, i1 false)
         %getelementptr_7 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
-        %getelementptr_8 = getelementptr i32, ptr %getelementptr_7, i32 0
-        store i32 8, ptr %getelementptr_8
-        %getelementptr_10 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
-        %call_11 = call i32 @f(i32* %getelementptr_10)
-        %getelementptr_12 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
-        call void @putarray(i32 1, i32* %getelementptr_12)
+        store i32 8, ptr %getelementptr_7
+        %getelementptr_9 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
+        %call_10 = call i32 @f(i32* %getelementptr_9)
+        %getelementptr_11 = getelementptr [1 x i32], ptr %alloca_5, i32 0, i32 0
+        call void @putarray(i32 1, i32* %getelementptr_11)
         store i32 0, ptr %alloca_2
         br label %exit
 
@@ -1404,21 +1395,21 @@ mod tests {
         }
         define i32 @f(i32* %a) {
         entry:
-        %alloca_18 = alloca i32
-        %alloca_21 = alloca i32*
-        store i32* %a, ptr %alloca_21
-        %load_23 = load i32*, ptr %alloca_21
-        %getelementptr_24 = getelementptr i32, ptr %load_23, i32 0
-        store i32 1, ptr %getelementptr_24
-        %load_26 = load i32*, ptr %alloca_21
-        %getelementptr_27 = getelementptr i32, ptr %load_26, i32 0
-        %load_28 = load i32, ptr %getelementptr_27
-        store i32 %load_28, ptr %alloca_18
+        %alloca_17 = alloca i32
+        %alloca_20 = alloca i32*
+        store i32* %a, ptr %alloca_20
+        %load_22 = load i32*, ptr %alloca_20
+        %getelementptr_23 = getelementptr i32, ptr %load_22, i32 0
+        store i32 1, ptr %getelementptr_23
+        %load_25 = load i32*, ptr %alloca_20
+        %getelementptr_26 = getelementptr i32, ptr %load_25, i32 0
+        %load_27 = load i32, ptr %getelementptr_26
+        store i32 %load_27, ptr %alloca_17
         br label %exit
 
         exit:
-        %load_19 = load i32, ptr %alloca_18
-        ret i32 %load_19
+        %load_18 = load i32, ptr %alloca_17
+        ret i32 %load_18
 
 
         }
@@ -1955,14 +1946,13 @@ mod tests {
         %alloca_2 = alloca i32
         %alloca_5 = alloca [2 x [8 x i32]]
         call void @llvm.memset.p0.i32([2 x [8 x i32]]* %alloca_5, i8 0, i32 64, i1 false)
-        %getelementptr_7 = getelementptr [2 x [8 x i32]], ptr %alloca_5, i32 0, i32 0
         br label %cond0
 
         cond0:
-        %getelementptr_13 = getelementptr [4 x i32], ptr @c, i32 0, i32 2
-        %load_14 = load i32, ptr %getelementptr_13
-        %icmp_15 = icmp ne i32 %load_14, 0
-        br i1 %icmp_15, label %then1, label %alt2
+        %getelementptr_12 = getelementptr [4 x i32], ptr @c, i32 0, i32 2
+        %load_13 = load i32, ptr %getelementptr_12
+        %icmp_14 = icmp ne i32 %load_13, 0
+        br i1 %icmp_14, label %then1, label %alt2
 
         then1:
         call void @putch(i32 10)
@@ -2146,7 +2136,6 @@ mod tests {
         then1:
         %alloca_13 = alloca [20 x i32]
         call void @llvm.memset.p0.i32([20 x i32]* %alloca_13, i8 0, i32 80, i1 false)
-        %getelementptr_15 = getelementptr [20 x i32], ptr %alloca_13, i32 0, i32 0
         br label %final3
 
         alt2:

@@ -59,9 +59,9 @@ pub mod tests_effect_analysis {
             def: %alloca_5
             use: 
 
-        %load_9 = load i32, ptr %getelementptr_8:
+        %load_8 = load i32, ptr %getelementptr_7:
             def: 
-            use: %getelementptr_8
+            use: %getelementptr_7
 
         "###);
     }

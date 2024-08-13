@@ -259,9 +259,9 @@ pub mod tests_store_elim {
         exit:
         [-] %alloca_5 = alloca [3 x i32]
         [-] call void @llvm.memset.p0.i32([3 x i32]* %alloca_5, i8 0, i32 12, i1 false)
-        [-] %getelementptr_11 = getelementptr [3 x i32], ptr %alloca_5, i32 0, i32 1
-        [-] %load_12 = load i32, ptr %getelementptr_11
-        [-] ret i32 %load_12
+        [-] %getelementptr_10 = getelementptr [3 x i32], ptr %alloca_5, i32 0, i32 1
+        [-] %load_11 = load i32, ptr %getelementptr_10
+        [-] ret i32 %load_11
         [+] ret i32 0
 
 
