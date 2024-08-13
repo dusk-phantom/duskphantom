@@ -9,7 +9,7 @@ pub mod tests_memory_ssa {
                 effect_analysis::EffectAnalysis, memory_ssa::MemorySSA,
             },
             irgen::gen,
-            transform::{dead_code_elim, inst_combine, mem2reg, redundance_elim},
+            transform::{dead_code_elim, symbolic_eval, mem2reg, redundance_elim},
         },
     };
 
@@ -107,7 +107,7 @@ pub mod tests_memory_ssa {
         let parsed = parse(code).unwrap();
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
-        inst_combine::optimize_program(&mut program).unwrap();
+        symbolic_eval::optimize_program(&mut program).unwrap();
         redundance_elim::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
@@ -148,7 +148,7 @@ pub mod tests_memory_ssa {
         let parsed = parse(code).unwrap();
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
-        inst_combine::optimize_program(&mut program).unwrap();
+        symbolic_eval::optimize_program(&mut program).unwrap();
         redundance_elim::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
@@ -192,7 +192,7 @@ pub mod tests_memory_ssa {
         let parsed = parse(code).unwrap();
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
-        inst_combine::optimize_program(&mut program).unwrap();
+        symbolic_eval::optimize_program(&mut program).unwrap();
         redundance_elim::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
@@ -243,7 +243,7 @@ pub mod tests_memory_ssa {
         let parsed = parse(code).unwrap();
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
-        inst_combine::optimize_program(&mut program).unwrap();
+        symbolic_eval::optimize_program(&mut program).unwrap();
         redundance_elim::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);

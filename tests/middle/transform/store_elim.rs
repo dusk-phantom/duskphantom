@@ -8,7 +8,7 @@ pub mod tests_store_elim {
             analysis::{effect_analysis::EffectAnalysis, memory_ssa::MemorySSA},
             irgen::gen,
             transform::{
-                block_fuse, constant_fold, dead_code_elim, func_inline, inst_combine, load_elim,
+                block_fuse, constant_fold, dead_code_elim, func_inline, symbolic_eval, load_elim,
                 mem2reg, redundance_elim, store_elim, unreachable_block_elim,
             },
         },
@@ -229,7 +229,7 @@ pub mod tests_store_elim {
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
-        inst_combine::optimize_program(&mut program).unwrap();
+        symbolic_eval::optimize_program(&mut program).unwrap();
         redundance_elim::optimize_program(&mut program).unwrap();
         unreachable_block_elim::optimize_program(&mut program).unwrap();
         block_fuse::optimize_program(&mut program).unwrap();
@@ -289,7 +289,7 @@ pub mod tests_store_elim {
         mem2reg::optimize_program(&mut program).unwrap();
         func_inline::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
-        inst_combine::optimize_program(&mut program).unwrap();
+        symbolic_eval::optimize_program(&mut program).unwrap();
         redundance_elim::optimize_program(&mut program).unwrap();
         unreachable_block_elim::optimize_program(&mut program).unwrap();
         block_fuse::optimize_program(&mut program).unwrap();
@@ -303,7 +303,7 @@ pub mod tests_store_elim {
             load_elim::optimize_program(&mut program, &mut memory_ssa).unwrap();
             store_elim::optimize_program(&mut program, &mut memory_ssa).unwrap();
             constant_fold::optimize_program(&mut program).unwrap();
-            inst_combine::optimize_program(&mut program).unwrap();
+            symbolic_eval::optimize_program(&mut program).unwrap();
             redundance_elim::optimize_program(&mut program).unwrap();
             unreachable_block_elim::optimize_program(&mut program).unwrap();
             block_fuse::optimize_program(&mut program).unwrap();

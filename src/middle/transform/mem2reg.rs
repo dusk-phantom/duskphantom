@@ -18,13 +18,36 @@ use crate::{
     utils::frame_map::FrameMap,
 };
 
+use super::Transform;
+
 pub fn optimize_program(program: &mut Program) -> Result<bool> {
-    for func in &program.module.functions {
-        if !func.is_lib() {
-            mem2reg(*func, &mut program.mem_pool)?;
-        }
+    Mem2Reg::new(program).run_and_log()
+}
+
+pub struct Mem2Reg<'a> {
+    program: &'a mut Program,
+}
+
+impl<'a> Transform for Mem2Reg<'a> {
+    fn name() -> String {
+        "mem2reg".to_string()
     }
-    Ok(true)
+
+    fn run(&mut self) -> Result<bool> {
+        let mut changed = false;
+        for func in &self.program.module.functions {
+            if !func.is_lib() {
+                changed |= mem2reg(*func, &mut self.program.mem_pool)?;
+            }
+        }
+        Ok(changed)
+    }
+}
+
+impl<'a> Mem2Reg<'a> {
+    pub fn new(program: &'a mut Program) -> Self {
+        Self { program }
+    }
 }
 
 /// A single argument of "phi" instruction
@@ -75,7 +98,7 @@ impl PhiPack {
 
 /// The mem2reg pass
 #[allow(unused)]
-pub fn mem2reg(func: FunPtr, mem_pool: &mut Pin<Box<IRBuilder>>) -> Result<()> {
+pub fn mem2reg(func: FunPtr, mem_pool: &mut Pin<Box<IRBuilder>>) -> Result<bool> {
     let entry = func.entry.unwrap();
     let mut variable_to_phi_insertion: BTreeMap<InstPtr, BTreeSet<BBPtr>> =
         get_variable_to_phi_insertion(func);
@@ -109,7 +132,9 @@ pub fn mem2reg(func: FunPtr, mem_pool: &mut Pin<Box<IRBuilder>>) -> Result<()> {
         visited: &mut BTreeSet<BBPtr>,
         current_variable_value: &mut FrameMap<InstPtr, Operand>,
         block_to_phi_insertion: &mut BTreeMap<BBPtr, Vec<PhiPack>>,
-    ) -> Result<()> {
+    ) -> Result<bool> {
+        let mut changed = false;
+
         // Decide value for each "phi" instruction to add
         for mut phi in block_to_phi_insertion
             .get_mut(&current_bb)
@@ -119,13 +144,14 @@ pub fn mem2reg(func: FunPtr, mem_pool: &mut Pin<Box<IRBuilder>>) -> Result<()> {
             let value = decide_variable_value(phi.variable, current_variable_value)?;
             phi.add_argument((parent_bb.unwrap(), value));
             current_variable_value.insert(phi.variable, Operand::Instruction(phi.inst));
+            changed = true;
         }
 
         // Do not continue if visited
         // "phi" instruction can be added multiple times for each basic block,
         // so that part is before this check
         if visited.contains(&current_bb) {
-            return Ok(());
+            return Ok(changed);
         }
         visited.insert(current_bb);
 
@@ -148,6 +174,7 @@ pub fn mem2reg(func: FunPtr, mem_pool: &mut Pin<Box<IRBuilder>>) -> Result<()> {
                         if variable.get_type() == InstType::Alloca {
                             current_variable_value.insert(*variable, store_value.clone());
                             inst.remove_self();
+                            changed = true;
                         }
                     }
                 }
@@ -161,6 +188,7 @@ pub fn mem2reg(func: FunPtr, mem_pool: &mut Pin<Box<IRBuilder>>) -> Result<()> {
                             let current_value =
                                 decide_variable_value(*variable, current_variable_value)?;
                             inst.replace_self(&current_value);
+                            changed = true;
                         }
                     }
                 }
@@ -171,7 +199,7 @@ pub fn mem2reg(func: FunPtr, mem_pool: &mut Pin<Box<IRBuilder>>) -> Result<()> {
         // Visit all successors
         let successors = current_bb.get_succ_bb();
         for succ in successors {
-            decide_values_start_from(
+            changed |= decide_values_start_from(
                 Some(current_bb),
                 *succ,
                 visited,
@@ -179,7 +207,7 @@ pub fn mem2reg(func: FunPtr, mem_pool: &mut Pin<Box<IRBuilder>>) -> Result<()> {
                 block_to_phi_insertion,
             )?;
         }
-        Ok(())
+        Ok(changed)
     }
 
     // Start mem2reg pass from the entry block

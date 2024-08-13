@@ -6,7 +6,6 @@ pub mod block_fuse;
 pub mod constant_fold;
 pub mod dead_code_elim;
 pub mod func_inline;
-pub mod inst_combine;
 pub mod ldce;
 pub mod licm;
 pub mod load_elim;
@@ -16,8 +15,8 @@ pub mod loop_simplify;
 pub mod mem2reg;
 pub mod redundance_elim;
 pub mod store_elim;
+pub mod symbolic_eval;
 pub mod ultimate_pass;
-pub mod unreachable_block_elim;
 
 pub trait Transform {
     fn name() -> String;
@@ -29,10 +28,10 @@ pub trait Transform {
         let changed = self.run()?;
         let elapsed = before_run.elapsed().as_millis();
         println!(
-            "{}: elapsed = {} ms, changed = {}",
+            "{}: elapsed = {} ms {}",
             Self::name(),
             elapsed,
-            changed
+            if changed { "(changed)" } else { "" }
         );
         Ok(changed)
     }

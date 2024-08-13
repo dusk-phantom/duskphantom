@@ -7,7 +7,7 @@ use crate::middle::{
         loop_tools::{self, LoopForest, LoopPtr},
     },
     ir::FunPtr,
-    transform::inst_combine,
+    transform::symbolic_eval,
     Program,
 };
 use anyhow::{Ok, Result};
@@ -26,7 +26,7 @@ pub fn optimize_program(program: &mut Program) -> Result<()> {
         licm::LICM::new(&mut program.mem_pool).run(forest)?;
         ldce::LDCE::new(&mut program.mem_pool, &effect_analysis).run(forest)?;
     }
-    inst_combine::optimize_program(program)?;
+    symbolic_eval::optimize_program(program)?;
 
     Ok(())
 }
