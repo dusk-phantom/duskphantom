@@ -319,16 +319,20 @@ pub mod tests_store_elim {
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
         exit:
-        [-] %getelementptr_24 = getelementptr [3 x [3 x i32]], ptr @a, i32 0, i32 0, i32 0
-        [-] store i32 1, ptr %getelementptr_24
-        [-] %load_10 = load i32, ptr %getelementptr_24
-        [-] %getelementptr_28 = getelementptr [3 x [3 x i32]], ptr @a, i32 0, i32 %load_10, i32 0
-        [-] store i32 2, ptr %getelementptr_28
+        [-] %getelementptr_5 = getelementptr [3 x [3 x i32]], ptr @a, i32 0, i32 0
+        [-] %getelementptr_6 = getelementptr [3 x i32], ptr %getelementptr_5, i32 0, i32 0
+        [-] store i32 1, ptr %getelementptr_6
+        [-] %load_10 = load i32, ptr %getelementptr_6
+        [-] %getelementptr_11 = getelementptr [3 x [3 x i32]], ptr @a, i32 0, i32 %load_10
+        [-] %getelementptr_12 = getelementptr [3 x i32], ptr %getelementptr_11, i32 0, i32 0
+        [-] store i32 2, ptr %getelementptr_12
         %call_14 = call i32 @getint()
-        [-] %getelementptr_30 = getelementptr [3 x [3 x i32]], ptr @a, i32 0, i32 2, i32 %call_14
-        [-] store i32 3, ptr %getelementptr_30
-        [-] %getelementptr_32 = getelementptr [3 x [3 x i32]], ptr @a, i32 0, i32 1, i32 0
-        [-] %load_20 = load i32, ptr %getelementptr_32
+        [-] %getelementptr_15 = getelementptr [3 x [3 x i32]], ptr @a, i32 0, i32 2
+        [-] %getelementptr_16 = getelementptr [3 x i32], ptr %getelementptr_15, i32 0, i32 %call_14
+        [-] store i32 3, ptr %getelementptr_16
+        [-] %getelementptr_18 = getelementptr [3 x [3 x i32]], ptr @a, i32 0, i32 1
+        [-] %getelementptr_19 = getelementptr [3 x i32], ptr %getelementptr_18, i32 0, i32 0
+        [-] %load_20 = load i32, ptr %getelementptr_19
         [-] ret i32 %load_20
         [+] ret i32 2
 
