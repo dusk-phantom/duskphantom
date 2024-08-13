@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
 use reg_set::RegSet;
 
@@ -344,40 +344,70 @@ pub struct RegLives2 {
 
 impl Debug for RegLives2 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("RegLives2")
-            .field(
-                "live_ins",
-                &self
-                    .live_ins
-                    .iter()
+        f.debug_struct("RegLives")
+            .field("live_ins", {
+                let mut live_ins: Vec<(&String, &RegSet)> = self.live_ins.iter().collect();
+                live_ins.sort_by(|(k, _), (k2, _)| k.cmp(k2));
+                &live_ins
+                    .into_iter()
                     .map(|(k, v)| {
-                        (
-                            k,
-                            v.iter()
-                                .into_iter()
-                                .map(|v| v.gen_asm())
-                                .collect::<Vec<String>>(),
-                        )
+                        let mut v = v
+                            .iter()
+                            .into_iter()
+                            .map(|v| v.gen_asm())
+                            .collect::<Vec<String>>();
+                        v.sort();
+                        (k, v)
                     })
-                    .collect::<Vec<_>>(),
-            )
-            .field(
-                "live_outs",
-                &self
-                    .live_outs
-                    .iter()
+                    .collect::<Vec<_>>()
+            })
+            .field("live_outs", {
+                let mut live_outs: Vec<(&String, &RegSet)> = self.live_outs.iter().collect();
+                live_outs.sort_by(|(k, _), (k2, _)| k.cmp(k2));
+                &live_outs
+                    .into_iter()
                     .map(|(k, v)| {
-                        (
-                            k,
-                            v.iter()
-                                .into_iter()
-                                .map(|v| v.gen_asm())
-                                .collect::<Vec<String>>(),
-                        )
+                        let mut v = v
+                            .iter()
+                            .into_iter()
+                            .map(|v| v.gen_asm())
+                            .collect::<Vec<String>>();
+                        v.sort();
+                        (k, v)
                     })
-                    .collect::<Vec<_>>(),
-            )
+                    .collect::<Vec<_>>()
+            })
             .finish()
+    }
+}
+
+impl Display for RegLives2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "live_ins:")?;
+        let mut live_ins: Vec<(&String, &RegSet)> = self.live_ins.iter().collect();
+        live_ins.sort_by(|(k, _), (k2, _)| k.cmp(k2));
+        for (k, v) in live_ins {
+            let mut v = v
+                .iter()
+                .into_iter()
+                .map(|v| v.gen_asm())
+                .collect::<Vec<String>>();
+            v.sort();
+            writeln!(f, "{}: {:?}", k, v)?;
+        }
+        writeln!(f, "live_outs:")?;
+        let mut live_outs: Vec<(&String, &RegSet)> = self.live_outs.iter().collect();
+        live_outs.sort_by(|(k, _), (k2, _)| k.cmp(k2));
+        for (k, v) in live_outs {
+            let mut v = v
+                .iter()
+                .into_iter()
+                .map(|v| v.gen_asm())
+                .collect::<Vec<String>>();
+            v.sort();
+            writeln!(f, "{}: {:?}", k, v)?;
+        }
+        Ok(())
     }
 }
 
@@ -402,47 +432,100 @@ pub struct RegLives {
 impl Debug for RegLives {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RegLives")
-            .field(
-                "live_ins",
-                &self
-                    .live_ins
-                    .iter()
+            .field("live_ins", {
+                let mut live_ins: Vec<(&String, &HashSet<Reg>)> = self.live_ins.iter().collect();
+                live_ins.sort_by(|(k, _), (k2, _)| k.cmp(k2));
+                &live_ins
+                    .into_iter()
                     .map(|(k, v)| {
-                        (
-                            k,
-                            v.iter()
-                                .map(|v| v.gen_asm())
-                                .collect::<Vec<String>>()
-                                .join(", "),
-                        )
+                        let mut v = v.iter().map(|v| v.gen_asm()).collect::<Vec<String>>();
+                        v.sort();
+                        (k, v)
                     })
-                    .collect::<Vec<_>>(),
-            )
-            .field(
-                "live_outs",
-                &self
-                    .live_outs
-                    .iter()
+                    .collect::<Vec<_>>()
+            })
+            .field("live_outs", {
+                let mut live_outs: Vec<(&String, &HashSet<Reg>)> = self.live_outs.iter().collect();
+                live_outs.sort_by(|(k, _), (k2, _)| k.cmp(k2));
+                &live_outs
+                    .into_iter()
                     .map(|(k, v)| {
-                        (
-                            k,
-                            v.iter()
-                                .map(|v| v.gen_asm())
-                                .collect::<Vec<String>>()
-                                .join(", "),
-                        )
+                        let mut v = v.iter().map(|v| v.gen_asm()).collect::<Vec<String>>();
+                        v.sort();
+                        (k, v)
                     })
-                    .collect::<Vec<_>>(),
-            )
+                    .collect::<Vec<_>>()
+            })
             .finish()
     }
 }
+
+impl Display for RegLives {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "live_ins:")?;
+        let mut live_ins: Vec<(&String, &HashSet<Reg>)> = self.live_ins.iter().collect();
+        live_ins.sort_by(|(k, _), (k2, _)| k.cmp(k2));
+        for (k, v) in live_ins {
+            let mut v = v.iter().map(|v| v.gen_asm()).collect::<Vec<String>>();
+            v.sort();
+            writeln!(f, "{}: {:?}", k, v)?;
+        }
+        writeln!(f, "live_outs:")?;
+        let mut live_outs: Vec<(&String, &HashSet<Reg>)> = self.live_outs.iter().collect();
+        live_outs.sort_by(|(k, _), (k2, _)| k.cmp(k2));
+        for (k, v) in live_outs {
+            let mut v = v.iter().map(|v| v.gen_asm()).collect::<Vec<String>>();
+            v.sort();
+            writeln!(f, "{}: {:?}", k, v)?;
+        }
+        Ok(())
+    }
+}
+
 impl RegLives {
     pub fn live_ins(&self, bb: &Block) -> &HashSet<Reg> {
         self.live_ins.get(bb.label()).unwrap()
     }
     pub fn live_outs(&self, bb: &Block) -> &HashSet<Reg> {
         self.live_outs.get(bb.label()).unwrap()
+    }
+}
+
+impl From<RegLives2> for RegLives {
+    fn from(rl: RegLives2) -> Self {
+        let live_ins = rl
+            .live_ins
+            .into_iter()
+            .map(|(k, v)| (k, v.into_iter().collect()))
+            .collect();
+        let live_outs = rl
+            .live_outs
+            .into_iter()
+            .map(|(k, v)| (k, v.into_iter().collect()))
+            .collect();
+        RegLives {
+            live_ins,
+            live_outs,
+        }
+    }
+}
+
+impl From<RegLives> for RegLives2 {
+    fn from(rl: RegLives) -> Self {
+        let live_ins = rl
+            .live_ins
+            .into_iter()
+            .map(|(k, v)| (k, v.into_iter().collect()))
+            .collect();
+        let live_outs = rl
+            .live_outs
+            .into_iter()
+            .map(|(k, v)| (k, v.into_iter().collect()))
+            .collect();
+        RegLives2 {
+            live_ins,
+            live_outs,
+        }
     }
 }
 

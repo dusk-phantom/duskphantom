@@ -214,7 +214,7 @@ pub fn apply_spills2(func: &mut Func, spills: HashSet<Reg>) -> Result<()> {
 /// 其中t0-t3是临时寄存器,t0-t2用于处理spill的虚拟寄存器,t3用于计算内存操作指令off溢出时的地址 <br>
 /// s0是栈帧指针,用于保存调用者保存的寄存器 <br>
 /// ...
-fn free_iregs() -> &'static [Reg; 22] {
+pub fn free_iregs() -> &'static [Reg; 22] {
     &[
         // usual registers
         REG_S1, REG_A0, REG_A1, REG_A2, REG_A3, REG_A4, REG_A5, REG_A6, REG_A7, REG_S2, REG_S3,
@@ -222,7 +222,7 @@ fn free_iregs() -> &'static [Reg; 22] {
     ]
 }
 
-fn free_fregs() -> &'static [Reg; 29] {
+pub fn free_fregs() -> &'static [Reg; 29] {
     // usual registers
     &[
         // float registers

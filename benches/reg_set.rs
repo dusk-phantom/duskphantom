@@ -2,7 +2,7 @@ use compiler::backend::irs::*;
 use criterion::black_box;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use reg_set::RegSet;
-use std::{collections::HashSet, time::Duration};
+use std::collections::HashSet;
 
 fn prepare_regs(n: usize) -> Vec<Reg> {
     let mut regs: Vec<Reg> = vec![];
@@ -161,7 +161,7 @@ fn bench_clone_then_retain(c: &mut Criterion) {
 
 #[allow(unused)]
 fn bench_remove(c: &mut Criterion) {
-    let regs = prepare_regs(100000);
+    let regs = prepare_regs(10000);
     let mut rg1 = RegSet::new();
     let mut rg2 = HashSet::new();
     for reg in regs.iter() {
@@ -191,13 +191,13 @@ fn bench_remove(c: &mut Criterion) {
 
 criterion_group! {
     name = benches;
-    config = Criterion::default().measurement_time(Duration::from_secs(10)).sample_size(10);
+    config = Criterion::default();
     targets =
-        //  bench_contains,
-        //  bench_insert,
-        // bench_merge,
+         bench_contains,
+         bench_insert,
+        bench_merge,
         bench_remove,
-        // bench_clone,
-        // bench_clone_then_retain,
+        bench_clone,
+        bench_clone_then_retain,
 }
 criterion_main!(benches);

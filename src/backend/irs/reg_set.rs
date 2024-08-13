@@ -1,11 +1,36 @@
+use std::fmt::{Debug, Display};
+
 use bitvec::prelude;
 
 use super::*;
 
-#[derive(Debug)]
 pub struct RegSet {
     float: prelude::BitVec,
     usual: prelude::BitVec,
+}
+
+impl Display for RegSet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut s = String::new();
+        for r in self.iter() {
+            s.push_str(&format!("{}, ", r.gen_asm()));
+        }
+        write!(f, "{}", s)
+    }
+}
+impl Debug for RegSet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RegSet")
+            .field(
+                "usual",
+                &self.iter_usual().into_iter().collect::<Vec<Reg>>(),
+            )
+            .field(
+                "float",
+                &self.iter_float().into_iter().collect::<Vec<Reg>>(),
+            )
+            .finish()
+    }
 }
 
 impl Clone for RegSet {
@@ -106,6 +131,12 @@ impl RegSet {
 
     /// add all regs in `other` to `self`
     pub fn merge(&mut self, other: &RegSet) {
+        if self.float.len() < other.float.len() {
+            self.float.resize(other.float.len(), false);
+        }
+        if self.usual.len() < other.usual.len() {
+            self.usual.resize(other.usual.len(), false);
+        }
         self.float |= &other.float;
         self.usual |= &other.usual;
     }
@@ -361,5 +392,14 @@ mod reg_set_tests {
 
         reg_set2.remove(&REG_A0);
         assert_eq!(reg_set, reg_set2);
+    }
+
+    #[test]
+    fn test_merge() {
+        let mut rg = RegSet::new();
+        rg.insert(&Reg::new(0, false));
+        let mut rg2 = RegSet::new();
+        rg2.merge(&rg);
+        assert!(rg2.num_regs() == 1);
     }
 }
