@@ -8,7 +8,7 @@ pub mod tests_constant_fold {
             irgen::gen,
             transform::{
                 block_fuse, constant_fold, dead_code_elim, func_inline, mem2reg, redundance_elim,
-                symbolic_eval,
+                inst_combine,
             },
         },
         utils::diff::diff,
@@ -94,7 +94,7 @@ pub mod tests_constant_fold {
 
         // Check after optimization
         redundance_elim::optimize_program(&mut program).unwrap();
-        symbolic_eval::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         func_inline::optimize_program(&mut program).unwrap();
         block_fuse::optimize_program(&mut program).unwrap();

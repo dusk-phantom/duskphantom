@@ -15,7 +15,7 @@ pub mod loop_simplify;
 pub mod mem2reg;
 pub mod redundance_elim;
 pub mod store_elim;
-pub mod symbolic_eval;
+pub mod inst_combine;
 pub mod ultimate_pass;
 
 pub trait Transform {

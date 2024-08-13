@@ -9,7 +9,7 @@ pub mod tests_store_elim {
             irgen::gen,
             transform::{
                 block_fuse, constant_fold, dead_code_elim, func_inline, load_elim, load_store_elim,
-                mem2reg, redundance_elim, store_elim, symbolic_eval,
+                mem2reg, redundance_elim, store_elim, inst_combine,
             },
         },
         utils::diff::diff,
@@ -228,7 +228,7 @@ pub mod tests_store_elim {
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
-        symbolic_eval::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
         redundance_elim::optimize_program(&mut program).unwrap();
         block_fuse::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
@@ -287,7 +287,7 @@ pub mod tests_store_elim {
         mem2reg::optimize_program(&mut program).unwrap();
         func_inline::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
-        symbolic_eval::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
         redundance_elim::optimize_program(&mut program).unwrap();
         block_fuse::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();

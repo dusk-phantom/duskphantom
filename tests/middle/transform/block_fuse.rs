@@ -6,7 +6,7 @@ pub mod tests_block_fuse {
         frontend::parse,
         middle::{
             irgen::gen,
-            transform::{block_fuse, constant_fold, dead_code_elim, mem2reg, symbolic_eval},
+            transform::{block_fuse, constant_fold, dead_code_elim, mem2reg, inst_combine},
         },
         utils::diff::diff,
     };
@@ -30,7 +30,7 @@ pub mod tests_block_fuse {
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
-        symbolic_eval::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_before = program.module.gen_llvm_ir();
 
@@ -94,7 +94,7 @@ pub mod tests_block_fuse {
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
-        symbolic_eval::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_before = program.module.gen_llvm_ir();
 

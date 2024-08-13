@@ -7,7 +7,7 @@ pub mod tests_effect_analysis {
         middle::{
             analysis::effect_analysis::EffectAnalysis,
             irgen::gen,
-            transform::{constant_fold, dead_code_elim, symbolic_eval, mem2reg},
+            transform::{constant_fold, dead_code_elim, inst_combine, mem2reg},
         },
     };
 
@@ -24,7 +24,7 @@ pub mod tests_effect_analysis {
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
-        symbolic_eval::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
         assert_snapshot!(effect_analysis.dump_inst(), @r###"
@@ -51,7 +51,7 @@ pub mod tests_effect_analysis {
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
-        symbolic_eval::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
         assert_snapshot!(effect_analysis.dump_inst(), @r###"
@@ -82,7 +82,7 @@ pub mod tests_effect_analysis {
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
-        symbolic_eval::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
         assert_snapshot!(effect_analysis.dump_inst(), @r###"
@@ -116,7 +116,7 @@ pub mod tests_effect_analysis {
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
-        symbolic_eval::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
         assert_snapshot!(effect_analysis.dump_inst(), @r###"
@@ -157,7 +157,7 @@ pub mod tests_effect_analysis {
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
-        symbolic_eval::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
         assert_snapshot!(effect_analysis.dump_inst(), @r###"
@@ -193,7 +193,7 @@ pub mod tests_effect_analysis {
         let mut program = gen(&parsed).unwrap();
         mem2reg::optimize_program(&mut program).unwrap();
         constant_fold::optimize_program(&mut program).unwrap();
-        symbolic_eval::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let effect_analysis = EffectAnalysis::new(&program);
         assert_snapshot!(effect_analysis.dump_inst(), @r###"

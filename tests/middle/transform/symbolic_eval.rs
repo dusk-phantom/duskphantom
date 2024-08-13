@@ -6,7 +6,7 @@ pub mod tests_symbolic_eval {
         frontend::parse,
         middle::{
             irgen::gen,
-            transform::{constant_fold, dead_code_elim, mem2reg, symbolic_eval},
+            transform::{constant_fold, dead_code_elim, mem2reg, inst_combine},
         },
         utils::diff::diff,
     };
@@ -35,7 +35,7 @@ pub mod tests_symbolic_eval {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        symbolic_eval::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after), @r###"
@@ -105,7 +105,7 @@ pub mod tests_symbolic_eval {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        symbolic_eval::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after), @r###"
@@ -164,7 +164,7 @@ pub mod tests_symbolic_eval {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        symbolic_eval::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
@@ -221,7 +221,7 @@ pub mod tests_symbolic_eval {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        symbolic_eval::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
@@ -278,7 +278,7 @@ pub mod tests_symbolic_eval {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        symbolic_eval::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
@@ -336,7 +336,7 @@ pub mod tests_symbolic_eval {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        symbolic_eval::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
@@ -396,7 +396,7 @@ pub mod tests_symbolic_eval {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        symbolic_eval::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
@@ -456,7 +456,7 @@ pub mod tests_symbolic_eval {
         let llvm_before = program.module.gen_llvm_ir();
 
         // Check after optimization
-        symbolic_eval::optimize_program(&mut program).unwrap();
+        inst_combine::optimize_program(&mut program).unwrap();
         dead_code_elim::optimize_program(&mut program).unwrap();
         let llvm_after = program.module.gen_llvm_ir();
         assert_snapshot!(diff(&llvm_before, &llvm_after),@r###"
