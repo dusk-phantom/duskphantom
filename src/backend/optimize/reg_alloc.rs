@@ -7,15 +7,11 @@ use super::*;
 
 pub fn handle_reg_alloc(func: &mut Func) -> Result<()> {
     // count the interference graph
-    let reg_graphs = Func::reg_interfere_graph(func)?;
-    if try_perfect_alloc(func, &reg_graphs).is_ok() {
+    let reg_graph = Func::reg_interfere_graph2(func)?;
+    if try_perfect_alloc2(func, &reg_graph).is_ok() {
         return Ok(());
     }
-
-    let (colors, spills) = reg_alloc(&reg_graphs, free_iregs(), free_fregs())?;
-    // FIMXE:, a more quick way to allocate reg
-    // let mut reg_graphs = Func::reg_interfere_graph2(func)?;
-    // let (colors, spills) = reg_alloc2(&reg_graphs, free_iregs(), free_fregs())?;
+    let (colors, spills) = reg_alloc2(&reg_graph, free_iregs(), free_fregs())?;
     apply_colors(func, colors);
     apply_spills(func, spills);
     // apply_spills2(func, spills)?;
@@ -29,6 +25,20 @@ pub fn try_perfect_alloc(func: &mut Func, reg_graphs: &HashMap<Reg, HashSet<Reg>
     let mut f_regs: Vec<Reg> = free_fregs().to_vec();
     f_regs.extend(tmp_f_regs().iter().cloned());
     let (colors, spills) = reg_alloc(reg_graphs, &i_regs, &f_regs)?;
+    if spills.is_empty() {
+        apply_colors(func, colors);
+        Ok(())
+    } else {
+        Err(anyhow!("spills is not empty,fail to allocate perfectly"))
+    }
+}
+
+pub fn try_perfect_alloc2(func: &mut Func, reg_graphs: &HashMap<Reg, RegSet>) -> Result<()> {
+    let mut i_regs: Vec<Reg> = free_iregs().to_vec();
+    i_regs.extend(tmp_i_regs().iter().cloned());
+    let mut f_regs: Vec<Reg> = free_fregs().to_vec();
+    f_regs.extend(tmp_f_regs().iter().cloned());
+    let (colors, spills) = reg_alloc2(reg_graphs, &i_regs, &f_regs)?;
     if spills.is_empty() {
         apply_colors(func, colors);
         Ok(())
@@ -222,6 +232,7 @@ pub fn free_iregs() -> &'static [Reg; 22] {
     ]
 }
 
+/// 除了ft0-ft2用于处理spill的虚拟寄存器,其他的都可以自由用于寄存器分配
 pub fn free_fregs() -> &'static [Reg; 29] {
     // usual registers
     &[
@@ -341,6 +352,7 @@ pub fn reg_alloc2(
     i_colors: &[Reg],
     f_colors: &[Reg],
 ) -> Result<(HashMap<Reg, Reg>, HashSet<Reg>)> {
+    #[inline]
     fn remove_node(g: &mut HashMap<Reg, RegSet>, r: Reg) -> Result<()> {
         let nbs = g.remove(&r).unwrap_or_default();
         for nb in nbs {
@@ -352,6 +364,7 @@ pub fn reg_alloc2(
         }
         Ok(())
     }
+    #[inline]
     fn num_inters(g: &HashMap<Reg, RegSet>, r: Reg) -> usize {
         g.get(&r)
             .map(|nbs| {
@@ -425,13 +438,13 @@ pub fn reg_alloc2(
 
     for r in ordered_to_color {
         let mut used_colors: RegSet = RegSet::with_capacity(32);
-        let inter = graph.get(&r).expect("");
-        for v in inter.iter() {
-            if v.is_physical() {
-                used_colors.insert(&v);
-            }
-            if let Some(c) = colors.get(&v) {
-                used_colors.insert(c);
+        if let Some(inter) = graph.get(&r) {
+            for v in inter.iter() {
+                if v.is_physical() {
+                    used_colors.insert(&v);
+                } else if let Some(c) = colors.get(&v) {
+                    used_colors.insert(c);
+                }
             }
         }
         // find the first color that is not used
@@ -453,6 +466,8 @@ pub fn reg_alloc2(
 //////////////////////////////////////////////////////
 /// some helper functions
 //////////////////////////////////////////////////////
+
+/// generate the interference graph txt for the function
 pub fn g2txt(g: &HashMap<Reg, HashSet<Reg>>) -> String {
     let mut s = String::new();
     s.push_str("{\n");
