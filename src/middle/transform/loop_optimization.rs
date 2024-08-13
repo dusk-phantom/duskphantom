@@ -2,7 +2,10 @@ use std::collections::{HashMap, VecDeque};
 
 use super::*;
 use crate::middle::{
-    analysis::loop_tools::{self, LoopForest, LoopPtr},
+    analysis::{
+        effect_analysis::EffectAnalysis,
+        loop_tools::{self, LoopForest, LoopPtr},
+    },
     ir::FunPtr,
     transform::inst_combine,
     Program,
@@ -10,6 +13,7 @@ use crate::middle::{
 use anyhow::{Ok, Result};
 
 pub fn optimize_program(program: &mut Program) -> Result<()> {
+    let effect_analysis = EffectAnalysis::new(program);
     let mut func_loop_map = program
         .module
         .functions
@@ -20,6 +24,7 @@ pub fn optimize_program(program: &mut Program) -> Result<()> {
     for (_, forest) in func_loop_map.iter_mut() {
         loop_simplify::LoopSimplifier::new(&mut program.mem_pool).run(forest)?;
         licm::LICM::new(&mut program.mem_pool).run(forest)?;
+        ldce::LDCE::new(&mut program.mem_pool, &effect_analysis).run(forest)?;
     }
     inst_combine::optimize_program(program)?;
 
