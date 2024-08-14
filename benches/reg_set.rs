@@ -9,12 +9,10 @@ static MAX_ID: u32 = 1000;
 
 fn prepare_regs(n: usize) -> Vec<Reg> {
     let mut regs: Vec<Reg> = vec![];
-    // let mut rg = RegGenerator::new();
     for _ in 0..n {
         let is_usual: bool = rand::random();
         let id: u32 = rand::random::<u32>() as u32 % MAX_ID;
         regs.push(Reg::new(id, is_usual));
-        // regs.push(rg.gen_virtual_reg(is_usual));
     }
     regs
 }
