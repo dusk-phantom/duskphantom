@@ -17,6 +17,17 @@ pub struct Reg {
     id: u32,
     is_usual: bool,
 }
+
+impl PartialOrd for Reg {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match self.id.partial_cmp(&other.id) {
+            Some(core::cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        self.is_usual.partial_cmp(&other.is_usual)
+    }
+}
+
 impl Reg {
     #[inline]
     pub const fn caller_save_regs() -> &'static [Reg; 35] {
