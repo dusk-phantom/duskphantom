@@ -188,45 +188,72 @@ impl<'a> Graph<'a> {
         if avail.is_empty() {
             return Ok((None, None));
         }
-        // 有两个的情况
-        for i in 0..avail.len() {
-            for j in i + 1..avail.len() {
-                let inst1 = &self.insts[avail[i]];
-                let (latency1, inst_type1) = inst1.character().with_context(|| context!())?;
-                let inst2 = &self.insts[avail[j]];
-                let (latency2, inst_type2) = inst2.character().with_context(|| context!())?;
-                if inst_type1 != inst_type2
-                    || (inst_type1 == inst_type2 && inst_type1 == InstType::Integer)
-                {
+
+        dbg!(&avail);
+
+        let mut ordered: Vec<(InstID, i32)> = Vec::new();
+        for id in avail {
+            let uses_latency: usize = self
+                .use_defs
+                .get(id)
+                .unwrap()
+                .iter()
+                .map(|i| {
+                    self.insts[*i]
+                        .character()
+                        .unwrap_or((1, InstType::Integer))
+                        .0
+                })
+                .sum();
+            let uses = self.use_defs.get(id).unwrap().len() as i32;
+            ordered.push((*id, -(uses_latency as i32) * uses));
+        }
+
+        // 从大到小排序 (贪心)
+        ordered.sort_by(|a, b| b.1.cmp(&a.1));
+
+        for i in 0..ordered.len() {
+            for j in i + 1..ordered.len() {
+                let inst1_id = ordered[i].0;
+                let inst2_id = ordered[j].0;
+                let (latency1, type1) = self.insts[inst1_id]
+                    .character()
+                    .with_context(|| context!())?;
+                let (latency2, type2) = self.insts[inst2_id]
+                    .character()
+                    .with_context(|| context!())?;
+                if type1 != type2 || (type1 == type2 && type1 == InstType::Integer) {
                     return Ok((
                         Some((
                             StateOperand {
-                                def: avail[i],
+                                def: inst1_id,
                                 cnt: latency1,
                             },
-                            avail[i],
+                            inst1_id,
                         )),
                         Some((
                             StateOperand {
-                                def: avail[j],
+                                def: inst2_id,
                                 cnt: latency2,
                             },
-                            avail[j],
+                            inst2_id,
                         )),
                     ));
                 }
             }
         }
-        // 只有一个的情况
-        let inst1 = &self.insts[avail[0]];
-        let (latency1, _) = inst1.character().with_context(|| context!())?;
+
+        let inst1_id = ordered[0].0;
+        let (latency1, _) = self.insts[inst1_id]
+            .character()
+            .with_context(|| context!())?;
         Ok((
             Some((
                 StateOperand {
-                    def: avail[0],
+                    def: inst1_id,
                     cnt: latency1,
                 },
-                avail[0],
+                inst1_id,
             )),
             None,
         ))

@@ -60,9 +60,6 @@ pub fn optimize_func(func: &mut Func) -> Result<()> {
 
     phisicalize::handle_illegal_inst(func)?;
 
-    // inst scheduling
-    schedule::handle_inst_scheduling(func)?;
-
     phisicalize::handle_long_jump(func, &REG_T0, 20_0000);
 
     fprintln!("log/after_inst_scheduling.s", "{}", func.gen_asm());
@@ -77,5 +74,9 @@ pub fn optimize_func(func: &mut Func) -> Result<()> {
     stack::handle_stack(func)?;
 
     block_reorder::handle_single_jmp(func)?;
+
+    // inst scheduling
+    schedule::handle_inst_scheduling(func)?;
+
     Ok(())
 }
