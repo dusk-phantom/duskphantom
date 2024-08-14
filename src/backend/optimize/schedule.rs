@@ -189,24 +189,10 @@ impl<'a> Graph<'a> {
             return Ok((None, None));
         }
 
-        dbg!(&avail);
-
         let mut ordered: Vec<(InstID, i32)> = Vec::new();
         for id in avail {
-            let uses_latency: usize = self
-                .use_defs
-                .get(id)
-                .unwrap()
-                .iter()
-                .map(|i| {
-                    self.insts[*i]
-                        .character()
-                        .unwrap_or((1, InstType::Integer))
-                        .0
-                })
-                .sum();
-            let uses = self.use_defs.get(id).unwrap().len() as i32;
-            ordered.push((*id, -(uses_latency as i32) * uses));
+            let uses = self.use_defs.get(id).ok_or(anyhow!(""))?.len() as i32;
+            ordered.push((*id, uses));
         }
 
         // 从大到小排序 (贪心)
