@@ -1,3 +1,4 @@
+use core::num;
 use std::hash::Hash;
 
 use graph::UdGraph;
@@ -10,7 +11,9 @@ use super::*;
 pub fn handle_reg_alloc(func: &mut Func) -> Result<()> {
     if func.line() < 10000 {
         // count the interference graph
-        let reg_graph = Func::reg_interfere_graph2(func)?;
+        let mut reg_graph = Func::reg_interfere_graph2(func)?;
+        let waw = func.def_then_def2();
+        assign_extra_edge2(&mut reg_graph, free_iregs().len(), free_fregs().len(), waw);
         if try_perfect_alloc2(func, &reg_graph).is_ok() {
             return Ok(());
         }
@@ -18,7 +21,9 @@ pub fn handle_reg_alloc(func: &mut Func) -> Result<()> {
         apply_colors(func, colors);
         apply_spills(func, spills);
     } else {
-        let reg_graph = Func::reg_interfere_graph(func)?;
+        let mut reg_graph = Func::reg_interfere_graph(func)?;
+        let waw = func.def_then_def();
+        assign_extra_edge(&mut reg_graph, free_iregs().len(), free_fregs().len(), waw);
         if try_perfect_alloc(func, &reg_graph).is_ok() {
             return Ok(());
         }
@@ -486,6 +491,99 @@ pub fn simplify_graph2(
 
     (graph_to_simplify, later_to_color)
 }
+
+// 给图加上附加边,在不超过最佳范围的情况
+// 要求: 输入的图应该是个无向图,如果不是,执行结果可能不符合预期
+pub fn assign_extra_edge(
+    graph: &mut HashMap<Reg, HashSet<Reg>>,
+    num_free_iregs: usize,
+    num_free_fregs: usize,
+    mut extra_edges: HashMap<Reg, HashSet<Reg>>,
+) {
+    fn num_inter(g: &HashMap<Reg, HashSet<Reg>>, r: &Reg) -> usize {
+        g.get(r).map(|nbs| nbs.len()).unwrap_or(0)
+    }
+    fn inter(g: &HashMap<Reg, HashSet<Reg>>, r1: &Reg, r2: &Reg) -> bool {
+        g.get(r1).map(|nbs| nbs.contains(r2)).unwrap_or(false)
+    }
+
+    for (r1, r2) in extra_edges {
+        for r2 in r2.into_iter() {
+            // case1: 相同的寄存器不能加边
+            // case2: 已经存在冲突关系的,不需要加边
+            // case3: 类型不同的寄存器,不需要加边
+            // case4: 两个寄存器都是物理寄存器,不需要加边
+            if r1 == r2
+                || inter(graph, &r1, &r2)
+                || r1.is_usual() != r2.is_usual()
+                || (r1.is_physical() && r2.is_physical())
+            {
+                continue;
+            }
+            let num_inter1 = num_inter(graph, &r1);
+            let num_inter2 = num_inter(graph, &r2);
+            let num_max_free = if r1.is_usual() {
+                num_free_iregs
+            } else {
+                num_free_fregs
+            };
+            if num_inter1 + 1 < num_max_free && num_inter2 + 1 < num_max_free {
+                graph.entry(r1).or_default().insert(r2);
+                graph.entry(r2).or_default().insert(r1);
+            }
+        }
+    }
+}
+
+pub fn assign_extra_edge2(
+    graph: &mut HashMap<Reg, RegSet>,
+    num_free_fregs: usize,
+    num_free_iregs: usize,
+    mut extra_edges: HashMap<Reg, RegSet>,
+) {
+    fn num_inter(g: &HashMap<Reg, RegSet>, r: &Reg) -> usize {
+        g.get(r)
+            .map(|nbs| {
+                if r.is_usual() {
+                    nbs.num_regs_usual()
+                } else {
+                    nbs.num_regs_float()
+                }
+            })
+            .unwrap_or(0)
+    }
+    fn inter(g: &HashMap<Reg, RegSet>, r1: &Reg, r2: &Reg) -> bool {
+        g.get(r1).map(|nbs| nbs.contains(r2)).unwrap_or(false)
+    }
+
+    for (r1, r2) in extra_edges {
+        for r2 in r2.iter() {
+            // case1: 相同的寄存器不能加边
+            // case2: 已经存在冲突关系的,不需要加边
+            // case3: 类型不同的寄存器,不需要加边
+            // case4: 两个寄存器都是物理寄存器,不需要加边
+            if r1 == r2
+                || inter(graph, &r1, &r2)
+                || r1.is_usual() != r2.is_usual()
+                || (r1.is_physical() && r2.is_physical())
+            {
+                continue;
+            }
+            let num_inter1 = num_inter(graph, &r1);
+            let num_inter2 = num_inter(graph, &r2);
+            let num_max_free = if r1.is_usual() {
+                num_free_iregs
+            } else {
+                num_free_fregs
+            };
+            if num_inter1 + 1 < num_max_free && num_inter2 + 1 < num_max_free {
+                graph.entry(r1).or_default().insert(&r2);
+                graph.entry(r2).or_default().insert(&r1);
+            }
+        }
+    }
+}
+
 //////////////////////////////////////////////////////
 /// some helper functions
 //////////////////////////////////////////////////////
