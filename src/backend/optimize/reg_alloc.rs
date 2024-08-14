@@ -1,3 +1,5 @@
+use std::hash::Hash;
+
 use graph::UdGraph;
 use reg_set::RegSet;
 
@@ -265,17 +267,63 @@ pub fn reg_alloc(
     i_colors: &[Reg],
     f_colors: &[Reg],
 ) -> Result<(HashMap<Reg, Reg>, HashSet<Reg>)> {
-    fn remove_node(g: &mut HashMap<Reg, HashSet<Reg>>, r: Reg) -> Result<()> {
+    let (graph_to_simplify, mut later_to_color) = simplify_graph(graph, i_colors, f_colors);
+
+    let mut colors: HashMap<Reg, Reg> = HashMap::new();
+    let mut to_spill: HashSet<Reg> = HashSet::new();
+
+    // try to color the rest of the graph
+    let mut first_to_color: Vec<(Reg, usize)> = graph_to_simplify
+        .into_iter()
+        .filter(|(k, _)| k.is_virtual())
+        .map(|(k, v)| (k, v.len()))
+        .collect();
+    first_to_color.sort_by_key(|(_, v)| *v);
+    for (k, _) in first_to_color {
+        later_to_color.push_back(k);
+    }
+
+    while let Some(r) = later_to_color.pop_back() {
+        let mut used_colors: HashSet<Reg> = HashSet::new();
+        let inter = graph.get(&r).expect("");
+        for v in inter {
+            if v.is_physical() {
+                used_colors.insert(*v);
+            }
+            if let Some(c) = colors.get(v) {
+                used_colors.insert(*c);
+            }
+        }
+        // find the first color that is not used
+        let color = if r.is_usual() {
+            i_colors.iter().find(|c| !used_colors.contains(c))
+        } else {
+            f_colors.iter().find(|c| !used_colors.contains(c))
+        };
+        if let Some(color) = color {
+            colors.insert(r, *color);
+        } else {
+            to_spill.insert(r);
+        }
+    }
+
+    Ok((colors, to_spill))
+}
+
+/// return simplified graph and ordered later to color nodes
+#[inline]
+pub fn simplify_graph(
+    graph: &HashMap<Reg, HashSet<Reg>>,
+    i_colors: &[Reg],
+    f_colors: &[Reg],
+) -> (HashMap<Reg, HashSet<Reg>>, VecDeque<Reg>) {
+    fn remove_node(g: &mut HashMap<Reg, HashSet<Reg>>, r: Reg) {
         let nbs = g.remove(&r).unwrap_or_default();
         for nb in nbs {
-            g.get_mut(&nb)
-                .ok_or(anyhow!(
-                    "neighbors of node {} must be in the graph",
-                    r.gen_asm()
-                ))?
-                .remove(&r);
+            if let Some(nb_nbs) = g.get_mut(&nb) {
+                nb_nbs.remove(&r);
+            }
         }
-        Ok(())
     }
 
     let mut graph_to_simplify = graph.clone();
@@ -310,50 +358,11 @@ pub fn reg_alloc(
             break;
         }
         for r in to_remove {
-            remove_node(&mut graph_to_simplify, r)?;
+            remove_node(&mut graph_to_simplify, r);
         }
     }
 
-    let mut colors: HashMap<Reg, Reg> = HashMap::new();
-    let mut to_spill: HashSet<Reg> = HashSet::new();
-
-    // try to color the rest of the graph
-    let mut first_to_color: Vec<(Reg, usize)> = graph_to_simplify
-        .into_iter()
-        .filter(|(k, _)| k.is_virtual())
-        .map(|(k, v)| (k, v.len()))
-        .collect();
-    first_to_color.sort_by_key(|(_, v)| *v);
-    for (k, _) in first_to_color {
-        later_to_color.push_back(k);
-    }
-
-    let ordered_to_color = later_to_color.into_iter().rev();
-    for r in ordered_to_color {
-        let mut used_colors: HashSet<Reg> = HashSet::new();
-        let inter = graph.get(&r).expect("");
-        for v in inter {
-            if v.is_physical() {
-                used_colors.insert(*v);
-            }
-            if let Some(c) = colors.get(v) {
-                used_colors.insert(*c);
-            }
-        }
-        // find the first color that is not used
-        let color = if r.is_usual() {
-            i_colors.iter().find(|c| !used_colors.contains(c))
-        } else {
-            f_colors.iter().find(|c| !used_colors.contains(c))
-        };
-        if let Some(color) = color {
-            colors.insert(r, *color);
-        } else {
-            to_spill.insert(r);
-        }
-    }
-
-    Ok((colors, to_spill))
+    (graph_to_simplify, later_to_color)
 }
 
 pub fn reg_alloc2(
@@ -361,65 +370,7 @@ pub fn reg_alloc2(
     i_colors: &[Reg],
     f_colors: &[Reg],
 ) -> Result<(HashMap<Reg, Reg>, HashSet<Reg>)> {
-    #[inline]
-    fn remove_node(g: &mut HashMap<Reg, RegSet>, r: Reg) -> Result<()> {
-        let nbs = g.remove(&r).unwrap_or_default();
-        for nb in nbs {
-            g.entry(nb)
-                .and_modify(|nbs| {
-                    nbs.remove(&r);
-                })
-                .or_default();
-        }
-        Ok(())
-    }
-    #[inline]
-    fn num_inters(g: &HashMap<Reg, RegSet>, r: Reg) -> usize {
-        g.get(&r)
-            .map(|nbs| {
-                if r.is_usual() {
-                    nbs.num_regs_usual()
-                } else {
-                    nbs.num_regs_float()
-                }
-            })
-            .unwrap_or(0)
-    }
-
-    let mut graph_to_simplify = graph.clone();
-    let mut later_to_color: VecDeque<Reg> = VecDeque::new();
-    // simpilify the graph
-    // if a node has less than K neighbors, remove it from the graph, and add it to the later_to_color
-    loop {
-        let mut to_remove = vec![];
-        for (k, _) in graph_to_simplify.iter() {
-            if k.is_physical() {
-                continue;
-            }
-            let num_inter = num_inters(&graph_to_simplify, *k);
-            if k.is_float() {
-                if num_inter < f_colors.len() {
-                    to_remove.push(*k);
-                    later_to_color.push_back(*k);
-                }
-            } else if k.is_usual() {
-                if num_inter < i_colors.len() {
-                    to_remove.push(*k);
-                    later_to_color.push_back(*k);
-                }
-            } else {
-                unreachable!("a reg can only be usual or float");
-            }
-        }
-
-        if to_remove.is_empty() {
-            break;
-        }
-        for r in to_remove {
-            remove_node(&mut graph_to_simplify, r)?;
-        }
-    }
-
+    let (graph_to_simplify, mut later_to_color) = simplify_graph2(graph, i_colors, f_colors);
     let mut colors: HashMap<Reg, Reg> = HashMap::new();
     let mut to_spill: HashSet<Reg> = HashSet::new();
 
@@ -472,6 +423,69 @@ pub fn reg_alloc2(
     Ok((colors, to_spill))
 }
 
+pub fn simplify_graph2(
+    graph: &HashMap<Reg, RegSet>,
+    i_colors: &[Reg],
+    f_colors: &[Reg],
+) -> (HashMap<Reg, RegSet>, VecDeque<Reg>) {
+    #[inline]
+    fn remove_node(g: &mut HashMap<Reg, RegSet>, r: Reg) {
+        let nbs = g.remove(&r).unwrap_or_default();
+        for nb in nbs {
+            if let Some(nb_nbs) = g.get_mut(&nb) {
+                nb_nbs.remove(&r);
+            }
+        }
+    }
+    #[inline]
+    fn num_inters(g: &HashMap<Reg, RegSet>, r: Reg) -> usize {
+        g.get(&r)
+            .map(|nbs| {
+                if r.is_usual() {
+                    nbs.num_regs_usual()
+                } else {
+                    nbs.num_regs_float()
+                }
+            })
+            .unwrap_or(0)
+    }
+
+    let mut graph_to_simplify = graph.clone();
+    let mut later_to_color: VecDeque<Reg> = VecDeque::new();
+    // simpilify the graph
+    // if a node has less than K neighbors, remove it from the graph, and add it to the later_to_color
+    loop {
+        let mut to_remove = vec![];
+        for (k, _) in graph_to_simplify.iter() {
+            if k.is_physical() {
+                continue;
+            }
+            let num_inter = num_inters(&graph_to_simplify, *k);
+            if k.is_float() {
+                if num_inter < f_colors.len() {
+                    to_remove.push(*k);
+                    later_to_color.push_back(*k);
+                }
+            } else if k.is_usual() {
+                if num_inter < i_colors.len() {
+                    to_remove.push(*k);
+                    later_to_color.push_back(*k);
+                }
+            } else {
+                unreachable!("a reg can only be usual or float");
+            }
+        }
+
+        if to_remove.is_empty() {
+            break;
+        }
+        for r in to_remove {
+            remove_node(&mut graph_to_simplify, r);
+        }
+    }
+
+    (graph_to_simplify, later_to_color)
+}
 //////////////////////////////////////////////////////
 /// some helper functions
 //////////////////////////////////////////////////////
