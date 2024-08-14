@@ -4,7 +4,7 @@ mod reg_live;
 
 mod line;
 
-mod def_then_use;
+mod def_then_def;
 
 pub use cfg::*;
 
