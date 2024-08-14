@@ -1,65 +1,36 @@
-use core::num;
-use std::hash::Hash;
+use core::ffi;
 
-use graph::UdGraph;
-use reg_set::RegSet;
+pub use super::*;
 
-use crate::fprintln;
-
-use super::*;
-
-pub fn handle_reg_alloc(func: &mut Func) -> Result<()> {
-    if func.line() < 10000 {
-        // count the interference graph
-        let mut reg_graph = Func::reg_interfere_graph2(func)?;
-        let waw = func.def_then_def2();
-        assign_extra_edge2(&mut reg_graph, free_iregs().len(), free_fregs().len(), waw);
-        if try_perfect_alloc2(func, &reg_graph).is_ok() {
-            return Ok(());
-        }
-        let (colors, spills) = reg_alloc2(&reg_graph, free_iregs(), free_fregs())?;
-        apply_colors(func, colors);
-        apply_spills(func, spills);
-    } else {
-        let mut reg_graph = Func::reg_interfere_graph(func)?;
-        let waw = func.def_then_def();
-        assign_extra_edge(&mut reg_graph, free_iregs().len(), free_fregs().len(), waw);
-        if try_perfect_alloc(func, &reg_graph).is_ok() {
-            return Ok(());
-        }
-        let (colors, spills) = reg_alloc(&reg_graph, free_iregs(), free_fregs())?;
-        apply_colors(func, colors);
-        apply_spills(func, spills);
-    }
-
-    Ok(())
-}
-
-pub fn try_perfect_alloc(func: &mut Func, reg_graphs: &HashMap<Reg, HashSet<Reg>>) -> Result<()> {
-    let mut i_regs: Vec<Reg> = free_iregs().to_vec();
-    i_regs.extend(tmp_i_regs().iter().cloned());
-    let mut f_regs: Vec<Reg> = free_fregs().to_vec();
-    f_regs.extend(tmp_f_regs().iter().cloned());
-    let (colors, spills) = reg_alloc(reg_graphs, &i_regs, &f_regs)?;
+pub fn try_perfect_alloc(
+    reg_graph: &HashMap<Reg, HashSet<Reg>>,
+    def_then_def: &HashMap<Reg, HashSet<Reg>>,
+) -> Result<HashMap<Reg, Reg>> {
+    let u_regs = free_iregs_with_tmp();
+    let f_regs = free_fregs_with_tmp();
+    let mut reg_graph = reg_graph.clone();
+    // assign_extra_edge(&mut reg_graph, u_regs.len(), f_regs.len(), def_then_def);
+    let (colors, spills) = reg_alloc(&reg_graph, u_regs, f_regs)?;
     if spills.is_empty() {
-        apply_colors(func, colors);
-        Ok(())
+        Ok(colors)
     } else {
-        Err(anyhow!("spills is not empty,fail to allocate perfectly"))
+        Err(anyhow!(""))
     }
 }
 
-pub fn try_perfect_alloc2(func: &mut Func, reg_graphs: &HashMap<Reg, RegSet>) -> Result<()> {
-    let mut i_regs: Vec<Reg> = free_iregs().to_vec();
-    i_regs.extend(tmp_i_regs().iter().cloned());
-    let mut f_regs: Vec<Reg> = free_fregs().to_vec();
-    f_regs.extend(tmp_f_regs().iter().cloned());
-    let (colors, spills) = reg_alloc2(reg_graphs, &i_regs, &f_regs)?;
+pub fn try_perfect_alloc2(
+    reg_graph: &HashMap<Reg, RegSet>,
+    def_then_def: &HashMap<Reg, RegSet>,
+) -> Result<HashMap<Reg, Reg>> {
+    let u_regs = free_iregs_with_tmp();
+    let f_regs = free_fregs_with_tmp();
+    let mut reg_graph = reg_graph.clone();
+    // assign_extra_edge2(&mut reg_graph, u_regs.len(), f_regs.len(), def_then_def);
+    let (colors, spills) = reg_alloc2(&reg_graph, u_regs, f_regs)?;
     if spills.is_empty() {
-        apply_colors(func, colors);
-        Ok(())
+        Ok(colors)
     } else {
-        Err(anyhow!("spills is not empty,fail to allocate perfectly"))
+        Err(anyhow!(""))
     }
 }
 
@@ -234,29 +205,6 @@ pub fn apply_spills2(func: &mut Func, spills: HashSet<Reg>) -> Result<()> {
 
     func.stack_allocator_mut().replace(ssa);
     Ok(())
-}
-
-/// 能够用于寄存器分配的寄存器,也就是除了特殊寄存器以外的寄存器, 这里的特殊寄存器包括: zero, ra, sp, gp, tp,s0,t0-t3 <br>
-/// 其中t0-t3是临时寄存器,t0-t2用于处理spill的虚拟寄存器,t3用于计算内存操作指令off溢出时的地址 <br>
-/// s0是栈帧指针,用于保存调用者保存的寄存器 <br>
-/// ...
-pub fn free_iregs() -> &'static [Reg; 22] {
-    &[
-        // usual registers
-        REG_S1, REG_A0, REG_A1, REG_A2, REG_A3, REG_A4, REG_A5, REG_A6, REG_A7, REG_S2, REG_S3,
-        REG_S4, REG_S5, REG_S6, REG_S7, REG_S8, REG_S9, REG_S10, REG_S11, REG_T4, REG_T5, REG_T6,
-    ]
-}
-
-/// 除了ft0-ft2用于处理spill的虚拟寄存器,其他的都可以自由用于寄存器分配
-pub fn free_fregs() -> &'static [Reg; 29] {
-    // usual registers
-    &[
-        // float registers
-        REG_FT3, REG_FT4, REG_FT5, REG_FT6, REG_FT7, REG_FS0, REG_FS1, REG_FA0, REG_FA1, REG_FA2,
-        REG_FA3, REG_FA4, REG_FA5, REG_FA6, REG_FA7, REG_FS2, REG_FS3, REG_FS4, REG_FS5, REG_FS6,
-        REG_FS7, REG_FS8, REG_FS9, REG_FS10, REG_FS11, REG_FT8, REG_FT9, REG_FT10, REG_FT11,
-    ]
 }
 
 /// register allocation, return the mapping from virtual reg to physical reg, and the set of regs that need to be spilled
@@ -498,7 +446,7 @@ pub fn assign_extra_edge(
     graph: &mut HashMap<Reg, HashSet<Reg>>,
     num_free_iregs: usize,
     num_free_fregs: usize,
-    mut extra_edges: HashMap<Reg, HashSet<Reg>>,
+    mut extra_edges: &HashMap<Reg, HashSet<Reg>>,
 ) {
     fn num_inter(g: &HashMap<Reg, HashSet<Reg>>, r: &Reg) -> usize {
         g.get(r).map(|nbs| nbs.len()).unwrap_or(0)
@@ -508,28 +456,28 @@ pub fn assign_extra_edge(
     }
 
     for (r1, r2) in extra_edges {
-        for r2 in r2.into_iter() {
+        for r2 in r2 {
             // case1: 相同的寄存器不能加边
             // case2: 已经存在冲突关系的,不需要加边
             // case3: 类型不同的寄存器,不需要加边
             // case4: 两个寄存器都是物理寄存器,不需要加边
             if r1 == r2
-                || inter(graph, &r1, &r2)
+                || inter(graph, r1, r2)
                 || r1.is_usual() != r2.is_usual()
                 || (r1.is_physical() && r2.is_physical())
             {
                 continue;
             }
-            let num_inter1 = num_inter(graph, &r1);
-            let num_inter2 = num_inter(graph, &r2);
+            let num_inter1 = num_inter(graph, r1);
+            let num_inter2 = num_inter(graph, r2);
             let num_max_free = if r1.is_usual() {
                 num_free_iregs
             } else {
                 num_free_fregs
             };
             if num_inter1 + 1 < num_max_free && num_inter2 + 1 < num_max_free {
-                graph.entry(r1).or_default().insert(r2);
-                graph.entry(r2).or_default().insert(r1);
+                graph.entry(*r1).or_default().insert(*r2);
+                graph.entry(*r2).or_default().insert(*r1);
             }
         }
     }
@@ -539,7 +487,7 @@ pub fn assign_extra_edge2(
     graph: &mut HashMap<Reg, RegSet>,
     num_free_fregs: usize,
     num_free_iregs: usize,
-    mut extra_edges: HashMap<Reg, RegSet>,
+    extra_edges: &HashMap<Reg, RegSet>,
 ) {
     fn num_inter(g: &HashMap<Reg, RegSet>, r: &Reg) -> usize {
         g.get(r)
@@ -562,14 +510,14 @@ pub fn assign_extra_edge2(
             // case2: 已经存在冲突关系的,不需要加边
             // case3: 类型不同的寄存器,不需要加边
             // case4: 两个寄存器都是物理寄存器,不需要加边
-            if r1 == r2
-                || inter(graph, &r1, &r2)
+            if *r1 == r2
+                || inter(graph, r1, &r2)
                 || r1.is_usual() != r2.is_usual()
                 || (r1.is_physical() && r2.is_physical())
             {
                 continue;
             }
-            let num_inter1 = num_inter(graph, &r1);
+            let num_inter1 = num_inter(graph, r1);
             let num_inter2 = num_inter(graph, &r2);
             let num_max_free = if r1.is_usual() {
                 num_free_iregs
@@ -577,8 +525,8 @@ pub fn assign_extra_edge2(
                 num_free_fregs
             };
             if num_inter1 + 1 < num_max_free && num_inter2 + 1 < num_max_free {
-                graph.entry(r1).or_default().insert(&r2);
-                graph.entry(r2).or_default().insert(&r1);
+                graph.entry(*r1).or_default().insert(&r2);
+                graph.entry(r2).or_default().insert(r1);
             }
         }
     }
@@ -679,6 +627,7 @@ mod tests {
         // dbg!(&colors);
         check_alloc(&graph, &colors, &to_spill);
     }
+
     #[test]
     fn t2() {
         let g: UdGraph<Reg> = udgraph!({v1->v2,v3}, {v2 -> v3},).unwrap();
