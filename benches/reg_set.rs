@@ -4,12 +4,15 @@ use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use reg_set::RegSet;
 use std::collections::HashSet;
 
+static N: usize = 1000;
+static MAX_ID: u32 = 1000;
+
 fn prepare_regs(n: usize) -> Vec<Reg> {
     let mut regs: Vec<Reg> = vec![];
     // let mut rg = RegGenerator::new();
     for _ in 0..n {
         let is_usual: bool = rand::random();
-        let id: u32 = rand::random::<u32>() as u32 % 10_0000;
+        let id: u32 = rand::random::<u32>() as u32 % MAX_ID;
         regs.push(Reg::new(id, is_usual));
         // regs.push(rg.gen_virtual_reg(is_usual));
     }
@@ -18,7 +21,7 @@ fn prepare_regs(n: usize) -> Vec<Reg> {
 
 #[allow(unused)]
 fn bench_insert(c: &mut Criterion) {
-    let regs = prepare_regs(10000);
+    let regs = prepare_regs(N);
     let insert1 = || {
         let mut rg1 = RegSet::new();
         for reg in &regs {
@@ -39,7 +42,7 @@ fn bench_insert(c: &mut Criterion) {
 
 #[allow(unused)]
 fn bench_contains(c: &mut Criterion) {
-    let regs = prepare_regs(10000);
+    let regs = prepare_regs(N);
     let mut rg = RegSet::new();
     for reg in &regs {
         rg.insert(reg);
@@ -71,11 +74,11 @@ fn bench_merge(c: &mut Criterion) {
 
     let mut rg3: HashSet<Reg> = HashSet::new();
     let mut rg4: HashSet<Reg> = HashSet::new();
-    for reg in prepare_regs(10000) {
+    for reg in prepare_regs(N) {
         rg1.insert(&reg);
         rg3.insert(reg);
     }
-    for reg in prepare_regs(10000) {
+    for reg in prepare_regs(N) {
         rg2.insert(&reg);
         rg4.insert(reg);
     }
@@ -100,7 +103,7 @@ fn bench_merge(c: &mut Criterion) {
 fn bench_clone(c: &mut Criterion) {
     let mut rg1 = RegSet::new();
     let mut rg2 = HashSet::new();
-    for reg in prepare_regs(10000) {
+    for reg in prepare_regs(N) {
         rg1.insert(&reg);
         rg2.insert(reg);
     }
@@ -122,11 +125,11 @@ fn bench_clone_then_retain(c: &mut Criterion) {
     let mut rg2 = RegSet::new();
     let mut rg3 = HashSet::new();
     let mut rg4 = HashSet::new();
-    for reg in prepare_regs(10000) {
+    for reg in prepare_regs(N) {
         rg1.insert(&reg);
         rg3.insert(reg);
     }
-    for reg in prepare_regs(10000) {
+    for reg in prepare_regs(N) {
         rg2.insert(&reg);
         rg4.insert(reg);
     }
@@ -161,7 +164,7 @@ fn bench_clone_then_retain(c: &mut Criterion) {
 
 #[allow(unused)]
 fn bench_remove(c: &mut Criterion) {
-    let regs = prepare_regs(10000);
+    let regs = prepare_regs(N);
     let mut rg1 = RegSet::new();
     let mut rg2 = HashSet::new();
     for reg in regs.iter() {
@@ -193,8 +196,8 @@ criterion_group! {
     name = benches;
     config = Criterion::default();
     targets =
-         bench_contains,
-         bench_insert,
+        bench_contains,
+        bench_insert,
         bench_merge,
         bench_remove,
         bench_clone,

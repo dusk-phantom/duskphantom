@@ -1,0 +1,31 @@
+[package]
+name = "reg-set-fuzz-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.reg-set-fuzz]
+path = ".."
+
+
+
+[[bin]]
+name = "reg_set"
+path = "fuzz_targets/reg_set.rs"
+test = false
+doc = false
+bench = false
+
+
+[[bin]]
+name = "single"
+path = "fuzz_targets/single.rs"
+test = false
+doc = false
+bench = false
