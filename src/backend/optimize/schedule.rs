@@ -68,21 +68,6 @@ fn insts_scheduling(insts: &[Inst]) -> Result<Vec<InstID>> {
             // 6. 初始化状态并加入到队列中
             queue.push(state_operand);
         }
-
-        // let dot = graph.gen_inst_dependency_graph_dot();
-        // let dot_name = format!("dot/{}.dot", 0);
-        // fprintln!(&dot_name, "{}", dot);
-
-        // let asm_name = format!("asm/{}.s", 0);
-        // fprintln!(
-        //     &asm_name,
-        //     "{}",
-        //     new_insts
-        //         .iter()
-        //         .map(|inst| inst.gen_asm())
-        //         .collect::<Vec<String>>()
-        //         .join("\n")
-        // );
     }
 
     for last in graph.control.iter().flatten() {
@@ -300,13 +285,13 @@ impl<'a> Graph<'a> {
 
         // 初始化图
         let mut use_defs: HashMap<InstID, HashSet<InstID>> = HashMap::new();
-        for insts_flag in bucket.iter() {
-            for (i, _) in insts_flag.iter() {
-                use_defs.entry(*i).or_default();
-            }
+        let mut def_uses: HashMap<InstID, HashSet<InstID>> = HashMap::new();
+        for id in 0..inst_len {
+            use_defs.entry(id).or_default();
+            def_uses.entry(id).or_default();
         }
 
-        for insts_flag in bucket.iter() {
+        for (_, insts_flag) in bucket.iter() {
             // 几种情况, 滑动窗口, 建立依赖, win_l, win_r 是闭区间
             // r r r r r r r r r
             // w w w w w w w w w
@@ -360,11 +345,9 @@ impl<'a> Graph<'a> {
             }
         }
 
-        // 建立反向依赖
-        let mut def_uses: HashMap<InstID, HashSet<InstID>> = HashMap::new();
-        for (u, d) in use_defs.iter() {
-            for dep in d.iter() {
-                def_uses.entry(*dep).or_default().insert(*u);
+        for (u, deps) in use_defs.iter() {
+            for d in deps {
+                def_uses.entry(*d).or_default().insert(*u);
             }
         }
 
@@ -415,7 +398,7 @@ type IsW = bool;
 
 impl<'a> Graph<'a> {
     #[allow(clippy::type_complexity)]
-    fn construct_bucket(insts: &[Inst]) -> Result<Vec<Vec<(InstID, IsW)>>> {
+    fn construct_bucket(insts: &[Inst]) -> Result<HashMap<WrapOperand, Vec<(InstID, IsW)>>> {
         let mut bucket: HashMap<WrapOperand, Vec<(InstID, IsW)>> = HashMap::new();
 
         let mut reg_label: HashMap<Reg, String> = HashMap::new();
@@ -532,7 +515,7 @@ impl<'a> Graph<'a> {
             }
         }
 
-        Ok(bucket.into_values().collect())
+        Ok(bucket)
     }
 }
 
