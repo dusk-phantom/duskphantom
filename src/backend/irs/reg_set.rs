@@ -2,10 +2,19 @@ use bitvec::prelude;
 
 use super::*;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct RegSet {
     float: prelude::BitVec,
     usual: prelude::BitVec,
+}
+
+impl Clone for RegSet {
+    fn clone(&self) -> Self {
+        Self {
+            float: self.float.clone(),
+            usual: self.usual.clone(),
+        }
+    }
 }
 
 impl Eq for RegSet {}
@@ -36,22 +45,50 @@ impl RegSet {
         }
     }
 
-    pub fn retain(&mut self, f: impl Fn(&Reg) -> bool) {
-        let mut float = prelude::BitVec::new();
-        let mut usual = prelude::BitVec::new();
-        for r in self.iter() {
-            if f(&r) {
-                if r.is_usual() {
-                    usual.push(true);
-                } else {
-                    float.push(true);
-                }
-            }
-        }
-        self.float = float;
-        self.usual = usual;
+    /// Remove all regs in `other` from `self`
+    pub fn minus(&mut self, other: &RegSet) {
+        other.float.iter_ones().for_each(|idx| {
+            self.float
+                .get_mut(idx)
+                .iter_mut()
+                .for_each(|x| x.set(false));
+        });
+        other.usual.iter_ones().for_each(|idx| {
+            self.usual
+                .get_mut(idx)
+                .iter_mut()
+                .for_each(|x| x.set(false));
+        });
     }
 
+    /// Retain only the elements specified by the predicate.
+    pub fn retain(&mut self, f: impl Fn(&Reg) -> bool) {
+        for (id, mut r) in self.float.iter_mut().filter(|x| **x).enumerate() {
+            if !f(&Reg::new(id as u32, false)) {
+                r.set(false);
+            }
+        }
+        for (id, mut r) in self.usual.iter_mut().filter(|x| **x).enumerate() {
+            if !f(&Reg::new(id as u32, true)) {
+                r.set(false);
+            }
+        }
+        // let mut float = prelude::BitVec::with_capacity(self.usual.capacity());
+        // let mut usual = prelude::BitVec::with_capacity(self.float.capacity());
+        // for r in self.iter() {
+        //     if f(&r) {
+        //         if r.is_usual() {
+        //             usual.push(true);
+        //         } else {
+        //             float.push(true);
+        //         }
+        //     }
+        // }
+        // self.float = float;
+        // self.usual = usual;
+    }
+
+    /// insert a reg into the set
     pub fn insert(&mut self, reg: &Reg) {
         let id = reg.id() as usize;
         if reg.is_usual() {
@@ -67,10 +104,12 @@ impl RegSet {
         }
     }
 
+    /// add all regs in `other` to `self`
     pub fn merge(&mut self, other: &RegSet) {
         self.float |= &other.float;
         self.usual |= &other.usual;
     }
+
     pub fn clear(&mut self) {
         self.float.clear();
         self.usual.clear();
@@ -109,30 +148,18 @@ impl RegSet {
     pub fn remove(&mut self, reg: &Reg) {
         let id = reg.id() as usize;
         if reg.is_usual() {
-            if self.usual.len() <= id {
-                return;
-            }
-            self.usual.set(id, false);
+            self.usual.get_mut(id).iter_mut().for_each(|a| a.set(false));
         } else {
-            if self.float.len() <= id {
-                return;
-            }
-            self.float.set(id, false);
+            self.float.get_mut(id).iter_mut().for_each(|e| e.set(false));
         }
     }
 
     pub fn contains(&self, reg: &Reg) -> bool {
         let id = reg.id() as usize;
         if reg.is_usual() {
-            if self.usual.len() <= id {
-                return false;
-            }
-            self.usual[id]
+            self.usual.get(id).map(|x| *x).unwrap_or(false)
         } else {
-            if self.float.len() <= id {
-                return false;
-            }
-            self.float[id]
+            self.float.get(id).map(|x| *x).unwrap_or(false)
         }
     }
 
@@ -257,6 +284,22 @@ mod reg_set_tests {
         assert!(reg_set1.num_regs() == 4);
         assert!(reg_set1.num_regs_usual() == 3);
         assert!(reg_set1.num_regs_float() == 1);
+    }
+
+    #[test]
+    fn test_minus_another() {
+        let mut reg_set1 = RegSet::new();
+        let mut reg_set2 = RegSet::new();
+        reg_set1.insert(&REG_A0);
+        reg_set1.insert(&REG_FA0);
+
+        reg_set2.insert(&REG_A1);
+        reg_set2.insert(&REG_A2);
+        reg_set2.insert(&REG_A0);
+
+        reg_set1.minus(&reg_set2);
+        assert!(reg_set1.contains(&REG_FA0) && reg_set1.num_regs() == 1);
+        assert!(reg_set1.num_regs_float() == 1 && reg_set1.num_regs_usual() == 0);
     }
 
     #[test]
