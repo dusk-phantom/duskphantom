@@ -58,7 +58,7 @@ macro_rules! impl_three_op_inst {
         }
         impl RegUses for $ty_name {
             fn uses(&self) -> Vec<&Reg> {
-                let mut regs = vec![];
+                let mut regs = Vec::with_capacity(2);
                 if let Operand::Reg(r1) = self.lhs() {
                     regs.push(r1);
                     if let Operand::Reg(r2) = self.rhs() {
@@ -171,7 +171,7 @@ macro_rules! impl_three_op_inst_with_dstmem {
         }
         impl RegUses for $ty_name {
             fn uses(&self) -> Vec<&Reg> {
-                let mut regs = vec![];
+                let mut regs = Vec::with_capacity(2);
                 if let Operand::Reg(r1) = self.lhs() {
                     regs.push(r1);
                     if let Operand::Reg(r2) = self.rhs() {
