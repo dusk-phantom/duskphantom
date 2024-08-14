@@ -62,7 +62,7 @@ impl<'a> Arbitrary<'a> for MReg {
         u: &mut libfuzzer_sys::arbitrary::Unstructured<'a>,
     ) -> libfuzzer_sys::arbitrary::Result<Self> {
         let id: u16 = u.arbitrary()?;
-        let id: u32 = id as u32 % 500;
+        let id: u32 = id as u32 % 10_000;
         let is_usual: bool = u.arbitrary()?;
         let r = Reg::new(id, is_usual);
         Ok(MReg(r))
