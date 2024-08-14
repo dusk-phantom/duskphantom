@@ -30,11 +30,12 @@ name = "compiler-sc"
 path = "src/main_self_llc.rs"
 
 [workspace]
-members = ["crates/graph"]
+members = ["crates/*", "crates/reg-set-fuzz/fuzz"]
 
 [workspace.dependencies]
 anyhow = "1.0.86"
 graph = { path = "crates/graph" }
+duskphantom = { path = "." }
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]

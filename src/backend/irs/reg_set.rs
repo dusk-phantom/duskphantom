@@ -88,29 +88,24 @@ impl RegSet {
 
     /// Retain only the elements specified by the predicate.
     pub fn retain(&mut self, f: impl Fn(&Reg) -> bool) {
-        for (id, mut r) in self.float.iter_mut().filter(|x| **x).enumerate() {
-            if !f(&Reg::new(id as u32, false)) {
-                r.set(false);
+        let mut to_remove = Vec::new();
+        self.float.iter_ones().for_each(|idx| {
+            if !f(&Reg::new(idx as u32, false)) {
+                to_remove.push(idx);
             }
+        });
+        for idx in to_remove {
+            self.float.set(idx, false);
         }
-        for (id, mut r) in self.usual.iter_mut().filter(|x| **x).enumerate() {
-            if !f(&Reg::new(id as u32, true)) {
-                r.set(false);
+        let mut to_remove = Vec::new();
+        self.usual.iter_ones().for_each(|idx| {
+            if !f(&Reg::new(idx as u32, true)) {
+                to_remove.push(idx);
             }
+        });
+        for idx in to_remove {
+            self.usual.set(idx, false);
         }
-        // let mut float = prelude::BitVec::with_capacity(self.usual.capacity());
-        // let mut usual = prelude::BitVec::with_capacity(self.float.capacity());
-        // for r in self.iter() {
-        //     if f(&r) {
-        //         if r.is_usual() {
-        //             usual.push(true);
-        //         } else {
-        //             float.push(true);
-        //         }
-        //     }
-        // }
-        // self.float = float;
-        // self.usual = usual;
     }
 
     /// insert a reg into the set
