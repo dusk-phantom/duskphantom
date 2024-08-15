@@ -118,7 +118,7 @@ impl<'a, 'b> LoadElim<'a, 'b> {
         // (we assume this memset sets 0 and is large enough)
         if def_inst.get_type() == InstType::Call {
             let call = downcast_ref::<Call>(def_inst.as_ref().as_ref());
-            if call.func.is_memset() {
+            if call.func.name.contains("memset") {
                 let memset_op = &Operand::Constant(0.into());
                 load_inst.replace_self(memset_op);
                 self.memory_ssa.remove_node(load_node);
