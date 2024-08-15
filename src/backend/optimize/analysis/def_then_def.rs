@@ -3,8 +3,8 @@ use super::*;
 impl Block {
     /// 统计基本块中存在的所有def then def 关系的寄存器,返回一个有向边的集合
     /// 边的起点是某指令的def,终点是下一条指令的def的集合
-    pub fn def_then_def(&self) -> HashMap<Reg, HashSet<Reg>> {
-        let mut def_then_def: HashMap<Reg, HashSet<Reg>> = HashMap::new();
+    pub fn def_then_def(&self) -> HashMap<Reg, FxHashSet<Reg>> {
+        let mut def_then_def: HashMap<Reg, FxHashSet<Reg>> = HashMap::new();
         let mut last_defs: Vec<Reg> = vec![];
         for inst in self.insts() {
             for cur_def in inst.defs() {
@@ -20,8 +20,8 @@ impl Block {
 
 impl Func {
     /// 统计函数中存在的所有def then def 关系的寄存器,返回一个有向边的集合 而不是一个无向图
-    pub fn def_then_def(&self) -> HashMap<Reg, HashSet<Reg>> {
-        let mut def_then_def: HashMap<Reg, HashSet<Reg>> = HashMap::new();
+    pub fn def_then_def(&self) -> HashMap<Reg, FxHashSet<Reg>> {
+        let mut def_then_def: HashMap<Reg, FxHashSet<Reg>> = HashMap::new();
         for bb in self.iter_bbs() {
             for (def, then_defs) in bb.def_then_def() {
                 def_then_def.entry(def).or_default().extend(then_defs);

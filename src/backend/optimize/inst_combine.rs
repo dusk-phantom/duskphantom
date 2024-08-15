@@ -1,3 +1,5 @@
+use rustc_hash::FxHashSet;
+
 use super::*;
 /// 处理指令结合,一些指令的组合可能被优化成一条指令
 pub fn handle_inst_combine(func: &mut Func) -> Result<()> {
@@ -239,7 +241,7 @@ impl Block {
         Ok(())
     }
 
-    pub fn rm_useless_def_reg(bb: &mut Block, live_out: &HashSet<Reg>) -> Result<()> {
+    pub fn rm_useless_def_reg(bb: &mut Block, live_out: &FxHashSet<Reg>) -> Result<()> {
         let mut is_changed = true;
         while is_changed {
             is_changed = false;
@@ -390,7 +392,7 @@ mod tests {
             LiInst::new(REG_A0.into(), 0.into()).into(),
             LiInst::new(REG_S1.into(), 0.into()).into(),
         ];
-        let live_out: HashSet<Reg> = vec![REG_S1].into_iter().collect();
+        let live_out: FxHashSet<Reg> = vec![REG_S1].into_iter().collect();
         let old_asm = bb.gen_asm();
         Block::rm_useless_def_reg(&mut bb, &live_out).unwrap();
         let new_asm = bb.gen_asm();
@@ -409,7 +411,7 @@ mod tests {
             LiInst::new(REG_S1.into(), 0.into()).into(),
             AddInst::new(REG_S1.into(), REG_A0.into(), REG_A1.into()).into(),
         ];
-        let live_out: HashSet<Reg> = vec![REG_ZERO].into_iter().collect();
+        let live_out: FxHashSet<Reg> = vec![REG_ZERO].into_iter().collect();
         let old_asm = bb.gen_asm();
         Block::rm_useless_def_reg(&mut bb, &live_out).unwrap();
         let new_asm = bb.gen_asm();
