@@ -15,4 +15,4 @@ pub use reg_live::*;
 pub use interval::*;
 
 pub use super::*;
-pub use rustc_hash::FxHashSet;
+pub use rustc_hash::{FxHashMap, FxHashSet};

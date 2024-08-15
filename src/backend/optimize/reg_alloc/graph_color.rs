@@ -1,11 +1,11 @@
 pub use super::*;
 use core::ffi;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 pub fn try_perfect_alloc(
-    reg_graph: &HashMap<Reg, FxHashSet<Reg>>,
-    def_then_def: &HashMap<Reg, FxHashSet<Reg>>,
-) -> Result<HashMap<Reg, Reg>> {
+    reg_graph: &FxHashMap<Reg, FxHashSet<Reg>>,
+    def_then_def: &FxHashMap<Reg, FxHashSet<Reg>>,
+) -> Result<FxHashMap<Reg, Reg>> {
     let u_regs = free_iregs_with_tmp();
     let f_regs = free_fregs_with_tmp();
     let mut reg_graph = reg_graph.clone();
@@ -18,7 +18,7 @@ pub fn try_perfect_alloc(
     }
 }
 
-pub fn apply_colors(func: &mut Func, colors: HashMap<Reg, Reg>) {
+pub fn apply_colors(func: &mut Func, colors: FxHashMap<Reg, Reg>) {
     for block in func.iter_bbs_mut() {
         for inst in block.insts_mut() {
             let uses: Vec<Reg> = inst.uses().into_iter().cloned().collect();
@@ -59,7 +59,7 @@ pub fn apply_spills2(func: &mut Func, spills: FxHashSet<Reg>) -> Result<()> {
         .stack_allocator_mut()
         .take()
         .ok_or(anyhow!("stack allocator is none"))?;
-    let mut v_ss = HashMap::new();
+    let mut v_ss = FxHashMap::default();
     let mut get_ss_for_spill = |r: &Reg| -> Result<StackSlot> {
         if let Some(ss) = v_ss.get(r) {
             return Ok(*ss);
@@ -70,7 +70,7 @@ pub fn apply_spills2(func: &mut Func, spills: FxHashSet<Reg>) -> Result<()> {
     };
 
     // key: virtual reg, value: the physical reg that is used to store the value of the virtual reg
-    let mut owner: HashMap<Reg, Reg> = HashMap::new();
+    let mut owner: FxHashMap<Reg, Reg> = FxHashMap::default();
     let mut owned: FxHashSet<Reg> = FxHashSet::default();
     let i_tmps = tmp_i_regs();
     let f_tmps = tmp_f_regs();
@@ -195,18 +195,18 @@ pub fn apply_spills2(func: &mut Func, spills: FxHashSet<Reg>) -> Result<()> {
 /// # Arguments
 /// * `graph` - the interference graph
 /// # Returns
-/// `Result<(colors: HashMap<Reg, Reg>, to_spill: FxHashSet<Reg>)>`
+/// `Result<(colors: FxHashMap<Reg, Reg>, to_spill: FxHashSet<Reg>)>`
 /// - colors: the mapping from virtual reg to physical reg
 /// - to_spill: the set of regs that need to be spilled
 ///
 pub fn reg_alloc(
-    graph: &HashMap<Reg, FxHashSet<Reg>>,
+    graph: &FxHashMap<Reg, FxHashSet<Reg>>,
     i_colors: &[Reg],
     f_colors: &[Reg],
-) -> Result<(HashMap<Reg, Reg>, FxHashSet<Reg>)> {
+) -> Result<(FxHashMap<Reg, Reg>, FxHashSet<Reg>)> {
     let (graph_to_simplify, mut later_to_color) = simplify_graph(graph, i_colors, f_colors);
 
-    let mut colors: HashMap<Reg, Reg> = HashMap::new();
+    let mut colors: FxHashMap<Reg, Reg> = FxHashMap::default();
     let mut to_spill: FxHashSet<Reg> = FxHashSet::default();
 
     // try to color the rest of the graph
@@ -250,11 +250,11 @@ pub fn reg_alloc(
 /// return simplified graph and ordered later to color nodes
 #[inline]
 pub fn simplify_graph(
-    graph: &HashMap<Reg, FxHashSet<Reg>>,
+    graph: &FxHashMap<Reg, FxHashSet<Reg>>,
     i_colors: &[Reg],
     f_colors: &[Reg],
-) -> (HashMap<Reg, FxHashSet<Reg>>, VecDeque<Reg>) {
-    fn remove_node(g: &mut HashMap<Reg, FxHashSet<Reg>>, r: Reg) {
+) -> (FxHashMap<Reg, FxHashSet<Reg>>, VecDeque<Reg>) {
+    fn remove_node(g: &mut FxHashMap<Reg, FxHashSet<Reg>>, r: Reg) {
         let nbs = g.remove(&r).unwrap_or_default();
         for nb in nbs {
             if let Some(nb_nbs) = g.get_mut(&nb) {
@@ -305,15 +305,15 @@ pub fn simplify_graph(
 // 给图加上附加边,在不超过最佳范围的情况
 // 要求: 输入的图应该是个无向图,如果不是,执行结果可能不符合预期
 pub fn assign_extra_edge(
-    graph: &mut HashMap<Reg, FxHashSet<Reg>>,
+    graph: &mut FxHashMap<Reg, FxHashSet<Reg>>,
     num_free_iregs: usize,
     num_free_fregs: usize,
-    mut extra_edges: &HashMap<Reg, FxHashSet<Reg>>,
+    mut extra_edges: &FxHashMap<Reg, FxHashSet<Reg>>,
 ) {
-    fn num_inter(g: &HashMap<Reg, FxHashSet<Reg>>, r: &Reg) -> usize {
+    fn num_inter(g: &FxHashMap<Reg, FxHashSet<Reg>>, r: &Reg) -> usize {
         g.get(r).map(|nbs| nbs.len()).unwrap_or(0)
     }
-    fn inter(g: &HashMap<Reg, FxHashSet<Reg>>, r1: &Reg, r2: &Reg) -> bool {
+    fn inter(g: &FxHashMap<Reg, FxHashSet<Reg>>, r1: &Reg, r2: &Reg) -> bool {
         g.get(r1).map(|nbs| nbs.contains(r2)).unwrap_or(false)
     }
 
@@ -350,7 +350,7 @@ pub fn assign_extra_edge(
 //////////////////////////////////////////////////////
 
 /// generate the interference graph txt for the function
-pub fn g2txt(g: &HashMap<Reg, FxHashSet<Reg>>) -> String {
+pub fn g2txt(g: &FxHashMap<Reg, FxHashSet<Reg>>) -> String {
     let mut s = String::new();
     s.push_str("{\n");
     for (k, v) in g {
@@ -374,8 +374,8 @@ mod tests {
     use super::*;
     use graph::{udgraph, UdGraph};
     fn check_alloc(
-        graph: &HashMap<Reg, FxHashSet<Reg>>,
-        colors: &HashMap<Reg, Reg>,
+        graph: &FxHashMap<Reg, FxHashSet<Reg>>,
+        colors: &FxHashMap<Reg, Reg>,
         to_spill: &FxHashSet<Reg>,
     ) {
         for (k, v) in graph.iter() {
@@ -428,7 +428,7 @@ mod tests {
 
     #[test]
     pub fn test_reg_alloc() {
-        let mut graph = std::collections::HashMap::new();
+        let mut graph = FxHashMap::default();
         let mut reg_gener = RegGenerator::new();
         let i_v1 = reg_gener.gen_virtual_reg(true);
         let i_v2 = reg_gener.gen_virtual_reg(true);
@@ -445,7 +445,11 @@ mod tests {
     fn t2() {
         let g: UdGraph<Reg> = udgraph!({v1->v2,v3}, {v2 -> v3},).unwrap();
         let g: HashMap<Reg, HashSet<Reg>> = g.into();
-        let g: HashMap<Reg, FxHashSet<Reg>> = g
+        let g: FxHashMap<Reg, HashSet<Reg>> = g
+            .into_iter()
+            .map(|(k, v)| (k, v.into_iter().collect()))
+            .collect();
+        let g: FxHashMap<Reg, FxHashSet<Reg>> = g
             .into_iter()
             .map(|(k, v)| (k, v.into_iter().collect()))
             .collect();
