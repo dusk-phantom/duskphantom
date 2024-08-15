@@ -69,6 +69,7 @@ pub enum Inst {
     // data transfer operation
     Mv(MvInst),
     Li(LiInst),
+    Lui(LuiInst),
     Ld(LdInst),
     Sd(SdInst),
     Lw(LwInst),
@@ -174,6 +175,7 @@ impl Inst {
             Inst::Feqs(feqs) => feqs.gen_asm(),
             Inst::Fles(fles) => fles.gen_asm(),
             Inst::Flts(flts) => flts.gen_asm(),
+            Inst::Lui(lui) => lui.gen_asm(),
         }
     }
 
@@ -256,6 +258,7 @@ impl RegReplace for Inst {
             Inst::Feqs(feqs) => feqs.replace_use(from, to),
             Inst::Fles(fles) => fles.replace_use(from, to),
             Inst::Flts(flts) => flts.replace_use(from, to),
+            Inst::Lui(lui) => lui.replace_use(from, to),
         }
     }
 
@@ -305,6 +308,7 @@ impl RegReplace for Inst {
             Inst::Feqs(feqs) => feqs.replace_def(from, to),
             Inst::Fles(fles) => fles.replace_def(from, to),
             Inst::Flts(flts) => flts.replace_def(from, to),
+            Inst::Lui(lui) => lui.replace_def(from, to),
         }
     }
 }

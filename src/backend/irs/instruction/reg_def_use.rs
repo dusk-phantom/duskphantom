@@ -59,6 +59,7 @@ impl RegUses for Inst {
             Inst::Feqs(feqs) => feqs.uses(),
             Inst::Fles(fles) => fles.uses(),
             Inst::Flts(flts) => flts.uses(),
+            Inst::Lui(lui) => lui.uses(),
         }
     }
 }
@@ -109,6 +110,7 @@ impl RegDefs for Inst {
             Inst::Feqs(feqs) => feqs.defs(),
             Inst::Fles(fles) => fles.defs(),
             Inst::Flts(flts) => flts.defs(),
+            Inst::Lui(lui) => lui.defs(),
         }
     }
 }

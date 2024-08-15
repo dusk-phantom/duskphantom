@@ -131,11 +131,16 @@ impl InstChecker for Riscv {
             Inst::Feqs(feqs) => self.check_feqs(feqs),
             Inst::Fles(fles) => self.check_fles(fles),
             Inst::Flts(flts) => self.check_flts(flts),
+            Inst::Lui(lui) => self.check_lui(lui),
         }
     }
 }
 
 impl Riscv {
+    fn check_lui(&self, lui: &LuiInst) -> bool {
+        matches!(lui.dst(), Operand::Reg(_)) && matches!(lui.src(), Operand::Imm(_))
+    }
+
     fn check_feqs(&self, feqs: &FeqsInst) -> bool {
         matches!(feqs.dst(), Operand::Reg(_))
             && matches!(feqs.lhs(), Operand::Reg(_))
