@@ -217,8 +217,8 @@ macro_rules! impl_branch_inst {
         #[derive(Clone, Debug)]
         pub struct $ty_name(Reg, Reg, Label);
         impl $ty_name {
-            pub fn new(dst: Reg, lhs: Reg, rhs: Label) -> Self {
-                Self(dst, lhs, rhs)
+            pub fn new(lhs: Reg, rhs: Reg, label: Label) -> Self {
+                Self(lhs, rhs, label)
             }
             #[inline]
             pub fn lhs(&self) -> &Reg {
