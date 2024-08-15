@@ -151,26 +151,29 @@ impl EffectAnalysis {
                         // Add instruction effect
                         if call.func.name.contains("memset") {
                             // Treat memset as a store
+                            let ptr = get_base_pointer(inst.get_operand()[0].clone());
                             self.inst_effect.insert(
                                 inst,
                                 Effect {
-                                    def_range: inst.get_operand()[0].clone().into(),
+                                    def_range: ptr.into(),
                                     use_range: EffectRange::new(),
                                 },
                             );
                         } else if call.func.name == "putarray" || call.func.name == "putfarray" {
+                            let ptr = get_base_pointer(inst.get_operand()[1].clone());
                             self.inst_effect.insert(
                                 inst,
                                 Effect {
                                     def_range: EffectRange::new(),
-                                    use_range: inst.get_operand()[0].clone().into(),
+                                    use_range: ptr.into(),
                                 },
                             );
                         } else if call.func.name == "getarray" || call.func.name == "getfarray" {
+                            let ptr = get_base_pointer(inst.get_operand()[0].clone());
                             self.inst_effect.insert(
                                 inst,
                                 Effect {
-                                    def_range: inst.get_operand()[0].clone().into(),
+                                    def_range: ptr.into(),
                                     use_range: EffectRange::new(),
                                 },
                             );
@@ -255,5 +258,19 @@ fn check_effect(operand: &Operand) -> bool {
         Operand::Global(_) => true,
         Operand::Parameter(_) => true,
         Operand::Constant(_) => false,
+    }
+}
+
+/// Get base pointer of operand (because pointer in function argument can GEP a lot)
+fn get_base_pointer(operand: Operand) -> Operand {
+    match operand {
+        Operand::Instruction(inst) => {
+            if inst.get_type() == InstType::GetElementPtr {
+                get_base_pointer(inst.get_operand().first().unwrap().clone())
+            } else {
+                operand
+            }
+        }
+        _ => operand,
     }
 }
