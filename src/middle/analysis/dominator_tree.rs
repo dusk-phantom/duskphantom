@@ -7,6 +7,7 @@ pub struct DominatorTree {
     dominator_map: HashMap<BBPtr, HashSet<BBPtr>>,
     dominatee_map: Option<HashMap<BBPtr, HashSet<BBPtr>>>,
     idom_map: Option<HashMap<BBPtr, BBPtr>>,
+    postorder_map: Option<HashMap<BBPtr, i32>>,
     df_map: Option<HashMap<BBPtr, HashSet<BBPtr>>>,
 }
 
@@ -18,6 +19,7 @@ impl DominatorTree {
             dominator_map: HashMap::new(),
             dominatee_map: None,
             idom_map: None,
+            postorder_map: None,
             df_map: None,
         }
     }
@@ -43,6 +45,13 @@ impl DominatorTree {
                 dom
             }
         }
+    }
+
+    pub fn get_lca(&mut self, a: BBPtr, b: BBPtr) -> BBPtr {
+        self.get_idom_map();
+        let idoms = self.idom_map.as_ref().unwrap();
+        let depths = self.postorder_map.as_ref().unwrap();
+        intersect(a, b, depths, idoms)
     }
 
     pub fn get_dominatee(&mut self, dominator: BBPtr) -> HashSet<BBPtr> {
@@ -94,9 +103,9 @@ impl DominatorTree {
     }
 
     fn calculate_idom(&mut self) {
+        let entry = self.fun.entry.unwrap();
         let mut idom_map = HashMap::new();
         let mut dominatee_map = HashMap::new();
-        let entry = self.fun.entry.unwrap();
         let mut postorder_map = HashMap::new();
         self.fun.po_iter().enumerate().for_each(|(i, bb)| {
             postorder_map.insert(bb, i as i32);
@@ -131,6 +140,7 @@ impl DominatorTree {
 
         // Assign idom map and dominatee map to self
         self.idom_map = Some(idom_map);
+        self.postorder_map = Some(postorder_map);
         self.dominatee_map = Some(dominatee_map);
     }
 
