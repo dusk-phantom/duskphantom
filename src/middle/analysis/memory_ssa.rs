@@ -73,7 +73,15 @@ impl<'a> MemorySSA<'a> {
             }
             result += &format!("MemorySSA for function: {}\n", func.name);
             for bb in func.dfs_iter() {
-                result += &format!("{}:\n", bb.name);
+                result += &format!(
+                    "{}:    ; preds = {}\n",
+                    bb.name,
+                    bb.get_pred_bb()
+                        .iter()
+                        .map(|bb| bb.name.clone())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
                 if let Some(node) = self.block_to_node.get(&bb) {
                     result += &self.dump_node(*node);
                     result += "\n";
