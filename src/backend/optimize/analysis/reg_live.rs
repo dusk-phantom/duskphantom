@@ -1,5 +1,7 @@
 use super::*;
+use rustc_hash::FxHashMap;
 use rustc_hash::FxHashSet;
+// use rustc_hash
 use std::fmt::{Debug, Display};
 
 impl Block {
@@ -23,13 +25,13 @@ impl Block {
 }
 
 impl Func {
-    pub fn reg_live_use(f: &Func) -> HashMap<String, FxHashSet<Reg>> {
+    pub fn reg_live_use(f: &Func) -> FxHashMap<String, FxHashSet<Reg>> {
         f.iter_bbs()
             .map(|bb| (bb.label().to_string(), bb.live_use_regs()))
             .collect()
     }
 
-    pub fn reg_live_def(f: &Func) -> HashMap<String, FxHashSet<Reg>> {
+    pub fn reg_live_def(f: &Func) -> FxHashMap<String, FxHashSet<Reg>> {
         f.iter_bbs()
             .map(|bb| (bb.label().to_string(), bb.live_def_regs()))
             .collect()
@@ -39,8 +41,8 @@ impl Func {
     pub fn reg_lives(f: &Func) -> Result<RegLives> {
         let (ins, outs) = Func::in_out_bbs(f)?;
 
-        let mut live_ins: HashMap<String, FxHashSet<Reg>> = HashMap::new();
-        let mut live_outs: HashMap<String, FxHashSet<Reg>> = HashMap::new();
+        let mut live_ins: FxHashMap<String, FxHashSet<Reg>> = FxHashMap::default();
+        let mut live_outs: FxHashMap<String, FxHashSet<Reg>> = FxHashMap::default();
 
         // consider the exit block
         if let Some(ret) = f.ret() {
@@ -114,8 +116,8 @@ impl Func {
     }
 
     /// compute the reg interference graph of a function
-    pub fn reg_interfere_graph(f: &Func) -> Result<HashMap<Reg, FxHashSet<Reg>>> {
-        fn add_inter(g: &mut HashMap<Reg, FxHashSet<Reg>>, r1: &Reg, r2: &Reg) {
+    pub fn reg_interfere_graph(f: &Func) -> Result<FxHashMap<Reg, FxHashSet<Reg>>> {
+        fn add_inter(g: &mut FxHashMap<Reg, FxHashSet<Reg>>, r1: &Reg, r2: &Reg) {
             if r1.is_virtual() || r2.is_virtual() {
                 if r1 == r2 {
                     g.entry(*r1).or_default();
@@ -125,13 +127,13 @@ impl Func {
                 g.entry(*r2).or_default().insert(*r1);
             }
         }
-        fn add_node(g: &mut HashMap<Reg, FxHashSet<Reg>>, r: &Reg) {
+        fn add_node(g: &mut FxHashMap<Reg, FxHashSet<Reg>>, r: &Reg) {
             if r.is_virtual() {
                 g.entry(*r).or_default();
             }
         }
         // for each basic block, collect interference between regs
-        let mut graph: HashMap<Reg, FxHashSet<Reg>> = HashMap::new();
+        let mut graph: FxHashMap<Reg, FxHashSet<Reg>> = FxHashMap::default();
         let reg_lives = Func::reg_lives(f)?;
         // dbg!(&reg_lives);
         // FIXME: 使用位图实现的寄存器记录表来加速运算过程，以及节省内存
@@ -169,8 +171,8 @@ impl Func {
 }
 
 pub struct RegLives {
-    live_ins: HashMap<String, FxHashSet<Reg>>,
-    live_outs: HashMap<String, FxHashSet<Reg>>,
+    live_ins: FxHashMap<String, FxHashSet<Reg>>,
+    live_outs: FxHashMap<String, FxHashSet<Reg>>,
 }
 impl Debug for RegLives {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
