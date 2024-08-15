@@ -72,8 +72,10 @@ impl<'a> SymbolicEval<'a> {
     fn symbolic_eval(&mut self, inst: InstPtr) -> Result<bool> {
         let mut changed = false;
         changed |= self.canonicalize_binary(inst)?;
-        changed |=
-            self.constant_fold(inst)? || self.useless_elim(inst)? || self.inst_combine(inst)?;
+        changed |= self.constant_fold(inst)?
+            || self.canonicalize_gep(inst)?
+            || self.useless_elim(inst)?
+            || self.inst_combine(inst)?;
         Ok(changed)
     }
 
@@ -95,6 +97,35 @@ impl<'a> SymbolicEval<'a> {
                 }
             }
             _ => (),
+        }
+        Ok(false)
+    }
+
+    /// Canonicalize `gep (gep %ptr, a, 0), b` to `gep %ptr, a, b`.
+    /// If changed, original instruction is removed.
+    fn canonicalize_gep(&mut self, mut inst: InstPtr) -> Result<bool> {
+        let inst_type = inst.get_type();
+        if inst_type == InstType::GetElementPtr && inst.get_operand().len() == 2 {
+            let lhs = inst.get_operand()[0].clone();
+            let rhs = inst.get_operand()[1].clone();
+            if let Operand::Instruction(lhs) = lhs {
+                if lhs.get_type() == InstType::GetElementPtr
+                    && lhs.get_operand().last() == Some(&Operand::Constant(Constant::Int(0)))
+                {
+                    let lhs_lhs = lhs.get_operand()[0].clone();
+                    let mut indexes = lhs.get_operand()[1..].to_vec();
+                    *indexes.last_mut().unwrap() = rhs;
+                    let gep = downcast_ref::<GetElementPtr>(lhs.as_ref().as_ref());
+                    let new_inst = self.program.mem_pool.get_getelementptr(
+                        gep.element_type.clone(),
+                        lhs_lhs,
+                        indexes,
+                    );
+                    inst.insert_after(new_inst);
+                    inst.replace_self(&new_inst.into());
+                    return Ok(true);
+                }
+            }
         }
         Ok(false)
     }

@@ -103,8 +103,8 @@ impl Value {
     pub fn load(self, target: ValueType, kit: &mut FunctionKit) -> Result<Operand> {
         let (uncast_operand, loaded_type) = self.load_uncast(kit)?;
 
-        // Return directly if type matches
-        if loaded_type == target {
+        // Return directly if base type matches
+        if loaded_type.get_base_type() == target.get_base_type() {
             return Ok(uncast_operand);
         }
 

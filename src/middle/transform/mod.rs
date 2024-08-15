@@ -15,6 +15,7 @@ pub mod loop_optimization;
 pub mod loop_simplify;
 pub mod mem2reg;
 pub mod redundance_elim;
+pub mod sink;
 pub mod store_elim;
 pub mod ultimate_pass;
 
