@@ -136,7 +136,7 @@ impl Inst {
             Inst::Mv(mv) => arithmetic_char!(mv),
             /* int */
             Inst::LocalAddr(_) => Ok((1, InstType::Integer)),
-            Inst::Li(_) | Inst::Lla(_) => Ok((1, InstType::Integer)),
+            Inst::Li(_) | Inst::Lla(_) | Inst::Lui(_) => Ok((1, InstType::Integer)),
             /* mem access */
             Inst::F2i(_) | Inst::Fles(_) | Inst::Feqs(_) | Inst::Flts(_) | Inst::I2f(_) => {
                 Ok((4, InstType::FloatPoint))

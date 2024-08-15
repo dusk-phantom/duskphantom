@@ -142,6 +142,7 @@ impl_mem_inst!(SdInst, "sd");
 impl_mem_inst!(SwInst, "sw");
 impl_mem_inst!(LwInst, "lw");
 impl_two_op_inst!(LiInst, "li");
+impl_two_op_inst!(LuiInst, "lui");
 
 // la
 #[derive(Clone, Debug)]
@@ -305,6 +306,7 @@ mod c {
     impl_inst_convert!(LoadInst, Load);
     impl_inst_convert!(StoreInst, Store);
     impl_inst_convert!(LocalAddr, LocalAddr);
+    impl_inst_convert!(LuiInst, Lui);
 }
 
 #[cfg(test)]
