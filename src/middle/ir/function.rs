@@ -33,11 +33,6 @@ impl Function {
         self.name == "main"
     }
 
-    /// Return true if it is memset.
-    pub fn is_memset(&self) -> bool {
-        self.name.contains("memset")
-    }
-
     /// Create a depth-first iterator to traverse the graph structure of basicblocks.
     /// Traverse in the direction of data flow with the function entry as the starting point.
     /// Do not change the graph structure during traversal, which may cause unknown errors

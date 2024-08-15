@@ -382,7 +382,8 @@ impl Node {
                 inst.get_type() == InstType::Call
                     && downcast_ref::<Call>(inst.as_ref().as_ref())
                         .func
-                        .is_memset()
+                        .name
+                        .contains("memset")
             })
             .unwrap_or(false)
     }

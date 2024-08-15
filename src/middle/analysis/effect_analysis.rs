@@ -54,10 +54,13 @@ impl EffectAnalysis {
                 {
                     effect.has_io_output.insert(*func);
                 }
-                if func.name.contains("memset") || func.name.contains("getarray") {
+                if func.name.contains("memset")
+                    || func.name == "getarray"
+                    || func.name == "getfarray"
+                {
                     effect.has_mem_output.insert(*func);
                 }
-                if func.name.contains("putarray") {
+                if func.name == "putarray" || func.name == "putfarray" {
                     effect.has_mem_input.insert(*func);
                 }
             }
@@ -145,7 +148,7 @@ impl EffectAnalysis {
                         changed |= self.add_batch_to_func(func, call.func);
 
                         // Add instruction effect
-                        if call.func.is_memset() {
+                        if call.func.name.contains("memset") {
                             // Treat memset as a store
                             self.inst_effect.insert(
                                 inst,
