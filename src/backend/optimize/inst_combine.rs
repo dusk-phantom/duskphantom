@@ -140,46 +140,10 @@ impl Block {
                     _ => unimplemented!(),
                 }
             }
-            Inst::Add(_) => todo!(),
-            Inst::Sub(_) => todo!(),
-            Inst::Mul(_) => todo!(),
-            Inst::Div(_) => todo!(),
-            Inst::UDiv(_) => todo!(),
-            Inst::Rem(_) => todo!(),
-            Inst::Sll(_) => todo!(),
-            Inst::Srl(_) => todo!(),
-            Inst::SRA(_) => todo!(),
-            Inst::Not(_) => todo!(),
-            Inst::And(_) => todo!(),
-            Inst::Or(_) => todo!(),
-            Inst::Neg(_) => todo!(),
-            Inst::Sltu(_) => todo!(),
-            Inst::Sgtu(_) => todo!(),
-            Inst::Feqs(_) => todo!(),
-            Inst::Fles(_) => todo!(),
-            Inst::Flts(_) => todo!(),
-            Inst::Mv(_) => todo!(),
-            Inst::Li(_) => todo!(),
-            Inst::Ld(_) => todo!(),
-            Inst::Sd(_) => todo!(),
-            Inst::Lw(_) => todo!(),
-            Inst::Sw(_) => todo!(),
-            Inst::Lla(_) => todo!(),
-            Inst::Load(_) => todo!(),
-            Inst::Store(_) => todo!(),
-            Inst::LocalAddr(_) => todo!(),
-            Inst::I2f(_) => todo!(),
-            Inst::F2i(_) => todo!(),
-            Inst::Jmp(_) => todo!(),
-            Inst::Beq(_) => todo!(),
-            Inst::Bne(_) => todo!(),
-            Inst::Blt(_) => todo!(),
-            Inst::Ble(_) => todo!(),
-            Inst::Bgt(_) => todo!(),
-            Inst::Bge(_) => todo!(),
-            Inst::Call(_) => todo!(),
-            Inst::Tail(_) => todo!(),
-            Inst::Ret => todo!(),
+            Inst::Sltu(_) | Inst::Sgtu(_) | Inst::Feqs(_) | Inst::Fles(_) | Inst::Flts(_) => {
+                return Ok(())
+            }
+            _ => unimplemented!(),
         };
         Ok(())
     }
@@ -241,13 +205,13 @@ impl Block {
                         _ => unimplemented!(),
                     }
                 }
-                Inst::Sltu(_) => todo!(),
-                Inst::Sgtu(_) => todo!(),
-                Inst::Seqz(_) => todo!(),
-                Inst::Snez(_) => todo!(),
-                Inst::Feqs(_) => todo!(),
-                Inst::Fles(_) => todo!(),
-                Inst::Flts(_) => todo!(),
+                Inst::Sltu(_)
+                | Inst::Sgtu(_)
+                | Inst::Seqz(_)
+                | Inst::Snez(_)
+                | Inst::Feqs(_)
+                | Inst::Fles(_)
+                | Inst::Flts(_) => return Ok(()),
                 _ => unimplemented!(),
             }
         } else {
@@ -315,13 +279,13 @@ impl Block {
                         _ => unimplemented!(),
                     }
                 }
-                Inst::Sltu(_) => todo!(),
-                Inst::Sgtu(_) => todo!(),
-                Inst::Seqz(_) => todo!(),
-                Inst::Snez(_) => todo!(),
-                Inst::Feqs(_) => todo!(),
-                Inst::Fles(_) => todo!(),
-                Inst::Flts(_) => todo!(),
+                Inst::Sltu(_)
+                | Inst::Sgtu(_)
+                | Inst::Seqz(_)
+                | Inst::Snez(_)
+                | Inst::Feqs(_)
+                | Inst::Fles(_)
+                | Inst::Flts(_) => return Ok(()),
                 _ => unimplemented!(),
             }
         } else {
