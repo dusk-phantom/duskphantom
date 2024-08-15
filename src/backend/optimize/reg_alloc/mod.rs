@@ -92,7 +92,7 @@ pub fn special_regs() -> &'static [Reg; 7] {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
+    use super::*;
 
     use crate::backend::irs::Reg;
 
