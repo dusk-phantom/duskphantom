@@ -18,22 +18,6 @@ pub fn try_perfect_alloc(
     }
 }
 
-pub fn try_perfect_alloc2(
-    reg_graph: &HashMap<Reg, RegSet>,
-    def_then_def: &HashMap<Reg, RegSet>,
-) -> Result<HashMap<Reg, Reg>> {
-    let u_regs = free_iregs_with_tmp();
-    let f_regs = free_fregs_with_tmp();
-    let mut reg_graph = reg_graph.clone();
-    // assign_extra_edge2(&mut reg_graph, u_regs.len(), f_regs.len(), def_then_def);
-    let (colors, spills) = reg_alloc2(&reg_graph, u_regs, f_regs)?;
-    if spills.is_empty() {
-        Ok(colors)
-    } else {
-        Err(anyhow!(""))
-    }
-}
-
 pub fn apply_colors(func: &mut Func, colors: HashMap<Reg, Reg>) {
     for block in func.iter_bbs_mut() {
         for inst in block.insts_mut() {
@@ -318,128 +302,6 @@ pub fn simplify_graph(
     (graph_to_simplify, later_to_color)
 }
 
-pub fn reg_alloc2(
-    graph: &HashMap<Reg, RegSet>,
-    i_colors: &[Reg],
-    f_colors: &[Reg],
-) -> Result<(HashMap<Reg, Reg>, HashSet<Reg>)> {
-    let (graph_to_simplify, mut later_to_color) = simplify_graph2(graph, i_colors, f_colors);
-    let mut colors: HashMap<Reg, Reg> = HashMap::new();
-    let mut to_spill: HashSet<Reg> = HashSet::new();
-
-    // try to color the rest of the graph
-    let mut first_to_color: Vec<(Reg, usize)> = graph_to_simplify
-        .into_iter()
-        .filter(|(k, _)| k.is_virtual())
-        .map(|(k, v)| {
-            (
-                k,
-                if k.is_usual() {
-                    v.num_regs_usual()
-                } else {
-                    v.num_regs_float()
-                },
-            )
-        })
-        .collect();
-    first_to_color.sort_by_key(|(_, v)| *v);
-    for (k, _) in first_to_color {
-        later_to_color.push_back(k);
-    }
-
-    let ordered_to_color = later_to_color.into_iter().rev();
-
-    for r in ordered_to_color {
-        let mut used_colors: RegSet = RegSet::with_capacity(32);
-        if let Some(inter) = graph.get(&r) {
-            for v in inter.iter() {
-                if v.is_physical() {
-                    used_colors.insert(&v);
-                } else if let Some(c) = colors.get(&v) {
-                    used_colors.insert(c);
-                }
-            }
-        }
-        // find the first color that is not used
-        let color = if r.is_usual() {
-            i_colors.iter().find(|c| !used_colors.contains(c))
-        } else {
-            f_colors.iter().find(|c| !used_colors.contains(c))
-        };
-        if let Some(color) = color {
-            colors.insert(r, *color);
-        } else {
-            to_spill.insert(r);
-        }
-    }
-
-    Ok((colors, to_spill))
-}
-
-pub fn simplify_graph2(
-    graph: &HashMap<Reg, RegSet>,
-    i_colors: &[Reg],
-    f_colors: &[Reg],
-) -> (HashMap<Reg, RegSet>, VecDeque<Reg>) {
-    #[inline]
-    fn remove_node(g: &mut HashMap<Reg, RegSet>, r: Reg) {
-        let nbs = g.remove(&r).unwrap_or_default();
-        for nb in nbs {
-            if let Some(nb_nbs) = g.get_mut(&nb) {
-                nb_nbs.remove(&r);
-            }
-        }
-    }
-    #[inline]
-    fn num_inters(g: &HashMap<Reg, RegSet>, r: Reg) -> usize {
-        g.get(&r)
-            .map(|nbs| {
-                if r.is_usual() {
-                    nbs.num_regs_usual()
-                } else {
-                    nbs.num_regs_float()
-                }
-            })
-            .unwrap_or(0)
-    }
-
-    let mut graph_to_simplify = graph.clone();
-    let mut later_to_color: VecDeque<Reg> = VecDeque::new();
-    // simpilify the graph
-    // if a node has less than K neighbors, remove it from the graph, and add it to the later_to_color
-    loop {
-        let mut to_remove = vec![];
-        for (k, _) in graph_to_simplify.iter() {
-            if k.is_physical() {
-                continue;
-            }
-            let num_inter = num_inters(&graph_to_simplify, *k);
-            if k.is_float() {
-                if num_inter < f_colors.len() {
-                    to_remove.push(*k);
-                    later_to_color.push_back(*k);
-                }
-            } else if k.is_usual() {
-                if num_inter < i_colors.len() {
-                    to_remove.push(*k);
-                    later_to_color.push_back(*k);
-                }
-            } else {
-                unreachable!("a reg can only be usual or float");
-            }
-        }
-
-        if to_remove.is_empty() {
-            break;
-        }
-        for r in to_remove {
-            remove_node(&mut graph_to_simplify, r);
-        }
-    }
-
-    (graph_to_simplify, later_to_color)
-}
-
 // 给图加上附加边,在不超过最佳范围的情况
 // 要求: 输入的图应该是个无向图,如果不是,执行结果可能不符合预期
 pub fn assign_extra_edge(
@@ -478,55 +340,6 @@ pub fn assign_extra_edge(
             if num_inter1 + 1 < num_max_free && num_inter2 + 1 < num_max_free {
                 graph.entry(*r1).or_default().insert(*r2);
                 graph.entry(*r2).or_default().insert(*r1);
-            }
-        }
-    }
-}
-
-pub fn assign_extra_edge2(
-    graph: &mut HashMap<Reg, RegSet>,
-    num_free_fregs: usize,
-    num_free_iregs: usize,
-    extra_edges: &HashMap<Reg, RegSet>,
-) {
-    fn num_inter(g: &HashMap<Reg, RegSet>, r: &Reg) -> usize {
-        g.get(r)
-            .map(|nbs| {
-                if r.is_usual() {
-                    nbs.num_regs_usual()
-                } else {
-                    nbs.num_regs_float()
-                }
-            })
-            .unwrap_or(0)
-    }
-    fn inter(g: &HashMap<Reg, RegSet>, r1: &Reg, r2: &Reg) -> bool {
-        g.get(r1).map(|nbs| nbs.contains(r2)).unwrap_or(false)
-    }
-
-    for (r1, r2) in extra_edges {
-        for r2 in r2.iter() {
-            // case1: 相同的寄存器不能加边
-            // case2: 已经存在冲突关系的,不需要加边
-            // case3: 类型不同的寄存器,不需要加边
-            // case4: 两个寄存器都是物理寄存器,不需要加边
-            if *r1 == r2
-                || inter(graph, r1, &r2)
-                || r1.is_usual() != r2.is_usual()
-                || (r1.is_physical() && r2.is_physical())
-            {
-                continue;
-            }
-            let num_inter1 = num_inter(graph, r1);
-            let num_inter2 = num_inter(graph, &r2);
-            let num_max_free = if r1.is_usual() {
-                num_free_iregs
-            } else {
-                num_free_fregs
-            };
-            if num_inter1 + 1 < num_max_free && num_inter2 + 1 < num_max_free {
-                graph.entry(*r1).or_default().insert(&r2);
-                graph.entry(r2).or_default().insert(r1);
             }
         }
     }

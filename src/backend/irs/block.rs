@@ -1,7 +1,7 @@
 use super::{gen_asm::GenTool, *};
 
 #[allow(unused)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Block {
     label: String,
     insts: Vec<Inst>,
