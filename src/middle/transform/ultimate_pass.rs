@@ -3,8 +3,9 @@ use anyhow::Result;
 use crate::middle::Program;
 
 use super::{
-    block_fuse, dead_code_elim, func_inline, load_store_elim, mem2reg, redundance_elim,
-    inst_combine,
+    block_fuse, dead_code_elim, func_inline, inst_combine,
+    load_store_elim, /* loop_optimization, */
+    mem2reg, redundance_elim,
 };
 
 pub fn optimize_program(program: &mut Program) -> Result<bool> {
@@ -17,6 +18,12 @@ pub fn optimize_program(program: &mut Program) -> Result<bool> {
 
         // Weaken instructions
         changed |= inst_combine::optimize_program(program)?;
+
+        // Optimize loop
+        // TODO add changed and timing info for this pass
+        // TODO remove inst_combine in loop_optimization
+        // TODO fix uni backedge preds
+        // loop_optimization::optimize_program(program)?;
 
         // Remove redundancy for load_store_elim
         // TODO this is O(n^2) and consumes 1s+ in long_line case,
