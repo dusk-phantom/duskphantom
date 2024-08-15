@@ -2,17 +2,14 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 
-use crate::{
-    middle::{
-        analysis::{
-            dominator_tree::DominatorTree,
-            effect_analysis::EffectAnalysis,
-            simple_gvn::{Expr, SimpleGVN},
-        },
-        ir::{BBPtr, InstPtr, Operand, ValueType},
-        Program,
+use crate::middle::{
+    analysis::{
+        dominator_tree::DominatorTree,
+        effect_analysis::EffectAnalysis,
+        simple_gvn::{Expr, SimpleGVN},
     },
-    utils::frame_map::FrameMap,
+    ir::{InstPtr, Operand, ValueType},
+    Program,
 };
 
 use super::Transform;
@@ -35,22 +32,40 @@ impl<'a> Transform for RedundanceElim<'a> {
 
     fn run(&mut self) -> Result<bool> {
         // Get instruction leader from GVN
-        let mut inst_leader = HashMap::new();
-        for func in self.program.module.functions.clone() {
-            let Some(bb) = func.entry else {
-                continue;
-            };
-            let mut dom_tree = DominatorTree::new(func);
-            let expr_leader = FrameMap::new();
-            dfs(self.gvn, bb, &mut inst_leader, expr_leader, &mut dom_tree);
-        }
-
-        // Replace instruction with its leader
         let mut changed = false;
-        for (inst, leader) in inst_leader.iter() {
-            let leader = (*leader).into();
-            inst.clone().replace_self(&leader);
-            changed = true;
+        for func in self.program.module.functions.clone() {
+            if func.is_lib() {
+                continue;
+            }
+            let mut dom_tree = DominatorTree::new(func);
+            let mut expr_leader: HashMap<Expr, InstPtr> = HashMap::new();
+            for bb in func.rpo_iter() {
+                for inst in bb.iter() {
+                    // Refuse to replace instruction that returns void
+                    if inst.get_value_type() == ValueType::Void {
+                        continue;
+                    }
+                    let expr = self.gvn.get_expr(Operand::Instruction(inst));
+                    match expr_leader.get(&expr) {
+                        // Expression appeared before, remove redundancy
+                        Some(&leader) => {
+                            let inst_bb = inst.get_parent_bb().unwrap();
+                            let leader_bb = leader.get_parent_bb().unwrap();
+                            let lca = dom_tree.get_lca(inst_bb, leader_bb);
+                            if lca != leader_bb {
+                                // Remove partial redundancy and hoist at the same time
+                                lca.get_last_inst().insert_before(leader);
+                            }
+                            inst.clone().replace_self(&leader.into());
+                            changed = true;
+                        }
+                        // Expression not appeared before, set as leader
+                        None => {
+                            expr_leader.insert(expr, inst);
+                        }
+                    }
+                }
+            }
         }
         Ok(changed)
     }
@@ -59,35 +74,5 @@ impl<'a> Transform for RedundanceElim<'a> {
 impl<'a> RedundanceElim<'a> {
     pub fn new(program: &'a mut Program, gvn: &'a mut SimpleGVN<'a>) -> Self {
         Self { program, gvn }
-    }
-}
-
-/// Analyse instruction leader from GVN
-fn dfs<'a>(
-    gvn: &mut SimpleGVN<'a>,
-    bb: BBPtr,
-    inst_leader: &mut HashMap<InstPtr, InstPtr>,
-    mut expr_leader: FrameMap<'_, Expr<'a>, InstPtr>,
-    dom_tree: &mut DominatorTree,
-) {
-    bb.iter().for_each(|inst| {
-        // Refuse to replace instruction that returns void
-        if inst.get_value_type() == ValueType::Void {
-            return;
-        }
-        let expr = gvn.get_expr(Operand::Instruction(inst));
-        match expr_leader.get(&expr) {
-            // Expression appeared before, set instruction leader
-            Some(&leader) => {
-                inst_leader.insert(inst, leader);
-            }
-            // Expression not appeared before, set as leader
-            None => {
-                expr_leader.insert(expr, inst);
-            }
-        }
-    });
-    for succ in dom_tree.get_dominatee(bb) {
-        dfs(gvn, succ, inst_leader, expr_leader.branch(), dom_tree);
     }
 }
