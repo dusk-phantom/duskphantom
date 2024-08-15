@@ -1,7 +1,7 @@
 use super::*;
-
+use rustc_hash::FxHashSet;
 pub struct RegIntervalCounter {
-    intervals: HashMap<String, Vec<HashSet<Reg>>>,
+    intervals: HashMap<String, Vec<FxHashSet<Reg>>>,
 }
 // impl fmt::Debug for RegIntervalCounter {
 //     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -22,7 +22,7 @@ impl RegIntervalCounter {
     /// interval analysis
     pub fn count(func: &Func) -> Result<Self> {
         let reg_lives = Func::reg_lives(func)?;
-        let mut intervals: HashMap<String, Vec<HashSet<Reg>>> = HashMap::new();
+        let mut intervals: HashMap<String, Vec<FxHashSet<Reg>>> = HashMap::new();
         for bb in func.iter_bbs() {
             // interval[i] 表示第 i 条 指令处的 活跃寄存器集合
             // interval[0] = live_in
@@ -52,8 +52,8 @@ impl RegIntervalCounter {
     #[allow(unused)]
     /// FIXME: test needed
     /// get registers which born between from and to,including from and to
-    pub fn occur_between(&self, bb: &str, from: usize, mut to: usize) -> Result<HashSet<Reg>> {
-        let mut alive = HashSet::new();
+    pub fn occur_between(&self, bb: &str, from: usize, mut to: usize) -> Result<FxHashSet<Reg>> {
+        let mut alive = FxHashSet::default();
         if let Some(interval) = self.intervals.get(bb) {
             let up_edge = if to >= interval.len() - 1 {
                 interval.len() - 1
