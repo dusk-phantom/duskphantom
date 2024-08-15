@@ -19,6 +19,10 @@ pub struct DeadCodeElim<'a> {
 }
 
 impl<'a> Transform for DeadCodeElim<'a> {
+    fn get_program_mut(&mut self) -> &mut Program {
+        self.program
+    }
+
     fn name() -> String {
         "dead_code_elim".to_string()
     }

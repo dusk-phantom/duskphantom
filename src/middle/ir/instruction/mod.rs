@@ -129,6 +129,14 @@ pub trait Instruction: Display {
         }
     }
 
+    /// Replace operand to another.
+    #[inline]
+    fn replace_operand(&mut self, from: &Operand, to: &Operand) {
+        unsafe {
+            self.get_manager_mut().replace_operand(from, to);
+        }
+    }
+
     /// Returns the operands of current instruction.
     ///
     /// # Safety
@@ -520,6 +528,45 @@ impl InstManager {
             _ => {}
         }
         self.operand[index] = operand;
+    }
+
+    /// # Safety
+    ///
+    /// FIXME: explain why it is unsafe,and describe the safety requirements
+    pub unsafe fn replace_operand(&mut self, from: &Operand, to: &Operand) {
+        match from {
+            Operand::Instruction(mut inst) => {
+                inst.get_user_mut().retain(|x| x != &self.self_ptr.unwrap());
+            }
+            Operand::Parameter(mut param) => {
+                param
+                    .get_user_mut()
+                    .retain(|x| x != &self.self_ptr.unwrap());
+            }
+            Operand::Global(mut global) => {
+                global
+                    .get_user_mut()
+                    .retain(|x| x != &self.self_ptr.unwrap());
+            }
+            _ => {}
+        }
+        match to {
+            Operand::Instruction(mut inst) => {
+                inst.get_user_mut().push(self.self_ptr.unwrap());
+            }
+            Operand::Parameter(mut param) => {
+                param.add_user(self.self_ptr.unwrap());
+            }
+            Operand::Global(mut global) => {
+                global.add_user(self.self_ptr.unwrap());
+            }
+            _ => {}
+        }
+        self.operand.iter_mut().for_each(|op| {
+            if op == from {
+                *op = to.clone();
+            }
+        });
     }
 
     /// # Safety

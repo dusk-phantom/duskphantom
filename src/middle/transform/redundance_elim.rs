@@ -26,6 +26,10 @@ pub struct RedundanceElim<'a> {
 }
 
 impl<'a> Transform for RedundanceElim<'a> {
+    fn get_program_mut(&mut self) -> &mut Program {
+        self.program
+    }
+
     fn name() -> String {
         "redundance_elim".to_string()
     }

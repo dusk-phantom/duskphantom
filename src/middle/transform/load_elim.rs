@@ -28,6 +28,10 @@ pub struct LoadElim<'a, 'b> {
 }
 
 impl<'a, 'b> Transform for LoadElim<'a, 'b> {
+    fn get_program_mut(&mut self) -> &mut Program {
+        self.program
+    }
+
     fn name() -> String {
         "load_elim".to_string()
     }
