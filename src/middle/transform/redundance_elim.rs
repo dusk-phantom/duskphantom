@@ -17,13 +17,6 @@ use crate::{
 
 use super::Transform;
 
-pub fn optimize_program_cached<'a>(
-    program: &'a mut Program,
-    gvn: &'a mut SimpleGVN<'a>,
-) -> Result<bool> {
-    RedundanceElim::new(program, gvn).run_and_log()
-}
-
 pub fn optimize_program(program: &mut Program) -> Result<bool> {
     let effect_analysis = EffectAnalysis::new(program);
     let mut gvn = SimpleGVN::new(&effect_analysis);

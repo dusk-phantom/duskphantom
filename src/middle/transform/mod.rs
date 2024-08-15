@@ -6,6 +6,7 @@ pub mod block_fuse;
 pub mod constant_fold;
 pub mod dead_code_elim;
 pub mod func_inline;
+pub mod inst_combine;
 pub mod ldce;
 pub mod licm;
 pub mod load_elim;
@@ -15,7 +16,6 @@ pub mod loop_simplify;
 pub mod mem2reg;
 pub mod redundance_elim;
 pub mod store_elim;
-pub mod inst_combine;
 pub mod ultimate_pass;
 
 pub trait Transform {
@@ -33,6 +33,18 @@ pub trait Transform {
             elapsed,
             if changed { "(changed)" } else { "" }
         );
+        Ok(changed)
+    }
+
+    fn loop_and_log(&mut self) -> Result<bool> {
+        let mut changed = false;
+        loop {
+            let c = self.run_and_log()?;
+            changed |= c;
+            if !c {
+                break;
+            }
+        }
         Ok(changed)
     }
 }
