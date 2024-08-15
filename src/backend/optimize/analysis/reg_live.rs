@@ -1,10 +1,10 @@
+use super::*;
+use rustc_hash::FxHashSet;
 use std::fmt::{Debug, Display};
 
-use super::*;
-
 impl Block {
-    pub fn live_use_regs(&self) -> HashSet<Reg> {
-        let mut live_use = HashSet::new();
+    pub fn live_use_regs(&self) -> FxHashSet<Reg> {
+        let mut live_use = FxHashSet::default();
         for inst in self.insts().iter().rev() {
             live_use.retain(|r| !inst.defs().contains(&r));
             live_use.extend(inst.uses().iter().cloned());
@@ -12,8 +12,8 @@ impl Block {
         live_use
     }
 
-    pub fn live_def_regs(&self) -> HashSet<Reg> {
-        let mut live_def = HashSet::new();
+    pub fn live_def_regs(&self) -> FxHashSet<Reg> {
+        let mut live_def = FxHashSet::default();
         for inst in self.insts().iter().rev() {
             live_def.extend(inst.defs().iter().cloned());
             live_def.retain(|r| !inst.uses().contains(&r));
@@ -23,13 +23,13 @@ impl Block {
 }
 
 impl Func {
-    pub fn reg_live_use(f: &Func) -> HashMap<String, HashSet<Reg>> {
+    pub fn reg_live_use(f: &Func) -> HashMap<String, FxHashSet<Reg>> {
         f.iter_bbs()
             .map(|bb| (bb.label().to_string(), bb.live_use_regs()))
             .collect()
     }
 
-    pub fn reg_live_def(f: &Func) -> HashMap<String, HashSet<Reg>> {
+    pub fn reg_live_def(f: &Func) -> HashMap<String, FxHashSet<Reg>> {
         f.iter_bbs()
             .map(|bb| (bb.label().to_string(), bb.live_def_regs()))
             .collect()
@@ -39,13 +39,13 @@ impl Func {
     pub fn reg_lives(f: &Func) -> Result<RegLives> {
         let (ins, outs) = Func::in_out_bbs(f)?;
 
-        let mut live_ins: HashMap<String, HashSet<Reg>> = HashMap::new();
-        let mut live_outs: HashMap<String, HashSet<Reg>> = HashMap::new();
+        let mut live_ins: HashMap<String, FxHashSet<Reg>> = HashMap::new();
+        let mut live_outs: HashMap<String, FxHashSet<Reg>> = HashMap::new();
 
         // consider the exit block
         if let Some(ret) = f.ret() {
             for bb in f.exit_bbs() {
-                let mut live_out: HashSet<Reg> = HashSet::new();
+                let mut live_out: FxHashSet<Reg> = FxHashSet::default();
                 live_out.insert(*ret);
                 live_outs.insert(bb.label().to_string(), live_out);
             }
@@ -68,7 +68,10 @@ impl Func {
             // new_live_out = SUM(live_in[succ[bb]])
             // new_live_in = old_live_in U ( SUM(live_in[out[bb]]) - live_def[bb] ) U new_live_out
             for bb in bb_iter.clone() {
-                let mut new_live_in = live_ins.get(bb.label()).cloned().unwrap_or(HashSet::new());
+                let mut new_live_in = live_ins
+                    .get(bb.label())
+                    .cloned()
+                    .unwrap_or(FxHashSet::default());
                 for in_bb in ins.ins(bb) {
                     if let Some(out) = live_outs.get(in_bb.label()) {
                         new_live_in.extend(out.iter().cloned());
@@ -76,7 +79,10 @@ impl Func {
                 }
                 new_live_in.retain(|r| !live_def[bb.label()].contains(r));
 
-                let mut new_live_out = live_outs.get(bb.label()).cloned().unwrap_or(HashSet::new());
+                let mut new_live_out = live_outs
+                    .get(bb.label())
+                    .cloned()
+                    .unwrap_or(FxHashSet::default());
                 for out_bb in outs.outs(bb) {
                     if let Some(in_) = live_ins.get(out_bb.label()) {
                         new_live_out.extend(in_.iter().cloned());
@@ -108,8 +114,8 @@ impl Func {
     }
 
     /// compute the reg interference graph of a function
-    pub fn reg_interfere_graph(f: &Func) -> Result<HashMap<Reg, HashSet<Reg>>> {
-        fn add_inter(g: &mut HashMap<Reg, HashSet<Reg>>, r1: &Reg, r2: &Reg) {
+    pub fn reg_interfere_graph(f: &Func) -> Result<HashMap<Reg, FxHashSet<Reg>>> {
+        fn add_inter(g: &mut HashMap<Reg, FxHashSet<Reg>>, r1: &Reg, r2: &Reg) {
             if r1.is_virtual() || r2.is_virtual() {
                 if r1 == r2 {
                     g.entry(*r1).or_default();
@@ -119,18 +125,18 @@ impl Func {
                 g.entry(*r2).or_default().insert(*r1);
             }
         }
-        fn add_node(g: &mut HashMap<Reg, HashSet<Reg>>, r: &Reg) {
+        fn add_node(g: &mut HashMap<Reg, FxHashSet<Reg>>, r: &Reg) {
             if r.is_virtual() {
                 g.entry(*r).or_default();
             }
         }
         // for each basic block, collect interference between regs
-        let mut graph: HashMap<Reg, HashSet<Reg>> = HashMap::new();
+        let mut graph: HashMap<Reg, FxHashSet<Reg>> = HashMap::new();
         let reg_lives = Func::reg_lives(f)?;
         // dbg!(&reg_lives);
         // FIXME: 使用位图实现的寄存器记录表来加速运算过程，以及节省内存
         for bb in f.iter_bbs() {
-            let mut alive_regs: HashSet<Reg> = reg_lives.live_outs(bb).clone();
+            let mut alive_regs: FxHashSet<Reg> = reg_lives.live_outs(bb).clone();
             for r in &alive_regs {
                 add_node(&mut graph, r);
             }
@@ -163,14 +169,14 @@ impl Func {
 }
 
 pub struct RegLives {
-    live_ins: HashMap<String, HashSet<Reg>>,
-    live_outs: HashMap<String, HashSet<Reg>>,
+    live_ins: HashMap<String, FxHashSet<Reg>>,
+    live_outs: HashMap<String, FxHashSet<Reg>>,
 }
 impl Debug for RegLives {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RegLives")
             .field("live_ins", {
-                let mut live_ins: Vec<(&String, &HashSet<Reg>)> = self.live_ins.iter().collect();
+                let mut live_ins: Vec<(&String, &FxHashSet<Reg>)> = self.live_ins.iter().collect();
                 live_ins.sort_by(|(k, _), (k2, _)| k.cmp(k2));
                 &live_ins
                     .into_iter()
@@ -182,7 +188,8 @@ impl Debug for RegLives {
                     .collect::<Vec<_>>()
             })
             .field("live_outs", {
-                let mut live_outs: Vec<(&String, &HashSet<Reg>)> = self.live_outs.iter().collect();
+                let mut live_outs: Vec<(&String, &FxHashSet<Reg>)> =
+                    self.live_outs.iter().collect();
                 live_outs.sort_by(|(k, _), (k2, _)| k.cmp(k2));
                 &live_outs
                     .into_iter()
@@ -200,7 +207,7 @@ impl Debug for RegLives {
 impl Display for RegLives {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "live_ins:")?;
-        let mut live_ins: Vec<(&String, &HashSet<Reg>)> = self.live_ins.iter().collect();
+        let mut live_ins: Vec<(&String, &FxHashSet<Reg>)> = self.live_ins.iter().collect();
         live_ins.sort_by(|(k, _), (k2, _)| k.cmp(k2));
         for (k, v) in live_ins {
             let mut v = v.iter().map(|v| v.gen_asm()).collect::<Vec<String>>();
@@ -208,7 +215,7 @@ impl Display for RegLives {
             writeln!(f, "{}: {:?}", k, v)?;
         }
         writeln!(f, "live_outs:")?;
-        let mut live_outs: Vec<(&String, &HashSet<Reg>)> = self.live_outs.iter().collect();
+        let mut live_outs: Vec<(&String, &FxHashSet<Reg>)> = self.live_outs.iter().collect();
         live_outs.sort_by(|(k, _), (k2, _)| k.cmp(k2));
         for (k, v) in live_outs {
             let mut v = v.iter().map(|v| v.gen_asm()).collect::<Vec<String>>();
@@ -220,10 +227,10 @@ impl Display for RegLives {
 }
 
 impl RegLives {
-    pub fn live_ins(&self, bb: &Block) -> &HashSet<Reg> {
+    pub fn live_ins(&self, bb: &Block) -> &FxHashSet<Reg> {
         self.live_ins.get(bb.label()).unwrap()
     }
-    pub fn live_outs(&self, bb: &Block) -> &HashSet<Reg> {
+    pub fn live_outs(&self, bb: &Block) -> &FxHashSet<Reg> {
         self.live_outs.get(bb.label()).unwrap()
     }
 }
@@ -231,10 +238,10 @@ impl RegLives {
 #[cfg(test)]
 mod tests {
     use insta::assert_snapshot;
-    use std::collections::HashSet;
+    use rustc_hash::FxHashSet;
 
     use super::{AddInst, Block, MvInst, Reg};
-    fn stringfy_regs(regs: &HashSet<Reg>) -> String {
+    fn stringfy_regs(regs: &FxHashSet<Reg>) -> String {
         let mut regs: Vec<String> = regs.iter().map(|r| r.gen_asm()).collect();
         regs.sort();
         format!("{{{}}}", regs.join(","))
