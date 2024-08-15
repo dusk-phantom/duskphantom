@@ -2,7 +2,6 @@ use core::num;
 use std::hash::Hash;
 
 use graph::UdGraph;
-use reg_set::RegSet;
 
 mod graph_color;
 pub use graph_color::*;

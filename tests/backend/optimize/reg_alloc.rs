@@ -124,32 +124,3 @@ fn test_count_reg_inter_graph() {
     // println!("{}", f.gen_asm());
     // dbg!(&f);
 }
-
-#[test]
-fn debug_rg_live() {
-    // 从相对路径获取字符串
-    let code = include_str!("94_loop3.c");
-    let b = backend_from_self(code);
-    let f = find_func(&b, "loop3");
-    let lu1 = Func::reg_live_use(f);
-    let lu2 = Func::reg_live_use2(f);
-    let lu2 = lu2
-        .into_iter()
-        .map(|(k, v)| (k, v.into_iter().collect::<HashSet<_>>()))
-        .collect::<HashMap<_, _>>();
-    assert_eq!(lu1, lu2);
-
-    let ld1 = Func::reg_live_def(f);
-    let ld2 = Func::reg_live_def2(f);
-    let ld2 = ld2
-        .into_iter()
-        .map(|(k, v)| (k, v.into_iter().collect::<HashSet<_>>()))
-        .collect::<HashMap<_, _>>();
-    assert_eq!(ld1, ld2);
-
-    let rl1 = Func::reg_lives(f).unwrap();
-    let rl2 = Func::reg_lives2(f).unwrap();
-
-    let rl2: RegLives = rl2.into();
-    assert_eq!(format!("{:?}", rl1), format!("{:?}", rl2));
-}

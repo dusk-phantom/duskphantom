@@ -9,7 +9,6 @@ pub mod instruction;
 pub mod module;
 pub mod operand;
 pub mod prog;
-pub mod reg_set;
 pub mod stack_slot;
 pub mod var;
 
