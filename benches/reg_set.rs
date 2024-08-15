@@ -1,7 +1,8 @@
 use compiler::backend::irs::*;
 use criterion::black_box;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use reg_set::RegSet;
+
+use rustc_hash::FxHashSet;
 use std::collections::HashSet;
 
 static N: usize = 1000;
@@ -21,7 +22,7 @@ fn prepare_regs(n: usize) -> Vec<Reg> {
 fn bench_insert(c: &mut Criterion) {
     let regs = prepare_regs(N);
     let insert1 = || {
-        let mut rg1 = RegSet::new();
+        let mut rg1 = FxHashSet::default();
         for reg in &regs {
             rg1.insert(black_box(reg));
         }
@@ -41,7 +42,7 @@ fn bench_insert(c: &mut Criterion) {
 #[allow(unused)]
 fn bench_contains(c: &mut Criterion) {
     let regs = prepare_regs(N);
-    let mut rg = RegSet::new();
+    let mut rg = FxHashSet::default();
     for reg in &regs {
         rg.insert(reg);
     }
@@ -67,23 +68,23 @@ fn bench_contains(c: &mut Criterion) {
 
 #[allow(unused)]
 fn bench_merge(c: &mut Criterion) {
-    let mut rg1 = RegSet::new();
-    let mut rg2 = RegSet::new();
+    let mut rg1 = FxHashSet::default();
+    let mut rg2 = FxHashSet::default();
 
     let mut rg3: HashSet<Reg> = HashSet::new();
     let mut rg4: HashSet<Reg> = HashSet::new();
     for reg in prepare_regs(N) {
-        rg1.insert(&reg);
+        rg1.insert(reg);
         rg3.insert(reg);
     }
     for reg in prepare_regs(N) {
-        rg2.insert(&reg);
+        rg2.insert(reg);
         rg4.insert(reg);
     }
     let merge = || {
-        let mut rg: RegSet = RegSet::new();
-        rg.merge(&rg1);
-        rg.merge(&rg2);
+        let mut rg: FxHashSet<Reg> = FxHashSet::default();
+        rg.extend(rg2.iter().cloned());
+        rg.extend(rg2.iter().cloned());
     };
     let merge2 = || {
         let mut rg: HashSet<Reg> = HashSet::new();
@@ -99,10 +100,10 @@ fn bench_merge(c: &mut Criterion) {
 
 #[allow(unused)]
 fn bench_clone(c: &mut Criterion) {
-    let mut rg1 = RegSet::new();
+    let mut rg1 = FxHashSet::default();
     let mut rg2 = HashSet::new();
     for reg in prepare_regs(N) {
-        rg1.insert(&reg);
+        rg1.insert(reg);
         rg2.insert(reg);
     }
     let clone = || {
@@ -119,16 +120,16 @@ fn bench_clone(c: &mut Criterion) {
 
 #[allow(unused)]
 fn bench_clone_then_retain(c: &mut Criterion) {
-    let mut rg1 = RegSet::new();
-    let mut rg2 = RegSet::new();
+    let mut rg1 = FxHashSet::default();
+    let mut rg2 = FxHashSet::default();
     let mut rg3 = HashSet::new();
     let mut rg4 = HashSet::new();
     for reg in prepare_regs(N) {
-        rg1.insert(&reg);
+        rg1.insert(reg);
         rg3.insert(reg);
     }
     for reg in prepare_regs(N) {
-        rg2.insert(&reg);
+        rg2.insert(reg);
         rg4.insert(reg);
     }
     let rg1 = black_box(rg1);
@@ -142,7 +143,7 @@ fn bench_clone_then_retain(c: &mut Criterion) {
     };
     let minus = || {
         let mut rg = rg1.clone();
-        rg.minus(rg2);
+        rg.retain(|r| !rg2.contains(r));
         black_box(rg);
     };
     let retain2 = || {
@@ -163,10 +164,10 @@ fn bench_clone_then_retain(c: &mut Criterion) {
 #[allow(unused)]
 fn bench_remove(c: &mut Criterion) {
     let regs = prepare_regs(N);
-    let mut rg1 = RegSet::new();
+    let mut rg1 = FxHashSet::default();
     let mut rg2 = HashSet::new();
     for reg in regs.iter() {
-        rg1.insert(reg);
+        rg1.insert(*reg);
         rg2.insert(*reg);
     }
     let regs = black_box(regs);

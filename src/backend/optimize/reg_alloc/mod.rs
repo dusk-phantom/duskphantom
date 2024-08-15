@@ -2,7 +2,6 @@ use core::num;
 use std::hash::Hash;
 
 use graph::UdGraph;
-use reg_set::RegSet;
 
 mod graph_color;
 pub use graph_color::*;
@@ -12,27 +11,27 @@ use crate::fprintln;
 use super::*;
 
 pub fn handle_reg_alloc(func: &mut Func) -> Result<()> {
-    if func.line() > 10000 {
-        let mut reg_graph = Func::reg_interfere_graph(func)?;
-        let dtd = func.def_then_def();
-        if let Ok(colors) = try_perfect_alloc(&reg_graph, &dtd) {
-            apply_colors(func, colors);
-            return Ok(());
-        }
-        let (colors, spills) = reg_alloc(&reg_graph, free_iregs(), free_fregs())?;
+    // if func.line() > 10000 {
+    let mut reg_graph = Func::reg_interfere_graph(func)?;
+    let dtd = func.def_then_def();
+    if let Ok(colors) = try_perfect_alloc(&reg_graph, &dtd) {
         apply_colors(func, colors);
-        apply_spills(func, spills);
-    } else {
-        let mut reg_graph = Func::reg_interfere_graph2(func)?;
-        let dtd = func.def_then_def2();
-        if let Ok(colors) = try_perfect_alloc2(&reg_graph, &dtd) {
-            apply_colors(func, colors);
-            return Ok(());
-        }
-        let (colors, spills) = reg_alloc2(&reg_graph, free_iregs(), free_fregs())?;
-        apply_colors(func, colors);
-        apply_spills(func, spills);
+        return Ok(());
     }
+    let (colors, spills) = reg_alloc(&reg_graph, free_iregs(), free_fregs())?;
+    apply_colors(func, colors);
+    apply_spills(func, spills);
+    // } else {
+    //     let mut reg_graph = Func::reg_interfere_graph2(func)?;
+    //     let dtd = func.def_then_def2();
+    //     if let Ok(colors) = try_perfect_alloc2(&reg_graph, &dtd) {
+    //         apply_colors(func, colors);
+    //         return Ok(());
+    //     }
+    //     let (colors, spills) = reg_alloc2(&reg_graph, free_iregs(), free_fregs())?;
+    //     apply_colors(func, colors);
+    //     apply_spills(func, spills);
+    // }
     Ok(())
 }
 
@@ -75,6 +74,19 @@ pub fn free_fregs_with_tmp() -> &'static [Reg; 32] {
         REG_FT4, REG_FT5, REG_FT6, REG_FT7, REG_FS0, REG_FS1, REG_FA0, REG_FA1, REG_FA2, REG_FA3,
         REG_FA4, REG_FA5, REG_FA6, REG_FA7, REG_FS2, REG_FS3, REG_FS4, REG_FS5, REG_FS6, REG_FS7,
         REG_FS8, REG_FS9, REG_FS10, REG_FS11, REG_FT8, REG_FT9, REG_FT10, REG_FT11,
+    ]
+}
+
+/// 特殊作用的寄存器
+pub fn special_regs() -> &'static [Reg; 7] {
+    &[
+        REG_ZERO, // zero register
+        REG_RA,   // return address
+        REG_SP,   // stack pointer
+        REG_GP,   // global pointer
+        REG_TP,   // thread pointer
+        REG_S0,   // stack frame pointer
+        REG_T3,   // temp register for address overflow
     ]
 }
 

@@ -30,7 +30,7 @@ name = "compiler-sc"
 path = "src/main_self_llc.rs"
 
 [workspace]
-members = ["crates/*", "crates/reg-set-fuzz/fuzz"]
+members = ["crates/*"]
 
 [workspace.dependencies]
 anyhow = "1.0.86"
@@ -61,6 +61,7 @@ bitvec = "1.0.1"
 regex = "1.10.5"
 indoc = "2.0.5"
 diff = "0.1.13"
+rustc-hash = "2.0.0"
 
 
 [dev-dependencies]

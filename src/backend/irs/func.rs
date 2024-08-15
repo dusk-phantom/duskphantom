@@ -9,7 +9,7 @@ use crate::config::CONFIG;
 use rayon::prelude::*;
 
 #[allow(unused)]
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct Func {
     name: String,
@@ -210,6 +210,15 @@ impl Func {
         };
         from.merge(to)?;
         Ok(())
+    }
+}
+
+impl Func {
+    pub fn find_bb(&self, label: &str) -> Option<&Block> {
+        if self.entry.label() == label {
+            return Some(&self.entry);
+        }
+        self.other_bbs.iter().find(|bb| bb.label() == label)
     }
 }
 
