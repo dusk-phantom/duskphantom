@@ -79,6 +79,7 @@ impl ValueType {
     pub fn get_base_type(&self) -> ValueType {
         match self {
             ValueType::Array(sub_type, _) => sub_type.get_base_type(),
+            ValueType::Pointer(sub_type) => sub_type.get_base_type(),
             _ => self.clone(),
         }
     }

@@ -51,10 +51,7 @@ impl<'a> FunctionKit<'a> {
 
                 // Generate arguments
                 let mut operands = Vec::new();
-                if func_ptr.params.len() == args.len()
-                    && func_ptr.name != "getarray"
-                    && func_ptr.name != "putarray"
-                {
+                if func_ptr.params.len() == args.len() {
                     for (param, arg) in func_ptr.params.iter().zip(args.iter()) {
                         let arg = self.gen_expr(arg)?.load(param.value_type.clone(), self)?;
                         operands.push(arg);
