@@ -1,10 +1,7 @@
 mod single;
 pub use single::*;
 
-use std::{
-    collections::{HashMap, HashSet},
-    ops::Deref,
-};
+use std::collections::{HashMap, HashSet};
 
 use arbitrary::Arbitrary;
 pub use compiler::backend::irs::*;
@@ -21,33 +18,32 @@ pub enum Action {
     Intersect(usize, usize),
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct MReg(pub Reg);
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub struct MReg {
+    pub id: u32,
+    pub is_usual: bool,
+}
 impl From<Reg> for MReg {
     fn from(r: Reg) -> Self {
-        MReg(r)
+        MReg {
+            id: r.id(),
+            is_usual: r.is_usual(),
+        }
     }
 }
 impl From<MReg> for Reg {
     fn from(r: MReg) -> Self {
-        r.0
+        Reg::new(r.id, r.is_usual)
     }
 }
 impl From<&MReg> for Reg {
     fn from(r: &MReg) -> Self {
-        r.0
+        (*r).into()
     }
 }
 impl From<&Reg> for MReg {
     fn from(r: &Reg) -> Self {
-        MReg(*r)
-    }
-}
-
-impl Deref for MReg {
-    type Target = Reg;
-    fn deref(&self) -> &Reg {
-        &self.0
+        (*r).into()
     }
 }
 
@@ -65,7 +61,7 @@ impl<'a> Arbitrary<'a> for MReg {
         let id: u32 = id as u32 % 10_000;
         let is_usual: bool = u.arbitrary()?;
         let r = Reg::new(id, is_usual);
-        Ok(MReg(r))
+        Ok(r.into())
     }
 }
 
@@ -87,12 +83,12 @@ pub fn apply_action(rgs: &mut HashMap<usize, Item>, action: Action) {
     match action {
         Action::Insert(id, r) => {
             let rg = rgs.entry(id).or_default();
-            rg.reg_set.insert(&r);
+            rg.reg_set.insert(&r.into());
             rg.reg_hset.insert(r.into());
         }
         Action::Remove(id, r) => rgs.get_mut(&id).iter_mut().for_each(|i| {
-            i.reg_set.remove(&r);
-            i.reg_hset.remove(&r);
+            i.reg_set.remove(&r.into());
+            i.reg_hset.remove(&r.into());
         }),
         Action::Clear(id) => {
             rgs.get_mut(&id).iter_mut().for_each(|i| {

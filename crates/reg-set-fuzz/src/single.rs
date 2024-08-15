@@ -11,9 +11,12 @@ pub enum SingleAction {
 fn prepare_for_merge(regs: &Vec<MReg>) -> RegSet {
     let mut rg = RegSet::new();
     for r in regs {
-        rg.insert(r);
+        rg.insert(&r.into());
     }
     rg
+}
+fn perpare_for_merge2(regs: &[MReg]) -> HashSet<Reg> {
+    regs.iter().map(|r| r.into()).collect()
 }
 
 pub fn apply_single_actions(rg: &mut RegSet, rge: &mut HashSet<Reg>, actions: Vec<SingleAction>) {
@@ -26,14 +29,14 @@ pub fn apply_single_action(rg: &mut RegSet, rge: &mut HashSet<Reg>, action: Sing
     match action {
         SingleAction::Insert(rs) => {
             for r in rs {
-                rg.insert(&r);
+                rg.insert(&r.into());
                 rge.insert(r.into());
             }
         }
         SingleAction::Remove(rs) => {
             for r in rs {
-                rg.remove(&r);
-                rge.remove(&r);
+                rg.remove(&r.into());
+                rge.remove(&r.into());
             }
         }
         SingleAction::Clear => {
@@ -43,13 +46,11 @@ pub fn apply_single_action(rg: &mut RegSet, rge: &mut HashSet<Reg>, action: Sing
         SingleAction::Merge(rs) => {
             let rhs = prepare_for_merge(&rs);
             rg.merge(&rhs);
-            for r in rs {
-                rge.insert(r.into());
-            }
+            rge.extend(perpare_for_merge2(&rs));
         }
         SingleAction::RetainInVec(rs) => {
-            rg.retain(|r| rs.contains(&MReg(*r)));
-            rge.retain(|r| rs.contains(&MReg(*r)));
+            rg.retain(|r| rs.contains(&r.into()));
+            rge.retain(|r| rs.contains(&r.into()));
         }
     }
 }
@@ -60,4 +61,9 @@ pub fn single_check(rg: &RegSet, rge: &HashSet<Reg>) {
         rge2.insert(r);
     }
     assert_eq!(rge, &rge2);
+    let mut rg2 = RegSet::new();
+    for r in rge.iter() {
+        rg2.insert(r);
+    }
+    assert_eq!(*rg, rg2);
 }

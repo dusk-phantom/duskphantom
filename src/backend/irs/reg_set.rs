@@ -5,8 +5,53 @@ use bitvec::prelude;
 use super::*;
 
 pub struct RegSet {
-    float: prelude::BitVec,
-    usual: prelude::BitVec,
+    pub float: prelude::BitVec,
+    pub usual: prelude::BitVec,
+}
+
+impl Ord for RegSet {
+    /// FIXME: Compare two RegSet, but this impl is too slow, so it's not recommended to use it
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        let mut it1 = self.float.iter_ones();
+        let mut it2 = other.float.iter_ones();
+        loop {
+            match (it1.next(), it2.next()) {
+                (Some(a), Some(b)) => {
+                    if a != b {
+                        return a.cmp(&b);
+                    }
+                }
+                (Some(_), None) => return std::cmp::Ordering::Greater,
+                (None, Some(_)) => return std::cmp::Ordering::Less,
+                (None, None) => {
+                    break;
+                }
+            }
+        }
+        let mut it1 = self.usual.iter_ones();
+        let mut it2 = other.usual.iter_ones();
+        loop {
+            match (it1.next(), it2.next()) {
+                (Some(a), Some(b)) => {
+                    if a != b {
+                        return a.cmp(&b);
+                    }
+                }
+                (Some(_), None) => return std::cmp::Ordering::Greater,
+                (None, Some(_)) => return std::cmp::Ordering::Less,
+                (None, None) => {
+                    break;
+                }
+            }
+        }
+
+        std::cmp::Ordering::Equal
+    }
+}
+impl PartialOrd for RegSet {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl Display for RegSet {
