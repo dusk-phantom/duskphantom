@@ -47,220 +47,290 @@ impl Block {
         let beq_idx = block.insts().len() - 2;
         if let Some(Inst::Beq(beq)) = block.insts().iter().rev().nth(1) {
             if beq.rhs().eq(&REG_ZERO) {
-                // (reg, defined inst idx)
-                let mut defs: HashMap<&Reg, usize> = HashMap::new();
-                for (idx, inst) in block.insts().iter().enumerate() {
-                    for reg in inst.defs() {
-                        defs.insert(reg, idx);
-                    }
-                }
-                let defs = defs;
-
-                // lhs 定义在了其他基本块中
-                let Some(icmp_def_idx) = defs.get(beq.lhs()) else {
-                    return Ok(());
-                };
-
-                // 两种情况: slt/xor <- snez, seqz
-                match block
-                    .insts()
-                    .get(*icmp_def_idx)
-                    .with_context(|| context!())?
-                {
-                    Inst::Snez(snez) => {
-                        let snez_idx = icmp_def_idx;
-                        // snez 的 src 只能是 reg
-                        let snez_src = snez.src().reg().with_context(|| context!())?;
-                        if let Some(def_idx) = defs.get(&snez_src) {
-                            // xor/slt
-                            match block.insts().get(*def_idx).with_context(|| context!())? {
-                                // xor -> snez -> beq
-                                Inst::Xor(xor) => {
-                                    let xor_idx = def_idx;
-                                    new_insts[*xor_idx] = None;
-                                    let lhs = xor.lhs().reg().with_context(|| context!())?;
-                                    let label = beq.label().clone();
-                                    match xor.rhs() {
-                                        Operand::Reg(rhs) => {
-                                            new_insts[*snez_idx] = None;
-                                            let rhs = *rhs;
-                                            new_insts[beq_idx] =
-                                                Some(BeqInst::new(lhs, rhs, label).into());
-                                        }
-                                        Operand::Imm(imm) => {
-                                            // 重复利用这个 reg 和 槽
-                                            let rhs =
-                                                snez.dst().reg().with_context(|| context!())?;
-                                            new_insts[*snez_idx] =
-                                                Some(LiInst::new(rhs.into(), (*imm).into()).into());
-                                            new_insts[beq_idx] =
-                                                Some(BeqInst::new(lhs, rhs, label).into());
-                                        }
-                                        _ => unimplemented!(),
-                                    }
-                                }
-                                Inst::Slt(slt) => {
-                                    let slt_idx = def_idx;
-                                    new_insts[*slt_idx] = None;
-                                    let label = beq.label().clone();
-                                    let lhs = slt.lhs().reg().with_context(|| context!())?;
-                                    match slt.rhs() {
-                                        Operand::Reg(rhs) => {
-                                            let rhs = *rhs;
-                                            new_insts[*snez_idx] = None;
-                                            new_insts[beq_idx] =
-                                                Some(BgeInst::new(lhs, rhs, label).into());
-                                        }
-                                        Operand::Imm(imm) => {
-                                            // 重复利用这个 reg 和 槽
-                                            let rhs =
-                                                snez.dst().reg().with_context(|| context!())?;
-                                            new_insts[*snez_idx] =
-                                                Some(LiInst::new(rhs.into(), (*imm).into()).into());
-                                            new_insts[beq_idx] =
-                                                Some(BgeInst::new(lhs, rhs, label).into());
-                                        }
-                                        _ => unimplemented!(),
-                                    }
-                                }
-                                _ => unimplemented!(),
-                            }
-                        } else {
-                            // 可以合并 snez 与 beqz
-                            let reg = snez.src().reg().with_context(|| context!())?;
-                            let label = beq.label().clone();
-                            new_insts[*snez_idx] = None;
-                            new_insts[beq_idx] = Some(BeqInst::new(reg, REG_ZERO, label).into());
-                        };
-                    }
-                    Inst::Seqz(seqz) => {
-                        let seqz_idx = icmp_def_idx;
-                        // snez 的 src 只能是 reg
-                        let seqz_src = seqz.src().reg().with_context(|| context!())?;
-                        if let Some(def_idx) = defs.get(&seqz_src) {
-                            // xor/slt
-                            match block.insts().get(*def_idx).with_context(|| context!())? {
-                                // xor -> snez -> beq
-                                Inst::Xor(xor) => {
-                                    let xor_idx = def_idx;
-                                    new_insts[*xor_idx] = None;
-                                    let lhs = xor.lhs().reg().with_context(|| context!())?;
-                                    let label = beq.label().clone();
-                                    match xor.rhs() {
-                                        Operand::Reg(rhs) => {
-                                            new_insts[*seqz_idx] = None;
-                                            let rhs = *rhs;
-                                            new_insts[beq_idx] =
-                                                Some(BneInst::new(lhs, rhs, label).into());
-                                        }
-                                        Operand::Imm(imm) => {
-                                            // 重复利用这个 reg 和 槽
-                                            let rhs =
-                                                seqz.dst().reg().with_context(|| context!())?;
-                                            new_insts[*seqz_idx] =
-                                                Some(LiInst::new(rhs.into(), (*imm).into()).into());
-                                            new_insts[beq_idx] =
-                                                Some(BneInst::new(lhs, rhs, label).into());
-                                        }
-                                        _ => unimplemented!(),
-                                    }
-                                }
-                                Inst::Slt(slt) => {
-                                    let slt_idx = def_idx;
-                                    new_insts[*slt_idx] = None;
-                                    let label = beq.label().clone();
-                                    let lhs = slt.lhs().reg().with_context(|| context!())?;
-                                    match slt.rhs() {
-                                        Operand::Reg(rhs) => {
-                                            let rhs = *rhs;
-                                            new_insts[*seqz_idx] = None;
-                                            new_insts[beq_idx] =
-                                                Some(BltInst::new(lhs, rhs, label).into());
-                                        }
-                                        Operand::Imm(imm) => {
-                                            // 重复利用这个 reg 和 槽
-                                            let rhs =
-                                                seqz.dst().reg().with_context(|| context!())?;
-                                            new_insts[*seqz_idx] =
-                                                Some(LiInst::new(rhs.into(), (*imm).into()).into());
-                                            new_insts[beq_idx] =
-                                                Some(BltInst::new(lhs, rhs, label).into());
-                                        }
-                                        _ => unimplemented!(),
-                                    }
-                                }
-                                Inst::Sltu(_) => todo!(),
-                                Inst::Sgtu(_) => todo!(),
-                                Inst::Seqz(_) => todo!(),
-                                Inst::Snez(_) => todo!(),
-                                Inst::Feqs(_) => todo!(),
-                                Inst::Fles(_) => todo!(),
-                                Inst::Flts(_) => todo!(),
-                                _ => unimplemented!(),
-                            }
-                        } else {
-                            // 可以合并 snez 与 beqz
-                            let reg = seqz.src().reg().with_context(|| context!())?;
-                            let label = beq.label().clone();
-                            new_insts[*seqz_idx] = None;
-                            new_insts[beq_idx] = Some(BneInst::new(reg, REG_ZERO, label).into());
-                        };
-                    }
-                    Inst::Xor(xor) => {
-                        let xor_idx = icmp_def_idx;
-                        // snez 的 src 只能是 reg
-                        let lhs = xor.lhs().reg().with_context(|| context!())?;
-                        let label = beq.label().clone();
-                        match xor.rhs() {
-                            Operand::Reg(rhs) => {
-                                new_insts[*xor_idx] = None;
-                                let rhs = *rhs;
-                                new_insts[beq_idx] = Some(BeqInst::new(lhs, rhs, label).into());
-                            }
-                            Operand::Imm(imm) => {
-                                // 重复利用这个 reg 和 槽
-                                let rhs = xor.dst().reg().with_context(|| context!())?;
-                                new_insts[*xor_idx] =
-                                    Some(LiInst::new(rhs.into(), (*imm).into()).into());
-                                new_insts[beq_idx] = Some(BeqInst::new(lhs, rhs, label).into());
-                            }
-                            _ => unimplemented!(),
-                        }
-                    }
-                    Inst::Slt(slt) => {
-                        let slt_idx = icmp_def_idx;
-                        // snez 的 src 只能是 reg
-                        let lhs = slt.lhs().reg().with_context(|| context!())?;
-                        let label = beq.label().clone();
-                        match slt.rhs() {
-                            Operand::Reg(rhs) => {
-                                new_insts[*slt_idx] = None;
-                                let rhs = *rhs;
-                                new_insts[beq_idx] = Some(BgeInst::new(lhs, rhs, label).into());
-                            }
-                            Operand::Imm(imm) => {
-                                // 重复利用这个 reg 和 槽
-                                let rhs = slt.dst().reg().with_context(|| context!())?;
-                                new_insts[*slt_idx] =
-                                    Some(LiInst::new(rhs.into(), (*imm).into()).into());
-                                new_insts[beq_idx] = Some(BgeInst::new(lhs, rhs, label).into());
-                            }
-                            _ => unimplemented!(),
-                        }
-                    }
-                    Inst::Sltu(_) => todo!(),
-                    Inst::Sgtu(_) => todo!(),
-                    Inst::Seqz(_) => todo!(),
-                    Inst::Snez(_) => todo!(),
-                    Inst::Feqs(_) => todo!(),
-                    Inst::Fles(_) => todo!(),
-                    Inst::Flts(_) => todo!(),
-                    _ => unimplemented!(),
-                };
+                Self::__combine_for_br(&mut new_insts, block.insts(), beq, beq_idx)?;
             }
         }
 
         *block.insts_mut() = new_insts.into_iter().flatten().collect();
+        Ok(())
+    }
+
+    fn __combine_for_br(
+        new_insts: &mut [Option<Inst>],
+        insts: &[Inst],
+        beq: &BeqInst,
+        beq_idx: usize,
+    ) -> Result<()> {
+        // (reg, defined inst idx)
+        let mut defs: HashMap<&Reg, usize> = HashMap::new();
+        for (idx, inst) in insts.iter().enumerate() {
+            for reg in inst.defs() {
+                defs.insert(reg, idx);
+            }
+        }
+        let defs = defs;
+
+        // lhs 定义在了其他基本块中
+        let Some(icmp_def_idx) = defs.get(beq.lhs()) else {
+            return Ok(());
+        };
+
+        // 两种情况: slt/xor <- snez, seqz
+        match insts.get(*icmp_def_idx).with_context(|| context!())? {
+            Inst::Snez(snez) => {
+                // snez 的 src 只能是 reg
+                Self::combine_for_br_snez(
+                    beq,
+                    beq_idx,
+                    snez,
+                    *icmp_def_idx,
+                    new_insts,
+                    defs,
+                    insts,
+                )?;
+            }
+            Inst::Seqz(seqz) => {
+                Self::combine_for_br_seqz(
+                    beq,
+                    beq_idx,
+                    seqz,
+                    *icmp_def_idx,
+                    new_insts,
+                    defs,
+                    insts,
+                )?;
+            }
+            Inst::Xor(xor) => {
+                let xor_idx = icmp_def_idx;
+                // snez 的 src 只能是 reg
+                let lhs = xor.lhs().reg().with_context(|| context!())?;
+                let label = beq.label().clone();
+                match xor.rhs() {
+                    Operand::Reg(rhs) => {
+                        new_insts[*xor_idx] = None;
+                        let rhs = *rhs;
+                        new_insts[beq_idx] = Some(BeqInst::new(lhs, rhs, label).into());
+                    }
+                    Operand::Imm(imm) => {
+                        // 重复利用这个 reg 和 槽
+                        let rhs = xor.dst().reg().with_context(|| context!())?;
+                        new_insts[*xor_idx] = Some(LiInst::new(rhs.into(), (*imm).into()).into());
+                        new_insts[beq_idx] = Some(BeqInst::new(lhs, rhs, label).into());
+                    }
+                    _ => unimplemented!(),
+                }
+            }
+            Inst::Slt(slt) => {
+                let slt_idx = icmp_def_idx;
+                // snez 的 src 只能是 reg
+                let lhs = slt.lhs().reg().with_context(|| context!())?;
+                let label = beq.label().clone();
+                match slt.rhs() {
+                    Operand::Reg(rhs) => {
+                        new_insts[*slt_idx] = None;
+                        let rhs = *rhs;
+                        new_insts[beq_idx] = Some(BgeInst::new(lhs, rhs, label).into());
+                    }
+                    Operand::Imm(imm) => {
+                        // 重复利用这个 reg 和 槽
+                        let rhs = slt.dst().reg().with_context(|| context!())?;
+                        new_insts[*slt_idx] = Some(LiInst::new(rhs.into(), (*imm).into()).into());
+                        new_insts[beq_idx] = Some(BgeInst::new(lhs, rhs, label).into());
+                    }
+                    _ => unimplemented!(),
+                }
+            }
+            Inst::Add(_) => todo!(),
+            Inst::Sub(_) => todo!(),
+            Inst::Mul(_) => todo!(),
+            Inst::Div(_) => todo!(),
+            Inst::UDiv(_) => todo!(),
+            Inst::Rem(_) => todo!(),
+            Inst::Sll(_) => todo!(),
+            Inst::Srl(_) => todo!(),
+            Inst::SRA(_) => todo!(),
+            Inst::Not(_) => todo!(),
+            Inst::And(_) => todo!(),
+            Inst::Or(_) => todo!(),
+            Inst::Neg(_) => todo!(),
+            Inst::Sltu(_) => todo!(),
+            Inst::Sgtu(_) => todo!(),
+            Inst::Feqs(_) => todo!(),
+            Inst::Fles(_) => todo!(),
+            Inst::Flts(_) => todo!(),
+            Inst::Mv(_) => todo!(),
+            Inst::Li(_) => todo!(),
+            Inst::Ld(_) => todo!(),
+            Inst::Sd(_) => todo!(),
+            Inst::Lw(_) => todo!(),
+            Inst::Sw(_) => todo!(),
+            Inst::Lla(_) => todo!(),
+            Inst::Load(_) => todo!(),
+            Inst::Store(_) => todo!(),
+            Inst::LocalAddr(_) => todo!(),
+            Inst::I2f(_) => todo!(),
+            Inst::F2i(_) => todo!(),
+            Inst::Jmp(_) => todo!(),
+            Inst::Beq(_) => todo!(),
+            Inst::Bne(_) => todo!(),
+            Inst::Blt(_) => todo!(),
+            Inst::Ble(_) => todo!(),
+            Inst::Bgt(_) => todo!(),
+            Inst::Bge(_) => todo!(),
+            Inst::Call(_) => todo!(),
+            Inst::Tail(_) => todo!(),
+            Inst::Ret => todo!(),
+        };
+        Ok(())
+    }
+
+    fn combine_for_br_seqz(
+        beq: &BeqInst,
+        beq_idx: usize,
+        seqz: &SeqzInst,
+        seqz_idx: usize,
+        new_insts: &mut [Option<Inst>],
+        defs: HashMap<&Reg, usize>,
+        insts: &[Inst],
+    ) -> Result<()> {
+        // snez 的 src 只能是 reg
+        let seqz_src = seqz.src().reg().with_context(|| context!())?;
+        if let Some(def_idx) = defs.get(&seqz_src) {
+            // xor/slt
+            match insts.get(*def_idx).with_context(|| context!())? {
+                // xor -> snez -> beq
+                Inst::Xor(xor) => {
+                    let xor_idx = def_idx;
+                    new_insts[*xor_idx] = None;
+                    let lhs = xor.lhs().reg().with_context(|| context!())?;
+                    let label = beq.label().clone();
+                    match xor.rhs() {
+                        Operand::Reg(rhs) => {
+                            new_insts[seqz_idx] = None;
+                            let rhs = *rhs;
+                            new_insts[beq_idx] = Some(BneInst::new(lhs, rhs, label).into());
+                        }
+                        Operand::Imm(imm) => {
+                            // 重复利用这个 reg 和 槽
+                            let rhs = seqz.dst().reg().with_context(|| context!())?;
+                            new_insts[seqz_idx] =
+                                Some(LiInst::new(rhs.into(), (*imm).into()).into());
+                            new_insts[beq_idx] = Some(BneInst::new(lhs, rhs, label).into());
+                        }
+                        _ => unimplemented!(),
+                    }
+                }
+                Inst::Slt(slt) => {
+                    let slt_idx = def_idx;
+                    new_insts[*slt_idx] = None;
+                    let label = beq.label().clone();
+                    let lhs = slt.lhs().reg().with_context(|| context!())?;
+                    match slt.rhs() {
+                        Operand::Reg(rhs) => {
+                            let rhs = *rhs;
+                            new_insts[seqz_idx] = None;
+                            new_insts[beq_idx] = Some(BltInst::new(lhs, rhs, label).into());
+                        }
+                        Operand::Imm(imm) => {
+                            // 重复利用这个 reg 和 槽
+                            let rhs = seqz.dst().reg().with_context(|| context!())?;
+                            new_insts[seqz_idx] =
+                                Some(LiInst::new(rhs.into(), (*imm).into()).into());
+                            new_insts[beq_idx] = Some(BltInst::new(lhs, rhs, label).into());
+                        }
+                        _ => unimplemented!(),
+                    }
+                }
+                Inst::Sltu(_) => todo!(),
+                Inst::Sgtu(_) => todo!(),
+                Inst::Seqz(_) => todo!(),
+                Inst::Snez(_) => todo!(),
+                Inst::Feqs(_) => todo!(),
+                Inst::Fles(_) => todo!(),
+                Inst::Flts(_) => todo!(),
+                _ => unimplemented!(),
+            }
+        } else {
+            // 可以合并 snez 与 beqz
+            let reg = seqz.src().reg().with_context(|| context!())?;
+            let label = beq.label().clone();
+            new_insts[seqz_idx] = None;
+            new_insts[beq_idx] = Some(BneInst::new(reg, REG_ZERO, label).into());
+        };
+        Ok(())
+    }
+
+    fn combine_for_br_snez(
+        beq: &BeqInst,
+        beq_idx: usize,
+        snez: &SnezInst,
+        snez_idx: usize,
+        new_insts: &mut [Option<Inst>],
+        defs: HashMap<&Reg, usize>,
+        insts: &[Inst],
+    ) -> Result<()> {
+        if let Some(def_idx) = defs.get(&snez.src().reg().with_context(|| context!())?) {
+            // xor/slt
+            match insts.get(*def_idx).with_context(|| context!())? {
+                // xor -> snez -> beq
+                Inst::Xor(xor) => {
+                    let xor_idx = def_idx;
+                    new_insts[*xor_idx] = None;
+                    let lhs = xor.lhs().reg().with_context(|| context!())?;
+                    let label = beq.label().clone();
+                    match xor.rhs() {
+                        Operand::Reg(rhs) => {
+                            new_insts[snez_idx] = None;
+                            let rhs = *rhs;
+                            new_insts[beq_idx] = Some(BeqInst::new(lhs, rhs, label).into());
+                        }
+                        Operand::Imm(imm) => {
+                            // 重复利用这个 reg 和 槽
+                            let rhs = snez.dst().reg().with_context(|| context!())?;
+                            new_insts[snez_idx] =
+                                Some(LiInst::new(rhs.into(), (*imm).into()).into());
+                            new_insts[beq_idx] = Some(BeqInst::new(lhs, rhs, label).into());
+                        }
+                        _ => unimplemented!(),
+                    }
+                }
+                Inst::Slt(slt) => {
+                    let slt_idx = def_idx;
+                    new_insts[*slt_idx] = None;
+                    let label = beq.label().clone();
+                    let lhs = slt.lhs().reg().with_context(|| context!())?;
+                    match slt.rhs() {
+                        Operand::Reg(rhs) => {
+                            let rhs = *rhs;
+                            new_insts[snez_idx] = None;
+                            new_insts[beq_idx] = Some(BgeInst::new(lhs, rhs, label).into());
+                        }
+                        Operand::Imm(imm) => {
+                            // 重复利用这个 reg 和 槽
+                            let rhs = snez.dst().reg().with_context(|| context!())?;
+                            new_insts[snez_idx] =
+                                Some(LiInst::new(rhs.into(), (*imm).into()).into());
+                            new_insts[beq_idx] = Some(BgeInst::new(lhs, rhs, label).into());
+                        }
+                        _ => unimplemented!(),
+                    }
+                }
+                Inst::Sltu(_) => todo!(),
+                Inst::Sgtu(_) => todo!(),
+                Inst::Seqz(_) => todo!(),
+                Inst::Snez(_) => todo!(),
+                Inst::Feqs(_) => todo!(),
+                Inst::Fles(_) => todo!(),
+                Inst::Flts(_) => todo!(),
+                _ => unimplemented!(),
+            }
+        } else {
+            // 可以合并 snez 与 beqz
+            let reg = snez.src().reg().with_context(|| context!())?;
+            let label = beq.label().clone();
+            new_insts[snez_idx] = None;
+            new_insts[beq_idx] = Some(BeqInst::new(reg, REG_ZERO, label).into());
+        };
         Ok(())
     }
 
