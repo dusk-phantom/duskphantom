@@ -7,8 +7,8 @@ pub mod tests_constant_fold {
         middle::{
             irgen::gen,
             transform::{
-                block_fuse, constant_fold, dead_code_elim, func_inline, mem2reg, redundance_elim,
-                inst_combine,
+                block_fuse, constant_fold, dead_code_elim, func_inline, inst_combine, mem2reg,
+                redundance_elim,
             },
         },
         utils::diff::diff,

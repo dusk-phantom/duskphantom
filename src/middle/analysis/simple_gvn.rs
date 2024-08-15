@@ -5,25 +5,20 @@ use std::{
 
 use crate::{
     backend::from_self::downcast_ref,
-    middle::{
-        ir::{
-            instruction::{
-                misc_inst::{Call, FCmp, ICmp},
-                InstType,
-            },
-            BBPtr, InstPtr, Operand, ValueType,
+    middle::ir::{
+        instruction::{
+            misc_inst::{Call, FCmp, ICmp},
+            InstType,
         },
-        Program,
+        InstPtr, Operand,
     },
-    utils::frame_map::FrameMap,
 };
 
-use super::{dominator_tree::DominatorTree, effect_analysis::EffectAnalysis};
+use super::effect_analysis::EffectAnalysis;
 
 pub struct SimpleGVN<'a> {
     ctx: Context<'a>,
-    pub inst_expr: HashMap<InstPtr, Expr<'a>>,
-    pub inst_leader: HashMap<InstPtr, InstPtr>,
+    inst_expr: HashMap<InstPtr, Expr<'a>>,
 }
 
 #[derive(Clone, Copy)]
@@ -32,82 +27,36 @@ struct Context<'a> {
 }
 
 impl<'a> SimpleGVN<'a> {
-    pub fn new(program: &Program, effect_analysis: &'a EffectAnalysis) -> Self {
+    pub fn new(effect_analysis: &'a EffectAnalysis) -> Self {
         let ctx = Context { effect_analysis };
-        let mut simple_gvn = Self {
+        Self {
             ctx,
             inst_expr: HashMap::new(),
-            inst_leader: HashMap::new(),
-        };
-        for func in program.module.functions.clone() {
-            if func.is_lib() {
-                continue;
-            }
-            let mut dom_tree = DominatorTree::new(func);
-            simple_gvn.dfs(func.entry.unwrap(), FrameMap::new(), &mut dom_tree);
-        }
-        simple_gvn
-    }
-
-    fn dfs<'b>(
-        &'b mut self,
-        bb: BBPtr,
-        mut expr_leader: FrameMap<'_, Expr<'a>, InstPtr>,
-        dom_tree: &'b mut DominatorTree,
-    ) {
-        bb.iter().for_each(|inst| {
-            // Refuse to replace instruction that returns void
-            if inst.get_value_type() == ValueType::Void {
-                return;
-            }
-            let expr = Expr::new(self, Operand::Instruction(inst));
-            match expr_leader.get(&expr) {
-                // Expression appeared before, set instruction leader
-                Some(&leader) => {
-                    self.inst_leader.insert(inst, leader);
-                }
-                // Expression not appeared before, set as leader
-                None => {
-                    expr_leader.insert(expr, inst);
-                }
-            }
-        });
-        for succ in dom_tree.get_dominatee(bb) {
-            self.dfs(succ, expr_leader.branch(), dom_tree);
         }
     }
-}
 
-#[derive(Clone)]
-pub struct Expr<'a> {
-    ctx: Context<'a>,
-    op: Operand,
-    num: u64,
-}
-
-impl<'a> Expr<'a> {
     /// Create a value-numbered expression from operand
-    pub fn new(simple_gvn: &mut SimpleGVN<'a>, op: Operand) -> Self {
+    pub fn get_expr(&mut self, op: Operand) -> Expr<'a> {
         // If operand is not inst, construct expression directly
         let Operand::Instruction(inst) = op else {
             let mut hasher = DefaultHasher::new();
             op.hash(&mut hasher);
-            return Self {
-                ctx: simple_gvn.ctx,
+            return Expr {
+                ctx: self.ctx,
                 op,
                 num: hasher.finish(),
             };
         };
 
         // If inst is not touched, construct expression
-        let Some(expr) = simple_gvn.inst_expr.get(&inst) else {
-            let num = Self::get_num(simple_gvn, inst);
-            let expr = Self {
-                ctx: simple_gvn.ctx,
+        let Some(expr) = self.inst_expr.get(&inst) else {
+            let num = self.get_num(inst);
+            let expr = Expr {
+                ctx: self.ctx,
                 op,
                 num,
             };
-            simple_gvn.inst_expr.insert(inst, expr.clone());
+            self.inst_expr.insert(inst, expr.clone());
             return expr;
         };
 
@@ -116,7 +65,7 @@ impl<'a> Expr<'a> {
     }
 
     /// Get value number for instruction
-    fn get_num(simple_gvn: &mut SimpleGVN<'a>, inst: InstPtr) -> u64 {
+    fn get_num(&mut self, inst: InstPtr) -> u64 {
         let mut hasher = DefaultHasher::new();
 
         // Some instructions equal only when they are the same instance
@@ -127,7 +76,7 @@ impl<'a> Expr<'a> {
         }
 
         // Impure function equal only when they are the same instance
-        if ty == InstType::Call && simple_gvn.ctx.effect_analysis.has_effect(inst) {
+        if ty == InstType::Call && self.ctx.effect_analysis.has_effect(inst) {
             inst.hash(&mut hasher);
             return hasher.finish();
         }
@@ -154,7 +103,7 @@ impl<'a> Expr<'a> {
         let mut numbers = inst
             .get_operand()
             .iter()
-            .map(|op| Self::new(simple_gvn, op.clone()).num)
+            .map(|op| self.get_expr(op.clone()).num)
             .collect::<Vec<_>>();
         numbers.sort_unstable();
         for num in numbers {
@@ -163,6 +112,15 @@ impl<'a> Expr<'a> {
         hasher.finish()
     }
 }
+
+#[derive(Clone)]
+pub struct Expr<'a> {
+    ctx: Context<'a>,
+    op: Operand,
+    num: u64,
+}
+
+impl<'a> Expr<'a> {}
 
 impl<'a> Hash for Expr<'a> {
     fn hash<H: Hasher>(&self, state: &mut H) {

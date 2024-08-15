@@ -5,9 +5,7 @@ pub mod tests_load_elim {
     use compiler::{
         frontend::parse,
         middle::{
-            analysis::{
-                effect_analysis::EffectAnalysis, memory_ssa::MemorySSA,
-            },
+            analysis::{effect_analysis::EffectAnalysis, memory_ssa::MemorySSA},
             irgen::gen,
             transform::{dead_code_elim, load_elim, mem2reg, redundance_elim},
         },
