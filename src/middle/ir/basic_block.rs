@@ -211,7 +211,7 @@ impl BasicBlock {
 
     /// Replace successor with given mapping.
     /// TODO: rename me
-    pub fn replace_succ_bb_only(&mut self, mut from: BBPtr, to: BBPtr) {
+    pub fn replace_succ_bb_only(&mut self, mut from: BBPtr, mut to: BBPtr) {
         if let Some(index) = self.succ_bbs.iter().enumerate().find_map(|(index, bb)| {
             if bb.id == from.id {
                 Some(index)
@@ -221,6 +221,7 @@ impl BasicBlock {
         }) {
             from.pred_bbs.retain(|x| x.id != self.id);
             self.succ_bbs[index] = to;
+            to.pred_bbs.push(ObjPtr::new(self))
         }
     }
 
