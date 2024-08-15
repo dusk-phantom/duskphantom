@@ -7,7 +7,7 @@ use crate::context;
 use crate::middle::analysis::dominator_tree::DominatorTree;
 use crate::middle::analysis::effect_analysis::EffectAnalysis;
 use crate::middle::ir::instruction::misc_inst::Phi;
-use crate::middle::ir::instruction::InstType;
+use crate::middle::ir::instruction::{downcast_mut, InstType};
 use crate::middle::ir::{BBPtr, InstPtr, Operand};
 use crate::middle::Program;
 
@@ -32,7 +32,7 @@ impl<'a> Transform for SinkCode<'a> {
     }
 
     fn name() -> String {
-        "dead_code_elim".to_string()
+        "sink_code".to_string()
     }
 
     fn run(&mut self) -> Result<bool> {
@@ -61,7 +61,7 @@ impl<'a> SinkCode<'a> {
         }
     }
 
-    fn sink_inst(&mut self, inst: InstPtr, dom_tree: &mut DominatorTree) -> Result<bool> {
+    fn sink_inst(&mut self, mut inst: InstPtr, dom_tree: &mut DominatorTree) -> Result<bool> {
         let mut changed = false;
 
         // Refuse to sink instruction with side effect
@@ -74,11 +74,8 @@ impl<'a> SinkCode<'a> {
             .get_parent_bb()
             .ok_or_else(|| anyhow!("Instruction {} has no parent BB", inst))
             .with_context(|| context!())?;
-        for user in inst.get_user() {
-            let parent_bb = user
-                .get_parent_bb()
-                .ok_or_else(|| anyhow!("Instruction {} has no parent BB", user))
-                .with_context(|| context!())?;
+        for user in FakeInst::from_inst_users(inst)? {
+            let parent_bb = user.get_parent_bb()?;
             if root == parent_bb {
                 return Ok(changed);
             }
@@ -96,12 +93,9 @@ impl<'a> SinkCode<'a> {
         // TODO below is a temporary implementation, it refuses to sink if there are users in (C OR D).
         if root.get_succ_bb().len() == 2 {
             let mut block_to_user: HashMap<BBPtr, HashSet<FakeInst>> = HashMap::new();
-            for user in inst.get_user() {
-                let user_bb = user
-                    .get_parent_bb()
-                    .ok_or_else(|| anyhow!("Instruction {} has no parent BB", user))
-                    .with_context(|| context!())?;
-                block_to_user.entry(user_bb).or_default().insert(*user);
+            for user in FakeInst::from_inst_users(inst)? {
+                let user_bb = user.get_parent_bb()?;
+                block_to_user.entry(user_bb).or_default().insert(user);
             }
 
             // Get mapping from dominatee to users
@@ -123,7 +117,7 @@ impl<'a> SinkCode<'a> {
                 dominatee_to_user
                     .entry(dominatee)
                     .or_default()
-                    .extend(&block_to_user[bb]);
+                    .extend(block_to_user[bb].clone());
             }
 
             // Check if there are users in (C OR D) branch
@@ -137,13 +131,13 @@ impl<'a> SinkCode<'a> {
 
             // If not, sink into each successor
             if !exist_in_other {
+                changed = true;
                 for succ in root.get_succ_bb() {
                     let user = dominatee_to_user
                         .get(succ)
                         .cloned()
                         .unwrap_or(HashSet::new());
                     if !user.is_empty() {
-                        changed = true;
                         let mut new_inst = self
                             .program
                             .mem_pool
@@ -164,6 +158,9 @@ impl<'a> SinkCode<'a> {
                         self.sink_inst(new_inst, dom_tree)?;
                     }
                 }
+
+                // Remove the original instruction
+                inst.remove_self();
             }
         }
 
@@ -189,23 +186,63 @@ impl<'a> SinkCode<'a> {
     }
 }
 
+/// We treat `phi` as multiple fake instructions, each corresponds to one incoming value.
+/// This way it's unified with normal instruction.
+#[derive(PartialEq, Eq, Hash, Clone)]
 enum FakeInst {
     Normal(InstPtr),
     Phi(InstPtr, BBPtr),
 }
 
 impl FakeInst {
-    fn from_user(inst: InstPtr, user: InstPtr) -> Result<FakeInst> {
+    fn from_inst_users(inst: InstPtr) -> Result<Vec<FakeInst>> {
+        inst.get_user()
+            .iter()
+            .map(|user| FakeInst::from_inst_user(inst, *user))
+            .collect::<Result<Vec<Vec<_>>>>()
+            .map(|v| v.into_iter().flatten().collect())
+    }
+
+    fn from_inst_user(inst: InstPtr, user: InstPtr) -> Result<Vec<FakeInst>> {
         if user.get_type() == InstType::Phi {
             let phi = downcast_ref::<Phi>(user.as_ref().as_ref());
+            let mut result = Vec::new();
             for (op, bb) in phi.get_incoming_values() {
                 if op == &Operand::Instruction(inst) {
-                    return Ok(FakeInst::Phi(user, *bb));
+                    result.push(FakeInst::Phi(user, *bb));
                 }
             }
-            Err(anyhow!("{} is not user of {}", user, inst)).with_context(|| context!())
+            Ok(result)
         } else {
-            Ok(FakeInst::Normal(user))
+            Ok(vec![FakeInst::Normal(user)])
+        }
+    }
+
+    fn get_parent_bb(&self) -> Result<BBPtr> {
+        match self {
+            FakeInst::Normal(inst) => inst
+                .get_parent_bb()
+                .ok_or_else(|| anyhow!("Instruction {} has no parent BB", inst))
+                .with_context(|| context!()),
+            // Phi FakeInst locates in one of data source block
+            FakeInst::Phi(_, bb) => Ok(*bb),
+        }
+    }
+
+    fn replace_operand(&mut self, old: &Operand, new: &Operand) {
+        match self {
+            FakeInst::Normal(inst) => {
+                inst.replace_operand(old, new);
+            }
+            FakeInst::Phi(inst, bb) => {
+                let phi = downcast_mut::<Phi>(inst.as_mut().as_mut());
+                for inc in phi.get_incoming_values_mut() {
+                    // Only replace value from corresponding basic block
+                    if inc.1 == *bb {
+                        inc.0 = new.clone();
+                    }
+                }
+            }
         }
     }
 }
