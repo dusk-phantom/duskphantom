@@ -22,6 +22,10 @@ pub struct ConstantFold<'a> {
 }
 
 impl<'a> Transform for ConstantFold<'a> {
+    fn get_program_mut(&mut self) -> &mut Program {
+        self.program
+    }
+
     fn name() -> String {
         "constant_fold".to_string()
     }

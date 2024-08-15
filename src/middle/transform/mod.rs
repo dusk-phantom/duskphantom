@@ -2,6 +2,10 @@ use std::time::Instant;
 
 use anyhow::Result;
 
+use crate::utils::diff::diff;
+
+use super::Program;
+
 pub mod block_fuse;
 pub mod constant_fold;
 pub mod dead_code_elim;
@@ -15,24 +19,28 @@ pub mod loop_optimization;
 pub mod loop_simplify;
 pub mod mem2reg;
 pub mod redundance_elim;
-pub mod sink;
+pub mod sink_code;
 pub mod store_elim;
 pub mod ultimate_pass;
 
 pub trait Transform {
     fn name() -> String;
 
+    fn get_program_mut(&mut self) -> &mut Program;
+
     fn run(&mut self) -> Result<bool>;
 
     fn run_and_log(&mut self) -> Result<bool> {
-        let before_run = Instant::now();
+        let time_before = Instant::now();
+        let program_before = self.get_program_mut().module.gen_llvm_ir();
         let changed = self.run()?;
-        let elapsed = before_run.elapsed().as_millis();
+        let elapsed = time_before.elapsed().as_millis();
+        let program_after = self.get_program_mut().module.gen_llvm_ir();
         println!(
-            "{}: elapsed = {} ms {}",
+            "## Pass {}\n\nTime elapsed = {} ms\n\nDiff:\n\n```diff\n{}```\n",
             Self::name(),
             elapsed,
-            if changed { "(changed)" } else { "" }
+            diff(&program_before, &program_after)
         );
         Ok(changed)
     }

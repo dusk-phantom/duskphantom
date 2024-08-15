@@ -31,6 +31,10 @@ pub struct SymbolicEval<'a> {
 }
 
 impl<'a> Transform for SymbolicEval<'a> {
+    fn get_program_mut(&mut self) -> &mut Program {
+        self.program
+    }
+
     fn name() -> String {
         "symbolic_eval".to_string()
     }

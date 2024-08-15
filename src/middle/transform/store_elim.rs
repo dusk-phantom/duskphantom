@@ -21,6 +21,10 @@ pub struct StoreElim<'a> {
 }
 
 impl<'a> Transform for StoreElim<'a> {
+    fn get_program_mut(&mut self) -> &mut Program {
+        self.program
+    }
+
     fn name() -> String {
         "store_elim".to_string()
     }

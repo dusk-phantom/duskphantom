@@ -36,6 +36,10 @@ pub struct FuncInline<'a> {
 }
 
 impl<'a> Transform for FuncInline<'a> {
+    fn get_program_mut(&mut self) -> &mut Program {
+        self.program
+    }
+
     fn name() -> String {
         "func_inline".to_string()
     }

@@ -29,6 +29,10 @@ pub struct Mem2Reg<'a> {
 }
 
 impl<'a> Transform for Mem2Reg<'a> {
+    fn get_program_mut(&mut self) -> &mut Program {
+        self.program
+    }
+
     fn name() -> String {
         "mem2reg".to_string()
     }

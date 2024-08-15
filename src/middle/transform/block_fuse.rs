@@ -16,6 +16,10 @@ pub struct BlockFuse<'a> {
 }
 
 impl<'a> Transform for BlockFuse<'a> {
+    fn get_program_mut(&mut self) -> &mut Program {
+        self.program
+    }
+
     fn name() -> String {
         "block_fuse".to_string()
     }
