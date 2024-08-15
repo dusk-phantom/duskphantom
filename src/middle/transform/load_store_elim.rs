@@ -13,7 +13,7 @@ pub fn optimize_program(program: &mut Program) -> Result<bool> {
     let mut changed = false;
 
     // Dump MemorySSA for debugging
-    // println!("\n{}", memory_ssa.dump());
+    println!("\n{}", memory_ssa.dump());
 
     // Eliminate predictable load first, and then eliminate unused store
     changed |= load_elim::optimize_program(program, &mut memory_ssa)?;

@@ -63,8 +63,9 @@ impl EffectAnalysis {
                 if func.name == "putarray" || func.name == "putfarray" {
                     effect.has_mem_input.insert(*func);
                 }
+            } else {
+                worklist.insert(*func);
             }
-            worklist.insert(*func);
         }
 
         // Iterate all functions until unchanged
@@ -157,7 +158,7 @@ impl EffectAnalysis {
                                     use_range: EffectRange::new(),
                                 },
                             );
-                        } else if call.func.name == "putarray" {
+                        } else if call.func.name == "putarray" || call.func.name == "putfarray" {
                             self.inst_effect.insert(
                                 inst,
                                 Effect {
@@ -165,7 +166,7 @@ impl EffectAnalysis {
                                     use_range: inst.get_operand()[0].clone().into(),
                                 },
                             );
-                        } else if call.func.name == "getarray" {
+                        } else if call.func.name == "getarray" || call.func.name == "getfarray" {
                             self.inst_effect.insert(
                                 inst,
                                 Effect {
