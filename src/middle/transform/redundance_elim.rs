@@ -6,6 +6,7 @@ use crate::middle::{
     analysis::{
         dominator_tree::DominatorTree,
         effect_analysis::EffectAnalysis,
+        memory_ssa::MemorySSA,
         simple_gvn::{Expr, SimpleGVN},
     },
     ir::{InstPtr, Operand, ValueType},
@@ -16,7 +17,8 @@ use super::Transform;
 
 pub fn optimize_program(program: &mut Program) -> Result<bool> {
     let effect_analysis = EffectAnalysis::new(program);
-    let mut gvn = SimpleGVN::new(&effect_analysis);
+    let memory_ssa = MemorySSA::new(program, &effect_analysis);
+    let mut gvn = SimpleGVN::new(&memory_ssa);
     RedundanceElim::new(program, &mut gvn).run_and_log()
 }
 
@@ -42,7 +44,14 @@ impl<'a> Transform for RedundanceElim<'a> {
                 continue;
             }
             let mut dom_tree = DominatorTree::new(func);
+
+            // Implementation of Expr::Hash does not use it's mutable content,
+            // so it's false positive according to:
+            // https://rust-lang.github.io/rust-clippy/master/index.html#/mutable_key_type
+            #[allow(clippy::mutable_key_type)]
             let mut expr_leader: HashMap<Expr, InstPtr> = HashMap::new();
+
+            // Iterate all instructions
             for bb in func.rpo_iter() {
                 for inst in bb.iter() {
                     // Refuse to replace instruction that returns void
@@ -51,7 +60,7 @@ impl<'a> Transform for RedundanceElim<'a> {
                     }
                     let expr = self.gvn.get_expr(Operand::Instruction(inst));
                     match expr_leader.get(&expr) {
-                        // Expression appeared before, remove redundancy
+                        // Expression appeared before, move leader and inst to lowest common ancestor
                         Some(&leader) => {
                             let inst_bb = inst.get_parent_bb().unwrap();
                             let leader_bb = leader.get_parent_bb().unwrap();

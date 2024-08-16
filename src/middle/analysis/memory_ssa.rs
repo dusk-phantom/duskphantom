@@ -182,10 +182,10 @@ impl<'a> MemorySSA<'a> {
     pub fn dump_node(&self, node: NodePtr) -> String {
         match node.as_ref() {
             Node::Entry(id) => format!("; {} (liveOnEntry)", id),
-            Node::Normal(id, used_node, def_node, _) => {
+            Node::Normal(id, use_node, def_node, _) => {
                 let mut result: Vec<String> = Vec::new();
-                if let Some(used_node) = used_node {
-                    result.push(format!("; MemoryUse({})", used_node.get_id()));
+                if let Some(use_node) = use_node {
+                    result.push(format!("; MemoryUse({})", use_node.get_id()));
                 }
                 if let Some(def_node) = def_node {
                     result.push(format!("; {} = MemoryDef({})", id, def_node.get_id()));
@@ -269,8 +269,8 @@ impl<'a> MemorySSA<'a> {
                 let def_range = effect.def_range.clone();
                 let use_range = effect.use_range.clone();
                 let def_node = range_to_node.get_def(&def_range);
-                let used_node = range_to_node.get_use(&use_range);
-                let new_node = self.create_normal_node(used_node, def_node, inst);
+                let use_node = range_to_node.get_use(&use_range);
+                let new_node = self.create_normal_node(use_node, def_node, inst);
                 range_to_node.insert(def_range, new_node);
             }
         }
@@ -291,14 +291,14 @@ impl<'a> MemorySSA<'a> {
     /// Create a normal node.
     fn create_normal_node(
         &mut self,
-        used_node: Option<NodePtr>,
+        use_node: Option<NodePtr>,
         def_node: Option<NodePtr>,
         inst: InstPtr,
     ) -> NodePtr {
-        let node = self.builder.get_normal_node(used_node, def_node, inst);
+        let node = self.builder.get_normal_node(use_node, def_node, inst);
         self.inst_to_node.insert(inst, node);
-        if let Some(used_node) = used_node {
-            self.node_to_user.entry(used_node).or_default().insert(node);
+        if let Some(use_node) = use_node {
+            self.node_to_user.entry(use_node).or_default().insert(node);
         }
         if let Some(def_node) = def_node {
             self.node_to_user.entry(def_node).or_default().insert(node);
@@ -378,12 +378,12 @@ impl MemorySSABuilder {
     /// Get a normal node.
     fn get_normal_node(
         &mut self,
-        used_node: Option<NodePtr>,
+        use_node: Option<NodePtr>,
         def_node: Option<NodePtr>,
         inst: InstPtr,
     ) -> NodePtr {
         let next_counter = self.next_counter();
-        self.new_node(Node::Normal(next_counter, used_node, def_node, inst))
+        self.new_node(Node::Normal(next_counter, use_node, def_node, inst))
     }
 
     /// Get a phi node.
@@ -399,7 +399,7 @@ pub enum Node {
     /// Entry(id) represents the memory state at the beginning of the function.
     Entry(usize),
 
-    /// Normal(id, used_node, def_node, inst) represents a memory state after an instruction.
+    /// Normal(id, use_node, def_node, inst) represents a memory state after an instruction.
     Normal(usize, Option<NodePtr>, Option<NodePtr>, InstPtr),
 
     /// Phi(id, args, range) represents a phi node.
@@ -424,7 +424,17 @@ impl Node {
         }
     }
 
+    /// Get use node.
+    /// Use node is the node that is read from.
+    pub fn get_use_node(&self) -> NodePtr {
+        match self {
+            Node::Normal(_, use_node, _, _) => use_node.unwrap(),
+            _ => panic!("not a normal node"),
+        }
+    }
+
     /// Get used nodes.
+    /// Used nodes contains both use and def nodes.
     pub fn get_used_node(&self) -> Vec<NodePtr> {
         match self {
             Node::Normal(_, use_node, def_node, _) => {

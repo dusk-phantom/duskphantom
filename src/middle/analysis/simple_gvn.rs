@@ -14,7 +14,7 @@ use crate::{
     },
 };
 
-use super::effect_analysis::EffectAnalysis;
+use super::memory_ssa::MemorySSA;
 
 pub struct SimpleGVN<'a> {
     ctx: Context<'a>,
@@ -23,12 +23,12 @@ pub struct SimpleGVN<'a> {
 
 #[derive(Clone, Copy)]
 struct Context<'a> {
-    effect_analysis: &'a EffectAnalysis,
+    memory_ssa: &'a MemorySSA<'a>,
 }
 
 impl<'a> SimpleGVN<'a> {
-    pub fn new(effect_analysis: &'a EffectAnalysis) -> Self {
-        let ctx = Context { effect_analysis };
+    pub fn new(memory_ssa: &'a MemorySSA<'a>) -> Self {
+        let ctx = Context { memory_ssa };
         Self {
             ctx,
             inst_expr: HashMap::new(),
@@ -70,13 +70,20 @@ impl<'a> SimpleGVN<'a> {
 
         // Some instructions equal only when they are the same instance
         let ty = inst.get_type();
-        if let InstType::Alloca | InstType::Load | InstType::Phi = ty {
+        if let InstType::Alloca | InstType::Phi = ty {
             inst.hash(&mut hasher);
             return hasher.finish();
         }
 
+        // Hash corresponding MemoryDef node for loads
+        if let InstType::Load = ty {
+            let node = self.ctx.memory_ssa.get_inst_node(inst).unwrap();
+            let use_node = node.get_use_node();
+            use_node.hash(&mut hasher);
+        }
+
         // Impure function equal only when they are the same instance
-        if ty == InstType::Call && self.ctx.effect_analysis.has_effect(inst) {
+        if ty == InstType::Call && self.ctx.memory_ssa.effect_analysis.has_effect(inst) {
             inst.hash(&mut hasher);
             return hasher.finish();
         }
@@ -139,14 +146,25 @@ impl<'a> PartialEq for Expr<'a> {
                 }
 
                 // Some instructions equal only when they are the same instance
-                if let InstType::Alloca | InstType::Load | InstType::Phi = ty {
+                if let InstType::Alloca | InstType::Phi = ty {
                     return inst1 == inst2;
+                }
+
+                // For loads, they should use the same MemoryDef node
+                if let InstType::Load = ty {
+                    let node1 = self.ctx.memory_ssa.get_inst_node(*inst1).unwrap();
+                    let node2 = self.ctx.memory_ssa.get_inst_node(*inst2).unwrap();
+                    let use1 = node1.get_use_node();
+                    let use2 = node2.get_use_node();
+                    if use1 != use2 {
+                        return false;
+                    }
                 }
 
                 // Impure function equal only when they are the same instance
                 if ty == InstType::Call
-                    && self.ctx.effect_analysis.has_effect(*inst1)
-                    && self.ctx.effect_analysis.has_effect(*inst2)
+                    && self.ctx.memory_ssa.effect_analysis.has_effect(*inst1)
+                    && self.ctx.memory_ssa.effect_analysis.has_effect(*inst2)
                 {
                     return inst1 == inst2;
                 }
