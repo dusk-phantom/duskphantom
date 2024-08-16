@@ -3,8 +3,7 @@ use anyhow::Result;
 use crate::middle::Program;
 
 use super::{
-    block_fuse, dead_code_elim, func_inline, inst_combine,
-    load_store_elim, /* loop_optimization, */
+    block_fuse, dead_code_elim, func_inline, inst_combine, load_store_elim, loop_optimization,
     mem2reg, redundance_elim, sink_code,
 };
 
@@ -28,13 +27,13 @@ pub fn optimize_program(program: &mut Program) -> Result<bool> {
             }
         }
 
+        // Remove redundancy
+        changed |= redundance_elim::optimize_program(program)?;
+
         // Optimize loop
         // TODO add changed and timing info for this pass
         // TODO remove inst_combine in loop_optimization
-        // loop_optimization::optimize_program(program)?;
-
-        // Remove redundancy for load_store_elim
-        changed |= redundance_elim::optimize_program(program)?;
+        loop_optimization::optimize_program(program)?;
 
         // Fuse blocks
         changed |= block_fuse::optimize_program(program)?;
