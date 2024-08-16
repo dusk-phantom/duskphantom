@@ -24,7 +24,6 @@ impl Block {
                 } else {
                     let imm = *imm;
                     let dst = li.dst().reg().with_context(|| context!())?;
-                    dbg!(li.gen_asm());
                     if (-(1 << 31)..(1 << 31)).contains(&imm) {
                         Block::post_split_li32(imm, dst, &mut new_insts)?;
                     } else if (-(1 << 43)..(1 << 43)).contains(&imm) {
