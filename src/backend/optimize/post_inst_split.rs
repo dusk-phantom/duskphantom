@@ -82,7 +82,7 @@ impl Block {
         Ok(())
     }
     fn post_split_li64(imm: i64, dst: Reg, new_insts: &mut Vec<Inst>) -> Result<()> {
-        let hi = (imm + 0x0080) >> 12; // 56
+        let hi = (imm + 0x0080) >> 8; // 56
         let lo = (imm << 56) >> 56; // 8
         Block::post_split_li56(hi, dst, new_insts)?;
         let slli = SllInst::new(dst.into(), dst.into(), (8).into()).with_8byte();
@@ -92,5 +92,111 @@ impl Block {
             new_insts.push(addi.into());
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[allow(unused)]
+    use insta::assert_snapshot;
+
+    #[allow(unused)]
+    use super::*;
+
+    use crate::utils::diff::diff;
+
+    #[test]
+    fn test_post_split_li() {
+        let mut bb0 = Block::new("bb0".to_string());
+        let mut bb1 = Block::new("bb1".to_string());
+        bb0.push_inst(LiInst::new(REG_A0.into(), (31415926).into()).into());
+        bb1.push_inst(LiInst::new(REG_A0.into(), (31415926).into()).into());
+        Block::post_split_li(&mut bb0).unwrap();
+        let bb0_asm = bb0.gen_asm();
+        let bb1_asm = bb1.gen_asm();
+        // 7670 << 12 = 31416320
+        // 31416320 - 394 = 31415926
+        assert_snapshot!(diff(&bb0_asm, &bb1_asm), @r###"
+        [-] bb0:
+        [-] lui a0,7670
+        [-] addi a0,a0,-394
+        [+] bb1:
+        [+] li a0,31415926
+        "###);
+
+        let mut bb0 = Block::new("bb0".to_string());
+        let mut bb1 = Block::new("bb1".to_string());
+        bb0.push_inst(LiInst::new(REG_A0.into(), (31415926535).into()).into());
+        bb1.push_inst(LiInst::new(REG_A0.into(), (31415926535).into()).into());
+        Block::post_split_li(&mut bb0).unwrap();
+        let bb0_asm = bb0.gen_asm();
+        let bb1_asm = bb1.gen_asm();
+        // 1873 << 12 = 7671808
+        // 7671808 - 249 = 7669904
+        // 7669904 << 12 = 31415926784
+        // 31415926784 - 249 = 31415926535
+        assert_snapshot!(diff(&bb0_asm, &bb1_asm), @r###"
+        [-] bb0:
+        [-] lui a0,1873
+        [-] addi a0,a0,-1904
+        [-] slli a0,a0,12
+        [-] addi a0,a0,-249
+        [+] bb1:
+        [+] li a0,31415926535
+        "###);
+
+        let mut bb0 = Block::new("bb0".to_string());
+        let mut bb1 = Block::new("bb1".to_string());
+        bb0.push_inst(LiInst::new(REG_A0.into(), (3141592653589793).into()).into());
+        bb1.push_inst(LiInst::new(REG_A0.into(), (3141592653589793).into()).into());
+        Block::post_split_li(&mut bb0).unwrap();
+        let bb0_asm = bb0.gen_asm();
+        let bb1_asm = bb1.gen_asm();
+        // 45716 << 12 = 187252736
+        // 187252736 + 776 = 187253514
+        // 187253514 << 12 = 766990393344
+        // 766990393344 + 599 = 766990393943
+        // 766990393943 << 12 = 3141592653590528
+        // 3141592653590528 - 735 = 3141592653589793
+        assert_snapshot!(diff(&bb0_asm, &bb1_asm), @r###"
+        [-] bb0:
+        [-] lui a0,45716
+        [-] addi a0,a0,778
+        [-] slli a0,a0,12
+        [-] addi a0,a0,599
+        [-] slli a0,a0,12
+        [-] addi a0,a0,-735
+        [+] bb1:
+        [+] li a0,3141592653589793
+        "###);
+
+        let mut bb0 = Block::new("bb0".to_string());
+        let mut bb1 = Block::new("bb1".to_string());
+        bb0.push_inst(LiInst::new(REG_A0.into(), (314159265358979323).into()).into());
+        bb1.push_inst(LiInst::new(REG_A0.into(), (314159265358979323).into()).into());
+        Block::post_split_li(&mut bb0).unwrap();
+        let bb0_asm = bb0.gen_asm();
+        let bb1_asm = bb1.gen_asm();
+        // 17858 << 12 = 73146368
+        // 73146368 - 464 = 73145904
+        // 73145904 << 12 = 299605622784
+        // 299605622784 - 150 = 299605622634
+        // 299605622634 << 12 = 1227184630308864
+        // 1227184630308864 - 351 = 1227184630308513
+        // 1227184630308513 << 8 = 314159265358979328
+        // 314159265358979328 - 5 = 314159265358979323
+        assert_snapshot!(diff(&bb0_asm, &bb1_asm), @r###"
+        [-] bb0:
+        [-] lui a0,17858
+        [-] addi a0,a0,-464
+        [-] slli a0,a0,12
+        [-] addi a0,a0,-150
+        [-] slli a0,a0,12
+        [-] addi a0,a0,-351
+        [-] slli a0,a0,8
+        [-] addi a0,a0,-5
+        [+] bb1:
+        [+] li a0,314159265358979323
+        "###);
     }
 }
