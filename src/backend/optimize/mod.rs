@@ -7,7 +7,9 @@ pub mod analysis;
 #[allow(unused)]
 pub mod inst_combine;
 
-pub mod pre_ra_inst_split;
+pub mod pre_inst_split;
+
+pub mod post_inst_split;
 
 pub mod schedule;
 
@@ -54,11 +56,13 @@ pub fn optimize_func(func: &mut Func) -> Result<()> {
     inst_combine::handle_inst_combine(func)?;
 
     // inst split? 将一条指令拆分成多条
-    pre_ra_inst_split::pre_ra_handle_inst_split(func)?;
+    pre_inst_split::handle_mul_div_opt(func)?;
 
     phisicalize::handle_illegal_inst(func)?;
 
     phisicalize::handle_long_jump(func, &REG_T0, 20_0000);
+
+    pre_inst_split::handle_pre_split_li(func)?;
 
     fprintln!("log/after_inst_scheduling.s", "{}", func.gen_asm());
     // register allocation
@@ -72,6 +76,10 @@ pub fn optimize_func(func: &mut Func) -> Result<()> {
     stack::handle_stack(func)?;
 
     block_reorder::handle_single_jmp(func)?;
+
+    fprintln!("log/before_split_li.s", "{}", func.gen_asm());
+    post_inst_split::post_handle_inst_split(func)?;
+    fprintln!("log/after_split_li.s", "{}", func.gen_asm());
 
     // inst scheduling
     schedule::handle_inst_scheduling(func)?;
