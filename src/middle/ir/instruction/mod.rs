@@ -117,8 +117,6 @@ pub trait Instruction: Display {
     }
 
     /// Set the operand of cur inst by index and operand (safe and interface).
-    /// If there are two identical inst operands, they must all be overwritten,
-    /// otherwise the use-def chain will be broken.
     ///
     /// # Panics
     /// It will panic with index out of range!
@@ -129,7 +127,7 @@ pub trait Instruction: Display {
         }
     }
 
-    /// Replace operands to another.
+    /// Replace all occurence of `from` to `to`.
     #[inline]
     fn replace_operand(&mut self, from: &Operand, to: &Operand) {
         unsafe {
@@ -497,25 +495,33 @@ impl InstManager {
 impl InstManager {
     /// # Safety
     ///
-    /// If index is out of bounds, the function will panic.
-    pub unsafe fn set_operand(&mut self, index: usize, operand: Operand) {
-        match self.operand[index] {
+    /// FIXME: explain why it is unsafe,and describe the safety requirements
+    pub unsafe fn set_operand(&mut self, index: usize, new_op: Operand) {
+        let old_op = std::mem::replace(&mut self.operand[index], new_op.clone());
+        match old_op {
             Operand::Instruction(mut inst) => {
-                inst.get_user_mut().retain(|x| x != &self.self_ptr.unwrap());
+                inst.get_user()
+                    .iter()
+                    .position(|x| x.get_id() == self.id.unwrap())
+                    .map(|index| inst.get_user_mut().remove(index));
             }
             Operand::Parameter(mut param) => {
                 param
-                    .get_user_mut()
-                    .retain(|x| x != &self.self_ptr.unwrap());
+                    .get_user()
+                    .iter()
+                    .position(|x| x.get_id() == self.id.unwrap())
+                    .map(|index| param.get_user_mut().remove(index));
             }
             Operand::Global(mut global) => {
                 global
-                    .get_user_mut()
-                    .retain(|x| x != &self.self_ptr.unwrap());
+                    .get_user()
+                    .iter()
+                    .position(|x| x.get_id() == self.id.unwrap())
+                    .map(|index| global.get_user_mut().remove(index));
             }
             _ => {}
         }
-        match operand {
+        match new_op {
             Operand::Instruction(mut inst) => {
                 inst.get_user_mut().push(self.self_ptr.unwrap());
             }
@@ -527,7 +533,6 @@ impl InstManager {
             }
             _ => {}
         }
-        self.operand[index] = operand;
     }
 
     /// # Safety
@@ -586,48 +591,6 @@ impl InstManager {
             _ => {}
         }
         self.operand.push(operand);
-    }
-
-    /// # Safety
-    ///
-    /// FIXME: explain why it is unsafe,and describe the safety requirements
-    pub unsafe fn replace_operand_at(&mut self, index: usize, new_op: Operand) {
-        let old_op = std::mem::replace(&mut self.operand[index], new_op.clone());
-        match old_op {
-            Operand::Instruction(mut inst) => {
-                inst.get_user()
-                    .iter()
-                    .position(|x| x.get_id() == self.id.unwrap())
-                    .map(|index| inst.get_user_mut().remove(index));
-            }
-            Operand::Parameter(mut param) => {
-                param
-                    .get_user()
-                    .iter()
-                    .position(|x| x.get_id() == self.id.unwrap())
-                    .map(|index| param.get_user_mut().remove(index));
-            }
-            Operand::Global(mut global) => {
-                global
-                    .get_user()
-                    .iter()
-                    .position(|x| x.get_id() == self.id.unwrap())
-                    .map(|index| global.get_user_mut().remove(index));
-            }
-            _ => {}
-        }
-        match new_op {
-            Operand::Instruction(mut inst) => {
-                inst.get_user_mut().push(self.self_ptr.unwrap());
-            }
-            Operand::Parameter(mut param) => {
-                param.add_user(self.self_ptr.unwrap());
-            }
-            Operand::Global(mut global) => {
-                global.add_user(self.self_ptr.unwrap());
-            }
-            _ => {}
-        }
     }
 
     /// # Safety
