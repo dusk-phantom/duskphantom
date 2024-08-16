@@ -289,7 +289,7 @@ impl Phi {
     }
 
     /// Replace incoming bb from `pos` to `bb`.
-    /// TODO: rename this function to `replace_incoming_bb`.
+    /// TODO: rename this function to `set_incoming_bb`.
     pub fn replace_incoming_value(&mut self, pos: BBPtr, bb: BBPtr) {
         let mut changed = false;
         for (_, pred) in &mut self.incoming_values {
@@ -308,7 +308,7 @@ impl Phi {
     }
 
     /// Replace incoming value from `pos` to `op`.
-    /// TODO: rename this function to `replace_incoming_value`.
+    /// TODO: rename this function to `set_incoming_value`.
     ///
     /// # Panics
     /// Please make sure incoming position exists in this "phi".
@@ -324,7 +324,7 @@ impl Phi {
             }
         }
         unsafe {
-            self.get_manager_mut().replace_operand_at(index, op);
+            self.get_manager_mut().set_operand(index, op);
         }
     }
 
