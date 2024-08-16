@@ -1,8 +1,6 @@
-use crate::utils::vec_util;
-
 use super::*;
 
-pub fn handle_inst_split(func: &mut Func) -> Result<()> {
+pub fn pre_ra_handle_inst_split(func: &mut Func) -> Result<()> {
     Func::mul_div_opt(func)?;
     Func::split_li(func)?;
     Ok(())
