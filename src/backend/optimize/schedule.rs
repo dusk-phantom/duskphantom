@@ -1,5 +1,3 @@
-use std::collections::BTreeSet;
-
 use super::*;
 /// 处理指令调度,将指令重新排序,以便于后续的优化
 pub fn handle_inst_scheduling(func: &mut Func) -> Result<()> {
@@ -42,7 +40,7 @@ fn insts_scheduling(insts: &[Inst]) -> Result<Vec<InstID>> {
         for state in queue.iter_mut() {
             state.cnt -= 1;
             if state.cnt == 0 {
-                graph.del_node(state.def).with_context(|| context!());
+                graph.del_node(state.def).with_context(|| context!())?;
             }
         }
 
@@ -260,7 +258,7 @@ impl<'a> Graph<'a> {
         // 处理控制流指令
         // branch -> jmp
         // jmp / call / ret
-        let mut inst_len = insts.len();
+        let mut inst_len;
         let last = if !insts.is_empty() {
             // 判断最后一条指令
             match insts[insts.len() - 1] {
@@ -534,6 +532,7 @@ impl<'a> Graph<'a> {
 
 #[cfg(test)]
 impl<'a> Graph<'a> {
+    #[allow(dead_code)]
     pub fn gen_inst_dependency_graph_dot(&self) -> String {
         let mut dot = String::new();
         dot.push_str("digraph G {\n");
@@ -559,7 +558,6 @@ impl<'a> Graph<'a> {
 
 #[cfg(test)]
 mod tests {
-    use insta::assert_debug_snapshot;
 
     use super::*;
 
@@ -678,7 +676,7 @@ mod tests {
     fn debug_schedule() {
         let f = construct_func();
         let bb1 = f.entry();
-        let new_insts = {
+        let _new_insts = {
             let insts = bb1.insts().clone();
             insts_scheduling(&insts).unwrap()
         };
