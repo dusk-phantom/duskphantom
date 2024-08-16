@@ -1,12 +1,15 @@
 use std::collections::{HashMap, HashSet};
 
+use anyhow::{anyhow, Context, Result};
+
 use crate::{
     backend::from_self::downcast_ref,
+    context,
     middle::{
         analysis::dominator_tree::DominatorTree,
         ir::{
             instruction::{misc_inst::Call, InstType},
-            BBPtr, FunPtr, InstPtr,
+            BBPtr, Constant, FunPtr, InstPtr, Operand,
         },
         Program,
     },
@@ -64,6 +67,81 @@ impl<'a> MemorySSA<'a> {
         self.node_to_user.get(&node).cloned().unwrap_or_default()
     }
 
+    /// Assume `src` writes memory, predict content read from `dst`.
+    pub fn predict_read(
+        &self,
+        src: NodePtr,
+        dst: InstPtr,
+        func: FunPtr,
+    ) -> Result<Option<Operand>> {
+        let use_range = &self
+            .effect_analysis
+            .inst_effect
+            .get(&dst)
+            .ok_or_else(|| anyhow!("{} effect not found", dst.gen_llvm_ir()))
+            .with_context(|| context!())?
+            .use_range;
+        match *src {
+            Node::Entry(_) => {
+                // In main function if read from entry, load from global variable initializer
+                if func.is_main() {
+                    if let Some(ptr) = use_range.get_single() {
+                        if let Some(op) = readonly_deref(&ptr, vec![Some(0)]) {
+                            return Ok(Some(op));
+                        }
+                    }
+                }
+                Ok(None)
+            }
+            Node::Normal(_, _, src, inst) => {
+                let def_range = &self
+                    .effect_analysis
+                    .inst_effect
+                    .get(&inst)
+                    .ok_or_else(|| anyhow!("{} effect not found", inst.gen_llvm_ir()))
+                    .with_context(|| context!())?
+                    .def_range;
+
+                // If range does not alias, recurse into sub-node
+                if !def_range.can_alias(use_range) {
+                    if let Some(src) = src {
+                        return self.predict_read(src, dst, func);
+                    }
+                    return Err(anyhow!("{} is not MemoryDef", inst.gen_llvm_ir()))
+                        .with_context(|| context!());
+                }
+
+                // If MemoryDef is store, return store operand if it's exact hit
+                // TODO check equality with GVN
+                if inst.get_type() == InstType::Store {
+                    if def_range == use_range {
+                        let store_op = inst
+                            .get_operand()
+                            .first()
+                            .ok_or_else(|| anyhow!("{} should be store", inst.gen_llvm_ir()))
+                            .with_context(|| context!())?;
+                        return Ok(Some(store_op.clone()));
+                    }
+                    return Ok(None);
+                }
+
+                // If MemoryDef is memset, replace with constant
+                // (we assume this memset sets 0 and is large enough)
+                if inst.get_type() == InstType::Call {
+                    let call = downcast_ref::<Call>(inst.as_ref().as_ref());
+                    if call.func.name.contains("memset") {
+                        return Ok(Some(Operand::Constant(0.into())));
+                    }
+                }
+                Ok(None)
+            }
+            Node::Phi(_, _, _) => {
+                // TODO phi translation
+                Ok(None)
+            }
+        }
+    }
+
     /// Dump MemorySSA result to string.
     pub fn dump(&self) -> String {
         let mut result = String::new();
@@ -104,7 +182,7 @@ impl<'a> MemorySSA<'a> {
     pub fn dump_node(&self, node: NodePtr) -> String {
         match node.as_ref() {
             Node::Entry(id) => format!("; {} (liveOnEntry)", id),
-            Node::Normal(id, used_node, def_node, _, _) => {
+            Node::Normal(id, used_node, def_node, _) => {
                 let mut result: Vec<String> = Vec::new();
                 if let Some(used_node) = used_node {
                     result.push(format!("; MemoryUse({})", used_node.get_id()));
@@ -191,8 +269,8 @@ impl<'a> MemorySSA<'a> {
                 let def_range = effect.def_range.clone();
                 let use_range = effect.use_range.clone();
                 let def_node = range_to_node.get_def(&def_range);
-                let (used_node, linear) = range_to_node.get_use(&use_range);
-                let new_node = self.create_normal_node(used_node, def_node, inst, linear);
+                let used_node = range_to_node.get_use(&use_range);
+                let new_node = self.create_normal_node(used_node, def_node, inst);
                 range_to_node.insert(def_range, new_node);
             }
         }
@@ -216,11 +294,8 @@ impl<'a> MemorySSA<'a> {
         used_node: Option<NodePtr>,
         def_node: Option<NodePtr>,
         inst: InstPtr,
-        linear: bool,
     ) -> NodePtr {
-        let node = self
-            .builder
-            .get_normal_node(used_node, def_node, inst, linear);
+        let node = self.builder.get_normal_node(used_node, def_node, inst);
         self.inst_to_node.insert(inst, node);
         if let Some(used_node) = used_node {
             self.node_to_user.entry(used_node).or_default().insert(node);
@@ -306,16 +381,9 @@ impl MemorySSABuilder {
         used_node: Option<NodePtr>,
         def_node: Option<NodePtr>,
         inst: InstPtr,
-        linear: bool,
     ) -> NodePtr {
         let next_counter = self.next_counter();
-        self.new_node(Node::Normal(
-            next_counter,
-            used_node,
-            def_node,
-            inst,
-            linear,
-        ))
+        self.new_node(Node::Normal(next_counter, used_node, def_node, inst))
     }
 
     /// Get a phi node.
@@ -331,9 +399,8 @@ pub enum Node {
     /// Entry(id) represents the memory state at the beginning of the function.
     Entry(usize),
 
-    /// Normal(id, used_node, def_node, inst, linear) represents a memory state after an instruction.
-    /// For a MemoryUse, if linear flag is true, it guarantees using used_node.
-    Normal(usize, Option<NodePtr>, Option<NodePtr>, InstPtr, bool),
+    /// Normal(id, used_node, def_node, inst) represents a memory state after an instruction.
+    Normal(usize, Option<NodePtr>, Option<NodePtr>, InstPtr),
 
     /// Phi(id, args, range) represents a phi node.
     Phi(usize, Vec<(BBPtr, NodePtr)>, EffectRange),
@@ -343,7 +410,7 @@ impl Node {
     /// Get instruction if it's a normal node.
     pub fn get_inst(&self) -> Option<InstPtr> {
         match self {
-            Node::Normal(_, _, _, inst, _) => Some(*inst),
+            Node::Normal(_, _, _, inst) => Some(*inst),
             _ => None,
         }
     }
@@ -352,7 +419,7 @@ impl Node {
     pub fn get_id(&self) -> usize {
         match self {
             Node::Entry(id) => *id,
-            Node::Normal(id, _, _, _, _) => *id,
+            Node::Normal(id, _, _, _) => *id,
             Node::Phi(id, _, _) => *id,
         }
     }
@@ -360,7 +427,7 @@ impl Node {
     /// Get used nodes.
     pub fn get_used_node(&self) -> Vec<NodePtr> {
         match self {
-            Node::Normal(_, use_node, def_node, _, _) => {
+            Node::Normal(_, use_node, def_node, _) => {
                 let mut result = Vec::new();
                 if let Some(node) = use_node {
                     result.push(*node);
@@ -373,24 +440,6 @@ impl Node {
             Node::Phi(_, args, _) => args.iter().map(|(_, node)| *node).collect(),
             _ => Vec::new(),
         }
-    }
-
-    /// Check if node is memset.
-    fn is_memset(&self) -> bool {
-        self.get_inst()
-            .map(|inst| {
-                inst.get_type() == InstType::Call
-                    && downcast_ref::<Call>(inst.as_ref().as_ref())
-                        .func
-                        .name
-                        .contains("memset")
-            })
-            .unwrap_or(false)
-    }
-
-    /// Check if node is entry.
-    fn is_entry(&self) -> bool {
-        matches!(self, Node::Entry(_))
     }
 
     /// Add an argument to a phi node.
@@ -505,18 +554,17 @@ impl<'a> RangeToNode<'a> {
     }
 
     /// Get an element from all frames with use range.
-    /// Returns the element, and if the hit is exact hit.
-    pub fn get_use(&self, use_range: &EffectRange) -> (Option<NodePtr>, bool) {
+    pub fn get_use(&self, use_range: &EffectRange) -> Option<NodePtr> {
         if use_range.is_empty() {
-            return (None, false);
+            return None;
         }
         let mut map = self;
         loop {
             match map {
                 Self::Root(m) => return m.get_use(use_range),
                 Self::Leaf(m, parent) => {
-                    if let (Some(v), l) = m.get_use(use_range) {
-                        return (Some(v), l);
+                    if let Some(v) = m.get_use(use_range) {
+                        return Some(v);
                     }
                     map = parent;
                 }
@@ -547,21 +595,88 @@ impl RangeToNodeFrame {
     }
 
     /// Get an element from the frame with given use range.
-    /// Returns the element, and if the hit is predictable.
-    ///
-    /// Criterion for predictable is:
-    /// - If effect range features only one variable, it's predictable.
-    /// - If store node is memset, it's predictable because we assume memset makes everything zero.
-    /// - If store node is entry, it's predictable so that load gvar in main function can reduce to constant.
-    pub fn get_use(&self, use_range: &EffectRange) -> (Option<NodePtr>, bool) {
+    pub fn get_use(&self, use_range: &EffectRange) -> Option<NodePtr> {
         for (key, value) in self.0.iter().rev() {
             if key.can_alias(use_range) {
-                return (
-                    Some(*value),
-                    key == use_range || value.is_memset() || value.is_entry(),
-                );
+                return Some(*value);
             }
         }
-        (None, false)
+        None
+    }
+}
+
+/// Deref readonly array operand with maybe-constant indices.
+fn readonly_deref(op: &Operand, mut index: Vec<Option<i32>>) -> Option<Operand> {
+    match op {
+        Operand::Global(gvar) => {
+            let mut val = &gvar.initializer;
+
+            // For a[0][1][2], it translates to something like `gep (gep a, 0, 0), 0, 1, 2`
+            // Calling `readonly_deref` on it will first push `2, 1` to index array, and then push `0 + 0, 0` (reversed!)
+            // To get the final value, we iterate the index array in reverse order
+            // The last index is skipped because it moves the base pointer, that's not valid for global var
+            for i in index.iter().rev().skip(1) {
+                if let Constant::Array(arr) = val {
+                    if let Some(i) = i {
+                        if let Some(element) = arr.get(*i as usize) {
+                            val = element;
+                        } else {
+                            return None;
+                        }
+                    } else {
+                        return None;
+                    }
+                } else if let Constant::Zero(_) = val {
+                    return Some(Operand::Constant(0.into()));
+                } else {
+                    return None;
+                }
+            }
+            Some(val.clone().into())
+        }
+        Operand::Instruction(inst) => {
+            if inst.get_type() == InstType::GetElementPtr {
+                // For example, if we have `index = [out_ix1, out_ix0]`, and `inst = gep %ptr, ix0, ix1, ix2`
+                // We would try to combine `ix2` with `out_ix0` first, so that index is `[out_ix1, out_ix0 + ix2]`
+                // The index array is in reverse order, and will be read reversed when indexing array
+                let last_const = if let (Some(Some(i)), Some(Operand::Constant(Constant::Int(j)))) =
+                    (index.last_mut(), inst.get_operand().last())
+                {
+                    *i += *j;
+                    true
+                } else {
+                    false
+                };
+
+                // If there is non-constant in last index, set it to None
+                if !last_const {
+                    if let Some(i) = index.last_mut() {
+                        *i = None;
+                    }
+                }
+
+                // Add `ix1, ix0` to index array, so that it becomes `[out_ix1, out_ix0 + ix2, ix1, ix0]`
+                index.extend(
+                    inst.get_operand()
+                        .iter()
+                        .skip(1)
+                        .rev()
+                        .skip(1)
+                        .cloned()
+                        .map(|op| {
+                            if let Operand::Constant(Constant::Int(i)) = op {
+                                Some(i)
+                            } else {
+                                None
+                            }
+                        }),
+                );
+
+                // Recurse into sub-expression
+                return readonly_deref(inst.get_operand().first().unwrap(), index);
+            }
+            None
+        }
+        _ => None,
     }
 }
