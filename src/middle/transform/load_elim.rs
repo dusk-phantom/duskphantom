@@ -1,16 +1,9 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::Result;
 
-use crate::{
-    backend::from_self::downcast_ref,
-    context,
-    middle::{
-        analysis::memory_ssa::{MemorySSA, Node},
-        ir::{
-            instruction::{misc_inst::Call, InstType},
-            Constant, InstPtr, Operand,
-        },
-        Program,
-    },
+use crate::middle::{
+    analysis::memory_ssa::{MemorySSA, Node},
+    ir::{instruction::InstType, FunPtr, InstPtr},
+    Program,
 };
 
 use super::Transform;
@@ -38,13 +31,13 @@ impl<'a, 'b> Transform for LoadElim<'a, 'b> {
 
     fn run(&mut self) -> Result<bool> {
         let mut changed = false;
-        for func in self.program.module.functions.clone().iter() {
+        for func in self.program.module.functions.clone() {
             if func.is_lib() {
                 continue;
             }
             for bb in func.rpo_iter() {
                 for inst in bb.iter() {
-                    changed |= self.process_inst(inst, func.is_main())?;
+                    changed |= self.process_inst(inst, func)?;
                 }
             }
         }
@@ -60,151 +53,31 @@ impl<'a, 'b> LoadElim<'a, 'b> {
         }
     }
 
-    fn process_inst(&mut self, mut load_inst: InstPtr, is_main: bool) -> Result<bool> {
+    fn process_inst(&mut self, mut inst: InstPtr, func: FunPtr) -> Result<bool> {
         // Instruction must be load (instead of function call), otherwise it can't be optimized
-        if load_inst.get_type() != InstType::Load {
+        if inst.get_type() != InstType::Load {
             return Ok(false);
         }
 
         // Get corresponding MemorySSA node
-        let Some(load_node) = self.memory_ssa.get_inst_node(load_inst) else {
+        let Some(load_node) = self.memory_ssa.get_inst_node(inst) else {
             return Ok(false);
         };
 
-        // It should be a predictable normal node (not entry or phi)
-        // - when `a[1] = 3`, `load a[x]` is not predictable
-        //   - because `x` may or may not be `1`
-        // - `load a[1]` is predictable
-        // - when `int a[3] = {}` (memset), `load a[x]` is predictable
-        let Node::Normal(_, used_node, _, _, true) = load_node.as_ref() else {
+        // It should be a MemoryUse node (not entry or phi)
+        let Node::Normal(_, Some(src), _, _) = load_node.as_ref() else {
             return Ok(false);
         };
 
-        // MemoryUse should use some node
-        let Some(store_node) = used_node else {
-            return Ok(false);
-        };
+        // Predict value in MemorySSA
+        let predicted = self.memory_ssa.predict_read(*src, inst, func)?;
 
-        // In main function if read from entry, load from global variable initializer
-        if is_main {
-            if let Node::Entry(_) = store_node.as_ref() {
-                let load_op = load_inst
-                    .get_operand()
-                    .first()
-                    .ok_or_else(|| anyhow!("{} should be load", load_inst))
-                    .with_context(|| context!())?;
-                if let Some(op) = readonly_deref(load_op, vec![Some(0)]) {
-                    load_inst.replace_self(&op);
-                    self.memory_ssa.remove_node(load_node);
-                    return Ok(true);
-                }
-            }
-        }
-
-        // The node used by MemoryUse should be a MemoryDef
-        let Node::Normal(_, _, _, def_inst, _) = store_node.as_ref() else {
-            return Ok(false);
-        };
-
-        // If MemoryDef is store, replace with store operand
-        if def_inst.get_type() == InstType::Store {
-            let store_op = def_inst
-                .get_operand()
-                .first()
-                .ok_or_else(|| anyhow!("{} should be store", def_inst))
-                .with_context(|| context!())?;
-            load_inst.replace_self(store_op);
+        // Replace if value can be predicted
+        if let Some(predicted) = predicted {
+            inst.replace_self(&predicted);
             self.memory_ssa.remove_node(load_node);
             return Ok(true);
         }
-
-        // If MemoryDef is memset, replace with constant
-        // (we assume this memset sets 0 and is large enough)
-        if def_inst.get_type() == InstType::Call {
-            let call = downcast_ref::<Call>(def_inst.as_ref().as_ref());
-            if call.func.name.contains("memset") {
-                let memset_op = &Operand::Constant(0.into());
-                load_inst.replace_self(memset_op);
-                self.memory_ssa.remove_node(load_node);
-                return Ok(true);
-            }
-        }
         Ok(false)
-    }
-}
-
-/// Deref readonly array operand with maybe-constant indices.
-fn readonly_deref(op: &Operand, mut index: Vec<Option<i32>>) -> Option<Operand> {
-    match op {
-        Operand::Global(gvar) => {
-            let mut val = &gvar.initializer;
-
-            // For a[0][1][2], it translates to something like `gep (gep a, 0, 0), 0, 1, 2`
-            // Calling `readonly_deref` on it will first push `2, 1` to index array, and then push `0 + 0, 0` (reversed!)
-            // To get the final value, we iterate the index array in reverse order
-            // The last index is skipped because it moves the base pointer, that's not valid for global var
-            for i in index.iter().rev().skip(1) {
-                if let Constant::Array(arr) = val {
-                    if let Some(i) = i {
-                        if let Some(element) = arr.get(*i as usize) {
-                            val = element;
-                        } else {
-                            return None;
-                        }
-                    } else {
-                        return None;
-                    }
-                } else if let Constant::Zero(_) = val {
-                    return Some(Operand::Constant(0.into()));
-                } else {
-                    return None;
-                }
-            }
-            Some(val.clone().into())
-        }
-        Operand::Instruction(inst) => {
-            if inst.get_type() == InstType::GetElementPtr {
-                // For example, if we have `index = [out_ix1, out_ix0]`, and `inst = gep %ptr, ix0, ix1, ix2`
-                // We would try to combine `ix2` with `out_ix0` first, so that index is `[out_ix1, out_ix0 + ix2]`
-                // The index array is in reverse order, and will be read reversed when indexing array
-                let last_const = if let (Some(Some(i)), Some(Operand::Constant(Constant::Int(j)))) =
-                    (index.last_mut(), inst.get_operand().last())
-                {
-                    *i += *j;
-                    true
-                } else {
-                    false
-                };
-
-                // If there is non-constant in last index, set it to None
-                if !last_const {
-                    if let Some(i) = index.last_mut() {
-                        *i = None;
-                    }
-                }
-
-                // Add `ix1, ix0` to index array, so that it becomes `[out_ix1, out_ix0 + ix2, ix1, ix0]`
-                index.extend(
-                    inst.get_operand()
-                        .iter()
-                        .skip(1)
-                        .rev()
-                        .skip(1)
-                        .cloned()
-                        .map(|op| {
-                            if let Operand::Constant(Constant::Int(i)) = op {
-                                Some(i)
-                            } else {
-                                None
-                            }
-                        }),
-                );
-
-                // Recurse into sub-expression
-                return readonly_deref(inst.get_operand().first().unwrap(), index);
-            }
-            None
-        }
-        _ => None,
     }
 }

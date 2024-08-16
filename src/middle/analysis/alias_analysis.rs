@@ -69,6 +69,19 @@ impl EffectRange {
         }
     }
 
+    pub fn get_single(&self) -> Option<Operand> {
+        match self {
+            EffectRange::All => None,
+            EffectRange::Some(set) => {
+                if set.len() == 1 {
+                    set.iter().next().cloned()
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
     pub fn dump(&self) -> String {
         match self {
             EffectRange::All => "all".to_string(),
