@@ -4,7 +4,7 @@ use super::*;
 
 pub fn handle_inst_split(func: &mut Func) -> Result<()> {
     Func::mul_div_opt(func)?;
-    // Func::split_li(func)?;
+    Func::split_li(func)?;
     Ok(())
 }
 
@@ -46,12 +46,13 @@ impl Block {
                     new_insts.push(li.clone().into());
                 } else {
                     let imm = *imm;
+                    let dst = li.dst().reg().with_context(|| context!())?;
                     if (-2 ^ 31..2 ^ 31).contains(&imm) {
-                        Block::split_li32()?;
+                        Block::split_li32(imm, dst, &mut new_insts, r_g)?;
                     } else if (-2 ^ 43..2 ^ 43).contains(&imm) {
-                        Block::split_li44()?;
+                        Block::split_li44(imm, dst, &mut new_insts, r_g)?;
                     } else {
-                        Block::split_li64()?;
+                        Block::split_li64(imm, dst, &mut new_insts, r_g)?;
                     }
                 }
             } else {
@@ -63,13 +64,80 @@ impl Block {
         Ok(())
     }
 
-    fn split_li32() -> Result<()> {
+    fn split_li32(
+        imm: i64,
+        dst: Reg,
+        new_insts: &mut Vec<Inst>,
+        r_g: &mut RegGenerator,
+    ) -> Result<()> {
+        let hi = (imm + 0x0800) >> 12; // 20
+        let lo = (imm << 52) >> 52; // 12
+        if lo == 0 {
+            let lui = LuiInst::new(dst.into(), hi.into());
+            new_insts.push(lui.into());
+        } else {
+            let _lui = r_g.gen_virtual_usual_reg();
+            let lui = LuiInst::new(_lui.into(), hi.into());
+            let addi = AddInst::new(dst.into(), _lui.into(), lo.into());
+            new_insts.push(lui.into());
+            new_insts.push(addi.into());
+        }
         Ok(())
     }
-    fn split_li44() -> Result<()> {
+    fn split_li44(
+        imm: i64,
+        dst: Reg,
+        new_insts: &mut Vec<Inst>,
+        r_g: &mut RegGenerator,
+    ) -> Result<()> {
+        let hi = (imm + 0x0000_8000_0000) >> 32; // 12
+        let lo = (imm << 32) >> 32; // 32
+        if lo == 0 {
+            let addi_ = r_g.gen_virtual_usual_reg();
+            let addi = AddInst::new(addi_.into(), REG_ZERO.into(), hi.into());
+            let slli = SllInst::new(dst.into(), addi_.into(), (32).into()).with_8byte();
+            new_insts.push(addi.into());
+            new_insts.push(slli.into());
+        } else {
+            let prepare = r_g.gen_virtual_usual_reg();
+            Block::split_li32(lo, prepare, new_insts, r_g)?;
+            let _slli = r_g.gen_virtual_usual_reg();
+            let addi_ = r_g.gen_virtual_usual_reg();
+            let addi = AddInst::new(addi_.into(), REG_ZERO.into(), hi.into());
+            let slli = SllInst::new(_slli.into(), addi_.into(), (32).into()).with_8byte();
+            let add = AddInst::new(dst.into(), _slli.into(), prepare.into());
+            new_insts.push(addi.into());
+            new_insts.push(slli.into());
+            new_insts.push(add.into());
+        }
         Ok(())
     }
-    fn split_li64() -> Result<()> {
+    fn split_li64(
+        imm: i64,
+        dst: Reg,
+        new_insts: &mut Vec<Inst>,
+        r_g: &mut RegGenerator,
+    ) -> Result<()> {
+        let hi = (imm + 0x0800_0000_0000) >> 44; // 20
+        let lo = (imm << 20) >> 20; // 44
+        if lo == 0 {
+            let lui_ = r_g.gen_virtual_usual_reg();
+            let lui = LuiInst::new(lui_.into(), hi.into());
+            let slli = SllInst::new(dst.into(), lui_.into(), (32).into()).with_8byte();
+            new_insts.push(lui.into());
+            new_insts.push(slli.into());
+        } else {
+            let prepare = r_g.gen_virtual_usual_reg();
+            Block::split_li44(lo, prepare, new_insts, r_g)?;
+            let lui_ = r_g.gen_virtual_usual_reg();
+            let lui = LuiInst::new(lui_.into(), hi.into());
+            let _slli = r_g.gen_virtual_usual_reg();
+            let slli = SllInst::new(_slli.into(), lui_.into(), (32).into()).with_8byte();
+            let add = AddInst::new(dst.into(), _slli.into(), prepare.into());
+            new_insts.push(lui.into());
+            new_insts.push(slli.into());
+            new_insts.push(add.into());
+        }
         Ok(())
     }
 }
