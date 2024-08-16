@@ -7,10 +7,8 @@ pub mod analysis;
 #[allow(unused)]
 pub mod inst_combine;
 
-#[allow(unused)]
-pub mod inst_split;
+pub mod pre_ra_inst_split;
 
-#[allow(unused)]
 pub mod schedule;
 
 #[allow(unused)]
@@ -56,7 +54,7 @@ pub fn optimize_func(func: &mut Func) -> Result<()> {
     inst_combine::handle_inst_combine(func)?;
 
     // inst split? 将一条指令拆分成多条
-    inst_split::handle_inst_split(func)?;
+    pre_ra_inst_split::pre_ra_handle_inst_split(func)?;
 
     phisicalize::handle_illegal_inst(func)?;
 
