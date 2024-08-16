@@ -1,4 +1,7 @@
 use anyhow::Context;
+
+#[cfg(not(feature = "gen_virtual_asm"))]
+use backend::irs::checker::ProgramChecker;
 use errors::CompilerError;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
@@ -14,8 +17,6 @@ pub mod errors;
 pub mod frontend;
 pub mod middle;
 pub mod utils;
-#[cfg(not(feature = "gen_virtual_asm"))]
-use backend::checker;
 
 use clap::arg;
 
@@ -49,7 +50,7 @@ pub fn compile(
 
     // check valid
     #[cfg(not(feature = "gen_virtual_asm"))]
-    checker::ProgramChecker::check_valid(&checker::Riscv, &program);
+    assert!(backend::irs::checker::Riscv.check_prog(&program));
 
     let asm = program.gen_asm();
     output(asm, output_path, asm_flag)
@@ -83,7 +84,7 @@ pub fn compile_clang(
     }
     // check valid
     #[cfg(not(feature = "gen_virtual_asm"))]
-    checker::ProgramChecker::check_valid(&checker::Riscv, &program);
+    assert!(backend::irs::checker::Riscv.check_prog(&program));
 
     let asm = program.gen_asm();
     output(asm, output_path, asm_flag)

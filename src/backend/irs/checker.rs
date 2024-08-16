@@ -4,35 +4,44 @@ use super::*;
 pub trait IRChecker: ProgramChecker {}
 
 pub trait ProgramChecker: ModuleChecker {
-    fn check_valid(&self, program: &Program) -> bool;
+    #[allow(unused)]
+    fn check_prog(&self, program: &Program) -> bool {
+        false
+    }
 }
 
 pub trait ModuleChecker: VarChecker + FuncChecker {
-    fn check_valid(&self, module: &Module) -> bool;
+    #[allow(unused)]
+    fn check_mdl(&self, module: &Module) -> bool {
+        false
+    }
 }
 
 pub trait VarChecker {
-    fn check_valid(&self, var: &Var) -> bool;
+    #[allow(unused)]
+    fn check_var(&self, var: &Var) -> bool {
+        false
+    }
 }
 
 pub trait FuncChecker: BBChecker {
-    fn check_valid(&self, func: &Func) -> bool;
+    fn check_func(&self, func: &Func) -> bool;
 }
 
 pub trait BBChecker {
-    fn check_valid(&self, bb: &Block) -> bool;
+    fn check_bb(&self, bb: &Block) -> bool;
 }
 pub trait InstChecker {
-    fn check_valid(&self, inst: &Inst) -> bool;
+    fn check_inst(&self, inst: &Inst) -> bool;
 }
 
 pub struct Riscv;
 
 impl IRChecker for Riscv {}
 impl ProgramChecker for Riscv {
-    fn check_valid(&self, program: &Program) -> bool {
+    fn check_prog(&self, program: &Program) -> bool {
         for module in program.modules.iter() {
-            if !ModuleChecker::check_valid(self, module) {
+            if !ModuleChecker::check_mdl(self, module) {
                 return false;
             }
         }
@@ -40,14 +49,14 @@ impl ProgramChecker for Riscv {
     }
 }
 impl ModuleChecker for Riscv {
-    fn check_valid(&self, module: &Module) -> bool {
+    fn check_mdl(&self, module: &Module) -> bool {
         for var in module.global.iter() {
-            if !VarChecker::check_valid(self, var) {
+            if !VarChecker::check_var(self, var) {
                 return false;
             }
         }
         for func in module.funcs.iter() {
-            if !FuncChecker::check_valid(self, func) {
+            if !FuncChecker::check_func(self, func) {
                 return false;
             }
         }
@@ -56,14 +65,14 @@ impl ModuleChecker for Riscv {
 }
 impl VarChecker for Riscv {
     #[allow(unused_variables)]
-    fn check_valid(&self, var: &Var) -> bool {
+    fn check_var(&self, var: &Var) -> bool {
         true
     }
 }
 impl FuncChecker for Riscv {
-    fn check_valid(&self, func: &Func) -> bool {
+    fn check_func(&self, func: &Func) -> bool {
         for bb in func.iter_bbs() {
-            if !BBChecker::check_valid(self, bb) {
+            if !BBChecker::check_bb(self, bb) {
                 return false;
             }
         }
@@ -72,9 +81,9 @@ impl FuncChecker for Riscv {
 }
 
 impl BBChecker for Riscv {
-    fn check_valid(&self, bb: &Block) -> bool {
+    fn check_bb(&self, bb: &Block) -> bool {
         for inst in bb.insts() {
-            if !InstChecker::check_valid(self, inst) {
+            if !InstChecker::check_inst(self, inst) {
                 return false;
             }
         }
@@ -82,7 +91,7 @@ impl BBChecker for Riscv {
     }
 }
 impl InstChecker for Riscv {
-    fn check_valid(&self, inst: &Inst) -> bool {
+    fn check_inst(&self, inst: &Inst) -> bool {
         match inst {
             Inst::Add(add) => self.check_add(add),
             Inst::Sub(sub) => self.check_sub(sub),

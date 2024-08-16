@@ -1,5 +1,4 @@
 mod algebra;
-pub mod checker;
 mod control_flow;
 mod convert;
 mod data_move;
