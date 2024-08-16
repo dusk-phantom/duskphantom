@@ -16,34 +16,60 @@ impl Func {
             .take()
             .ok_or(anyhow!("msg: reg_gener not found"))
             .with_context(|| context!())?;
-
         func.iter_bbs_mut()
             .try_for_each(|bb| Block::mul_div_opt(bb, &mut r_g))?;
-
         func.reg_gener_mut().replace(r_g);
         Ok(())
     }
 
     /// handle li , li
     fn split_li(func: &mut Func) -> Result<()> {
-        for block in func.iter_bbs_mut() {
-            let mut new_insts = Vec::new();
-            for i in block.insts_mut() {
-                if let Inst::Li(li) = i {
-                    let imm = li.src().imm().ok_or_else(|| anyhow!(""))?;
-                    if imm.in_limit_12() {
-                        new_insts.push(li.clone().into());
-                    } else {
-                        // FIXME: 这里需要拆分成多条指令
-                        todo!();
-                    }
-                } else {
-                    new_insts.push(i.clone());
-                }
-            }
-            *block.insts_mut() = new_insts;
-        }
+        let mut r_g = func
+            .reg_gener_mut()
+            .take()
+            .ok_or(anyhow!("msg: reg_gener not found"))
+            .with_context(|| context!())?;
+        func.iter_bbs_mut()
+            .try_for_each(|bb| Block::split_li(bb, &mut r_g))?;
+        func.reg_gener_mut().replace(r_g);
+        Ok(())
+    }
+}
 
+impl Block {
+    fn split_li(bb: &mut Block, r_g: &mut RegGenerator) -> Result<()> {
+        let mut new_insts = Vec::new();
+        for i in bb.insts_mut() {
+            if let Inst::Li(li) = i {
+                let imm = li.src().imm().ok_or_else(|| anyhow!(""))?;
+                if imm.in_limit_12() {
+                    new_insts.push(li.clone().into());
+                } else {
+                    let imm = *imm;
+                    if (-2 ^ 31..2 ^ 31).contains(&imm) {
+                        Block::split_li32()?;
+                    } else if (-2 ^ 43..2 ^ 43).contains(&imm) {
+                        Block::split_li44()?;
+                    } else {
+                        Block::split_li64()?;
+                    }
+                }
+            } else {
+                // 其他类型的指令就直接穿过
+                new_insts.push(i.clone());
+            }
+        }
+        *bb.insts_mut() = new_insts;
+        Ok(())
+    }
+
+    fn split_li32() -> Result<()> {
+        Ok(())
+    }
+    fn split_li44() -> Result<()> {
+        Ok(())
+    }
+    fn split_li64() -> Result<()> {
         Ok(())
     }
 }
@@ -53,9 +79,9 @@ impl Block {
         let mut new_insts: Vec<Inst> = Vec::new();
         for inst in bb.insts_mut() {
             match inst {
-                Inst::Mul(mul) => Inst::mul_opt(mul, r_g, &mut new_insts),
-                Inst::Div(div) => Inst::div_opt(div, r_g, &mut new_insts),
-                Inst::Rem(rem) => Inst::rem_opt(rem, r_g, &mut new_insts),
+                Inst::Mul(mul) => Block::mul_opt(mul, r_g, &mut new_insts),
+                Inst::Div(div) => Block::div_opt(div, r_g, &mut new_insts),
+                Inst::Rem(rem) => Block::rem_opt(rem, r_g, &mut new_insts),
                 _ => {
                     new_insts.push(inst.clone()); // 这里就是啥也不干
                 }
@@ -64,9 +90,7 @@ impl Block {
         *bb.insts_mut() = new_insts;
         Ok(())
     }
-}
 
-impl Inst {
     /// 如果对 2^n 取余, 可以优化成与操作
     fn rem_opt(rem: &mut RemInst, r_g: &mut RegGenerator, new_insts: &mut Vec<Inst>) {
         if let Operand::Imm(imm) = rem.rhs() {
