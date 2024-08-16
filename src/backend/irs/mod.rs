@@ -5,6 +5,7 @@ pub mod func;
 #[macro_use]
 mod macros;
 
+pub mod checker;
 pub mod instruction;
 pub mod module;
 pub mod operand;

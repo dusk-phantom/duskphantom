@@ -81,7 +81,7 @@ mod tests {
         let sub = SubInst::new(REG_A0.into(), REG_A1.into(), REG_A2.into());
         assert_eq!(sub.gen_asm(), "subw a0,a1,a2");
         let subi = SubInst::new(REG_A0.into(), REG_A1.into(), 1.into());
-        assert!(!checker::InstChecker::check_valid(
+        assert!(!checker::InstChecker::check_inst(
             &checker::Riscv,
             &subi.into()
         ),);
