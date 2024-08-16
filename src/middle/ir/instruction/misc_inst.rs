@@ -287,13 +287,47 @@ impl Phi {
             self.get_manager_mut().remove_operand(index);
         }
     }
-    pub fn replace_incoming_value(&mut self, from: BBPtr, to: BBPtr) {
+
+    /// Replace incoming bb from `pos` to `bb`.
+    /// TODO: rename this function to `replace_incoming_bb`.
+    pub fn replace_incoming_value(&mut self, pos: BBPtr, bb: BBPtr) {
+        let mut changed = false;
         for (_, pred) in &mut self.incoming_values {
-            if *pred == from {
-                *pred = to;
+            if *pred == pos {
+                *pred = bb;
+                changed = true;
             }
         }
+        if !changed {
+            panic!(
+                "{} does not have incoming value from {}",
+                self.gen_llvm_ir(),
+                pos.name
+            );
+        }
     }
+
+    /// Replace incoming value from `pos` to `op`.
+    /// TODO: rename this function to `replace_incoming_value`.
+    ///
+    /// # Panics
+    /// Please make sure incoming position exists in this "phi".
+    pub fn replace_incoming_value_at(&mut self, pos: BBPtr, op: Operand) {
+        let index = self
+            .incoming_values
+            .iter()
+            .position(|(_, pred)| *pred == pos)
+            .unwrap_or_else(|| panic!("{} does not have incoming value from {}", self, pos.name));
+        for (val, pred) in &mut self.incoming_values {
+            if *pred == pos {
+                *val = op.clone();
+            }
+        }
+        unsafe {
+            self.get_manager_mut().replace_operand_at(index, op);
+        }
+    }
+
     pub fn get_incoming_value(&self, bb: BBPtr) -> Option<&Operand> {
         for (val, pred) in &self.incoming_values {
             if *pred == bb {

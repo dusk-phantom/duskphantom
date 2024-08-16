@@ -129,7 +129,7 @@ pub trait Instruction: Display {
         }
     }
 
-    /// Replace operand to another.
+    /// Replace operands to another.
     #[inline]
     fn replace_operand(&mut self, from: &Operand, to: &Operand) {
         unsafe {
@@ -586,6 +586,48 @@ impl InstManager {
             _ => {}
         }
         self.operand.push(operand);
+    }
+
+    /// # Safety
+    ///
+    /// FIXME: explain why it is unsafe,and describe the safety requirements
+    pub unsafe fn replace_operand_at(&mut self, index: usize, new_op: Operand) {
+        let old_op = std::mem::replace(&mut self.operand[index], new_op.clone());
+        match old_op {
+            Operand::Instruction(mut inst) => {
+                inst.get_user()
+                    .iter()
+                    .position(|x| x.get_id() == self.id.unwrap())
+                    .map(|index| inst.get_user_mut().remove(index));
+            }
+            Operand::Parameter(mut param) => {
+                param
+                    .get_user()
+                    .iter()
+                    .position(|x| x.get_id() == self.id.unwrap())
+                    .map(|index| param.get_user_mut().remove(index));
+            }
+            Operand::Global(mut global) => {
+                global
+                    .get_user()
+                    .iter()
+                    .position(|x| x.get_id() == self.id.unwrap())
+                    .map(|index| global.get_user_mut().remove(index));
+            }
+            _ => {}
+        }
+        match new_op {
+            Operand::Instruction(mut inst) => {
+                inst.get_user_mut().push(self.self_ptr.unwrap());
+            }
+            Operand::Parameter(mut param) => {
+                param.add_user(self.self_ptr.unwrap());
+            }
+            Operand::Global(mut global) => {
+                global.add_user(self.self_ptr.unwrap());
+            }
+            _ => {}
+        }
     }
 
     /// # Safety

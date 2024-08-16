@@ -70,6 +70,7 @@ impl<'a> SinkCode<'a> {
         }
 
         // If any user is in the same block, do not sink
+        // TODO even in same BB it can sink as low as possible
         let root = inst
             .get_parent_bb()
             .ok_or_else(|| anyhow!("Instruction {} has no parent BB", inst))
@@ -146,10 +147,23 @@ impl<'a> SinkCode<'a> {
                             new_inst.add_operand(op.clone());
                         }
 
-                        // TODO put as below as possible
-                        succ.clone().push_front(new_inst);
+                        // Get insert position (as low as possible)
+                        let user_in_succ =
+                            block_to_user.get(succ).cloned().unwrap_or(HashSet::new());
+                        let mut frontier = None;
+                        for inst in succ.iter() {
+                            if user_in_succ.contains(&FakeInst::Normal(inst)) {
+                                frontier = Some(inst);
+                                break;
+                            }
+                        }
 
-                        // Replace operand of users
+                        // Insert new instruction and maintain use-def chain
+                        if let Some(mut frontier) = frontier {
+                            frontier.insert_before(new_inst);
+                        } else {
+                            succ.get_last_inst().insert_before(new_inst);
+                        }
                         for mut user in user {
                             user.replace_operand(&inst.into(), &new_inst.into());
                         }
@@ -236,12 +250,7 @@ impl FakeInst {
             }
             FakeInst::Phi(inst, bb) => {
                 let phi = downcast_mut::<Phi>(inst.as_mut().as_mut());
-                for inc in phi.get_incoming_values_mut() {
-                    // Only replace value from corresponding basic block
-                    if inc.1 == *bb {
-                        inc.0 = new.clone();
-                    }
-                }
+                phi.replace_incoming_value_at(*bb, new.clone());
             }
         }
     }

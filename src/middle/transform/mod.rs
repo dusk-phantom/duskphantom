@@ -32,12 +32,26 @@ pub trait Transform {
 
     fn run_and_log(&mut self) -> Result<bool> {
         let time_before = Instant::now();
+        let changed = self.run()?;
+        let elapsed = time_before.elapsed().as_micros();
+        println!(
+            "## Pass {} {}\n\nTime elapsed = {} µs\n",
+            Self::name(),
+            if changed { "[CHANGED]" } else { "" },
+            elapsed,
+        );
+        Ok(changed)
+    }
+
+    #[allow(unused)]
+    fn run_and_debug(&mut self) -> Result<bool> {
+        let time_before = Instant::now();
         let program_before = self.get_program_mut().module.gen_llvm_ir();
         let changed = self.run()?;
-        let elapsed = time_before.elapsed().as_millis();
+        let elapsed = time_before.elapsed().as_micros();
         let program_after = self.get_program_mut().module.gen_llvm_ir();
         println!(
-            "## Pass {}\n\nTime elapsed = {} ms\n\nDiff:\n\n```diff\n{}```\n",
+            "## Pass {}\n\nTime elapsed = {} µs\n\nDiff:\n\n```diff\n{}```\n",
             Self::name(),
             elapsed,
             diff(&program_before, &program_after)
