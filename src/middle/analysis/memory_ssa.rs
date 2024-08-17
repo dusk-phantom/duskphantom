@@ -86,7 +86,7 @@ impl<'a> MemorySSA<'a> {
                 // In main function if read from entry, load from global variable initializer
                 if func.is_main() {
                     if let Some(ptr) = use_range.get_single() {
-                        if let Some(op) = readonly_deref(&ptr, vec![Some(0)]) {
+                        if let Some(op) = readonly_deref(ptr, vec![Some(0)]) {
                             return Ok(Some(op));
                         }
                     }
@@ -205,11 +205,28 @@ impl<'a> MemorySSA<'a> {
     /// Remove a node, update use-def chain.
     ///
     /// # Panics
-    /// If the node is used, it will cause undefined behaviour.
+    /// Do not remove used phi node or entry node with this function!
     pub fn remove_node(&mut self, node: NodePtr) {
         let used_nodes = node.get_used_node();
         for used_node in &used_nodes {
             self.node_to_user.get_mut(used_node).unwrap().remove(&node);
+        }
+
+        // Wire users of this node to the first used node
+        let users = self.get_user(node);
+        for mut user in users {
+            let cloned_user = user;
+            let user_used_nodes = user.get_used_node_mut();
+            for user_used_node in user_used_nodes {
+                if *user_used_node == node {
+                    let used_node = used_nodes[0];
+                    *user_used_node = used_node;
+                    self.node_to_user
+                        .get_mut(&used_node)
+                        .unwrap()
+                        .insert(cloned_user);
+                }
+            }
         }
     }
 
@@ -448,6 +465,25 @@ impl Node {
                 result
             }
             Node::Phi(_, args, _) => args.iter().map(|(_, node)| *node).collect(),
+            _ => Vec::new(),
+        }
+    }
+
+    /// Get mutable used nodes.
+    /// Used nodes contains both use and def nodes.
+    pub fn get_used_node_mut(&mut self) -> Vec<&mut NodePtr> {
+        match self {
+            Node::Normal(_, use_node, def_node, _) => {
+                let mut result = Vec::new();
+                if let Some(node) = use_node {
+                    result.push(node);
+                }
+                if let Some(node) = def_node {
+                    result.push(node);
+                }
+                result
+            }
+            Node::Phi(_, args, _) => args.iter_mut().map(|(_, node)| node).collect(),
             _ => Vec::new(),
         }
     }

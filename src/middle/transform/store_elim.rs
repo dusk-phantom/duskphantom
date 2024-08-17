@@ -60,7 +60,7 @@ impl<'a> StoreElim<'a> {
         }
         if let Some(node) = self.memory_ssa.get_inst_node(inst) {
             if !self.can_delete_node(node) {
-                return Ok(false);
+                return self.try_fuse_store(node);
             }
             self.remove_node(node)?;
         };
@@ -72,7 +72,7 @@ impl<'a> StoreElim<'a> {
     /// This recurses into used nodes of the node.
     fn process_node(&mut self, node: NodePtr) -> Result<bool> {
         if !self.can_delete_node(node) {
-            return Ok(false);
+            return self.try_fuse_store(node);
         }
         if let Some(inst) = node.get_inst() {
             if !self.can_delete_inst(inst) {
@@ -117,5 +117,58 @@ impl<'a> StoreElim<'a> {
             self.process_node(node)?;
         }
         Ok(())
+    }
+
+    /// Attempt to remove overridden store instructions, and fuse them into a single store.
+    fn try_fuse_store(&mut self, node: NodePtr) -> Result<bool> {
+        let Some(inst) = node.get_inst() else {
+            return Ok(false);
+        };
+
+        // Only explicit store can be stored
+        if inst.get_type() != InstType::Store {
+            return Ok(false);
+        }
+
+        // Get store position
+        let store_ptr = inst.get_operand()[1].clone();
+
+        // Traverse all stores upwards MemoryDef chain, get if it's used or overridden
+        let mut used = false;
+        let mut cursor = Some(node);
+        while let Some(curr) = cursor {
+            cursor = None;
+            let mut overridden = false;
+            for user in self.memory_ssa.get_user(curr).clone() {
+                if let Some(user_inst) = user.get_inst() {
+                    if user_inst.get_type() == InstType::Store {
+                        cursor = Some(user);
+                        let override_ptr = user_inst.get_operand()[1].clone();
+
+                        // For store, check if override
+                        if store_ptr == override_ptr {
+                            overridden = true;
+                        }
+                        continue;
+                    }
+                }
+
+                // For load / call / phi, mark the store as used
+                used = true;
+            }
+
+            // Break if used or overridden
+            if used || overridden {
+                break;
+            }
+        }
+
+        // Eliminate store if unused
+        if !used {
+            self.remove_inst(inst)?;
+            self.memory_ssa.remove_node(node);
+            return Ok(true);
+        }
+        Ok(false)
     }
 }

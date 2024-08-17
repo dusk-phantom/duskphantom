@@ -36,13 +36,27 @@ impl Default for EffectRange {
     }
 }
 
-/// Check if two effect range can alias.
 #[allow(unused)]
 impl EffectRange {
+    /// Create an empty effect range.
     pub fn new() -> Self {
         EffectRange::Some(HashSet::new())
     }
 
+    /// Check if `self` contains `another`.
+    pub fn contains(&self, another: &Operand) -> bool {
+        let EffectRange::Some(set) = self else {
+            return false;
+        };
+        for op in set.iter() {
+            if op == another {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Check if two effect ranges can alias.
     pub fn can_alias(&self, another: &EffectRange) -> bool {
         match (self, another) {
             (EffectRange::All, EffectRange::All) => true,
@@ -54,6 +68,7 @@ impl EffectRange {
         }
     }
 
+    /// Merge two effect ranges.
     pub fn merge(&mut self, another: &EffectRange) {
         if let EffectRange::All = another {
             *self = EffectRange::All;
@@ -62,6 +77,7 @@ impl EffectRange {
         }
     }
 
+    /// Check if the effect range is empty.
     pub fn is_empty(&self) -> bool {
         match self {
             EffectRange::All => false,
@@ -69,12 +85,13 @@ impl EffectRange {
         }
     }
 
-    pub fn get_single(&self) -> Option<Operand> {
+    /// Get the only operand if the effect range contains only one operand.
+    pub fn get_single(&self) -> Option<&Operand> {
         match self {
             EffectRange::All => None,
             EffectRange::Some(set) => {
                 if set.len() == 1 {
-                    set.iter().next().cloned()
+                    set.iter().next()
                 } else {
                     None
                 }
@@ -82,6 +99,7 @@ impl EffectRange {
         }
     }
 
+    /// Dump effect range to string.
     pub fn dump(&self) -> String {
         match self {
             EffectRange::All => "all".to_string(),
