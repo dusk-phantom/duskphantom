@@ -224,7 +224,11 @@ impl GenTool {
     pub fn gen_array<T: Data>(name: &str, num_elems: usize, init: &[(usize, T)]) -> String {
         let mut ret = String::with_capacity(128);
         let size_elem: u32 = T::size();
-        ret.push_str(".data\n.align\t3\n");
+        if init.is_empty() {
+            ret.push_str(".bss\n.align\t3\n");
+        } else {
+            ret.push_str(".data\n.align\t3\n");
+        }
         ret.push_str(format!(".globl\t{0}\n", name).as_str());
         ret.push_str(
             format!(
