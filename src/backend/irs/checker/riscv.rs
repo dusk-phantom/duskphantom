@@ -1,39 +1,4 @@
-use var::Var;
-
 use super::*;
-pub trait IRChecker: ProgramChecker {}
-
-pub trait ProgramChecker: ModuleChecker {
-    #[allow(unused)]
-    fn check_prog(&self, program: &Program) -> bool {
-        false
-    }
-}
-
-pub trait ModuleChecker: VarChecker + FuncChecker {
-    #[allow(unused)]
-    fn check_mdl(&self, module: &Module) -> bool {
-        false
-    }
-}
-
-pub trait VarChecker {
-    #[allow(unused)]
-    fn check_var(&self, var: &Var) -> bool {
-        false
-    }
-}
-
-pub trait FuncChecker: BBChecker {
-    fn check_func(&self, func: &Func) -> bool;
-}
-
-pub trait BBChecker {
-    fn check_bb(&self, bb: &Block) -> bool;
-}
-pub trait InstChecker {
-    fn check_inst(&self, inst: &Inst) -> bool;
-}
 
 pub struct Riscv;
 

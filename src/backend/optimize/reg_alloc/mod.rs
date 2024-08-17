@@ -1,6 +1,7 @@
 use core::num;
 use std::hash::Hash;
 
+use checker::FuncChecker;
 use graph::UdGraph;
 
 mod graph_color;
@@ -11,6 +12,7 @@ use crate::fprintln;
 use super::*;
 
 pub fn handle_reg_alloc(func: &mut Func) -> Result<()> {
+    checker::TightTerm.check_func(func);
     // if func.line() > 10000 {
     let mut reg_graph = Func::reg_interfere_graph(func)?;
     let dtd = func.def_then_def();
