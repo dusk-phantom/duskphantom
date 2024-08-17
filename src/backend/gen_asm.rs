@@ -459,7 +459,7 @@ hello:
         let s = GenTool::gen_array::<u32>("arr", 2, &[]);
         assert_eq!(
             s,
-            ".data\n.align\t3\n.globl\tarr\n.type\tarr, @object\n.size\tarr, 8\narr:\n.zero\t8"
+            ".bss\n.align\t3\n.globl\tarr\n.type\tarr, @object\n.size\tarr, 8\narr:\n.zero\t8"
         );
     }
 

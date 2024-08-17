@@ -9,7 +9,7 @@ fn test_int_arr1() {
         init: vec![],
         is_const: false,
     });
-    assert_debug_snapshot!(var.gen_asm(), @r###"".data\n.align\t3\n.globl\tarr\n.type\tarr, @object\n.size\tarr, 8\narr:\n.zero\t8""###);
+    assert_debug_snapshot!(var.gen_asm(), @r###"".bss\n.align\t3\n.globl\tarr\n.type\tarr, @object\n.size\tarr, 8\narr:\n.zero\t8""###);
 }
 
 #[test]
