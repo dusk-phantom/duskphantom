@@ -134,6 +134,12 @@ impl Func {
         }
         // for each basic block, collect interference between regs
         let mut graph: FxHashMap<Reg, FxHashSet<Reg>> = FxHashMap::default();
+        for r1 in Reg::physical_regs() {
+            for r2 in Reg::physical_regs() {
+                graph.entry(*r1).or_default().insert(*r2);
+                graph.entry(*r2).or_default().insert(*r1);
+            }
+        }
         let reg_lives = Func::reg_lives(f)?;
         // dbg!(&reg_lives);
         // FIXME: 使用位图实现的寄存器记录表来加速运算过程，以及节省内存
