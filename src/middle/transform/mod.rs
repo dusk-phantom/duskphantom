@@ -18,6 +18,7 @@ pub mod load_store_elim;
 pub mod loop_depth;
 pub mod loop_optimization;
 pub mod loop_simplify;
+pub mod make_parallel;
 pub mod mem2reg;
 pub mod redundance_elim;
 pub mod sink_code;
