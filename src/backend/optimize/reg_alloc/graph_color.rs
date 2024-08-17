@@ -9,7 +9,7 @@ pub fn try_perfect_alloc(
     let u_regs = free_iregs_with_tmp();
     let f_regs = free_fregs_with_tmp();
     let mut reg_graph = reg_graph.clone();
-    // assign_extra_edge(&mut reg_graph, u_regs.len(), f_regs.len(), def_then_def);
+    assign_extra_edge(&mut reg_graph, u_regs.len(), f_regs.len(), def_then_def);
     let (colors, spills) = reg_alloc(&reg_graph, u_regs, f_regs)?;
     if spills.is_empty() {
         Ok(colors)
