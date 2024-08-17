@@ -18,7 +18,7 @@ pub fn handle_reg_alloc(func: &mut Func) -> Result<()> {
     let dtd = func.def_then_def();
     let could_merge = collect_mergeable_regs(func, &reg_graph);
     if let Ok(colors) = try_perfect_alloc(&reg_graph, &dtd, &could_merge) {
-        println!("### perfect alloc");
+        // println!("### perfect alloc {}", func.name());
         apply_colors(func, colors);
     } else {
         let (colors, spills) = reg_alloc(&reg_graph, free_iregs(), free_fregs())?;
@@ -26,6 +26,7 @@ pub fn handle_reg_alloc(func: &mut Func) -> Result<()> {
         apply_spills(func, spills);
     }
     // 删除因为寄存器合并而产生的冗余指令
+    remove_redundant_insts(func);
 
     Ok(())
 }
@@ -142,8 +143,12 @@ pub fn merge_regs(
 pub fn remove_redundant_insts(func: &mut Func) {
     for bb in func.iter_bbs_mut() {
         bb.insts_mut().retain(|i| {
-            println!("remove redundant inst: {:?}", i.gen_asm());
-            !is_redundant_inst(i)
+            if is_redundant_inst(i) {
+                // println!("remove redundant inst: {:?}", i.gen_asm());
+                false
+            } else {
+                true
+            }
         });
     }
 }
