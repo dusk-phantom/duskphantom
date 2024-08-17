@@ -13,7 +13,6 @@ use crate::{
 
 use super::{alias_analysis::EffectRange, call_graph::CallGraph};
 
-#[allow(unused)]
 pub struct Effect {
     pub def_range: EffectRange,
     pub use_range: EffectRange,
@@ -28,7 +27,6 @@ pub struct EffectAnalysis {
     functions: Vec<FunPtr>,
 }
 
-#[allow(unused)]
 impl EffectAnalysis {
     /// Run effect analysis on program.
     pub fn new(program: &Program) -> Self {

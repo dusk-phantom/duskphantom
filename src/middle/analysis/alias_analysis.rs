@@ -36,24 +36,10 @@ impl Default for EffectRange {
     }
 }
 
-#[allow(unused)]
 impl EffectRange {
     /// Create an empty effect range.
     pub fn new() -> Self {
         EffectRange::Some(HashSet::new())
-    }
-
-    /// Check if `self` contains `another`.
-    pub fn contains(&self, another: &Operand) -> bool {
-        let EffectRange::Some(set) = self else {
-            return false;
-        };
-        for op in set.iter() {
-            if op == another {
-                return true;
-            }
-        }
-        false
     }
 
     /// Check if two effect ranges can alias.
