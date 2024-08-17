@@ -5,10 +5,12 @@ use rustc_hash::{FxHashMap, FxHashSet};
 pub fn try_perfect_alloc(
     reg_graph: &FxHashMap<Reg, FxHashSet<Reg>>,
     def_then_def: &FxHashMap<Reg, FxHashSet<Reg>>,
+    could_merge: &[((Reg, Reg), usize)],
 ) -> Result<FxHashMap<Reg, Reg>> {
     let u_regs = free_iregs_with_tmp();
     let f_regs = free_fregs_with_tmp();
     let mut reg_graph = reg_graph.clone();
+    // merge_regs(&mut reg_graph, could_merge, u_regs.len(), f_regs.len());
     assign_extra_edge(&mut reg_graph, u_regs.len(), f_regs.len(), def_then_def);
     let (colors, spills) = reg_alloc(&reg_graph, u_regs, f_regs)?;
     if spills.is_empty() {

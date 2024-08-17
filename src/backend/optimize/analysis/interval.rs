@@ -1,73 +1,41 @@
 use super::*;
 use rustc_hash::FxHashSet;
+use std::ops::Range;
+
 pub struct RegIntervalCounter {
-    intervals: HashMap<String, Vec<FxHashSet<Reg>>>,
+    pub live_after: HashMap<String, Vec<FxHashSet<Reg>>>,
+    pub intervals: HashMap<String, HashMap<Range<usize>, FxHashSet<Reg>>>,
 }
-// impl fmt::Debug for RegIntervalCounter {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         let mut ds = f.debug_struct("RegIntervalCounter");
-//         let mut intervals: Vec<(&String, &Vec<RegSet>)> = self.intervals.iter().collect();
-//         intervals.sort_by(|a, b| a.0.cmp(b.0));
-//         for (k, v) in intervals {
-//             let mut v: Vec<&RegSet> = v.iter().collect();
-//             v.sort();
-//             ds.field(k, &v);
-//         }
-//         ds.finish()
-//     }
-// }
 
 impl RegIntervalCounter {
     #[allow(unused)]
     /// interval analysis
     pub fn count(func: &Func) -> Result<Self> {
         let reg_lives = Func::reg_lives(func)?;
-        let mut intervals: HashMap<String, Vec<FxHashSet<Reg>>> = HashMap::new();
         for bb in func.iter_bbs() {
-            // interval[i] 表示第 i 条 指令处的 活跃寄存器集合
-            // interval[0] = live_in
-            // interval[num_insts]>=live_out
-            // case 1: 考虑到可能存在只定义但是不使用的寄存器,比如在块结尾处定义了一个寄存器但是后续没有块使用,则它不会在live_out中,但是
-            // 也要在寄存器生存区间中统计它,所以 interval[num_insts] != live_out
-            // case 2: 否则 interval[num_insts] = live_out
-            // 一般计算式 interval[i] = interval[i-1] U def[i] (def[i]是第i条指令定义的寄存器)
-            let mut interval = vec![];
-
+            let mut live_afters = vec![];
             let live_in = reg_lives.live_ins(bb);
             let live_out = reg_lives.live_outs(bb);
-            interval.push(live_in.clone());
-            let mut live = live_in.clone();
-            for inst in bb.insts() {
+            let mut live_after: FxHashSet<Reg> = live_out.clone();
+            live_afters.push(live_after.clone());
+            for inst in bb.insts().iter().rev() {
                 for reg in inst.defs() {
-                    live.insert(*reg);
+                    live_after.remove(reg);
                 }
-                interval.push(live.clone());
+                for reg in inst.uses() {
+                    live_after.insert(*reg);
+                }
+                live_afters.push(live_after.clone());
             }
-
-            intervals.insert(bb.label().to_string(), interval);
         }
-        Ok(Self { intervals })
+        unimplemented!();
     }
 
     #[allow(unused)]
     /// FIXME: test needed
     /// get registers which born between from and to,including from and to
     pub fn occur_between(&self, bb: &str, from: usize, mut to: usize) -> Result<FxHashSet<Reg>> {
-        let mut alive = FxHashSet::default();
-        if let Some(interval) = self.intervals.get(bb) {
-            let up_edge = if to >= interval.len() - 1 {
-                interval.len() - 1
-            } else {
-                to + 1
-            };
-            if from >= interval.len() {
-                return Err(anyhow!("from index out of range"));
-                // return Err(anyhow!("from index out of range")).with_context(|| context!());
-            }
-            alive = interval[up_edge].clone();
-            alive.retain(|r| !interval[from].contains(r));
-        }
-        Ok(alive)
+        unimplemented!();
     }
 }
 

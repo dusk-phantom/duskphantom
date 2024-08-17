@@ -4,7 +4,7 @@ use std::ops::Deref;
 
 use super::{BackendError, StackSlot};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Operand {
     Reg(Reg),
     Imm(Imm),
@@ -186,7 +186,7 @@ impl Hash for Fmm {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Label(String);
 
 // impl from for Operand
