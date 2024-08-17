@@ -10,7 +10,7 @@ pub fn try_perfect_alloc(
     let u_regs = free_iregs_with_tmp();
     let f_regs = free_fregs_with_tmp();
     let mut reg_graph = reg_graph.clone();
-    // merge_regs(&mut reg_graph, could_merge, u_regs.len(), f_regs.len());
+    merge_regs(&mut reg_graph, could_merge, u_regs.len(), f_regs.len());
     assign_extra_edge(&mut reg_graph, u_regs.len(), f_regs.len(), def_then_def);
     let (colors, spills) = reg_alloc(&reg_graph, u_regs, f_regs)?;
     if spills.is_empty() {
@@ -277,7 +277,10 @@ pub fn simplify_graph(
             if k.is_physical() {
                 continue;
             }
-            let num_inter = v.iter().filter(|v| v.is_usual() == k.is_usual()).count();
+            let num_inter = v
+                .iter()
+                .filter(|v| v.is_usual() == k.is_usual() && !special_regs().contains(v))
+                .count();
             if k.is_float() {
                 if num_inter < f_colors.len() {
                     to_remove.push(*k);
