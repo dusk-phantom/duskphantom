@@ -51,6 +51,8 @@ impl<'a> ProgramKit<'a> {
         );
         insert("_sysy_starttime", ValueType::Void, vec![ValueType::Int]);
         insert("_sysy_stoptime", ValueType::Void, vec![ValueType::Int]);
+        insert("thrd_create", ValueType::Int, vec![ValueType::Int]);
+        insert("thrd_join", ValueType::Void, vec![]);
         insert("putf", ValueType::Void, vec![]);
         insert(
             "llvm.memset.p0.i32",
