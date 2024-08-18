@@ -43,14 +43,17 @@ impl EffectRange {
     }
 
     /// Check if two effect ranges conflict when parallelized.
-    pub fn can_conflict(&self, another: &EffectRange) -> bool {
+    /// TODO-TLE: use a more efficient way to check conflict, separate in parallel_analysis
+    pub fn can_conflict(&self, another: &EffectRange, indvar: &Operand) -> bool {
         match (self, another) {
             (EffectRange::All, EffectRange::All) => true,
             (EffectRange::All, EffectRange::Some(_)) => true,
             (EffectRange::Some(_), EffectRange::All) => true,
-            (EffectRange::Some(a), EffectRange::Some(b)) => a
-                .iter()
-                .any(|a_op| b.iter().any(|b_op| can_op_conflict(a_op, b_op))),
+            (EffectRange::Some(a), EffectRange::Some(b)) => a.iter().any(|a_op| {
+                b.iter().any(|b_op| {
+                    can_op_conflict(a_op, b_op, indvar) || can_op_conflict(b_op, b_op, indvar)
+                })
+            }),
         }
     }
 
@@ -130,8 +133,31 @@ fn can_op_alias(a: &Operand, b: &Operand) -> bool {
 }
 
 /// Check if two operands cans conflict when parallelized.
-fn can_op_conflict(a: &Operand, b: &Operand) -> bool {
-    a != b && can_op_alias(a, b)
+fn can_op_conflict(a: &Operand, b: &Operand, indvar: &Operand) -> bool {
+    if a == b && is_affine(a, indvar) {
+        return false;
+    }
+    can_op_alias(a, b)
+}
+
+/// Check if an operand address is affine over the induction variable.
+fn is_affine(op: &Operand, indvar: &Operand) -> bool {
+    let (_, offset) = split_gep(op);
+    for (_, op) in offset.iter() {
+        if let Operand::Instruction(inst) = op {
+            if let InstType::Add | InstType::Sub = inst.get_type() {
+                if &inst.get_operand()[0] == indvar {
+                    if let Operand::Constant(_) = inst.get_operand()[1] {
+                        return true;
+                    }
+                }
+            }
+        }
+        if op == indvar {
+            return true;
+        }
+    }
+    false
 }
 
 /// Check if two operands (without GEP) can alias.

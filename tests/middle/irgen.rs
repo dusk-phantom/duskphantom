@@ -31,6 +31,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -88,6 +90,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -154,6 +158,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -215,6 +221,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -277,6 +285,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -339,6 +349,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -405,6 +417,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -480,6 +494,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -562,6 +578,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -617,6 +635,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -665,6 +685,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -717,6 +739,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -762,6 +786,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main(i32 %arg) {
@@ -809,6 +835,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -876,6 +904,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @func(i32 %p) {
@@ -944,6 +974,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1005,6 +1037,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1052,6 +1086,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1096,6 +1132,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1146,6 +1184,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @f([1 x [1 x i32]]* %x) {
@@ -1196,6 +1236,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1240,6 +1282,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1313,6 +1357,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1371,6 +1417,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1448,6 +1496,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1526,6 +1576,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1575,6 +1627,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1636,6 +1690,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1681,6 +1737,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1734,6 +1792,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1810,6 +1870,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1881,6 +1943,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -1939,6 +2003,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -2004,6 +2070,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @select_sort(i32* %A, i32 %n) {
@@ -2064,6 +2132,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define void @f() {
@@ -2121,6 +2191,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -2183,6 +2255,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -2227,6 +2301,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -2268,6 +2344,8 @@ mod tests {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         "###);

@@ -62,6 +62,8 @@ pub mod tests_dce {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @ifElseIf() {
@@ -201,6 +203,8 @@ pub mod tests_dce {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -256,6 +260,8 @@ pub mod tests_dce {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define i32 @main() {
@@ -356,6 +362,8 @@ pub mod tests_dce {
         declare void @putfarray(i32 %p0, float* %p1)
         declare void @_sysy_starttime(i32 %p0)
         declare void @_sysy_stoptime(i32 %p0)
+        declare i32 @thrd_create(i32 %p0)
+        declare void @thrd_join()
         declare void @putf()
         declare void @llvm.memset.p0.i32(i32* %p0, i8 %p1, i32 %p2, i1 %p3)
         define void @func(i32 %i0) {

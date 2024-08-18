@@ -18,12 +18,26 @@ pub struct Effect {
     pub use_range: EffectRange,
 }
 
+impl Default for Effect {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Effect {
     pub fn new() -> Self {
         Self {
             def_range: EffectRange::new(),
             use_range: EffectRange::new(),
         }
+    }
+
+    pub fn dump(&self) -> String {
+        format!(
+            "(def: {}, use: {})",
+            self.def_range.dump(),
+            self.use_range.dump()
+        )
     }
 }
 
@@ -59,6 +73,10 @@ impl EffectAnalysis {
                     || func.name.contains("starttime")
                     || func.name.contains("stoptime")
                 {
+                    effect.has_io_output.insert(*func);
+                }
+                if func.name.contains("thrd") {
+                    effect.has_io_input.insert(*func);
                     effect.has_io_output.insert(*func);
                 }
                 if func.name.contains("memset")
