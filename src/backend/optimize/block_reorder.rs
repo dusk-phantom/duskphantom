@@ -1,6 +1,14 @@
 use super::*;
 
-#[allow(unused)]
+/// 对于块Bi和块Bj,(i<j,i!=j-1)
+/// 如果Bi的结尾的jmp指令跳转到Bj,则交换Bi+1和Bj的位置,能够省略jmp指令
+/// 如果交换会造成需要插入新的jmp指令或者产生新的长跳转,则不交换
+/// 否则,交换Bi+1和Bj的位置
+/// 不断重复上述过程,直到不能再交换为止
+pub fn handle_reorder(func: &mut Func) -> Result<()> {
+    Ok(())
+}
+
 /// FIXME: test needed
 pub fn handle_single_jmp(func: &mut Func) -> Result<()> {
     let (ins, outs) = Func::in_out_bbs(func)?;
