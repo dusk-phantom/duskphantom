@@ -133,6 +133,7 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
         let mut effect = Effect::new();
         for inst in bb.iter() {
             if let Some(inst_effect) = &self.effect_analysis.inst_effect.get(&inst) {
+                println!("[INFO] inst_effect: {}", inst_effect.dump());
                 if !merge_effect(&mut effect, inst_effect, indvar)? {
                     return Ok(None);
                 }
@@ -224,7 +225,7 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
             .program
             .mem_pool
             .get_call(*func_create, vec![Constant::Int(N_THREAD - 1).into()]);
-        candidate.init_bb.push_back(inst_create);
+        candidate.init_bb.get_last_inst().insert_before(inst_create);
 
         // Create parallized exit and indvar
         //
@@ -241,43 +242,43 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
 
         // e - i
         let inst_sub = self.program.mem_pool.get_sub(e.clone(), i.clone());
-        candidate.init_bb.push_back(inst_sub);
+        candidate.init_bb.get_last_inst().insert_before(inst_sub);
 
         // (e - i) * n
         let inst_mul = self
             .program
             .mem_pool
             .get_mul(inst_create.into(), inst_sub.into());
-        candidate.init_bb.push_back(inst_mul);
+        candidate.init_bb.get_last_inst().insert_before(inst_mul);
 
         // (e - i) * n / N
         let inst_div = self
             .program
             .mem_pool
             .get_sdiv(inst_mul.into(), Constant::Int(N_THREAD).into());
-        candidate.init_bb.push_back(inst_div);
+        candidate.init_bb.get_last_inst().insert_before(inst_div);
 
         // Lower bound: i + (e - i) * n / N
         let inst_lb = self.program.mem_pool.get_add(inst_div.into(), i.clone());
-        candidate.init_bb.push_back(inst_lb);
+        candidate.init_bb.get_last_inst().insert_before(inst_lb);
 
         // (e - i) * n + e - i
         let inst_add = self
             .program
             .mem_pool
             .get_add(inst_mul.into(), inst_sub.into());
-        candidate.init_bb.push_back(inst_add);
+        candidate.init_bb.get_last_inst().insert_before(inst_add);
 
         // ((e - i) * n + e - i) / N
         let inst_div = self
             .program
             .mem_pool
             .get_sdiv(inst_add.into(), Constant::Int(N_THREAD).into());
-        candidate.init_bb.push_back(inst_div);
+        candidate.init_bb.get_last_inst().insert_before(inst_div);
 
         // Upper bound: i + ((e - i) * n + e - i) / N
         let inst_ub = self.program.mem_pool.get_add(inst_div.into(), i);
-        candidate.init_bb.push_back(inst_ub);
+        candidate.init_bb.get_last_inst().insert_before(inst_ub);
 
         // Replace indvar to parallelized indvar
         let phi = downcast_mut::<Phi>(candidate.indvar.as_mut().as_mut());
@@ -313,6 +314,8 @@ fn merge_effect(a: &mut Effect, b: &Effect, indvar: &Operand) -> Result<bool> {
     if a.def_range.can_conflict(&b.def_range, indvar)
         || a.use_range.can_conflict(&b.def_range, indvar)
         || a.def_range.can_conflict(&b.use_range, indvar)
+        || b.def_range.can_conflict(&b.use_range, indvar)
+        || b.def_range.can_conflict(&b.def_range, indvar)
     {
         println!(
             "[INFO] failed to merge {} with {} (indvar = {})",
