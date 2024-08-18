@@ -49,11 +49,9 @@ impl EffectRange {
             (EffectRange::All, EffectRange::All) => true,
             (EffectRange::All, EffectRange::Some(_)) => true,
             (EffectRange::Some(_), EffectRange::All) => true,
-            (EffectRange::Some(a), EffectRange::Some(b)) => a.iter().any(|a_op| {
-                b.iter().any(|b_op| {
-                    can_op_conflict(a_op, b_op, indvar) || can_op_conflict(b_op, b_op, indvar)
-                })
-            }),
+            (EffectRange::Some(a), EffectRange::Some(b)) => a
+                .iter()
+                .any(|a_op| b.iter().any(|b_op| can_op_conflict(a_op, b_op, indvar))),
         }
     }
 
@@ -127,6 +125,9 @@ impl From<HashSet<Operand>> for EffectRange {
 
 /// Check if two operands (maybe with GEP) can alias.
 fn can_op_alias(a: &Operand, b: &Operand) -> bool {
+    if a == b {
+        return true;
+    }
     let (ptr_a, offset_a) = split_gep(a);
     let (ptr_b, offset_b) = split_gep(b);
     can_ptr_alias(&ptr_a, &ptr_b) && can_offset_overlap(offset_a, offset_b)
