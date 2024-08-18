@@ -18,6 +18,15 @@ pub struct Effect {
     pub use_range: EffectRange,
 }
 
+impl Effect {
+    pub fn new() -> Self {
+        Self {
+            def_range: EffectRange::new(),
+            use_range: EffectRange::new(),
+        }
+    }
+}
+
 pub struct EffectAnalysis {
     pub inst_effect: HashMap<InstPtr, Effect>,
     pub has_io_input: HashSet<FunPtr>,
