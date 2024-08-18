@@ -194,6 +194,17 @@ impl Inst {
                 | Inst::Tail(_)
         )
     }
+
+    pub fn is_term(&self) -> bool {
+        matches!(self, Inst::Ret | Inst::Jmp(_) | Inst::Tail(_)) | self.is_branch()
+    }
+
+    pub fn is_branch(&self) -> bool {
+        matches!(
+            self,
+            Inst::Beq(_) | Inst::Bne(_) | Inst::Bge(_) | Inst::Blt(_) | Inst::Bgt(_) | Inst::Ble(_)
+        )
+    }
 }
 
 //*********************************************************************************

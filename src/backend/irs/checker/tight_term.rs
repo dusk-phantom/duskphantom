@@ -18,24 +18,11 @@ impl VarChecker for TightTerm {
 
 impl BBChecker for TightTerm {
     fn check_bb(&self, bb: &Block) -> bool {
-        let is_branch = |inst: &Inst| -> bool {
-            matches!(
-                inst,
-                Inst::Beq(_)
-                    | Inst::Bge(_)
-                    | Inst::Bgt(_)
-                    | Inst::Ble(_)
-                    | Inst::Bne(_)
-                    | Inst::Blt(_)
-            )
-        };
-        let is_term =
-            |inst: &Inst| -> bool { matches!(inst, |Inst::Ret| Inst::Jmp(_)) || is_branch(inst) };
         let insts = bb.insts();
         let terms: Vec<(usize, &Inst)> = insts
             .iter()
             .enumerate()
-            .filter(|(_, inst)| is_term(inst))
+            .filter(|(_, inst)| inst.is_term())
             .collect();
         if terms.len() > 2 || terms.is_empty() {
             return false;
@@ -61,7 +48,7 @@ impl BBChecker for TightTerm {
         }
 
         if let Some((sec, inst)) = terms.get(terms.len() - 2) {
-            *sec == insts.len() - 2 && is_branch(inst)
+            *sec == insts.len() - 2 && inst.is_branch()
         } else {
             unreachable!();
         }
