@@ -303,7 +303,20 @@ impl<'a> Graph<'a> {
             }
         }
 
-        for id in (0..insts.len()).filter(|id| matches!(insts[*id], Inst::Call(_))) {
+        for id in (0..insts.len()).filter(|id| {
+            matches!(
+                insts[*id],
+                Inst::Call(_)
+                    | Inst::Beq(_)
+                    | Inst::Bne(_)
+                    | Inst::Bge(_)
+                    | Inst::Bgt(_)
+                    | Inst::Ble(_)
+                    | Inst::Blt(_)
+                    | Inst::Ret
+                    | Inst::Jmp(_)
+            )
+        }) {
             // call 依赖于前面所有指令的指令
             for i in 0..id {
                 use_defs.entry(id).or_default().insert(i);
@@ -382,11 +395,8 @@ impl<'a> Graph<'a> {
                 | Inst::Bge(_)
                 | Inst::Tail(_)
                 | Inst::Ret
-                | Inst::Jmp(_) => {
-                    for entry in bucket.iter_mut() {
-                        entry.1.push((id, true));
-                    }
-                }
+                | Inst::Jmp(_)
+                | Inst::Call(_) => { /* 对于 bucket 啥也不干, 后面再单独处理 */ }
                 Inst::Ld(ld) => {
                     let base = ld.base();
                     if let Some(label) = reg_label.get(base) {
@@ -455,7 +465,6 @@ impl<'a> Graph<'a> {
                         .or_default()
                         .push((id, false));
                 }
-                Inst::Call(_) => {}
                 Inst::Lla(lla) => {
                     let reg = lla.dst();
                     let label = lla.label().to_string();
