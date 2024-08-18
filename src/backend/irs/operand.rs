@@ -189,6 +189,17 @@ impl Hash for Fmm {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Label(String);
 
+impl From<Label> for String {
+    fn from(label: Label) -> Self {
+        label.0
+    }
+}
+impl From<&Label> for String {
+    fn from(label: &Label) -> Self {
+        label.0.clone()
+    }
+}
+
 // impl from for Operand
 impl From<u32> for Imm {
     fn from(value: u32) -> Self {

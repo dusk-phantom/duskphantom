@@ -220,6 +220,47 @@ impl Func {
         }
         self.other_bbs.iter().find(|bb| bb.label() == label)
     }
+
+    /// 化简块结尾的jmp指令,如果第i块的最后一条指令是jmp,且jmp的目标就是第i+1块,则删除jmp指令
+    /// 如果有发生化简,返回true
+    /// 否则返回false
+    pub fn simplify_term(&mut self) -> Result<bool> {
+        let mut bbs_mut: Vec<&mut Block> = self.iter_bbs_mut().collect();
+        let mut to_simplify = vec![];
+        for (idx, bb) in bbs_mut.iter().enumerate() {
+            let Some(inst) = bb.insts().last() else {
+                continue;
+            };
+            let Inst::Jmp(jmp) = inst else {
+                continue;
+            };
+            let jmp_to: String = jmp.dst().label().ok_or(anyhow!(""))?.into();
+            let Some(next_bb) = bbs_mut.get(idx + 1) else {
+                continue;
+            };
+            if jmp_to != next_bb.label() {
+                continue;
+            }
+            to_simplify.push(idx);
+        }
+        let if_simplify = !to_simplify.is_empty();
+        for idx in to_simplify {
+            let bb = bbs_mut.get_mut(idx).ok_or(anyhow!(""))?;
+            bb.insts_mut().pop();
+        }
+        Ok(if_simplify)
+    }
+
+    /// 解除化简块结尾的jmp指令
+    /// 如果一个块结尾的term类型指令只有1个,且不是jmp,则在该块的结尾插入jmp指令到它的邻接的下一个块
+    #[allow(unused)]
+    pub fn desimplify_term(&mut self) -> Result<()> {
+        let mut bbs_mut: Vec<&mut Block> = self.iter_bbs_mut().collect();
+        for (idx, bb) in bbs_mut.iter().enumerate() {
+            // let terms=bb.insts().iter().filter(|inst|inst);
+        }
+        Ok(())
+    }
 }
 
 pub struct BBDistanceCounter {
