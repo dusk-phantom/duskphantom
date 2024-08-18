@@ -93,7 +93,6 @@ pub fn optimize_func(func: &mut Func) -> Result<()> {
     // inst scheduling
     schedule::handle_inst_scheduling(func)?;
 
-    /// FIXME,pass [f,hf], but not [h-p]
-    // func.simplify_term();
+    func.simplify_term();
     Ok(())
 }
