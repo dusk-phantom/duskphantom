@@ -6,7 +6,7 @@ use crate::{
     backend::from_self::downcast_ref,
     middle::{
         analysis::{
-            effect_analysis::Effect,
+            effect_analysis::{Effect, EffectAnalysis},
             loop_tools::{LoopForest, LoopPtr},
         },
         ir::{
@@ -14,7 +14,7 @@ use crate::{
                 misc_inst::{ICmp, ICmpOp, Phi},
                 InstType,
             },
-            BBPtr, Constant, InstPtr, Operand,
+            BBPtr, Constant, InstPtr, Operand, ValueType,
         },
         Program,
     },
@@ -26,17 +26,19 @@ pub fn optimize_program<'a>(
     program: &'a mut Program,
     loop_forest: &'a mut LoopForest,
 ) -> Result<bool> {
-    MakeParallel::new(program, loop_forest).run_and_log()
+    let effect_analysis = EffectAnalysis::new(program);
+    MakeParallel::<5>::new(program, loop_forest, &effect_analysis).run_and_log()
 }
 
-pub struct MakeParallel<'a> {
+pub struct MakeParallel<'a, const N_THREAD: usize> {
     program: &'a mut Program,
     loop_forest: &'a mut LoopForest,
+    effect_analysis: &'a EffectAnalysis,
     has_return: HashSet<LoopPtr>,
     loop_effect: HashMap<LoopPtr, Effect>,
 }
 
-impl<'a> Transform for MakeParallel<'a> {
+impl<'a, const N_THREAD: usize> Transform for MakeParallel<'a, N_THREAD> {
     fn get_program_mut(&mut self) -> &mut Program {
         self.program
     }
@@ -58,11 +60,16 @@ impl<'a> Transform for MakeParallel<'a> {
     }
 }
 
-impl<'a> MakeParallel<'a> {
-    pub fn new(program: &'a mut Program, loop_forest: &'a mut LoopForest) -> Self {
+impl<'a, const N_THREAD: usize> MakeParallel<'a, N_THREAD> {
+    pub fn new(
+        program: &'a mut Program,
+        loop_forest: &'a mut LoopForest,
+        effect_analysis: &'a EffectAnalysis,
+    ) -> Self {
         Self {
             program,
             loop_forest,
+            effect_analysis,
             has_return: HashSet::new(),
             loop_effect: HashMap::new(),
         }
@@ -73,13 +80,22 @@ impl<'a> MakeParallel<'a> {
     /// - Get merged effect of each block if there's no collision, store to `loop_effect`
     fn preprocess(&mut self, lo: LoopPtr) -> Result<()> {
         let mut has_return = false;
+        let mut loop_effect = Some(Effect::new());
 
-        // If any of sub loops has return, then this loop has return
-        // However, we need to compute all sub loops here, because it will be cached
+        // If any of sub loops has return, then this loop has return;
+        // Effect of sub loops are owned by this loop;
+        // We need to compute all sub loops here, because it will be cached
         for sub_loop in lo.sub_loops.iter() {
             self.preprocess(*sub_loop)?;
             if self.has_return.contains(sub_loop) {
                 has_return = true;
+            }
+            if let Some(effect) = &mut loop_effect {
+                if let Some(sub_effect) = self.loop_effect.get(sub_loop) {
+                    if !merge_effect(effect, sub_effect)? {
+                        loop_effect = None;
+                    }
+                }
             }
         }
 
@@ -87,16 +103,42 @@ impl<'a> MakeParallel<'a> {
         for bb in &lo.blocks {
             if bb.get_succ_bb().iter().any(|&bb| bb.name == "exit") {
                 has_return = true;
+                break;
             }
         }
 
-        // TODO-funct: get merged effect of each block if there's no collision, store to `loop_effect`
+        // Get merged effect of each block if there's no collision, store to `loop_effect`
+        for bb in &lo.blocks {
+            let block_effect = self.get_block_effect(*bb)?;
+            if let Some(block_effect) = block_effect {
+                if let Some(effect) = &mut loop_effect {
+                    if !merge_effect(effect, &block_effect)? {
+                        loop_effect = None;
+                        break;
+                    }
+                }
+            }
+        }
 
         // Store result
         if has_return {
             self.has_return.insert(lo);
         }
+        if let Some(effect) = loop_effect {
+            self.loop_effect.insert(lo, effect);
+        }
         Ok(())
+    }
+
+    fn get_block_effect(&mut self, bb: BBPtr) -> Result<Option<Effect>> {
+        let mut effect = Effect::new();
+        for inst in bb.iter() {
+            let inst_effect = &self.effect_analysis.inst_effect[&inst];
+            if !merge_effect(&mut effect, inst_effect)? {
+                return Ok(None);
+            }
+        }
+        Ok(Some(effect))
     }
 
     fn make_candidate(&mut self, result: &mut Vec<ParallelCandidate>, lo: LoopPtr) -> Result<()> {
@@ -147,9 +189,93 @@ impl<'a> MakeParallel<'a> {
         Ok(())
     }
 
-    fn make_parallel(&mut self, candidate: ParallelCandidate) -> Result<bool> {
-        todo!("create parallized exit and indvar, join threads");
+    fn make_parallel(&mut self, mut candidate: ParallelCandidate) -> Result<bool> {
+        // Get current thread count
+        // TODO create library function
+        // TODO fill argument correctly
+        let func = self
+            .program
+            .module
+            .functions
+            .iter()
+            .find(|f| f.name == "thrd_create")
+            .unwrap();
+        let inst_create = self
+            .program
+            .mem_pool
+            .get_call(*func, vec![Constant::Int(0).into()]);
+        candidate.indvar.init_bb.push_back(inst_create);
+
+        // Create parallized exit and indvar
+        //
+        // i = init_val
+        // d = next_delta
+        // e = exit_value
+        // n = current_thread
+        // N = N_THREAD
+        //
+        // Before: i, i + d, i + 2d, ..., i + d(X = (e - i) ceildiv d)
+        // After: [ LB = i + (e-i)n/N, UB = i + ((e-i)n + e-i)/N )
+        // TODO sign preserve
+        let i = candidate.indvar.init_val;
+        let d = candidate.indvar.next_delta;
+        let e = candidate.indvar.exit_val;
+        let inst_mul = self
+            .program
+            .mem_pool
+            .get_mul(inst_create.into(), Constant::Int(e - i).into());
+        candidate.indvar.init_bb.push_back(inst_mul);
+        let inst_div = self
+            .program
+            .mem_pool
+            .get_sdiv(inst_mul.into(), Constant::Int(N_THREAD as i32).into());
+        candidate.indvar.init_bb.push_back(inst_div);
+        let inst_lb = self
+            .program
+            .mem_pool
+            .get_add(inst_div.into(), Constant::Int(i).into());
+        candidate.indvar.init_bb.push_back(inst_lb);
+        let inst_add = self
+            .program
+            .mem_pool
+            .get_add(inst_mul.into(), Constant::Int(e - i).into());
+        candidate.indvar.init_bb.push_back(inst_add);
+        let inst_div = self
+            .program
+            .mem_pool
+            .get_sdiv(inst_add.into(), Constant::Int(N_THREAD as i32).into());
+        candidate.indvar.init_bb.push_back(inst_div);
+        let inst_ub = self
+            .program
+            .mem_pool
+            .get_add(inst_div.into(), Constant::Int(i).into());
+        candidate.indvar.init_bb.push_back(inst_ub);
+        // TODO replace ind var
+        let inst_cond = self.program.mem_pool.get_icmp(
+            ICmpOp::Slt,
+            ValueType::Int,
+            candidate.indvar.indvar.into(),
+            Constant::Int(e).into(),
+        );
+        candidate.indvar.exit.set_operand(0, inst_cond.into());
+
+        // TODO Join threads
+        Ok(true)
     }
+}
+
+/// Merge effect if parallelizing them doesn't cause collision.
+/// Returns changed or not.
+fn merge_effect(a: &mut Effect, b: &Effect) -> Result<bool> {
+    if a.def_range.can_conflict(&b.def_range)
+        || a.use_range.can_conflict(&b.def_range)
+        || a.def_range.can_conflict(&b.use_range)
+    {
+        return Ok(false);
+    }
+    a.def_range.merge(&b.def_range);
+    a.use_range.merge(&b.use_range);
+    Ok(true)
 }
 
 /// A candidate for parallelization.
@@ -180,42 +306,48 @@ impl ParallelCandidate {
 /// For example:
 ///
 /// ```llvm
+/// exit = br (indvar < 6), loop, exit
 /// indvar = phi [2, pre_header], [indvar + 3, loop]
 /// ```
 ///
-/// inst = phi [2, pre_header], [indvar + 3, loop]
+/// indvar = phi [2, pre_header], [indvar + 3, loop]
+/// exit = br (indvar < 6), loop, exit
 /// init_val = 2
 /// init_bb = pre_header
 /// next_delta = 3
 /// next_bb = loop
+/// exit_val = 6
 struct IndVar {
-    inst: InstPtr,
+    indvar: InstPtr,
+    exit: InstPtr,
     init_val: i32,
     init_bb: BBPtr,
     next_delta: i32,
     next_bb: BBPtr,
     exit_val: i32,
-    exit_inst: InstPtr,
+    exit_bb: BBPtr,
 }
 
 impl IndVar {
     fn new(
-        inst: InstPtr,
+        indvar: InstPtr,
+        exit: InstPtr,
         init_val: i32,
         init_bb: BBPtr,
         next_delta: i32,
         next_bb: BBPtr,
         exit_val: i32,
-        exit_inst: InstPtr,
+        exit_bb: BBPtr,
     ) -> Self {
         Self {
-            inst,
+            indvar,
+            exit,
             init_val,
             init_bb,
             next_delta,
             next_bb,
             exit_val,
-            exit_inst,
+            exit_bb,
         }
     }
 
@@ -223,8 +355,16 @@ impl IndVar {
     /// Exit instruction should shape like:
     /// `exit = br (indvar < N), loop, exit`
     /// TODO-WA: check if indvar delta direction is compatible with exit criteria
-    fn from_exit(exit_inst: InstPtr, lo: LoopPtr) -> Option<Self> {
-        let Operand::Instruction(cond) = exit_inst.get_operand().first()? else {
+    fn from_exit(exit: InstPtr, lo: LoopPtr) -> Option<Self> {
+        if exit.get_type() != InstType::Br {
+            return None;
+        }
+        let parent_bb = exit.get_parent_bb()?;
+        let exit_bb = parent_bb
+            .get_succ_bb()
+            .iter()
+            .find(|bb| !lo.is_in_loop(bb))?;
+        let Operand::Instruction(cond) = exit.get_operand().first()? else {
             return None;
         };
         let InstType::ICmp = cond.get_type() else {
@@ -234,23 +374,16 @@ impl IndVar {
         if icmp.op != ICmpOp::Slt || icmp.op != ICmpOp::Sgt {
             return None;
         }
-        let Operand::Instruction(inst) = icmp.get_lhs() else {
+        let Operand::Instruction(indvar) = icmp.get_lhs() else {
             return None;
         };
         let Operand::Constant(Constant::Int(exit_val)) = icmp.get_rhs() else {
             return None;
         };
-        Self::from_phi(*inst, lo, *exit_val, exit_inst)
-    }
-
-    /// Get inductive variable from a phi instruction.
-    /// Phi instruction should shape like:
-    /// `indvar = phi [2, pre_header], [indvar + 3, loop]`
-    fn from_phi(inst: InstPtr, lo: LoopPtr, exit_val: i32, exit_inst: InstPtr) -> Option<Self> {
-        if inst.get_type() != InstType::Phi {
+        if indvar.get_type() != InstType::Phi {
             return None;
         }
-        let phi = downcast_ref::<Phi>(inst.as_ref().as_ref());
+        let phi = downcast_ref::<Phi>(indvar.as_ref().as_ref());
         let inc = phi.get_incoming_values();
         if inc.len() != 2 {
             return None;
@@ -285,7 +418,7 @@ impl IndVar {
             return None;
         }
         Some(Self::new(
-            inst, init_val, init_bb, next_delta, next_bb, exit_val, exit_inst,
+            *indvar, exit, init_val, init_bb, next_delta, next_bb, *exit_val, *exit_bb,
         ))
     }
 }

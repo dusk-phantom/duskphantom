@@ -42,6 +42,18 @@ impl EffectRange {
         EffectRange::Some(HashSet::new())
     }
 
+    /// Check if two effect ranges conflict when parallelized.
+    pub fn can_conflict(&self, another: &EffectRange) -> bool {
+        match (self, another) {
+            (EffectRange::All, EffectRange::All) => true,
+            (EffectRange::All, EffectRange::Some(_)) => true,
+            (EffectRange::Some(_), EffectRange::All) => true,
+            (EffectRange::Some(a), EffectRange::Some(b)) => a
+                .iter()
+                .any(|a_op| b.iter().any(|b_op| can_op_conflict(a_op, b_op))),
+        }
+    }
+
     /// Check if two effect ranges can alias.
     pub fn can_alias(&self, another: &EffectRange) -> bool {
         match (self, another) {
@@ -115,6 +127,11 @@ fn can_op_alias(a: &Operand, b: &Operand) -> bool {
     let (ptr_a, offset_a) = split_gep(a);
     let (ptr_b, offset_b) = split_gep(b);
     can_ptr_alias(&ptr_a, &ptr_b) && can_offset_overlap(offset_a, offset_b)
+}
+
+/// Check if two operands cans conflict when parallelized.
+fn can_op_conflict(a: &Operand, b: &Operand) -> bool {
+    a != b && can_op_alias(a, b)
 }
 
 /// Check if two operands (without GEP) can alias.
