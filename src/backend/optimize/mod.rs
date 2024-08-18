@@ -50,6 +50,17 @@ pub fn optimize(program: &mut prog::Program) -> Result<()> {
 }
 
 #[allow(unused)]
+fn test_symplify_and_desimplify_term(func: &mut Func) {
+    fprintln!("2.s", "{}", func.gen_asm());
+    for i in 0..1000 {
+        func.simplify_term();
+        fprintln!("2.s", "{}", func.gen_asm());
+        func.desimplify_term();
+        fprintln!("2.s", "{}", func.gen_asm());
+    }
+}
+
+#[allow(unused)]
 pub fn optimize_func(func: &mut Func) -> Result<()> {
     // inst combine? 匹配一些模式,将多条指令合并成一条
     fprintln!("log/before_inst_combine.s", "{}", func.gen_asm());
@@ -75,8 +86,6 @@ pub fn optimize_func(func: &mut Func) -> Result<()> {
     // processing stack frame's opening and closing
     stack::handle_stack(func)?;
 
-    block_reorder::handle_single_jmp(func)?;
-
     fprintln!("log/before_split_li.s", "{}", func.gen_asm());
     post_inst_split::post_handle_inst_split(func)?;
     fprintln!("log/after_split_li.s", "{}", func.gen_asm());
@@ -84,5 +93,7 @@ pub fn optimize_func(func: &mut Func) -> Result<()> {
     // inst scheduling
     schedule::handle_inst_scheduling(func)?;
 
+    /// FIXME,pass [f,hf], but not [h-p]
+    // func.simplify_term();
     Ok(())
 }
