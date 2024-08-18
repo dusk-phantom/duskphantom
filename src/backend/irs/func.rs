@@ -256,9 +256,28 @@ impl Func {
     #[allow(unused)]
     pub fn desimplify_term(&mut self) -> Result<()> {
         let mut bbs_mut: Vec<&mut Block> = self.iter_bbs_mut().collect();
+        let mut to_desimplify = vec![];
         for (idx, bb) in bbs_mut.iter().enumerate() {
-            // let terms=bb.insts().iter().filter(|inst|inst);
+            let terms: Vec<&Inst> = bb.insts().iter().filter(|inst| inst.is_term()).collect();
+            if terms.len() >= 2 {
+                continue;
+            } else if let Some(inst) = terms.last() {
+                if inst.is_branch() {
+                    to_desimplify.push(idx);
+                }
+            } else {
+                // this condition means the terms is empty
+                to_desimplify.push(idx);
+            }
         }
+
+        for idx in to_desimplify {
+            let next_bb_name = bbs_mut.get(idx + 1).ok_or(anyhow!(""))?.label().to_string();
+            let bb = bbs_mut.get_mut(idx).ok_or(anyhow!(""))?;
+            let jmp = JmpInst::new(next_bb_name.into());
+            bb.insts_mut().push(jmp.into());
+        }
+
         Ok(())
     }
 }
