@@ -163,9 +163,6 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
         // If there are multiple exit edges, then it can't be parallelized
         if exit.len() != 1 {
             println!("[INFO] loop {} has multiple exit edges", pre_header.name);
-            for lo in lo.sub_loops.iter() {
-                self.make_candidate(result, *lo)?;
-            }
             return Ok(());
         }
 
@@ -173,9 +170,6 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
         let exit = exit[0];
         let Some(candidate) = Candidate::from_exit(exit, lo, self.dom_tree) else {
             println!("[INFO] loop {} does not have indvar", pre_header.name);
-            for lo in lo.sub_loops.iter() {
-                self.make_candidate(result, *lo)?;
-            }
             return Ok(());
         };
 
@@ -185,9 +179,6 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
             .is_none()
         {
             println!("[INFO] loop {} has conflict effect", pre_header.name);
-            for lo in lo.sub_loops.iter() {
-                self.make_candidate(result, *lo)?;
-            }
             return Ok(());
         }
 
@@ -399,8 +390,6 @@ fn replace_base_alloc(mut inst: InstPtr, map: &HashMap<InstPtr, InstPtr>) {
             if let Operand::Instruction(ptr) = ptr.clone() {
                 if ptr.get_type() == InstType::Alloca {
                     inst.set_operand(0, map[&ptr].into());
-                } else {
-                    replace_base_alloc(ptr, map);
                 }
             }
         }
@@ -413,8 +402,6 @@ fn replace_base_alloc(mut inst: InstPtr, map: &HashMap<InstPtr, InstPtr>) {
             if let Operand::Instruction(ptr) = ptr.clone() {
                 if ptr.get_type() == InstType::Alloca {
                     inst.set_operand(0, map[&ptr].into());
-                } else {
-                    replace_base_alloc(ptr, map);
                 }
             }
         }
@@ -423,8 +410,6 @@ fn replace_base_alloc(mut inst: InstPtr, map: &HashMap<InstPtr, InstPtr>) {
             if let Operand::Instruction(ptr) = base.clone() {
                 if ptr.get_type() == InstType::Alloca {
                     inst.set_operand(1, map[&ptr].into());
-                } else {
-                    replace_base_alloc(ptr, map);
                 }
             }
         }
@@ -664,7 +649,7 @@ impl Candidate {
                 println!(
                     "[INFO] loop {} fails because {} has multiple phi",
                     pre_header.name,
-                    indvar.get_parent_bb().unwrap().name
+                    inst.gen_llvm_ir()
                 );
                 return None;
             }
