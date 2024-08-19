@@ -94,7 +94,7 @@ pub fn apply_spills2(func: &mut Func, spills: FxHashSet<Reg>) -> Result<()> {
     // key: virtual reg, value: the physical reg that is used to store the value of the virtual reg
     let mut owner: FxHashMap<Reg, Reg> = FxHashMap::default();
     let mut owned: FxHashSet<Reg> = FxHashSet::default();
-    let i_tmps = tmp_i_regs();
+    let i_tmps = tmp_u_regs();
     let f_tmps = tmp_f_regs();
     for block in func.iter_bbs_mut() {
         let mut new_insts = vec![];

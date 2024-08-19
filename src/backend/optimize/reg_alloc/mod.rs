@@ -204,7 +204,7 @@ pub fn physical_inters(
 pub fn merge_regs(
     graph: &mut FxHashMap<Reg, FxHashSet<Reg>>,
     could_merge: &[((Reg, Reg), usize)],
-    num_available_iregs: usize,
+    num_available_uregs: usize,
     num_available_fregs: usize,
 ) -> Result<()> {
     for ((r1, r2), _) in could_merge.iter().rev() {
@@ -223,7 +223,7 @@ pub fn merge_regs(
         let r2_inter = inters(graph, r2);
         r1_inter.extend(r2_inter);
         let num_available = if r1.is_usual() {
-            num_available_iregs
+            num_available_uregs
         } else {
             num_available_fregs
         };
@@ -376,7 +376,7 @@ mod tests {
     fn no_missed() {
         let mut regs = FxHashSet::default();
         regs.extend(free_uregs());
-        regs.extend(tmp_i_regs());
+        regs.extend(tmp_u_regs());
         assert!(regs.len() == 25);
         regs.extend(special_regs());
         assert!(regs.len() == 32);
