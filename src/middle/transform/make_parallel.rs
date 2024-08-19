@@ -35,7 +35,7 @@ pub fn optimize_program<const N_THREAD: i32>(program: &mut Program) -> Result<bo
         let mut dom_tree = DominatorTree::new(func);
         changed |=
             MakeParallel::<N_THREAD>::new(program, &mut forest, &mut dom_tree, &effect_analysis)
-                .run()?;
+                .run_and_debug()?;
     }
     Ok(changed)
 }
@@ -154,11 +154,7 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
         // Get all exit edges
         // TODO-TLE: ignore all bb with one succ
         let mut exit = Vec::new();
-        for bb in &lo.blocks {
-            if bb.get_succ_bb().iter().any(|bb| !lo.is_in_loop(bb)) {
-                exit.push(bb.get_last_inst());
-            }
-        }
+        get_exit_inst(lo, lo, &mut exit);
 
         // If there are multiple exit edges, then it can't be parallelized
         if exit.len() != 1 {
@@ -340,6 +336,18 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
             }
         }
         Ok(true)
+    }
+}
+
+/// Get all exit `br` in loop.
+fn get_exit_inst(lo: LoopPtr, parent: LoopPtr, result: &mut Vec<InstPtr>) {
+    for bb in &lo.blocks {
+        if bb.get_succ_bb().iter().any(|bb| !parent.is_in_loop(bb)) {
+            result.push(bb.get_last_inst());
+        }
+    }
+    for sub_loop in lo.sub_loops.iter() {
+        get_exit_inst(*sub_loop, parent, result);
     }
 }
 
