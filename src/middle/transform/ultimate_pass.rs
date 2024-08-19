@@ -9,6 +9,14 @@ use super::{
 
 pub fn optimize_program(program: &mut Program) -> Result<bool> {
     mem2reg::optimize_program(program)?;
+    main_loop(program)?;
+    make_parallel::optimize_program::<5>(program)?;
+    main_loop(program)?;
+    sink_code::optimize_program(program)?;
+    Ok(true)
+}
+
+pub fn main_loop(program: &mut Program) -> Result<bool> {
     loop {
         let mut changed = false;
 
@@ -43,7 +51,5 @@ pub fn optimize_program(program: &mut Program) -> Result<bool> {
             break;
         }
     }
-    make_parallel::optimize_program::<5>(program)?;
-    sink_code::optimize_program(program)?;
     Ok(true)
 }
