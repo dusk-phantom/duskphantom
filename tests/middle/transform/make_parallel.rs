@@ -157,8 +157,8 @@ pub mod tests_make_parallel {
         %alloca_6 = alloca [9 x i32]
         %getelementptr_9 = getelementptr [9 x i32], ptr %alloca_5, i32 0, i32 0
         %call_10 = call i32 @getarray(i32* %getelementptr_9)
-        [+] %getelementptr_32 = getelementptr [9 x i32], ptr %alloca_6, i32 0
-        [+] %getelementptr_33 = getelementptr [9 x i32], ptr %alloca_5, i32 0
+        [+] %getelementptr_32 = getelementptr [9 x i32], ptr %alloca_5, i32 0
+        [+] %getelementptr_33 = getelementptr [9 x i32], ptr %alloca_6, i32 0
         [+] %call_34 = call i32 @thrd_create(i32 4)
         [+] %Mul_36 = mul i32 %call_34, 8
         [+] %SDiv_37 = sdiv i32 %Mul_36, 5
@@ -178,8 +178,8 @@ pub mod tests_make_parallel {
         %Add_16 = add i32 %phi_31, 1
         [-] %getelementptr_19 = getelementptr [9 x i32], ptr %alloca_5, i32 0, i32 %Add_16
         [-] %getelementptr_21 = getelementptr [9 x i32], ptr %alloca_6, i32 0, i32 %Add_16
-        [+] %getelementptr_19 = getelementptr [9 x i32], ptr %getelementptr_33, i32 0, i32 %Add_16
-        [+] %getelementptr_21 = getelementptr [9 x i32], ptr %getelementptr_32, i32 0, i32 %Add_16
+        [+] %getelementptr_19 = getelementptr [9 x i32], ptr %getelementptr_32, i32 0, i32 %Add_16
+        [+] %getelementptr_21 = getelementptr [9 x i32], ptr %getelementptr_33, i32 0, i32 %Add_16
         %load_22 = load i32, ptr %getelementptr_19
         store i32 %load_22, ptr %getelementptr_21
         br label %cond0

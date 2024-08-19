@@ -153,6 +153,8 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
 
         // Get all exit edges
         // TODO-TLE: ignore all bb with one succ
+        // TODO-TLE: for sub loops, only check for return
+        // TODO-WA: currently for do-while loops, each thread run at least one cycle
         let mut exit = Vec::new();
         get_exit_inst(lo, lo, &mut exit);
 
@@ -189,17 +191,19 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
     }
 
     fn make_parallel(&mut self, mut candidate: Candidate) -> Result<bool> {
-        // Copy global array address to local stack
+        // Copy global array address to local stack with consistent order
         let mut map = HashMap::new();
         if let Some(stack_ref) = self.stack_ref.get(&candidate.lo) {
-            for inst in stack_ref.iter() {
+            let mut vec = stack_ref.iter().cloned().collect::<Vec<_>>();
+            vec.sort_by_key(|inst| inst.get_id());
+            for inst in vec {
                 let gep_zero = self.program.mem_pool.get_getelementptr(
                     inst.get_value_type().get_sub_type().cloned().unwrap(),
-                    (*inst).into(),
+                    inst.into(),
                     vec![Constant::Int(0).into()],
                 );
                 candidate.init_bb.get_last_inst().insert_before(gep_zero);
-                map.insert(*inst, gep_zero);
+                map.insert(inst, gep_zero);
             }
         }
         replace_stack_reference(candidate.lo, &map)?;
