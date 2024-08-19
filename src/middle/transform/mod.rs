@@ -15,6 +15,7 @@ pub mod ldce;
 pub mod licm;
 pub mod load_elim;
 pub mod load_store_elim;
+pub mod loop_depth;
 pub mod loop_optimization;
 pub mod loop_simplify;
 pub mod mem2reg;
