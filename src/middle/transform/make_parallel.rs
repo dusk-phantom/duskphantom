@@ -217,7 +217,7 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
         }
         replace_stack_reference(candidate.lo, &map)?;
 
-        // Get current thread count
+        // Get current thread ID
         let func_create = self
             .program
             .module
@@ -236,8 +236,8 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
         // i = init_val
         // d = next_delta
         // e = exit_value
-        // n = current_thread
         // N = N_THREAD
+        // n = current_thread
         //
         // Before: i, i + d, i + 2d, ..., i + d(X = (e - i) ceildiv d)
         // After: [ LB = i + (e-i)n/N, UB = i + ((e-i)n + e-i)/N )
@@ -281,7 +281,7 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
         candidate.init_bb.get_last_inst().insert_before(inst_div);
 
         // Upper bound: i + ((e - i) * n + e - i) / N
-        let inst_ub = self.program.mem_pool.get_add(inst_div.into(), i);
+        let inst_ub = self.program.mem_pool.get_add(inst_div.into(), i.clone());
         candidate.init_bb.get_last_inst().insert_before(inst_ub);
 
         // Replace indvar to parallelized indvar
@@ -306,8 +306,48 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
             .iter()
             .find(|f| f.name == "thrd_join")
             .unwrap();
-        let inst_join = self.program.mem_pool.get_call(*func_join, vec![]);
+        let mut inst_join = self.program.mem_pool.get_call(*func_join, vec![]);
         candidate.exit_bb.push_front(inst_join);
+
+        // For out-of-loop indvar, replace with predicted value:
+        // i + ((e - i - 1) / delta + 1) * delta
+        let mut inst_sub = self
+            .program
+            .mem_pool
+            .get_sub(inst_sub.into(), Constant::Int(1).into());
+        inst_join.insert_after(inst_sub);
+
+        // (e - i - 1) / delta
+        let mut inst_div = self
+            .program
+            .mem_pool
+            .get_sdiv(inst_sub.into(), Constant::Int(candidate.delta).into());
+        inst_sub.insert_after(inst_div);
+
+        // (e - i - 1) / delta + 1
+        let mut inst_add = self
+            .program
+            .mem_pool
+            .get_add(inst_div.into(), Constant::Int(1).into());
+        inst_div.insert_after(inst_add);
+
+        // ((e - i - 1) / delta + 1) * delta
+        let mut inst_mul = self
+            .program
+            .mem_pool
+            .get_mul(inst_add.into(), Constant::Int(candidate.delta).into());
+        inst_add.insert_after(inst_mul);
+
+        // i + ((e - i - 1) / delta + 1) * delta
+        let inst_pred = self.program.mem_pool.get_add(inst_mul.into(), i.clone());
+        inst_mul.insert_after(inst_pred);
+
+        // Iterate all indvar users, if not in loop, replace with predicted value
+        for mut user in candidate.indvar.get_user().iter().cloned() {
+            if !candidate.lo.is_in_loop(&user.get_parent_bb().unwrap()) {
+                user.replace_operand(&candidate.indvar.into(), &inst_pred.into());
+            }
+        }
         Ok(true)
     }
 }
@@ -431,6 +471,7 @@ struct Candidate {
     lo: LoopPtr,
     indvar: InstPtr,
     exit: InstPtr,
+    delta: i32,
     init_val: Operand,
     init_bb: BBPtr,
     exit_val: Operand,
@@ -438,10 +479,12 @@ struct Candidate {
 }
 
 impl Candidate {
+    #[allow(clippy::too_many_arguments)]
     fn new(
         lo: LoopPtr,
         indvar: InstPtr,
         exit: InstPtr,
+        delta: i32,
         init_val: Operand,
         init_bb: BBPtr,
         exit_val: Operand,
@@ -451,6 +494,7 @@ impl Candidate {
             lo,
             indvar,
             exit,
+            delta,
             init_val,
             init_bb,
             exit_val,
@@ -599,7 +643,7 @@ impl Candidate {
             );
             return None;
         }
-        let Operand::Constant(_) = next_val.get_operand()[1] else {
+        let Operand::Constant(Constant::Int(delta)) = next_val.get_operand()[1] else {
             println!(
                 "[INFO] loop {} fails because {}'s second operand is not constant",
                 pre_header.name,
@@ -628,7 +672,7 @@ impl Candidate {
 
         // Construct induction variable
         Some(Self::new(
-            lo, *indvar, exit, init_val, init_bb, exit_val, *exit_bb,
+            lo, *indvar, exit, delta, init_val, init_bb, exit_val, *exit_bb,
         ))
     }
 }
