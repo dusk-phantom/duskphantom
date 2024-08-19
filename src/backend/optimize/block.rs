@@ -19,26 +19,29 @@ pub fn handle_block_simplify(func: &mut Func) -> Result<()> {
 /// a -> b 的权重
 type Weight = f32;
 
-/// 基本块在原数组中的下标
-type NodeIdx = usize;
+/// 基本块在原数组中的下标, 这个下标在 other bbs 中是不变的
+type BBIdx = usize;
+
+/// grp 在 groups 中的下标, 注意, 这个下标是不断变化的
+type GRPIdx = usize;
 
 /// Pettis-Hansen code layout
 pub struct PHCL {
-    groups: Vec<Vec<NodeIdx>>,
-    edges: HashMap<(NodeIdx /* from */, NodeIdx /* to */), Weight /* weight */>,
+    groups: Vec<Vec<BBIdx>>,
+    edges: HashMap<(BBIdx /* from */, BBIdx /* to */), Weight /* weight */>,
 }
 
 impl PHCL {
     fn new(func: &Func) -> Result<Self> {
         // 初始化单元的 group
-        let groups: Vec<Vec<NodeIdx>> = func
+        let groups: Vec<Vec<BBIdx>> = func
             .iter_bbs()
             .skip(1) // entry bb 不参与 块重排, 也就是, 这个 idx 就是 other_bbs 的 idx
             .enumerate()
             .map(|(i, _)| vec![i])
             .collect();
 
-        let label_idx_map: HashMap<String, NodeIdx> = func
+        let label_idx_map: HashMap<String, BBIdx> = func
             .iter_bbs()
             .skip(1)
             .enumerate()
@@ -50,8 +53,8 @@ impl PHCL {
             let to_bbs_label = Block::to_bbs(bb).with_context(|| context!())?;
             for to_bb_label in to_bbs_label {
                 let to_bb = func.find_bb(&to_bb_label).with_context(|| context!())?;
-                let weight: Weight = (bb.depth + to_bb.depth) as Weight
-                    / (bb.depth.abs_diff(to_bb.depth) as Weight + 1.0);
+                let weight: Weight = ((bb.depth + to_bb.depth) as Weight)
+                    / ((bb.depth.abs_diff(to_bb.depth) as Weight) + 1.0);
                 let to_bb_idx = label_idx_map
                     .get(&to_bb_label)
                     .with_context(|| context!())?;
@@ -59,12 +62,10 @@ impl PHCL {
                 edges.insert((*bb_idx, *to_bb_idx), weight);
             }
         }
-
-        // TODO 初始化有权重的图
         Ok(Self { groups, edges })
     }
 
-    fn optimize_layout(&mut self) -> Vec<NodeIdx> {
+    fn optimize_layout(&mut self) -> Vec<BBIdx> {
         // 1. 基本块分组
         while self.groups.len() > 1 {
             if let Some((idx_a, idx_b)) = self.find_most_frequent_pair() {
@@ -75,10 +76,12 @@ impl PHCL {
         }
 
         // 2. 组间布局
-        let mut layout: Vec<HashSet<NodeIdx>> = Vec::new();
+        let mut layout: Vec<HashSet<BBIdx>> = Vec::new();
         while !self.groups.is_empty() {
             if let Some(best_group_idx) = self.select_best_group(&layout) {
-                // layout.push(self.groups.into_iter());
+                let best_grp: HashSet<BBIdx> =
+                    self.groups.remove(best_group_idx).iter().cloned().collect();
+                layout.push(best_grp);
             }
         }
 
@@ -93,19 +96,65 @@ impl PHCL {
         final_layout
     }
 
-    fn select_best_group(&self, layout: &[HashSet<NodeIdx>]) -> Option<usize> {
-        // TODO
-        todo!()
+    fn select_best_group(&self, layout: &[HashSet<BBIdx>]) -> Option<GRPIdx /* best_grp_idx */> {
+        let mut max_weight: Weight = -1.0;
+        let mut best_grp: Option<GRPIdx> = None;
+        // groups 中的 grp , 不包含 layout 中的 grp
+        for (idx, grp) in self.groups.iter().enumerate() {
+            let mut total_weight: Weight = 0.0;
+            for placed_grp in layout.iter() {
+                for bb_a in grp {
+                    for placed_bb in placed_grp {
+                        if let Some(weight) = self.edges.get(&(*bb_a, *placed_bb)) {
+                            total_weight += *weight;
+                        }
+                        if let Some(weight) = self.edges.get(&(*placed_bb, *bb_a)) {
+                            total_weight += *weight;
+                        }
+                    }
+                }
+            }
+            if total_weight > max_weight {
+                max_weight = total_weight;
+                best_grp = Some(idx);
+            }
+        }
+        best_grp
     }
 
-    fn find_most_frequent_pair(&self) -> Option<(NodeIdx, NodeIdx)> {
-        // TODO
-        todo!()
+    /// 找到权重最大的一对 group
+    fn find_most_frequent_pair(&self) -> Option<(GRPIdx, GRPIdx)> {
+        let mut max_weight: Weight = -1.0;
+        let mut best_pair: Option<(GRPIdx, GRPIdx)> = None;
+        for i /* 组下标 */ in 0..self.groups.len() {
+            for j in i + 1..self.groups.len() {
+                let mut total_weight : Weight = 0 as Weight;
+                for bb_a in &self.groups[i] {
+                    for bb_b in &self.groups[j] {
+                        if let Some( weight ) = self.edges.get( &(*bb_a, *bb_b) ) {
+                            total_weight += *weight;
+                        }
+                        if let Some( weight ) = self.edges.get( &(*bb_b, *bb_a) ) {
+                            total_weight += *weight;
+                        }
+                    }
+                    if total_weight > max_weight {
+                        max_weight = total_weight;
+                        best_pair = Some((i, j));
+                    }
+                }
+            }
+        }
+        best_pair
     }
 
-    fn merge_groups(&mut self, idx_a: NodeIdx, idx_b: NodeIdx) {
-        // TODO
-        todo!()
+    /// 合并两个 group
+    fn merge_groups(&mut self, idx_a: GRPIdx, idx_b: GRPIdx) {
+        let grp_b = self.groups.remove(idx_b);
+        let grp_a = &mut self.groups[idx_a];
+        for bb in grp_b {
+            grp_a.push(bb);
+        }
     }
 }
 
