@@ -15,7 +15,8 @@ use crate::fprintln;
 use super::*;
 
 pub fn handle_reg_alloc(func: &mut Func) -> Result<()> {
-    checker::TightTerm.check_func(func);
+    debug_assert!(checker::TightTerm.check_func(func));
+
     let mut reg_graph = Func::reg_interfere_graph(func)?;
     let dtd = func.def_then_def();
     let could_merge = collect_mergeable_regs(func, &reg_graph);
