@@ -7,7 +7,6 @@ use crate::middle::{
         loop_tools::{self, LoopForest, LoopPtr},
     },
     ir::FunPtr,
-    transform::inst_combine,
     Program,
 };
 use anyhow::{Ok, Result};
@@ -25,8 +24,8 @@ pub fn optimize_program(program: &mut Program) -> Result<()> {
         loop_simplify::LoopSimplifier::new(&mut program.mem_pool).run(forest)?;
         licm::LICM::new(&mut program.mem_pool).run(forest)?;
         ldce::LDCE::new(&mut program.mem_pool, &effect_analysis).run(forest)?;
+        loop_depth::LoopDepthTracer::run(forest)?;
     }
-    inst_combine::optimize_program(program)?;
 
     Ok(())
 }

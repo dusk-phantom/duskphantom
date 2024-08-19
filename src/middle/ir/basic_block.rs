@@ -13,6 +13,8 @@ pub struct BasicBlock {
 
     pub id: usize,
 
+    pub depth: usize,
+
     /// The head instruction of the `BasicBlock`,
     /// which is used to unify the insertion operation and has no actual meaning.
     /// Logical structure of the `BasicBlock` is a two-way non-circular linked list,
@@ -42,6 +44,7 @@ impl BasicBlock {
             ir_builder,
             name,
             id: 0,
+            depth: 0,
             head_inst,
             pred_bbs: Vec::new(),
             succ_bbs: Vec::new(),
