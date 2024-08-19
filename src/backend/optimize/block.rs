@@ -10,6 +10,12 @@ pub fn handle_reorder(func: &mut Func) -> Result<()> {
     Ok(())
 }
 
+pub fn handle_block_simplify(func: &mut Func) -> Result<()> {
+    while func.simplify_term()? && func.elim_empty_bb()? {}
+    func.desimplify_term()?;
+    Ok(())
+}
+
 /// FIXME: test needed
 pub fn handle_single_jmp(func: &mut Func) -> Result<()> {
     let (ins, outs) = Func::in_out_bbs(func)?;

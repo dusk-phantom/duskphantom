@@ -59,6 +59,8 @@ fn test_symplify_and_desimplify_term(func: &mut Func) {
 
 #[allow(unused)]
 pub fn optimize_func(func: &mut Func) -> Result<()> {
+    block::handle_block_simplify(func)?;
+
     // inst combine? 匹配一些模式,将多条指令合并成一条
     fprintln!("log/before_inst_combine.s", "{}", func.gen_asm());
     inst_combine::handle_inst_combine(func)?;
