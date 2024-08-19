@@ -45,7 +45,6 @@ pub struct MakeParallel<'a, const N_THREAD: i32> {
     loop_forest: &'a mut LoopForest,
     dom_tree: &'a mut DominatorTree,
     effect_analysis: &'a EffectAnalysis,
-    has_return: HashSet<LoopPtr>,
     stack_ref: HashMap<LoopPtr, HashSet<InstPtr>>,
 }
 
@@ -61,7 +60,6 @@ impl<'a, const N_THREAD: i32> Transform for MakeParallel<'a, N_THREAD> {
     fn run(&mut self) -> Result<bool> {
         let mut changed = false;
         for lo in self.loop_forest.forest.clone() {
-            self.check_has_return(lo)?;
             self.check_stack_reference(lo)?;
         }
         for lo in self.loop_forest.forest.clone() {
@@ -87,38 +85,8 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
             loop_forest,
             dom_tree,
             effect_analysis,
-            has_return: HashSet::new(),
             stack_ref: HashMap::new(),
         }
-    }
-
-    /// Check if any block has `exit` as succ, store to `has_return`
-    fn check_has_return(&mut self, lo: LoopPtr) -> Result<()> {
-        let mut has_return = false;
-
-        // If any of sub loops has return, then this loop has return;
-        // Effect of sub loops are owned by this loop;
-        // We need to compute all sub loops here, because it will be cached
-        for sub_loop in lo.sub_loops.iter() {
-            self.check_has_return(*sub_loop)?;
-            if self.has_return.contains(sub_loop) {
-                has_return = true;
-            }
-        }
-
-        // Check if any block has `exit` as succ, store to `has_return`
-        for bb in &lo.blocks {
-            if bb.get_succ_bb().iter().any(|&bb| bb.name == "exit") {
-                has_return = true;
-                break;
-            }
-        }
-
-        // Store result
-        if has_return {
-            self.has_return.insert(lo);
-        }
-        Ok(())
     }
 
     fn check_stack_reference(&mut self, lo: LoopPtr) -> Result<()> {
@@ -175,15 +143,7 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
     }
 
     fn make_candidate(&mut self, result: &mut Vec<Candidate>, lo: LoopPtr) -> Result<()> {
-        // If loop has return, then it can't be parallelized, check sub loops instead
         let pre_header = lo.pre_header.unwrap();
-        if self.has_return.contains(&lo) {
-            println!("[INFO] loop {} has return", pre_header.name);
-            for lo in lo.sub_loops.iter() {
-                self.make_candidate(result, *lo)?;
-            }
-            return Ok(());
-        }
 
         // Get all exit edges
         // TODO-TLE: ignore all bb with one succ
