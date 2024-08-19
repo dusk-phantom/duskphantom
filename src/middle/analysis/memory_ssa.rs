@@ -28,6 +28,7 @@ pub struct MemorySSA<'a> {
     functions: Vec<FunPtr>,
     inst_to_node: HashMap<InstPtr, NodePtr>,
     block_to_node: HashMap<BBPtr, NodePtr>,
+    node_to_block: HashMap<NodePtr, BBPtr>,
     node_to_user: HashMap<NodePtr, HashSet<NodePtr>>,
     pub effect_analysis: &'a EffectAnalysis,
 }
@@ -42,6 +43,7 @@ impl<'a> MemorySSA<'a> {
             },
             inst_to_node: HashMap::new(),
             block_to_node: HashMap::new(),
+            node_to_block: HashMap::new(),
             node_to_user: HashMap::new(),
             effect_analysis,
             functions: program.module.functions.clone(),
@@ -60,6 +62,11 @@ impl<'a> MemorySSA<'a> {
     /// Get node from block.
     pub fn get_block_node(&self, bb: BBPtr) -> Option<NodePtr> {
         self.block_to_node.get(&bb).cloned()
+    }
+
+    /// Get block from node.
+    pub fn get_node_block(&self, node: NodePtr) -> Option<BBPtr> {
+        self.node_to_block.get(&node).cloned()
     }
 
     /// Get all users of a node.
@@ -240,6 +247,7 @@ impl<'a> MemorySSA<'a> {
         let mut range_to_node = RangeToNode::new();
         let entry_node = self.builder.get_entry();
         self.block_to_node.insert(entry, entry_node);
+        self.node_to_block.insert(entry_node, entry);
         range_to_node.insert(EffectRange::All, entry_node);
 
         // Insert empty phi nodes
@@ -320,6 +328,8 @@ impl<'a> MemorySSA<'a> {
         if let Some(def_node) = def_node {
             self.node_to_user.entry(def_node).or_default().insert(node);
         }
+        self.node_to_block
+            .insert(node, inst.get_parent_bb().unwrap());
         node
     }
 
@@ -355,6 +365,7 @@ impl<'a> MemorySSA<'a> {
                             let phi = self.builder.get_phi(range.clone());
                             let phi = phi_insertions.entry(bb).or_default().insert(phi);
                             self.block_to_node.insert(bb, phi);
+                            self.node_to_block.insert(phi, bb);
                             positions.push((bb, phi.get_effect_range().clone()));
                         }
                     }

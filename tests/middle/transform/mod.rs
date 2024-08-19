@@ -3,6 +3,7 @@ mod constant_fold;
 mod dead_code_elim;
 mod func_inline;
 mod load_elim;
+mod loop_optimization;
 mod make_parallel;
 mod mem2reg;
 mod redundance_elim;

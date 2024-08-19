@@ -5,6 +5,7 @@ use crate::middle::{
     analysis::{
         effect_analysis::EffectAnalysis,
         loop_tools::{self, LoopForest, LoopPtr},
+        memory_ssa::MemorySSA,
     },
     ir::FunPtr,
     Program,
@@ -13,6 +14,7 @@ use anyhow::{Ok, Result};
 
 pub fn optimize_program(program: &mut Program) -> Result<()> {
     let effect_analysis = EffectAnalysis::new(program);
+    let mut memory_ssa = MemorySSA::new(program, &effect_analysis);
     let mut func_loop_map = program
         .module
         .functions
@@ -22,7 +24,7 @@ pub fn optimize_program(program: &mut Program) -> Result<()> {
 
     for (_, forest) in func_loop_map.iter_mut() {
         loop_simplify::LoopSimplifier::new(&mut program.mem_pool).run(forest)?;
-        licm::LICM::new(&mut program.mem_pool).run(forest)?;
+        licm::LICM::new(&mut program.mem_pool, &mut memory_ssa).run(forest)?;
         ldce::LDCE::new(&mut program.mem_pool, &effect_analysis).run(forest)?;
         loop_depth::LoopDepthTracer::run(forest)?;
     }
