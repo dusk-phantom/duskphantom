@@ -4,6 +4,7 @@ use anyhow::Result;
 
 use crate::{
     backend::from_self::downcast_ref,
+    cprintln,
     middle::{
         analysis::{
             dominator_tree::DominatorTree,
@@ -35,7 +36,7 @@ pub fn optimize_program<const N_THREAD: i32>(program: &mut Program) -> Result<bo
         let mut dom_tree = DominatorTree::new(func);
         changed |=
             MakeParallel::<N_THREAD>::new(program, &mut forest, &mut dom_tree, &effect_analysis)
-                .run_and_debug()?;
+                .run_and_log()?;
     }
     Ok(changed)
 }
@@ -160,7 +161,7 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
 
         // If there are multiple exit edges, then it can't be parallelized
         if exit.len() != 1 {
-            println!("[INFO] loop {} has multiple exit edges", pre_header.name);
+            cprintln!("[INFO] loop {} has multiple exit edges", pre_header.name);
             return Ok(());
         }
 
@@ -168,16 +169,17 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
         // We only parallelize while loops instead of do-while loops! (no canonical form and it's hard to analysis)
         let exit = exit[0];
         if pre_header.get_succ_bb() != &vec![exit.get_parent_bb().unwrap()] {
-            println!(
+            cprintln!(
                 "[INFO] loop {}'s pred is not {}",
-                pre_header.name, pre_header.name
+                pre_header.name,
+                pre_header.name
             );
             return Ok(());
         }
 
         // Get induction var from exit. If failed, check sub loops instead
         let Some(candidate) = Candidate::from_exit(exit, lo, self.dom_tree) else {
-            println!("[INFO] loop {} does not have indvar", pre_header.name);
+            cprintln!("[INFO] loop {} does not have indvar", pre_header.name);
             return Ok(());
         };
 
@@ -186,12 +188,12 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
             .get_loop_effect(lo, &candidate.indvar.into())?
             .is_none()
         {
-            println!("[INFO] loop {} has conflict effect", pre_header.name);
+            cprintln!("[INFO] loop {} has conflict effect", pre_header.name);
             return Ok(());
         }
 
         // Insert candidate to results
-        println!(
+        cprintln!(
             "[INFO] loop {} is made candidate {}!",
             pre_header.name,
             candidate.dump()
@@ -448,7 +450,7 @@ fn merge_effect(a: &mut Effect, b: &Effect, indvar: &Operand) -> Result<bool> {
         || b.def_range.can_conflict(&b.use_range, indvar)
         || b.def_range.can_conflict(&b.def_range, indvar)
     {
-        println!(
+        cprintln!(
             "[INFO] failed to merge {} with {} (indvar = {})",
             a.dump(),
             b.dump(),
@@ -529,7 +531,7 @@ impl Candidate {
     fn from_exit(exit: InstPtr, lo: LoopPtr, dom_tree: &mut DominatorTree) -> Option<Self> {
         let pre_header = lo.pre_header.unwrap();
         if exit.get_type() != InstType::Br {
-            println!(
+            cprintln!(
                 "[INFO] loop {} fails because {} is not br",
                 pre_header.name,
                 exit.gen_llvm_ir()
@@ -547,9 +549,10 @@ impl Candidate {
         // Exit block should have only one pred
         // TODO-PERF: this is for easy thread join implementation, but weakens optimization
         if exit_bb.get_pred_bb().len() != 1 {
-            println!(
+            cprintln!(
                 "[INFO] loop {} fails because {} has multiple preds",
-                pre_header.name, exit_bb.name
+                pre_header.name,
+                exit_bb.name
             );
             return None;
         }
@@ -557,7 +560,7 @@ impl Candidate {
         // Condition should be `indvar < op`, get `indvar` from condition
         // TODO-PERF: use induction variable analysis to get `indvar` consistently
         let Operand::Instruction(cond) = exit.get_operand().first()? else {
-            println!(
+            cprintln!(
                 "[INFO] loop {} fails because {}'s first operand is not inst",
                 pre_header.name,
                 exit.gen_llvm_ir()
@@ -565,7 +568,7 @@ impl Candidate {
             return None;
         };
         let InstType::ICmp = cond.get_type() else {
-            println!(
+            cprintln!(
                 "[INFO] loop {} fails because {} is not condition",
                 pre_header.name,
                 cond.gen_llvm_ir()
@@ -574,7 +577,7 @@ impl Candidate {
         };
         let icmp = downcast_ref::<ICmp>(cond.as_ref().as_ref());
         if icmp.op != ICmpOp::Slt {
-            println!(
+            cprintln!(
                 "[INFO] loop {} fails because {} is not slt",
                 pre_header.name,
                 cond.gen_llvm_ir()
@@ -582,7 +585,7 @@ impl Candidate {
             return None;
         }
         let Operand::Instruction(indvar) = icmp.get_lhs() else {
-            println!(
+            cprintln!(
                 "[INFO] loop {} fails because {}'s lhs is not inst",
                 pre_header.name,
                 cond.gen_llvm_ir()
@@ -594,7 +597,7 @@ impl Candidate {
         // Exit val should be calculated before loop (dominates pre_header)
         if let Operand::Instruction(inst) = exit_val {
             if !dom_tree.is_dominate(inst.get_parent_bb().unwrap(), pre_header) {
-                println!(
+                cprintln!(
                     "[INFO] loop {} fails because {} is not calculated before loop",
                     pre_header.name,
                     inst.gen_llvm_ir()
@@ -608,7 +611,7 @@ impl Candidate {
         // `init_bb` should be `pre_header`
         // `next_bb` should be in loop
         if indvar.get_type() != InstType::Phi {
-            println!(
+            cprintln!(
                 "[INFO] loop {} fails because {} is not phi",
                 pre_header.name,
                 indvar.gen_llvm_ir()
@@ -618,7 +621,7 @@ impl Candidate {
         let phi = downcast_ref::<Phi>(indvar.as_ref().as_ref());
         let inc = phi.get_incoming_values();
         if inc.len() != 2 {
-            println!(
+            cprintln!(
                 "[INFO] loop {} fails because {}'s incoming value length is not 2",
                 pre_header.name,
                 indvar.gen_llvm_ir()
@@ -628,7 +631,7 @@ impl Candidate {
         let init_val = inc[0].0.clone();
         let init_bb = lo.pre_header?;
         if init_bb != inc[0].1 {
-            println!(
+            cprintln!(
                 "[INFO] loop {} fails because {} is not pre_header",
                 pre_header.name,
                 inc[0].1.name.clone()
@@ -636,7 +639,7 @@ impl Candidate {
             return None;
         }
         let Operand::Instruction(next_val) = inc[1].0 else {
-            println!(
+            cprintln!(
                 "[INFO] loop {} fails because {}'s second incoming value is not inst",
                 pre_header.name,
                 indvar.gen_llvm_ir()
@@ -644,7 +647,7 @@ impl Candidate {
             return None;
         };
         if next_val.get_type() != InstType::Add {
-            println!(
+            cprintln!(
                 "[INFO] loop {} fails because {} is not add",
                 pre_header.name,
                 next_val.gen_llvm_ir()
@@ -652,7 +655,7 @@ impl Candidate {
             return None;
         }
         let Operand::Constant(Constant::Int(delta)) = next_val.get_operand()[1] else {
-            println!(
+            cprintln!(
                 "[INFO] loop {} fails because {}'s second operand is not constant",
                 pre_header.name,
                 next_val.gen_llvm_ir()
@@ -661,15 +664,16 @@ impl Candidate {
         };
         let next_bb = inc[1].1;
         if !lo.is_in_loop(&next_bb) {
-            println!(
+            cprintln!(
                 "[INFO] loop {} fails because {} is not in loop",
-                pre_header.name, next_bb.name
+                pre_header.name,
+                next_bb.name
             );
             return None;
         }
         for inst in indvar.get_parent_bb().unwrap().iter() {
             if inst.get_type() == InstType::Phi && inst != *indvar {
-                println!(
+                cprintln!(
                     "[INFO] loop {} fails because {} has multiple phi",
                     pre_header.name,
                     inst.gen_llvm_ir()

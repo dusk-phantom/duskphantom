@@ -37,6 +37,16 @@ macro_rules! fprintln {
         }
     };
 }
+// 控制台打印（条件编译）
+#[macro_export]
+macro_rules! cprintln {
+    ($($arg:tt)*) => {
+        #[cfg(feature = "log_enabled")]
+        {
+            println!($($arg)*);
+        }
+    };
+}
 
 #[allow(unused)]
 pub fn must_write(path: &str, content: &str, append: bool) {
