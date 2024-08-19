@@ -1,4 +1,5 @@
 pub use super::*;
+use anyhow::Ok;
 use core::ffi;
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -10,14 +11,46 @@ pub fn try_perfect_alloc(
     let u_regs = free_iregs_with_tmp();
     let f_regs = free_fregs_with_tmp();
     let mut reg_graph = reg_graph.clone();
-    merge_regs(&mut reg_graph, could_merge, u_regs.len(), f_regs.len());
+
+    merge_regs(&mut reg_graph, could_merge, u_regs.len(), f_regs.len())
+        .with_context(|| context!())
+        .unwrap();
+
     assign_extra_edge(&mut reg_graph, u_regs.len(), f_regs.len(), def_then_def);
-    let (colors, spills) = reg_alloc(&reg_graph, u_regs, f_regs)?;
-    if spills.is_empty() {
-        Ok(colors)
-    } else {
-        Err(anyhow!(""))
+    let (simplified_graph, mut later_to_color) = simplify_graph(&reg_graph, u_regs, f_regs);
+    if simplified_graph
+        .iter()
+        .filter(|(r, _)| r.is_virtual())
+        .count()
+        != 0
+    {
+        return Err(anyhow!(""));
     }
+    let mut colors: FxHashMap<Reg, Reg> = FxHashMap::default();
+    while let Some(r) = later_to_color.pop_back() {
+        let mut used_colors: FxHashSet<Reg> = FxHashSet::default();
+        let inter = reg_graph.get(&r).expect("");
+        for v in inter {
+            if v.is_physical() {
+                used_colors.insert(*v);
+            }
+            if let Some(c) = colors.get(v) {
+                used_colors.insert(*c);
+            }
+        }
+        let color = if r.is_usual() {
+            u_regs.iter().find(|c| !used_colors.contains(c))
+        } else {
+            f_regs.iter().find(|c| !used_colors.contains(c))
+        };
+        if let Some(color) = color {
+            colors.insert(r, *color);
+        } else {
+            return Err(anyhow!(""));
+        }
+    }
+
+    Ok(colors)
 }
 
 pub fn apply_colors(func: &mut Func, colors: FxHashMap<Reg, Reg>) {
@@ -205,6 +238,7 @@ pub fn reg_alloc(
     graph: &FxHashMap<Reg, FxHashSet<Reg>>,
     i_colors: &[Reg],
     f_colors: &[Reg],
+    costs: Option<&FxHashMap<Reg, usize>>,
 ) -> Result<(FxHashMap<Reg, Reg>, FxHashSet<Reg>)> {
     let (graph_to_simplify, mut later_to_color) = simplify_graph(graph, i_colors, f_colors);
 
@@ -256,15 +290,6 @@ pub fn simplify_graph(
     i_colors: &[Reg],
     f_colors: &[Reg],
 ) -> (FxHashMap<Reg, FxHashSet<Reg>>, VecDeque<Reg>) {
-    fn remove_node(g: &mut FxHashMap<Reg, FxHashSet<Reg>>, r: Reg) {
-        let nbs = g.remove(&r).unwrap_or_default();
-        for nb in nbs {
-            if let Some(nb_nbs) = g.get_mut(&nb) {
-                nb_nbs.remove(&r);
-            }
-        }
-    }
-
     let mut graph_to_simplify = graph.clone();
 
     let mut later_to_color: VecDeque<Reg> = VecDeque::new();
@@ -277,10 +302,7 @@ pub fn simplify_graph(
             if k.is_physical() {
                 continue;
             }
-            let num_inter = v
-                .iter()
-                .filter(|v| v.is_usual() == k.is_usual() && !special_regs().contains(v))
-                .count();
+            let num_inter = v.iter().filter(|v| v.is_usual() == k.is_usual()).count();
             if k.is_float() {
                 if num_inter < f_colors.len() {
                     to_remove.push(*k);
@@ -441,7 +463,8 @@ mod tests {
         graph.insert(i_v1, FxHashSet::from_iter(vec![i_v2, i_v3]));
         graph.insert(i_v2, FxHashSet::from_iter(vec![i_v1, i_v3]));
         graph.insert(i_v3, FxHashSet::from_iter(vec![i_v1, i_v2]));
-        let (colors, to_spill) = super::reg_alloc(&graph, free_iregs(), free_fregs()).unwrap();
+        let (colors, to_spill) =
+            super::reg_alloc(&graph, free_iregs(), free_fregs(), None).unwrap();
         // dbg!(&colors);
         check_alloc(&graph, &colors, &to_spill);
     }
@@ -459,18 +482,18 @@ mod tests {
             .map(|(k, v)| (k, v.into_iter().collect()))
             .collect();
         // dbg!(&g);
-        let (colors, spills) = reg_alloc(&g, &[REG_A0, REG_A1], &[]).unwrap();
+        let (colors, spills) = reg_alloc(&g, &[REG_A0, REG_A1], &[], None).unwrap();
         // dbg!(&colors);
         // dbg!(&spills);
         assert!(spills.len() == 1);
         check_alloc(&g, &colors, &spills);
 
-        let (colors, spills) = reg_alloc(&g, &[REG_A0], &[]).unwrap();
+        let (colors, spills) = reg_alloc(&g, &[REG_A0], &[], None).unwrap();
         // dbg!(&colors);
         assert!(spills.len() == 2);
         check_alloc(&g, &colors, &spills);
 
-        let (colors, spills) = reg_alloc(&g, &[REG_A0, REG_A1, REG_A2], &[]).unwrap();
+        let (colors, spills) = reg_alloc(&g, &[REG_A0, REG_A1, REG_A2], &[], None).unwrap();
         // dbg!(&colors);
         assert!(spills.is_empty());
         check_alloc(&g, &colors, &spills);

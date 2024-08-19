@@ -20,11 +20,15 @@ pub fn handle_reg_alloc(func: &mut Func) -> Result<()> {
     let mut reg_graph = Func::reg_interfere_graph(func)?;
     let dtd = func.def_then_def();
     let could_merge = collect_mergeable_regs(func, &reg_graph);
+
+    remove_special_regs(&mut reg_graph);
     if let Ok(colors) = try_perfect_alloc(&reg_graph, &dtd, &could_merge) {
         // println!("### perfect alloc {}", func.name());
         apply_colors(func, colors);
     } else {
-        let (colors, spills) = reg_alloc(&reg_graph, free_iregs(), free_fregs())?;
+        let spill_costs = count_spill_costs(func);
+        let (colors, spills) =
+            reg_alloc(&reg_graph, free_iregs(), free_fregs(), Some(&spill_costs))?;
         apply_colors(func, colors);
         apply_spills(func, spills);
     }
@@ -34,8 +38,20 @@ pub fn handle_reg_alloc(func: &mut Func) -> Result<()> {
     Ok(())
 }
 
+pub fn remove_special_regs(graph: &mut FxHashMap<Reg, FxHashSet<Reg>>) {
+    for r in special_regs() {
+        if let Some(inter) = graph.remove(r) {
+            for r2 in inter {
+                if let Some(inter) = graph.get_mut(&r2) {
+                    inter.remove(r);
+                }
+            }
+        }
+    }
+}
+
 /// 估计虚拟寄存器被spill造成的代价
-pub fn count_spill_cost(func: &Func) -> FxHashMap<Reg, usize> {
+pub fn count_spill_costs(func: &Func) -> FxHashMap<Reg, usize> {
     let mut cost: FxHashMap<Reg, usize> = FxHashMap::default();
     for bb in func.iter_bbs() {
         let factor = bb.depth + 1; //考虑深度从0开始,+1作为基数
@@ -133,6 +149,42 @@ pub fn collect_mergeable_regs(
     could_merge
 }
 
+pub fn inters(graph: &FxHashMap<Reg, FxHashSet<Reg>>, r: &Reg) -> impl IntoIterator<Item = Reg> {
+    graph.get(r).cloned().unwrap_or_default()
+}
+
+pub fn virtual_inters(graph: &FxHashMap<Reg, FxHashSet<Reg>>, r: &Reg) -> FxHashSet<Reg> {
+    inters(graph, r)
+        .into_iter()
+        .filter(|r| r.is_virtual())
+        .collect()
+}
+
+pub fn physical_inters(
+    graph: &FxHashMap<Reg, FxHashSet<Reg>>,
+    colors: Option<&FxHashMap<Reg, Reg>>,
+    r: &Reg,
+) -> FxHashSet<Reg> {
+    fn color(r: &Reg, colors: &FxHashMap<Reg, Reg>) -> Option<Reg> {
+        if r.is_physical() {
+            Some(*r)
+        } else {
+            colors.get(r).cloned()
+        }
+    }
+    if let Some(colors) = colors {
+        inters(graph, r)
+            .into_iter()
+            .flat_map(|r| color(&r, colors))
+            .collect()
+    } else {
+        inters(graph, r)
+            .into_iter()
+            .filter(|r| r.is_physical())
+            .collect()
+    }
+}
+
 /// 给冲突图增加约束以实现寄存器合并
 /// 如果两个虚拟寄存器或者一个虚拟寄存器和一个物理寄存器被认为应该分配到同一个物理寄存器上,那么就把它们在冲突图中的冲突列表合并并
 /// 设置为他们各自的冲突列表
@@ -141,31 +193,47 @@ pub fn merge_regs(
     could_merge: &[((Reg, Reg), usize)],
     num_available_iregs: usize,
     num_available_fregs: usize,
-) {
+) -> Result<()> {
     for ((r1, r2), _) in could_merge.iter().rev() {
-        // 如果两个寄存器都是物理寄存器,那么不需要合并,也不能合并
-        if r1.is_physical() && r2.is_physical() {
+        // 不能合并的情况
+        // case 1: 两个寄存器都是物理寄存器
+        // case 2: 两个寄存器中有一个是特殊寄存器
+        // case 3: 两个寄存器类型不同
+        if (r1.is_physical() && r2.is_physical())
+            || special_regs().contains(r1)
+            || special_regs().contains(r2)
+            || (r1.is_usual() != r2.is_usual())
+        {
             continue;
         }
-        let mut r1_inter = graph.get(r1).unwrap().clone();
-        let r2_inter = graph.get(r2).unwrap().clone();
-        r1_inter.extend(&r2_inter);
-        r1_inter.retain(|r| !special_regs().contains(r));
+        let mut r1_inter: FxHashSet<Reg> = inters(graph, r1).into_iter().collect();
+        let r2_inter = inters(graph, r2);
+        r1_inter.extend(r2_inter);
         let num_available = if r1.is_usual() {
             num_available_iregs
         } else {
             num_available_fregs
         };
-        // 移除不需要考虑
+
         let num_inter = r1_inter
             .iter()
-            .filter(|r| !special_regs().contains(r) && r.is_usual() == r1.is_usual())
+            .filter(|r| r.is_usual() == r1.is_usual())
             .count();
         // 如果合并两个寄存器(也就是给他们分配一样的颜色)之后,寄存器压力小于可分配物理寄存器的数量,那么认为不会降低可着色性
         // 则把新的冲突列表更新给r1,r2
         if num_inter < num_available {
             graph.insert(*r1, r1_inter.clone());
             graph.insert(*r2, r1_inter);
+        }
+    }
+    Ok(())
+}
+
+pub fn remove_node(g: &mut FxHashMap<Reg, FxHashSet<Reg>>, r: Reg) {
+    let nbs = g.remove(&r).unwrap_or_default();
+    for nb in nbs {
+        if let Some(nb_nbs) = g.get_mut(&nb) {
+            nb_nbs.remove(&r);
         }
     }
 }
@@ -290,5 +358,18 @@ mod tests {
         check(free_iregs());
         check(free_fregs_with_tmp());
         check(free_iregs_with_tmp());
+    }
+    #[test]
+    fn no_missed() {
+        let mut regs = FxHashSet::default();
+        regs.extend(free_iregs());
+        regs.extend(tmp_i_regs());
+        assert!(regs.len() == 25);
+        regs.extend(special_regs());
+        assert!(regs.len() == 32);
+        regs.extend(free_fregs());
+        assert!(regs.len() == 61);
+        regs.extend(tmp_f_regs());
+        assert!(regs.len() == 64);
     }
 }
