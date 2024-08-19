@@ -233,35 +233,35 @@ pub fn reg_alloc(
     let mut to_spill: FxHashSet<Reg> = FxHashSet::default();
 
     // try to color the rest of the graph
+    // 创建fisrst_to_color,first_to_color中的寄存器应该按照 从id小到大的顺序来分配
     let mut first_to_color: Vec<(Reg, usize)> = graph_to_simplify
         .into_iter()
         .filter(|(k, _)| k.is_virtual())
         .map(|(k, v)| (k, v.len()))
         .collect();
-    first_to_color.sort_by_key(|(_, v)| *v);
-    for (k, _) in first_to_color {
+
+    // spill cost越大,越不应该被spill,所以应该优先分配
+    // num_inter越大,越容易与其他寄存器冲突,越容易让其他寄存器spill,更可能增加spill总代价,所以应该晚分配
+    if let Some(costs) = costs {
+        // 仅仅考虑spill cost 的策略
+        first_to_color.sort_by_key(|(k, v)| costs.get(k).cloned().unwrap_or(1));
+        // 考虑spill cost 和 num_inter的策略,spill cost/num_inter越大,越不应该被spill,所以应该优先分配
+        // first_to_color.sort_by_key(|(k, v)| {
+        //     (costs.get(k).cloned().unwrap_or(1) as f64 / (*v as f64 + 1.0)) * 10000.0
+        // } as usize);
+    } else {
+        first_to_color.sort_by_key(|(_, v)| *v);
+        first_to_color.reverse();
+    }
+
+    for (k, _) in first_to_color.into_iter().rev() {
         later_to_color.push_back(k);
     }
 
     while let Some(r) = later_to_color.pop_back() {
-        let mut used_colors: FxHashSet<Reg> = FxHashSet::default();
-        let inter = graph.get(&r).expect("");
-        for v in inter {
-            if v.is_physical() {
-                used_colors.insert(*v);
-            }
-            if let Some(c) = colors.get(v) {
-                used_colors.insert(*c);
-            }
-        }
-        // find the first color that is not used
-        let color = if r.is_usual() {
-            i_colors.iter().find(|c| !used_colors.contains(c))
-        } else {
-            f_colors.iter().find(|c| !used_colors.contains(c))
-        };
-        if let Some(color) = color {
-            colors.insert(r, *color);
+        let mut interred_colors: FxHashSet<Reg> = physical_inters(graph, Some(&colors), &r);
+        if let Some(color) = select_free_color(i_colors, f_colors, &r, &interred_colors) {
+            colors.insert(r, color);
         } else {
             to_spill.insert(r);
         }
