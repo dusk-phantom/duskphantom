@@ -8,7 +8,7 @@ pub fn try_perfect_alloc(
     def_then_def: &FxHashMap<Reg, FxHashSet<Reg>>,
     could_merge: &[((Reg, Reg), usize)],
 ) -> Result<FxHashMap<Reg, Reg>> {
-    let u_regs = free_iregs_with_tmp();
+    let u_regs = free_uregs_with_tmp();
     let f_regs = free_fregs_with_tmp();
     let mut reg_graph = reg_graph.clone();
 
@@ -27,24 +27,11 @@ pub fn try_perfect_alloc(
         return Err(anyhow!(""));
     }
     let mut colors: FxHashMap<Reg, Reg> = FxHashMap::default();
+
     while let Some(r) = later_to_color.pop_back() {
-        let mut used_colors: FxHashSet<Reg> = FxHashSet::default();
-        let inter = reg_graph.get(&r).expect("");
-        for v in inter {
-            if v.is_physical() {
-                used_colors.insert(*v);
-            }
-            if let Some(c) = colors.get(v) {
-                used_colors.insert(*c);
-            }
-        }
-        let color = if r.is_usual() {
-            u_regs.iter().find(|c| !used_colors.contains(c))
-        } else {
-            f_regs.iter().find(|c| !used_colors.contains(c))
-        };
-        if let Some(color) = color {
-            colors.insert(r, *color);
+        let interred_colors = physical_inters(&reg_graph, Some(&colors), &r);
+        if let Some(color) = select_free_color(u_regs, f_regs, &r, &interred_colors) {
+            colors.insert(r, color);
         } else {
             return Err(anyhow!(""));
         }
@@ -464,7 +451,7 @@ mod tests {
         graph.insert(i_v2, FxHashSet::from_iter(vec![i_v1, i_v3]));
         graph.insert(i_v3, FxHashSet::from_iter(vec![i_v1, i_v2]));
         let (colors, to_spill) =
-            super::reg_alloc(&graph, free_iregs(), free_fregs(), None).unwrap();
+            super::reg_alloc(&graph, free_uregs(), free_fregs(), None).unwrap();
         // dbg!(&colors);
         check_alloc(&graph, &colors, &to_spill);
     }
