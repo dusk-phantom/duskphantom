@@ -68,10 +68,6 @@ fn insts_scheduling(insts: &[Inst]) -> Result<Vec<InstID>> {
         }
     }
 
-    for last in graph.control.iter().flatten() {
-        new_insts.push(*last);
-    }
-
     Ok(new_insts)
 }
 
@@ -169,7 +165,6 @@ struct Graph<'a> {
     use_defs: HashMap<InstID /* use */, HashSet<InstID> /* def */>,
     def_uses: HashMap<InstID /* def */, HashSet<InstID> /* use */>,
     insts: &'a [Inst],
-    control: [Option<InstID>; 2],
 }
 
 impl<'a> Graph<'a> {
@@ -255,49 +250,12 @@ enum WrapOperand {
 
 impl<'a> Graph<'a> {
     fn new(insts: &'a [Inst]) -> Result<Self> {
-        // 处理控制流指令
-        // branch -> jmp
-        // jmp / call / ret
-        let mut inst_len;
-        let last = if !insts.is_empty() {
-            // 判断最后一条指令
-            match insts[insts.len() - 1] {
-                Inst::Ret | Inst::Tail(_) | Inst::Jmp(_) => {
-                    inst_len = insts.len() - 1;
-                    Some(inst_len)
-                }
-                _ => {
-                    return Err(anyhow!("last instruction is not a control flow"));
-                }
-            }
-        } else {
-            return Err(anyhow!("build with a empty bb"));
-        };
-
-        let last_last = if insts.len() >= 2 {
-            // 判断最后一条指令
-            match insts[insts.len() - 2] {
-                Inst::Beq(_)
-                | Inst::Bne(_)
-                | Inst::Blt(_)
-                | Inst::Ble(_)
-                | Inst::Bgt(_)
-                | Inst::Bge(_) => {
-                    inst_len = insts.len() - 2;
-                    Some(inst_len)
-                }
-                _ => None,
-            }
-        } else {
-            None
-        };
-
-        let bucket = Self::construct_bucket(&insts[0..inst_len]).with_context(|| context!())?;
+        let bucket = Self::construct_bucket(insts).with_context(|| context!())?;
 
         // 初始化图
         let mut use_defs: HashMap<InstID, HashSet<InstID>> = HashMap::new();
         let mut def_uses: HashMap<InstID, HashSet<InstID>> = HashMap::new();
-        for id in 0..inst_len {
+        for id in 0..insts.len() {
             use_defs.entry(id).or_default();
             def_uses.entry(id).or_default();
         }
@@ -345,13 +303,26 @@ impl<'a> Graph<'a> {
             }
         }
 
-        for id in (0..inst_len).filter(|id| matches!(insts[*id], Inst::Call(_))) {
+        for id in (0..insts.len()).filter(|id| {
+            matches!(
+                insts[*id],
+                Inst::Call(_)
+                    | Inst::Beq(_)
+                    | Inst::Bne(_)
+                    | Inst::Bge(_)
+                    | Inst::Bgt(_)
+                    | Inst::Ble(_)
+                    | Inst::Blt(_)
+                    | Inst::Ret
+                    | Inst::Jmp(_)
+            )
+        }) {
             // call 依赖于前面所有指令的指令
             for i in 0..id {
                 use_defs.entry(id).or_default().insert(i);
             }
             // 后面所有指令依赖于这条 call
-            for i in id + 1..inst_len {
+            for i in id + 1..insts.len() {
                 use_defs.entry(i).or_default().insert(id);
             }
         }
@@ -366,7 +337,6 @@ impl<'a> Graph<'a> {
             use_defs,
             def_uses,
             insts,
-            control: [last_last, last],
         })
     }
 
@@ -425,9 +395,8 @@ impl<'a> Graph<'a> {
                 | Inst::Bge(_)
                 | Inst::Tail(_)
                 | Inst::Ret
-                | Inst::Jmp(_) => {
-                    return Err(anyhow!("control flow instruction"));
-                }
+                | Inst::Jmp(_)
+                | Inst::Call(_) => { /* 对于 bucket 啥也不干, 后面再单独处理 */ }
                 Inst::Ld(ld) => {
                     let base = ld.base();
                     if let Some(label) = reg_label.get(base) {
@@ -496,7 +465,6 @@ impl<'a> Graph<'a> {
                         .or_default()
                         .push((id, false));
                 }
-                Inst::Call(_) => {}
                 Inst::Lla(lla) => {
                     let reg = lla.dst();
                     let label = lla.label().to_string();
