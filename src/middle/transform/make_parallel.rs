@@ -149,12 +149,12 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
     }
 
     fn make_candidate(&mut self, result: &mut Vec<Candidate>, lo: LoopPtr) -> Result<()> {
+        #[allow(unused)]
         let pre_header = lo.pre_header.unwrap();
 
         // Get all exit edges
         // TODO-TLE: ignore all bb with one succ
         // TODO-TLE: for sub loops, only check for return
-        // TODO-WA: currently for do-while loops, each thread run at least one cycle
         let mut exit = Vec::new();
         get_exit_inst(lo, lo, &mut exit);
 
@@ -164,8 +164,18 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
             return Ok(());
         }
 
-        // Get induction var from exit. If failed, check sub loops instead
+        // If succ of pre_header is not exit, then it can't be parallelized
+        // We only parallelize while loops instead of do-while loops! (no canonical form and it's hard to analysis)
         let exit = exit[0];
+        if pre_header.get_succ_bb() != &vec![exit.get_parent_bb().unwrap()] {
+            println!(
+                "[INFO] loop {}'s pred is not {}",
+                pre_header.name, pre_header.name
+            );
+            return Ok(());
+        }
+
+        // Get induction var from exit. If failed, check sub loops instead
         let Some(candidate) = Candidate::from_exit(exit, lo, self.dom_tree) else {
             println!("[INFO] loop {} does not have indvar", pre_header.name);
             return Ok(());
@@ -500,6 +510,7 @@ impl Candidate {
     }
 
     /// Dump candidate to string for debugging.
+    #[allow(unused)]
     fn dump(&self) -> String {
         format!(
             "Candidate {{\n  indvar: {},\n  exit: {},\n  init_val: {},\n  init_bb: {},\n  exit_val: {},\n  exit_bb: {},\n}}",
