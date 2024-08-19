@@ -28,7 +28,7 @@ pub fn handle_reg_alloc(func: &mut Func) -> Result<()> {
     } else {
         let spill_costs = count_spill_costs(func);
         let (colors, spills) =
-            reg_alloc(&reg_graph, free_iregs(), free_fregs(), Some(&spill_costs))?;
+            reg_alloc(&reg_graph, free_uregs(), free_fregs(), Some(&spill_costs))?;
         apply_colors(func, colors);
         apply_spills(func, spills);
     }
@@ -48,6 +48,19 @@ pub fn remove_special_regs(graph: &mut FxHashMap<Reg, FxHashSet<Reg>>) {
             }
         }
     }
+}
+
+pub fn select_free_color(
+    ucolors: &[Reg],
+    fcolors: &[Reg],
+    r: &Reg,
+    interred_colors: &FxHashSet<Reg>,
+) -> Option<Reg> {
+    let colors = if r.is_usual() { ucolors } else { fcolors };
+    colors
+        .iter()
+        .find(|r1| !interred_colors.contains(r1) && (r1.is_usual() == r.is_usual()))
+        .cloned()
 }
 
 /// 估计虚拟寄存器被spill造成的代价
@@ -289,7 +302,7 @@ fn op_eq_one(op: &Operand) -> bool {
 /// 其中t0-t3是临时寄存器,t0-t2用于处理spill的虚拟寄存器,t3用于计算内存操作指令off溢出时的地址 <br>
 /// s0是栈帧指针,用于保存调用者保存的寄存器 <br>
 /// ...
-pub fn free_iregs() -> &'static [Reg; 22] {
+pub fn free_uregs() -> &'static [Reg; 22] {
     &[
         // usual registers
         REG_S1, REG_A0, REG_A1, REG_A2, REG_A3, REG_A4, REG_A5, REG_A6, REG_A7, REG_S2, REG_S3,
@@ -309,7 +322,7 @@ pub fn free_fregs() -> &'static [Reg; 29] {
 }
 
 /// 自由通用寄存器 加上 临时通用寄存器
-pub fn free_iregs_with_tmp() -> &'static [Reg; 25] {
+pub fn free_uregs_with_tmp() -> &'static [Reg; 25] {
     &[
         /* tmp usual regs: */ REG_T0, REG_T1, REG_T2, /* free usual regs: */ REG_S1,
         REG_A0, REG_A1, REG_A2, REG_A3, REG_A4, REG_A5, REG_A6, REG_A7, REG_S2, REG_S3, REG_S4,
@@ -346,7 +359,7 @@ mod tests {
 
     use crate::backend::irs::Reg;
 
-    use super::{free_fregs, free_fregs_with_tmp, free_iregs, free_iregs_with_tmp};
+    use super::{free_fregs, free_fregs_with_tmp, free_uregs, free_uregs_with_tmp};
 
     #[test]
     fn no_duplicate() {
@@ -355,14 +368,14 @@ mod tests {
             assert!(r_set.len() == regs.len());
         };
         check(free_fregs());
-        check(free_iregs());
+        check(free_uregs());
         check(free_fregs_with_tmp());
-        check(free_iregs_with_tmp());
+        check(free_uregs_with_tmp());
     }
     #[test]
     fn no_missed() {
         let mut regs = FxHashSet::default();
-        regs.extend(free_iregs());
+        regs.extend(free_uregs());
         regs.extend(tmp_i_regs());
         assert!(regs.len() == 25);
         regs.extend(special_regs());
