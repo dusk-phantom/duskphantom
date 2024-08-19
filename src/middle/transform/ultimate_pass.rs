@@ -4,7 +4,7 @@ use crate::middle::Program;
 
 use super::{
     block_fuse, dead_code_elim, func_inline, inst_combine, load_store_elim, loop_optimization,
-    mem2reg, redundance_elim, sink_code,
+    make_parallel, mem2reg, redundance_elim, sink_code,
 };
 
 pub fn optimize_program(program: &mut Program) -> Result<bool> {
@@ -43,6 +43,7 @@ pub fn optimize_program(program: &mut Program) -> Result<bool> {
             break;
         }
     }
+    make_parallel::optimize_program::<5>(program)?;
     sink_code::optimize_program(program)?;
     Ok(true)
 }

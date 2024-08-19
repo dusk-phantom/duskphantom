@@ -122,60 +122,64 @@ impl<'a> SinkCode<'a> {
             }
 
             // Check if there are users in (C OR D) branch
-            let mut exist_in_other = false;
             for (k, v) in dominatee_to_user.iter() {
                 if !root.get_succ_bb().contains(k) && !v.is_empty() {
-                    exist_in_other = true;
-                    break;
+                    return Ok(changed);
                 }
             }
 
-            // If not, sink into each successor
-            if !exist_in_other {
-                changed = true;
-                for succ in root.get_succ_bb() {
-                    let user = dominatee_to_user
-                        .get(succ)
-                        .cloned()
-                        .unwrap_or(HashSet::new());
-                    if !user.is_empty() {
-                        let mut new_inst = self
-                            .program
-                            .mem_pool
-                            .copy_instruction(inst.as_ref().as_ref());
-                        for op in inst.get_operand() {
-                            new_inst.add_operand(op.clone());
-                        }
-
-                        // Get insert position (as low as possible)
-                        let user_in_succ =
-                            block_to_user.get(succ).cloned().unwrap_or(HashSet::new());
-                        let mut frontier = None;
-                        for inst in succ.iter() {
-                            if user_in_succ.contains(&FakeInst::Normal(inst)) {
-                                frontier = Some(inst);
-                                break;
-                            }
-                        }
-
-                        // Insert new instruction and maintain use-def chain
-                        if let Some(mut frontier) = frontier {
-                            frontier.insert_before(new_inst);
-                        } else {
-                            succ.get_last_inst().insert_before(new_inst);
-                        }
-                        for mut user in user {
-                            user.replace_operand(&inst.into(), &new_inst.into());
-                        }
-
-                        // Sink recursively
-                        self.sink_inst(new_inst, dom_tree)?;
+            // Check if each dominatee is not loop header
+            for dominatee in dominatee_to_user.keys() {
+                for pred in dominatee.get_pred_bb() {
+                    if dom_tree.is_dominate(*dominatee, *pred) {
+                        return Ok(changed);
                     }
                 }
-
-                // Remove the original instruction
-                inst.remove_self();
             }
+
+            // Sink into each successor
+            changed = true;
+            for succ in root.get_succ_bb() {
+                let user = dominatee_to_user
+                    .get(succ)
+                    .cloned()
+                    .unwrap_or(HashSet::new());
+                if !user.is_empty() {
+                    let mut new_inst = self
+                        .program
+                        .mem_pool
+                        .copy_instruction(inst.as_ref().as_ref());
+                    for op in inst.get_operand() {
+                        new_inst.add_operand(op.clone());
+                    }
+
+                    // Get insert position (as low as possible)
+                    let user_in_succ = block_to_user.get(succ).cloned().unwrap_or(HashSet::new());
+                    let mut frontier = None;
+                    for inst in succ.iter() {
+                        if user_in_succ.contains(&FakeInst::Normal(inst)) {
+                            frontier = Some(inst);
+                            break;
+                        }
+                    }
+
+                    // Insert new instruction and maintain use-def chain
+                    if let Some(mut frontier) = frontier {
+                        frontier.insert_before(new_inst);
+                    } else {
+                        succ.get_last_inst().insert_before(new_inst);
+                    }
+                    for mut user in user {
+                        user.replace_operand(&inst.into(), &new_inst.into());
+                    }
+
+                    // Sink recursively
+                    self.sink_inst(new_inst, dom_tree)?;
+                }
+            }
+
+            // Remove the original instruction
+            inst.remove_self();
         }
 
         // If there is only one successor, and it's dominated
