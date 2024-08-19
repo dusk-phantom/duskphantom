@@ -1,7 +1,10 @@
 use std::pin::Pin;
 
 use crate::middle::{
-    analysis::loop_tools::{LoopForest, LoopPtr},
+    analysis::{
+        loop_tools::{LoopForest, LoopPtr},
+        memory_ssa::MemorySSA,
+    },
     ir::{instruction::InstType, BBPtr, IRBuilder, InstPtr, Operand},
 };
 use anyhow::{Ok, Result};
@@ -10,13 +13,20 @@ use super::loop_optimization::loop_forest_post_order;
 
 type IRBuilderWraper = Pin<Box<IRBuilder>>;
 
-pub struct LICM<'a> {
+pub struct LICM<'a, 'b> {
     _ir_builder: &'a mut IRBuilderWraper,
+    memory_ssa: &'a mut MemorySSA<'b>,
 }
 
-impl<'a> LICM<'a> {
-    pub fn new(_ir_builder: &'a mut IRBuilderWraper) -> LICM {
-        Self { _ir_builder }
+impl<'a, 'b> LICM<'a, 'b> {
+    pub fn new(
+        _ir_builder: &'a mut IRBuilderWraper,
+        memory_ssa: &'a mut MemorySSA<'b>,
+    ) -> LICM<'a, 'b> {
+        Self {
+            _ir_builder,
+            memory_ssa,
+        }
     }
 
     pub fn run(&mut self, forest: &mut LoopForest) -> Result<()> {
@@ -32,24 +42,23 @@ impl<'a> LICM<'a> {
 
     fn licm_one_bb(&mut self, lo: LoopPtr, bb: BBPtr, preheader: BBPtr) -> Result<()> {
         for inst in bb.iter() {
-            Self::licm_inst_trace(lo, inst, preheader)?
+            self.licm_inst_trace(lo, inst, preheader)?
         }
         Ok(())
     }
 
-    fn licm_inst_trace(lo: LoopPtr, mut inst: InstPtr, preheader: BBPtr) -> Result<()> {
+    fn licm_inst_trace(&mut self, lo: LoopPtr, mut inst: InstPtr, preheader: BBPtr) -> Result<()> {
         if
         // 防止递归之后得到循环外的inst
         lo.is_in_loop(&inst.get_parent_bb().unwrap())
-        // 以下指令暂不考虑（没有指针分析）
+        // 以下指令暂不考虑
         && !matches!(
             inst.get_type(),
             InstType::Br
             | InstType::Alloca
-            | InstType::Load
             | InstType::Store
-            | InstType::Ret
             | InstType::Call
+            | InstType::Ret
             | InstType::Phi
             )
         // 判断是否是循环不变量，即操作数是否都在循环外 
@@ -60,15 +69,19 @@ impl<'a> LICM<'a> {
                 true
             }
             })
-        {
+        // 对于 Load 指令，所使用的 MemoryDef 必须在循环外
+        && self.memory_ssa.get_inst_node(inst).map_or(true, |node| {
+            !lo.is_in_loop(&self.memory_ssa.get_node_block(node.get_use_node()).unwrap())
+        }) {
             unsafe {
                 inst.move_self();
             }
+            // 无需移动 MemorySSA 节点，反正 Load 不会被别的用
             preheader.get_last_inst().insert_before(inst);
 
             inst.get_user()
                 .iter()
-                .try_for_each(|&user| Self::licm_inst_trace(lo, user, preheader))?
+                .try_for_each(|&user| self.licm_inst_trace(lo, user, preheader))?
         }
         Ok(())
     }
