@@ -11,7 +11,7 @@ pub fn optimize_program(program: &mut Program) -> Result<bool> {
     mem2reg::optimize_program(program)?;
     main_loop(program)?;
     make_parallel::optimize_program::<5>(program)?;
-    main_loop(program)?;
+    eval_and_prune(program)?;
     sink_code::optimize_program(program)?;
     Ok(true)
 }
@@ -24,16 +24,7 @@ pub fn main_loop(program: &mut Program) -> Result<bool> {
         changed |= func_inline::optimize_program(program)?;
 
         // Simplify code
-        loop {
-            let mut c = false;
-            c |= inst_combine::optimize_program(program)?;
-            c |= load_store_elim::optimize_program(program)?;
-            c |= dead_code_elim::optimize_program(program)?;
-            changed |= c;
-            if !c {
-                break;
-            }
-        }
+        changed |= eval_and_prune(program)?;
 
         // Remove redundancy
         changed |= redundance_elim::optimize_program(program)?;
@@ -52,4 +43,19 @@ pub fn main_loop(program: &mut Program) -> Result<bool> {
         }
     }
     Ok(true)
+}
+
+pub fn eval_and_prune(program: &mut Program) -> Result<bool> {
+    let mut changed = false;
+    loop {
+        let mut c = false;
+        c |= inst_combine::optimize_program(program)?;
+        c |= load_store_elim::optimize_program(program)?;
+        c |= dead_code_elim::optimize_program(program)?;
+        changed |= c;
+        if !c {
+            break;
+        }
+    }
+    Ok(changed)
 }

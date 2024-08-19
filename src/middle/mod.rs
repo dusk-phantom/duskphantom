@@ -1,7 +1,7 @@
 use crate::{/* errors::MiddleError, */ frontend, utils::mem::ObjPtr};
 use anyhow::Context;
 use ir::ir_builder::IRBuilder;
-use transform::{loop_optimization, ultimate_pass};
+use transform::ultimate_pass;
 
 pub mod analysis;
 pub mod ir;
@@ -28,8 +28,6 @@ pub fn gen(program: &frontend::Program) -> Result<Program> {
 
 pub fn optimize(program: &mut Program) {
     ultimate_pass::optimize_program(program).unwrap();
-    // Loop optimization
-    loop_optimization::optimize_program(program).unwrap();
 }
 
 impl Default for Program {
