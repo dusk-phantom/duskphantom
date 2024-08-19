@@ -1,6 +1,5 @@
 pub use super::*;
 use anyhow::Ok;
-use core::ffi;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 pub fn try_perfect_alloc(
@@ -40,37 +39,39 @@ pub fn try_perfect_alloc(
     Ok(colors)
 }
 
-pub fn apply_colors(func: &mut Func, colors: FxHashMap<Reg, Reg>) {
+pub fn apply_colors(func: &mut Func, colors: FxHashMap<Reg, Reg>) -> Result<()> {
     for block in func.iter_bbs_mut() {
         for inst in block.insts_mut() {
             let uses: Vec<Reg> = inst.uses().into_iter().cloned().collect();
             let defs: Vec<Reg> = inst.defs().into_iter().cloned().collect();
             for r in uses.iter().filter(|r| r.is_virtual()) {
                 if let Some(color) = colors.get(r) {
-                    inst.replace_use(*r, *color);
+                    inst.replace_use(*r, *color)?;
                 }
             }
             for r in defs.into_iter().filter(|r| r.is_virtual()) {
                 if let Some(color) = colors.get(&r) {
-                    inst.replace_def(r, *color);
+                    inst.replace_def(r, *color)?;
                 }
             }
         }
     }
+    Ok(())
 }
 
 /// FIXME: some bug exists
 /// 使用t0-t2来处理spill的虚拟寄存器
-pub fn apply_spills(func: &mut Func, spills: FxHashSet<Reg>) {
+pub fn apply_spills(func: &mut Func, spills: FxHashSet<Reg>) -> Result<()> {
     if spills.is_empty() {
-        return;
+        return Ok(());
     }
-    phisicalize::phisicalize_reg(func);
+    phisicalize::phisicalize_reg(func)
 }
 
 /// FIXME: now have some bug, need more precise analysis for reg lives
 /// 延迟t0-t2的释放的方式来处理spill的虚拟寄存器,
 /// 也就是在使用到spill的虚拟寄存器时,选择t0-t2中一个将其物理化,在使用完后,直到被下一个spill虚拟寄存器使用前,才释放占有的物理寄存器
+#[allow(unused)]
 pub fn apply_spills2(func: &mut Func, spills: FxHashSet<Reg>) -> Result<()> {
     if spills.is_empty() {
         return Ok(());
@@ -244,7 +245,7 @@ pub fn reg_alloc(
     // num_inter越大,越容易与其他寄存器冲突,越容易让其他寄存器spill,更可能增加spill总代价,所以应该晚分配
     if let Some(costs) = costs {
         // 仅仅考虑spill cost 的策略
-        first_to_color.sort_by_key(|(k, v)| costs.get(k).cloned().unwrap_or(1));
+        first_to_color.sort_by_key(|(k, _)| costs.get(k).cloned().unwrap_or(1));
         // 考虑spill cost 和 num_inter的策略,spill cost/num_inter越大,越不应该被spill,所以应该优先分配
         // first_to_color.sort_by_key(|(k, v)| {
         //     (costs.get(k).cloned().unwrap_or(1) as f64 / (*v as f64 + 1.0)) * 10000.0
@@ -259,7 +260,7 @@ pub fn reg_alloc(
     }
 
     while let Some(r) = later_to_color.pop_back() {
-        let mut interred_colors: FxHashSet<Reg> = physical_inters(graph, Some(&colors), &r);
+        let interred_colors: FxHashSet<Reg> = physical_inters(graph, Some(&colors), &r);
         if let Some(color) = select_free_color(i_colors, f_colors, &r, &interred_colors) {
             colors.insert(r, color);
         } else {
@@ -322,7 +323,7 @@ pub fn assign_extra_edge(
     graph: &mut FxHashMap<Reg, FxHashSet<Reg>>,
     num_free_iregs: usize,
     num_free_fregs: usize,
-    mut extra_edges: &FxHashMap<Reg, FxHashSet<Reg>>,
+    extra_edges: &FxHashMap<Reg, FxHashSet<Reg>>,
 ) {
     fn num_inter(g: &FxHashMap<Reg, FxHashSet<Reg>>, r: &Reg) -> usize {
         g.get(r).map(|nbs| nbs.len()).unwrap_or(0)

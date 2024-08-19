@@ -5,6 +5,7 @@ use super::*;
 /// 如果交换会造成需要插入新的jmp指令或者产生新的长跳转,则不交换
 /// 否则,交换Bi+1和Bj的位置
 /// 不断重复上述过程,直到不能再交换为止
+#[allow(unused)]
 pub fn handle_reorder(func: &mut Func) -> Result<()> {
     Ok(())
 }
@@ -32,7 +33,7 @@ pub fn handle_single_jmp(func: &mut Func) -> Result<()> {
         }
     }
 
-    to_merge.retain(|from, to| to != func.entry().label());
+    to_merge.retain(|_, to| to != func.entry().label());
 
     while let Some((from, to)) = to_merge.iter().next() {
         func.merge_bb(from, to)?;
@@ -49,7 +50,7 @@ pub fn handle_single_jmp(func: &mut Func) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use insta::{assert_debug_snapshot, assert_snapshot};
+    use insta::assert_snapshot;
 
     use crate::utils::diff::diff;
 
@@ -127,11 +128,9 @@ mod tests {
         f.push_bb(bb2);
         f.push_bb(bb3);
 
-        let f_before = format!("{:?}", &f);
         let f_asm_before = f.gen_asm();
 
         handle_single_jmp(&mut f).unwrap();
-        let f_after = format!("{:?}", &f);
         let f_asm_after = f.gen_asm();
 
         assert_snapshot!(diff(&f_asm_before,&f_asm_after),@r###"
