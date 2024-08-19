@@ -133,6 +133,12 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
     fn get_block_effect(&mut self, bb: BBPtr, indvar: &Operand) -> Result<Option<Effect>> {
         let mut effect = Effect::new();
         for inst in bb.iter() {
+            // Prevent instruction with IO to be parallelized
+            if self.effect_analysis.has_io(inst) {
+                return Ok(None);
+            }
+
+            // Attempt to merge effect with no conflict
             if let Some(inst_effect) = &self.effect_analysis.inst_effect.get(&inst) {
                 if !merge_effect(&mut effect, inst_effect, indvar)? {
                     return Ok(None);
