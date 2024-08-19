@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use anyhow::Result;
 
@@ -6,8 +6,9 @@ use crate::{
     backend::from_self::downcast_ref,
     middle::{
         analysis::{
+            dominator_tree::DominatorTree,
             effect_analysis::{Effect, EffectAnalysis},
-            loop_tools::{LoopForest, LoopPtr},
+            loop_tools::{self, LoopForest, LoopPtr},
         },
         ir::{
             instruction::{
@@ -21,21 +22,31 @@ use crate::{
     },
 };
 
-use super::Transform;
+use super::{loop_simplify, Transform};
 
-pub fn optimize_program<'a>(
-    program: &'a mut Program,
-    loop_forest: &'a mut LoopForest,
-) -> Result<bool> {
+pub fn optimize_program<const N_THREAD: i32>(program: &mut Program) -> Result<bool> {
+    let mut changed = false;
     let effect_analysis = EffectAnalysis::new(program);
-    MakeParallel::<5>::new(program, loop_forest, &effect_analysis).run_and_log()
+    for func in program.module.functions.clone() {
+        let Some(mut forest) = loop_tools::LoopForest::make_forest(func) else {
+            continue;
+        };
+        loop_simplify::LoopSimplifier::new(&mut program.mem_pool).run(&mut forest)?;
+        let mut dom_tree = DominatorTree::new(func);
+        changed |=
+            MakeParallel::<N_THREAD>::new(program, &mut forest, &mut dom_tree, &effect_analysis)
+                .run()?;
+    }
+    Ok(changed)
 }
 
 pub struct MakeParallel<'a, const N_THREAD: i32> {
     program: &'a mut Program,
     loop_forest: &'a mut LoopForest,
+    dom_tree: &'a mut DominatorTree,
     effect_analysis: &'a EffectAnalysis,
     has_return: HashSet<LoopPtr>,
+    stack_ref: HashMap<LoopPtr, HashSet<InstPtr>>,
 }
 
 impl<'a, const N_THREAD: i32> Transform for MakeParallel<'a, N_THREAD> {
@@ -50,7 +61,8 @@ impl<'a, const N_THREAD: i32> Transform for MakeParallel<'a, N_THREAD> {
     fn run(&mut self) -> Result<bool> {
         let mut changed = false;
         for lo in self.loop_forest.forest.clone() {
-            self.preprocess(lo)?;
+            self.check_has_return(lo)?;
+            self.check_stack_reference(lo)?;
         }
         for lo in self.loop_forest.forest.clone() {
             let mut candidate = Vec::new();
@@ -67,25 +79,28 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
     pub fn new(
         program: &'a mut Program,
         loop_forest: &'a mut LoopForest,
+        dom_tree: &'a mut DominatorTree,
         effect_analysis: &'a EffectAnalysis,
     ) -> Self {
         Self {
             program,
             loop_forest,
+            dom_tree,
             effect_analysis,
             has_return: HashSet::new(),
+            stack_ref: HashMap::new(),
         }
     }
 
-    /// Preprocess each loop. This checks if any block has `exit` as succ, store to `has_return`
-    fn preprocess(&mut self, lo: LoopPtr) -> Result<()> {
+    /// Check if any block has `exit` as succ, store to `has_return`
+    fn check_has_return(&mut self, lo: LoopPtr) -> Result<()> {
         let mut has_return = false;
 
         // If any of sub loops has return, then this loop has return;
         // Effect of sub loops are owned by this loop;
         // We need to compute all sub loops here, because it will be cached
         for sub_loop in lo.sub_loops.iter() {
-            self.preprocess(*sub_loop)?;
+            self.check_has_return(*sub_loop)?;
             if self.has_return.contains(sub_loop) {
                 has_return = true;
             }
@@ -102,6 +117,24 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
         // Store result
         if has_return {
             self.has_return.insert(lo);
+        }
+        Ok(())
+    }
+
+    fn check_stack_reference(&mut self, lo: LoopPtr) -> Result<()> {
+        for bb in &lo.blocks {
+            for inst in bb.iter() {
+                if let Some(inst) = get_base_alloc(inst) {
+                    self.stack_ref.entry(lo).or_default().insert(inst);
+                }
+            }
+        }
+        for sub_loop in lo.sub_loops.iter() {
+            self.check_stack_reference(*sub_loop)?;
+            let Some(sub_ref) = self.stack_ref.get(sub_loop).cloned() else {
+                continue;
+            };
+            self.stack_ref.entry(lo).or_default().extend(sub_ref);
         }
         Ok(())
     }
@@ -133,7 +166,6 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
         let mut effect = Effect::new();
         for inst in bb.iter() {
             if let Some(inst_effect) = &self.effect_analysis.inst_effect.get(&inst) {
-                println!("[INFO] inst_effect: {}", inst_effect.dump());
                 if !merge_effect(&mut effect, inst_effect, indvar)? {
                     return Ok(None);
                 }
@@ -144,8 +176,9 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
 
     fn make_candidate(&mut self, result: &mut Vec<Candidate>, lo: LoopPtr) -> Result<()> {
         // If loop has return, then it can't be parallelized, check sub loops instead
+        let pre_header = lo.pre_header.unwrap();
         if self.has_return.contains(&lo) {
-            println!("[INFO] loop {} has return", lo.pre_header.unwrap().name);
+            println!("[INFO] loop {} has return", pre_header.name);
             for lo in lo.sub_loops.iter() {
                 self.make_candidate(result, *lo)?;
             }
@@ -163,10 +196,7 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
 
         // If there are multiple exit edges, then it can't be parallelized
         if exit.len() != 1 {
-            println!(
-                "[INFO] loop {} has multiple exit edges",
-                lo.pre_header.unwrap().name
-            );
+            println!("[INFO] loop {} has multiple exit edges", pre_header.name);
             for lo in lo.sub_loops.iter() {
                 self.make_candidate(result, *lo)?;
             }
@@ -175,11 +205,8 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
 
         // Get induction var from exit. If failed, check sub loops instead
         let exit = exit[0];
-        let Some(candidate) = Candidate::from_exit(exit, lo) else {
-            println!(
-                "[INFO] loop {} does not have indvar",
-                lo.pre_header.unwrap().name
-            );
+        let Some(candidate) = Candidate::from_exit(exit, lo, self.dom_tree) else {
+            println!("[INFO] loop {} does not have indvar", pre_header.name);
             for lo in lo.sub_loops.iter() {
                 self.make_candidate(result, *lo)?;
             }
@@ -191,10 +218,7 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
             .get_loop_effect(lo, &candidate.indvar.into())?
             .is_none()
         {
-            println!(
-                "[INFO] loop {} has conflict effect",
-                lo.pre_header.unwrap().name
-            );
+            println!("[INFO] loop {} has conflict effect", pre_header.name);
             for lo in lo.sub_loops.iter() {
                 self.make_candidate(result, *lo)?;
             }
@@ -204,7 +228,7 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
         // Insert candidate to results
         println!(
             "[INFO] loop {} is made candidate {}!",
-            lo.pre_header.unwrap().name,
+            pre_header.name,
             candidate.dump()
         );
         result.push(candidate);
@@ -212,8 +236,22 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
     }
 
     fn make_parallel(&mut self, mut candidate: Candidate) -> Result<bool> {
+        // Copy global array address to local stack
+        let mut map = HashMap::new();
+        if let Some(stack_ref) = self.stack_ref.get(&candidate.lo) {
+            for inst in stack_ref.iter() {
+                let gep_zero = self.program.mem_pool.get_getelementptr(
+                    inst.get_value_type().get_sub_type().cloned().unwrap(),
+                    (*inst).into(),
+                    vec![Constant::Int(0).into()],
+                );
+                candidate.init_bb.get_last_inst().insert_before(gep_zero);
+                map.insert(*inst, gep_zero);
+            }
+        }
+        replace_stack_reference(candidate.lo, &map)?;
+
         // Get current thread count
-        // TODO create library function
         let func_create = self
             .program
             .module
@@ -308,6 +346,86 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
     }
 }
 
+/// Get base pointer of load / store / gep instruction, return if it's alloc.
+fn get_base_alloc(inst: InstPtr) -> Option<InstPtr> {
+    if inst.get_type() == InstType::Alloca {
+        return Some(inst);
+    }
+    match inst.get_type() {
+        InstType::Load | InstType::GetElementPtr => {
+            let ptr = inst.get_operand().first()?;
+            if let Operand::Instruction(ptr) = ptr {
+                get_base_alloc(*ptr)
+            } else {
+                None
+            }
+        }
+        InstType::Store => {
+            let base = inst.get_operand().get(1)?;
+            if let Operand::Instruction(inst) = base {
+                get_base_alloc(*inst)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+/// Replace stack reference to copied global array address.
+fn replace_stack_reference(lo: LoopPtr, map: &HashMap<InstPtr, InstPtr>) -> Result<()> {
+    for bb in &lo.blocks {
+        for inst in bb.iter() {
+            replace_base_alloc(inst, map);
+        }
+    }
+    for sub_loop in lo.sub_loops.iter() {
+        replace_stack_reference(*sub_loop, map)?;
+    }
+    Ok(())
+}
+
+/// Replace base pointer of load / store / gep instruction, return if it's alloc.
+fn replace_base_alloc(mut inst: InstPtr, map: &HashMap<InstPtr, InstPtr>) {
+    match inst.get_type() {
+        InstType::Load => {
+            let ptr = inst.get_operand().first().unwrap();
+            if let Operand::Instruction(ptr) = ptr.clone() {
+                if ptr.get_type() == InstType::Alloca {
+                    inst.set_operand(0, map[&ptr].into());
+                } else {
+                    replace_base_alloc(ptr, map);
+                }
+            }
+        }
+        InstType::GetElementPtr => {
+            if inst.get_operand().len() == 2 {
+                // Refuse to replace `getelementptr %ptr, 0`
+                return;
+            }
+            let ptr = inst.get_operand().first().unwrap();
+            if let Operand::Instruction(ptr) = ptr.clone() {
+                if ptr.get_type() == InstType::Alloca {
+                    inst.set_operand(0, map[&ptr].into());
+                } else {
+                    replace_base_alloc(ptr, map);
+                }
+            }
+        }
+        InstType::Store => {
+            let base = inst.get_operand().get(1).unwrap();
+            if let Operand::Instruction(ptr) = base.clone() {
+                if ptr.get_type() == InstType::Alloca {
+                    inst.set_operand(1, map[&ptr].into());
+                } else {
+                    replace_base_alloc(ptr, map);
+                }
+            }
+        }
+        _ => (),
+    }
+}
+
 /// Merge effect if parallelizing them doesn't cause collision.
 /// Returns changed or not.
 fn merge_effect(a: &mut Effect, b: &Effect, indvar: &Operand) -> Result<bool> {
@@ -344,6 +462,7 @@ fn merge_effect(a: &mut Effect, b: &Effect, indvar: &Operand) -> Result<bool> {
 /// init_bb = pre_header
 /// exit_val = 6
 struct Candidate {
+    lo: LoopPtr,
     indvar: InstPtr,
     exit: InstPtr,
     init_val: Operand,
@@ -354,6 +473,7 @@ struct Candidate {
 
 impl Candidate {
     fn new(
+        lo: LoopPtr,
         indvar: InstPtr,
         exit: InstPtr,
         init_val: Operand,
@@ -362,6 +482,7 @@ impl Candidate {
         exit_bb: BBPtr,
     ) -> Self {
         Self {
+            lo,
             indvar,
             exit,
             init_val,
@@ -387,11 +508,12 @@ impl Candidate {
     /// Get induction variable from exit instruction.
     /// Exit instruction should shape like:
     /// `exit = br (indvar < N), loop, exit`
-    fn from_exit(exit: InstPtr, lo: LoopPtr) -> Option<Self> {
+    fn from_exit(exit: InstPtr, lo: LoopPtr, dom_tree: &mut DominatorTree) -> Option<Self> {
+        let pre_header = lo.pre_header.unwrap();
         if exit.get_type() != InstType::Br {
             println!(
                 "[INFO] loop {} fails because {} is not br",
-                lo.pre_header.unwrap().name,
+                pre_header.name,
                 exit.gen_llvm_ir()
             );
             return None;
@@ -409,8 +531,7 @@ impl Candidate {
         if exit_bb.get_pred_bb().len() != 1 {
             println!(
                 "[INFO] loop {} fails because {} has multiple preds",
-                lo.pre_header.unwrap().name,
-                exit_bb.name
+                pre_header.name, exit_bb.name
             );
             return None;
         }
@@ -420,7 +541,7 @@ impl Candidate {
         let Operand::Instruction(cond) = exit.get_operand().first()? else {
             println!(
                 "[INFO] loop {} fails because {}'s first operand is not inst",
-                lo.pre_header.unwrap().name,
+                pre_header.name,
                 exit.gen_llvm_ir()
             );
             return None;
@@ -428,7 +549,7 @@ impl Candidate {
         let InstType::ICmp = cond.get_type() else {
             println!(
                 "[INFO] loop {} fails because {} is not condition",
-                lo.pre_header.unwrap().name,
+                pre_header.name,
                 cond.gen_llvm_ir()
             );
             return None;
@@ -437,7 +558,7 @@ impl Candidate {
         if icmp.op != ICmpOp::Slt {
             println!(
                 "[INFO] loop {} fails because {} is not slt",
-                lo.pre_header.unwrap().name,
+                pre_header.name,
                 cond.gen_llvm_ir()
             );
             return None;
@@ -445,20 +566,33 @@ impl Candidate {
         let Operand::Instruction(indvar) = icmp.get_lhs() else {
             println!(
                 "[INFO] loop {} fails because {}'s lhs is not inst",
-                lo.pre_header.unwrap().name,
+                pre_header.name,
                 cond.gen_llvm_ir()
             );
             return None;
         };
         let exit_val = icmp.get_rhs().clone();
 
+        // Exit val should be calculated before loop (dominates pre_header)
+        if let Operand::Instruction(inst) = exit_val {
+            if !dom_tree.is_dominate(inst.get_parent_bb().unwrap(), pre_header) {
+                println!(
+                    "[INFO] loop {} fails because {} is not calculated before loop",
+                    pre_header.name,
+                    inst.gen_llvm_ir()
+                );
+                return None;
+            }
+        }
+
         // Indvar should be `phi [init_val, init_bb], [indvar + delta, next_bb]`
+        // `indvar` should be the only phi in its block (other phi can be non-trivial)
         // `init_bb` should be `pre_header`
         // `next_bb` should be in loop
         if indvar.get_type() != InstType::Phi {
             println!(
                 "[INFO] loop {} fails because {} is not phi",
-                lo.pre_header.unwrap().name,
+                pre_header.name,
                 indvar.gen_llvm_ir()
             );
             return None;
@@ -468,7 +602,7 @@ impl Candidate {
         if inc.len() != 2 {
             println!(
                 "[INFO] loop {} fails because {}'s incoming value length is not 2",
-                lo.pre_header.unwrap().name,
+                pre_header.name,
                 indvar.gen_llvm_ir()
             );
             return None;
@@ -478,7 +612,7 @@ impl Candidate {
         if init_bb != inc[0].1 {
             println!(
                 "[INFO] loop {} fails because {} is not pre_header",
-                lo.pre_header.unwrap().name,
+                pre_header.name,
                 inc[0].1.name.clone()
             );
             return None;
@@ -486,7 +620,7 @@ impl Candidate {
         let Operand::Instruction(next_val) = inc[1].0 else {
             println!(
                 "[INFO] loop {} fails because {}'s second incoming value is not inst",
-                lo.pre_header.unwrap().name,
+                pre_header.name,
                 indvar.gen_llvm_ir()
             );
             return None;
@@ -494,7 +628,7 @@ impl Candidate {
         if next_val.get_type() != InstType::Add {
             println!(
                 "[INFO] loop {} fails because {} is not add",
-                lo.pre_header.unwrap().name,
+                pre_header.name,
                 next_val.gen_llvm_ir()
             );
             return None;
@@ -502,7 +636,7 @@ impl Candidate {
         let Operand::Constant(_) = next_val.get_operand()[1] else {
             println!(
                 "[INFO] loop {} fails because {}'s second operand is not constant",
-                lo.pre_header.unwrap().name,
+                pre_header.name,
                 next_val.gen_llvm_ir()
             );
             return None;
@@ -511,15 +645,24 @@ impl Candidate {
         if !lo.is_in_loop(&next_bb) {
             println!(
                 "[INFO] loop {} fails because {} is not in loop",
-                lo.pre_header.unwrap().name,
-                next_bb.name
+                pre_header.name, next_bb.name
             );
             return None;
+        }
+        for inst in indvar.get_parent_bb().unwrap().iter() {
+            if inst.get_type() == InstType::Phi && inst != *indvar {
+                println!(
+                    "[INFO] loop {} fails because {} has multiple phi",
+                    pre_header.name,
+                    indvar.get_parent_bb().unwrap().name
+                );
+                return None;
+            }
         }
 
         // Construct induction variable
         Some(Self::new(
-            *indvar, exit, init_val, init_bb, exit_val, *exit_bb,
+            lo, *indvar, exit, init_val, init_bb, exit_val, *exit_bb,
         ))
     }
 }
