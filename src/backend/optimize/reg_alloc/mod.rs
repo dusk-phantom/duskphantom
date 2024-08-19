@@ -5,7 +5,9 @@ use checker::FuncChecker;
 use graph::UdGraph;
 
 mod graph_color;
+mod pbqp;
 pub use graph_color::*;
+pub use pbqp::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::fprintln;
@@ -29,6 +31,34 @@ pub fn handle_reg_alloc(func: &mut Func) -> Result<()> {
     remove_redundant_insts(func);
 
     Ok(())
+}
+
+/// 估计虚拟寄存器被spill造成的代价
+pub fn count_spill_cost(func: &Func) -> FxHashMap<Reg, usize> {
+    let mut cost: FxHashMap<Reg, usize> = FxHashMap::default();
+    for bb in func.iter_bbs() {
+        let factor = bb.depth + 1; //考虑深度从0开始,+1作为基数
+        for inst in bb.insts() {
+            // 一般来说,仅uses中寄存器代价为插入两条指令,仅defs中代价为插入两条指令
+            // 既在uses又在defs中代价为插入3条指令
+            let mut uses = inst.uses();
+            let defs = inst.defs();
+            for r in uses.iter().filter(|r| r.is_virtual()) {
+                let c = cost.entry(**r).or_insert(0);
+                *c += 2 * factor;
+            }
+            for r in defs.iter().filter(|r| r.is_virtual()) {
+                if uses.contains(r) {
+                    let c = cost.entry(**r).or_insert(0);
+                    *c += factor;
+                } else {
+                    let c = cost.entry(**r).or_insert(0);
+                    *c += 2 * factor;
+                }
+            }
+        }
+    }
+    cost
 }
 
 // item 如（(r1, r2), 1) 表示r1和r2可以合并,且合并后能够减少的指令数为1
