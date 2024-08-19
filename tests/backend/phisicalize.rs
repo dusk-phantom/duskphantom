@@ -253,6 +253,7 @@ fn test_handle_offset_overflow() {
                 ),
                 Ret,
             ],
+            depth: 0,
         },
         other_bbs: [],
     }
