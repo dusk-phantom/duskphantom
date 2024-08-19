@@ -1,16 +1,12 @@
-use core::num;
-use std::hash::Hash;
-
 use checker::FuncChecker;
-use graph::UdGraph;
 
 mod graph_color;
+#[allow(unused)]
 mod pbqp;
 pub use graph_color::*;
+#[allow(unused)]
 pub use pbqp::*;
 use rustc_hash::{FxHashMap, FxHashSet};
-
-use crate::fprintln;
 
 use super::*;
 
@@ -24,13 +20,13 @@ pub fn handle_reg_alloc(func: &mut Func) -> Result<()> {
     remove_special_regs(&mut reg_graph);
     if let Ok(colors) = try_perfect_alloc(&reg_graph, &dtd, &could_merge) {
         // println!("### perfect alloc {}", func.name());
-        apply_colors(func, colors);
+        apply_colors(func, colors)?;
     } else {
         let spill_costs = count_spill_costs(func);
         let (colors, spills) =
             reg_alloc(&reg_graph, free_uregs(), free_fregs(), Some(&spill_costs))?;
-        apply_colors(func, colors);
-        apply_spills(func, spills);
+        apply_colors(func, colors)?;
+        apply_spills(func, spills)?;
     }
     // 删除因为寄存器合并而产生的冗余指令
     remove_redundant_insts(func);
@@ -71,7 +67,7 @@ pub fn count_spill_costs(func: &Func) -> FxHashMap<Reg, usize> {
         for inst in bb.insts() {
             // 一般来说,仅uses中寄存器代价为插入两条指令,仅defs中代价为插入两条指令
             // 既在uses又在defs中代价为插入3条指令
-            let mut uses = inst.uses();
+            let uses = inst.uses();
             let defs = inst.defs();
             for r in uses.iter().filter(|r| r.is_virtual()) {
                 let c = cost.entry(**r).or_insert(0);
@@ -98,6 +94,21 @@ pub fn collect_mergeable_regs(
 ) -> Vec<((Reg, Reg), usize)> {
     // 如果两个虚拟寄存器合并为一个物理寄存器,能够减少指令,那么合并它们
     let mut could_merge: FxHashMap<(Reg, Reg), usize> = FxHashMap::default();
+    let not_interfere = |graph: &FxHashMap<Reg, FxHashSet<Reg>>, op1: &Operand, op2: &Operand| {
+        let Some(r1) = op1.reg() else {
+            return false;
+        };
+        let Some(r2) = op2.reg() else {
+            return false;
+        };
+        if let Some(inter) = graph.get(&r1) {
+            !inter.contains(&r2)
+        } else if let Some(inter) = graph.get(&r2) {
+            !inter.contains(&r1)
+        } else {
+            true
+        }
+    };
     let add_to_could_merge =
         |could_merge: &mut FxHashMap<(Reg, Reg), usize>, dst: &Operand, src: &Operand| {
             if let (Operand::Reg(dst), Operand::Reg(src)) = (dst, src) {
@@ -115,42 +126,44 @@ pub fn collect_mergeable_regs(
         for inst in bb.insts() {
             match inst {
                 Inst::Add(add) => {
-                    if op_eq_zero(add.rhs()) {
+                    if op_eq_zero(add.rhs()) && not_interfere(graph, add.dst(), add.lhs()) {
                         add_to_could_merge(&mut could_merge, add.dst(), add.lhs());
                     }
                 }
                 Inst::Sub(sub) => {
-                    if op_eq_zero(sub.rhs()) {
+                    if op_eq_zero(sub.rhs()) && not_interfere(graph, sub.dst(), sub.lhs()) {
                         add_to_could_merge(&mut could_merge, sub.dst(), sub.lhs());
                     }
                 }
                 Inst::Mul(mul) => {
-                    if op_eq_one(mul.rhs()) {
+                    if op_eq_one(mul.rhs()) && not_interfere(graph, mul.dst(), mul.lhs()) {
                         add_to_could_merge(&mut could_merge, mul.dst(), mul.lhs());
                     }
                 }
                 Inst::Div(div) => {
-                    if op_eq_one(div.rhs()) {
+                    if op_eq_one(div.rhs()) && not_interfere(graph, div.dst(), div.lhs()) {
                         add_to_could_merge(&mut could_merge, div.dst(), div.lhs());
                     }
                 }
                 Inst::Sll(sll) => {
-                    if op_eq_zero(sll.rhs()) {
+                    if op_eq_zero(sll.rhs()) && not_interfere(graph, sll.dst(), sll.lhs()) {
                         add_to_could_merge(&mut could_merge, sll.dst(), sll.lhs());
                     }
                 }
                 Inst::Srl(srl) => {
-                    if op_eq_zero(srl.rhs()) {
+                    if op_eq_zero(srl.rhs()) && not_interfere(graph, srl.dst(), srl.lhs()) {
                         add_to_could_merge(&mut could_merge, srl.dst(), srl.lhs());
                     }
                 }
                 Inst::SRA(sra) => {
-                    if op_eq_zero(sra.rhs()) {
+                    if op_eq_zero(sra.rhs()) && not_interfere(graph, sra.dst(), sra.lhs()) {
                         add_to_could_merge(&mut could_merge, sra.dst(), sra.lhs());
                     }
                 }
                 Inst::Mv(mv) => {
-                    add_to_could_merge(&mut could_merge, mv.dst(), mv.src());
+                    if not_interfere(graph, mv.dst(), mv.src()) {
+                        add_to_could_merge(&mut could_merge, mv.dst(), mv.src());
+                    }
                 }
                 _ => {}
             }

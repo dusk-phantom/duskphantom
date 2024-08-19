@@ -13,19 +13,16 @@ pub mod post_inst_split;
 
 pub mod schedule;
 
-#[allow(unused)]
 pub mod reg_alloc;
 
-#[allow(unused)]
 pub mod caller_callee;
 
-#[allow(unused)]
-pub mod block_reorder;
+/// 块相关的优化
+pub mod block;
 
-#[allow(unused)]
+/// 栈相关的优化
 pub mod stack;
 
-#[allow(unused)]
 pub fn optimize(program: &mut prog::Program) -> Result<()> {
     #[cfg(feature = "backend_opt")]
     {
