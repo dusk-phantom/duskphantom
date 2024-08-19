@@ -251,6 +251,66 @@ impl Func {
         Ok(if_simplify)
     }
 
+    /// 移除空块: 通过将空块与后继块合并的方式
+    /// Note: 如果entry块为空,则不会被移除
+    /// 如果成功移除至少空块,返回true
+    /// 否则返回false
+    #[allow(unused)]
+    pub fn elim_empty_bb(&mut self) -> Result<bool> {
+        let mut if_elim = false;
+        loop {
+            let pos = self
+                .other_bbs
+                .iter()
+                .enumerate()
+                .find(|(_, bb)| bb.insts().is_empty());
+            let Some((idx, empty_bb)) = pos else {
+                break;
+            };
+            if idx + 1 >= self.other_bbs.len() {
+                break;
+            }
+            let next_bb = self.other_bbs[idx + 1].label().to_string();
+            let from = empty_bb.label().to_string();
+            self.other_bbs.remove(idx);
+
+            self.rename_bb_label(&from, &next_bb)?;
+            if_elim = true;
+        }
+        Ok(if_elim)
+    }
+
+    pub fn rename_bb_label(&mut self, from: &str, to: &str) -> Result<()> {
+        macro_rules! replace_bb_label {
+            ($inst:ident,$from:expr,$to:expr) => {{
+                if $inst.label() == &$from.into() {
+                    *$inst.label_mut() = $to.into();
+                }
+            }};
+        }
+        for bb in self.iter_bbs_mut() {
+            for inst in bb.insts_mut() {
+                match inst {
+                    Inst::Beq(beq) => replace_bb_label!(beq, from, to),
+                    Inst::Bne(bne) => replace_bb_label!(bne, from, to),
+                    Inst::Blt(blt) => replace_bb_label!(blt, from, to),
+                    Inst::Ble(ble) => replace_bb_label!(ble, from, to),
+                    Inst::Bgt(bgt) => replace_bb_label!(bgt, from, to),
+                    Inst::Bge(bge) => replace_bb_label!(bge, from, to),
+                    Inst::Jmp(jmp) => {
+                        if jmp.dst().label() == Some(from.into()) {
+                            *jmp.dst_mut() = to.into();
+                        }
+                    }
+                    _ => {
+                        continue;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// 解除化简块结尾的jmp指令
     /// 如果一个块结尾的term类型指令只有1个,且不是jmp,则在该块的结尾插入jmp指令到它的邻接的下一个块
     #[allow(unused)]
