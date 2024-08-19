@@ -16,6 +16,99 @@ pub fn handle_block_simplify(func: &mut Func) -> Result<()> {
     Ok(())
 }
 
+/// a -> b 的权重
+type Weight = f32;
+
+/// 基本块在原数组中的下标
+type NodeIdx = usize;
+
+/// Pettis-Hansen code layout
+pub struct PHCL {
+    groups: Vec<Vec<NodeIdx>>,
+    edges: HashMap<(NodeIdx /* from */, NodeIdx /* to */), Weight /* weight */>,
+}
+
+impl PHCL {
+    fn new(func: &Func) -> Result<Self> {
+        // 初始化单元的 group
+        let groups: Vec<Vec<NodeIdx>> = func
+            .iter_bbs()
+            .skip(1) // entry bb 不参与 块重排, 也就是, 这个 idx 就是 other_bbs 的 idx
+            .enumerate()
+            .map(|(i, _)| vec![i])
+            .collect();
+
+        let label_idx_map: HashMap<String, NodeIdx> = func
+            .iter_bbs()
+            .skip(1)
+            .enumerate()
+            .map(|(i, bb)| (bb.label().to_string(), i))
+            .collect();
+
+        let mut edges = HashMap::new();
+        for bb in func.iter_bbs().skip(1) {
+            let to_bbs_label = Block::to_bbs(bb).with_context(|| context!())?;
+            for to_bb_label in to_bbs_label {
+                let to_bb = func.find_bb(&to_bb_label).with_context(|| context!())?;
+                let weight: Weight = (bb.depth + to_bb.depth) as Weight
+                    / (bb.depth.abs_diff(to_bb.depth) as Weight + 1.0);
+                let to_bb_idx = label_idx_map
+                    .get(&to_bb_label)
+                    .with_context(|| context!())?;
+                let bb_idx = label_idx_map.get(bb.label()).with_context(|| context!())?;
+                edges.insert((*bb_idx, *to_bb_idx), weight);
+            }
+        }
+
+        // TODO 初始化有权重的图
+        Ok(Self { groups, edges })
+    }
+
+    fn optimize_layout(&mut self) -> Vec<NodeIdx> {
+        // 1. 基本块分组
+        while self.groups.len() > 1 {
+            if let Some((idx_a, idx_b)) = self.find_most_frequent_pair() {
+                self.merge_groups(idx_a, idx_b);
+            } else {
+                break;
+            }
+        }
+
+        // 2. 组间布局
+        let mut layout: Vec<HashSet<NodeIdx>> = Vec::new();
+        while !self.groups.is_empty() {
+            if let Some(best_group_idx) = self.select_best_group(&layout) {
+                // layout.push(self.groups.into_iter());
+            }
+        }
+
+        // 3. 生成最终布局
+        let mut final_layout = Vec::new();
+        for grp in layout {
+            for blk in grp {
+                final_layout.push(blk);
+            }
+        }
+
+        final_layout
+    }
+
+    fn select_best_group(&self, layout: &[HashSet<NodeIdx>]) -> Option<usize> {
+        // TODO
+        todo!()
+    }
+
+    fn find_most_frequent_pair(&self) -> Option<(NodeIdx, NodeIdx)> {
+        // TODO
+        todo!()
+    }
+
+    fn merge_groups(&mut self, idx_a: NodeIdx, idx_b: NodeIdx) {
+        // TODO
+        todo!()
+    }
+}
+
 /// FIXME: test needed
 pub fn handle_single_jmp(func: &mut Func) -> Result<()> {
     let (ins, outs) = Func::in_out_bbs(func)?;
