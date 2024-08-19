@@ -5,6 +5,7 @@ use super::{gen_asm::GenTool, *};
 pub struct Block {
     label: String,
     insts: Vec<Inst>,
+    pub depth: usize,
 }
 
 impl Default for Block {
@@ -12,6 +13,7 @@ impl Default for Block {
         Self {
             label: "default".to_string(),
             insts: vec![],
+            depth: 0,
         }
     }
 }
@@ -28,7 +30,7 @@ impl Block {
     pub fn new(label: String) -> Block {
         Block {
             label,
-            insts: Vec::new(),
+            ..Default::default()
         }
     }
 

@@ -308,12 +308,6 @@ impl IRBuilder {
         fmms: &mut HashMap<Fmm, FloatVar>,
         insert_back_for_remove_phi: &mut HashMap<String, Vec<(middle::ir::Operand, Reg)>>,
     ) -> Result<Vec<Block>> {
-        // let mut blocks: Vec<Block> = Vec::new();
-        // for ptr_bb in f.dfs_iter() {
-        //     let m_bb = Self::build_bb(&ptr_bb, stack_allocator, stack_slots, reg_gener, regs)?;
-        //     blocks.push(m_bb);
-        // }
-        // Ok(blocks)
         func.bfs_iter()
             .skip(1)
             .map(|ptr_bb| {
@@ -354,9 +348,7 @@ impl IRBuilder {
             .with_context(|| context!())?;
             m_bb.extend_insts(gen_insts);
         }
-        // let gen_insts = Self::build_term_inst(&bb.get_last_inst(), regs, reg_gener, fmms)
-        //     .with_context(|| context!())?;
-        // m_bb.extend_insts(gen_insts);
+        m_bb.depth = bb.depth;
         Ok(m_bb)
     }
 
@@ -432,6 +424,9 @@ impl IRBuilder {
         let label = Self::label_name_from(&bb);
         let mut entry = Block::new(label);
         entry.extend_insts(insts);
+        // 设置循环深度
+        entry.depth = bb.depth;
+
         let caller_regs_stack = usize::try_from(caller_regs_stack)?;
         Ok((entry, caller_regs_stack))
     }
