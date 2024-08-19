@@ -274,6 +274,7 @@ impl IRBuilder {
         Ok(())
     }
 
+    /// 原来每个函数的bb名字分配是仅仅函数内唯一的,不同函数的bb名可能冲突,通过这个函数将bb名字唯一化,使得不同函数的bb名字不会冲突
     fn rename_bb_label(func: &mut [Func]) -> Result<()> {
         macro_rules! replace_bb_label {
             ($inst:ident,$bb_labels:ident) => {{
@@ -378,6 +379,7 @@ impl IRBuilder {
 
         let mut entry = Block::new(Self::label_name_from(&bb.name).with_context(|| context!())?);
         entry.extend_insts(insts);
+
         let caller_regs_stack = usize::try_from(caller_regs_stack)?; // 这是将 i64 转换为 usize
         Ok((entry, caller_regs_stack))
     }
