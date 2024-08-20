@@ -389,6 +389,7 @@ mod tests {
     fn no_missed() {
         let mut regs = FxHashSet::default();
         regs.extend(free_uregs());
+        assert_eq!(regs.len(), 22);
         regs.extend(tmp_u_regs());
         assert!(regs.len() == 25);
         regs.extend(special_regs());
