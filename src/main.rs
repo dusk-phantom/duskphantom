@@ -10,6 +10,7 @@ fn main() {
     let cli = Cli::parse();
     start_compiler(&cli);
 }
+
 fn start_compiler(cli: &Cli) {
     let (sy_path, output_path, opt_flag, asm_flag, ll_path) = (
         &cli.sy,

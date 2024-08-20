@@ -57,7 +57,7 @@ pub fn phisicalize_func(func: &mut Func) -> Result<()> {
     Ok(())
 }
 
-pub const fn tmp_i_regs() -> [Reg; 3] {
+pub const fn tmp_u_regs() -> [Reg; 3] {
     [REG_T0, REG_T1, REG_T2]
 }
 
@@ -118,7 +118,7 @@ pub fn phisicalize_reg(func: &mut Func) -> Result<()> {
         .take()
         .expect("msg: stack allocator not found");
     // 该情况下仅仅使用临时寄存器参与运算
-    let i_regs = tmp_i_regs();
+    let i_regs = tmp_u_regs();
     let f_regs = tmp_f_regs();
     // 对于遇到的每个寄存器,为其分配栈上空间
     let mut v_ss: HashMap<Reg, StackSlot> = HashMap::new();

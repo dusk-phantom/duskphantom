@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::middle::Program;
+use crate::{config::CONFIG, middle::Program};
 
 use super::{
     block_fuse, dead_code_elim, func_inline, inst_combine, load_store_elim, loop_optimization,
@@ -10,7 +10,9 @@ use super::{
 pub fn optimize_program(program: &mut Program) -> Result<bool> {
     mem2reg::optimize_program(program)?;
     main_loop(program)?;
-    make_parallel::optimize_program::<5>(program)?;
+    if CONFIG.open_auto_parallel {
+        make_parallel::optimize_program::<5>(program)?;
+    }
     eval_and_prune(program)?;
     sink_code::optimize_program(program)?;
     Ok(true)

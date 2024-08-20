@@ -7,7 +7,7 @@ use compiler::{
     utils::diff::diff,
 };
 use insta::{assert_debug_snapshot, assert_snapshot};
-use reg_alloc::{free_fregs, free_iregs, reg_alloc};
+use reg_alloc::{free_fregs, free_uregs, reg_alloc};
 pub fn backend_from_self(code: &str) -> Program {
     let f = frontend::parse(code).unwrap();
     let m = middle::r#gen(&f).unwrap();
