@@ -63,7 +63,7 @@ pub fn select_free_color(
 pub fn count_spill_costs(func: &Func) -> FxHashMap<Reg, usize> {
     let mut cost: FxHashMap<Reg, usize> = FxHashMap::default();
     for bb in func.iter_bbs() {
-        let factor = bb.depth + 1; //考虑深度从0开始,+1作为基数
+        let factor = (0..bb.depth).fold(1, |acc, _| acc * 10);
         for inst in bb.insts() {
             // 一般来说,仅uses中寄存器代价为插入两条指令,仅defs中代价为插入两条指令
             // 既在uses又在defs中代价为插入3条指令
