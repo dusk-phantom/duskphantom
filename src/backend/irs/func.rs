@@ -21,6 +21,7 @@ pub struct Func {
     entry: Block,
     // basic blocks
     other_bbs: Vec<Block>,
+    pub max_callee_regs_stack: u32,
 }
 
 impl Func {
@@ -70,6 +71,7 @@ impl Func {
             reg_gener: None,
             stack_allocator: None,
             other_bbs: Vec::new(),
+            max_callee_regs_stack: 0,
             entry,
         }
     }
