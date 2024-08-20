@@ -1,4 +1,5 @@
 pub use super::*;
+use anyhow::Ok;
 use core::ffi;
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -7,17 +8,36 @@ pub fn try_perfect_alloc(
     def_then_def: &FxHashMap<Reg, FxHashSet<Reg>>,
     could_merge: &[((Reg, Reg), usize)],
 ) -> Result<FxHashMap<Reg, Reg>> {
-    let u_regs = free_iregs_with_tmp();
+    let u_regs = free_uregs_with_tmp();
     let f_regs = free_fregs_with_tmp();
     let mut reg_graph = reg_graph.clone();
-    merge_regs(&mut reg_graph, could_merge, u_regs.len(), f_regs.len());
+
+    merge_regs(&mut reg_graph, could_merge, u_regs.len(), f_regs.len())
+        .with_context(|| context!())
+        .unwrap();
+
     assign_extra_edge(&mut reg_graph, u_regs.len(), f_regs.len(), def_then_def);
-    let (colors, spills) = reg_alloc(&reg_graph, u_regs, f_regs)?;
-    if spills.is_empty() {
-        Ok(colors)
-    } else {
-        Err(anyhow!(""))
+    let (simplified_graph, mut later_to_color) = simplify_graph(&reg_graph, u_regs, f_regs);
+    if simplified_graph
+        .iter()
+        .filter(|(r, _)| r.is_virtual())
+        .count()
+        != 0
+    {
+        return Err(anyhow!(""));
     }
+    let mut colors: FxHashMap<Reg, Reg> = FxHashMap::default();
+
+    while let Some(r) = later_to_color.pop_back() {
+        let interred_colors = physical_inters(&reg_graph, Some(&colors), &r);
+        if let Some(color) = select_free_color(u_regs, f_regs, &r, &interred_colors) {
+            colors.insert(r, color);
+        } else {
+            return Err(anyhow!(""));
+        }
+    }
+
+    Ok(colors)
 }
 
 pub fn apply_colors(func: &mut Func, colors: FxHashMap<Reg, Reg>) {
@@ -74,7 +94,7 @@ pub fn apply_spills2(func: &mut Func, spills: FxHashSet<Reg>) -> Result<()> {
     // key: virtual reg, value: the physical reg that is used to store the value of the virtual reg
     let mut owner: FxHashMap<Reg, Reg> = FxHashMap::default();
     let mut owned: FxHashSet<Reg> = FxHashSet::default();
-    let i_tmps = tmp_i_regs();
+    let i_tmps = tmp_u_regs();
     let f_tmps = tmp_f_regs();
     for block in func.iter_bbs_mut() {
         let mut new_insts = vec![];
@@ -205,6 +225,7 @@ pub fn reg_alloc(
     graph: &FxHashMap<Reg, FxHashSet<Reg>>,
     i_colors: &[Reg],
     f_colors: &[Reg],
+    costs: Option<&FxHashMap<Reg, usize>>,
 ) -> Result<(FxHashMap<Reg, Reg>, FxHashSet<Reg>)> {
     let (graph_to_simplify, mut later_to_color) = simplify_graph(graph, i_colors, f_colors);
 
@@ -212,35 +233,35 @@ pub fn reg_alloc(
     let mut to_spill: FxHashSet<Reg> = FxHashSet::default();
 
     // try to color the rest of the graph
+    // 创建fisrst_to_color,first_to_color中的寄存器应该按照 从id小到大的顺序来分配
     let mut first_to_color: Vec<(Reg, usize)> = graph_to_simplify
         .into_iter()
         .filter(|(k, _)| k.is_virtual())
         .map(|(k, v)| (k, v.len()))
         .collect();
-    first_to_color.sort_by_key(|(_, v)| *v);
-    for (k, _) in first_to_color {
+
+    // spill cost越大,越不应该被spill,所以应该优先分配
+    // num_inter越大,越容易与其他寄存器冲突,越容易让其他寄存器spill,更可能增加spill总代价,所以应该晚分配
+    if let Some(costs) = costs {
+        // 仅仅考虑spill cost 的策略
+        first_to_color.sort_by_key(|(k, v)| costs.get(k).cloned().unwrap_or(1));
+        // 考虑spill cost 和 num_inter的策略,spill cost/num_inter越大,越不应该被spill,所以应该优先分配
+        // first_to_color.sort_by_key(|(k, v)| {
+        //     (costs.get(k).cloned().unwrap_or(1) as f64 / (*v as f64 + 1.0)) * 10000.0
+        // } as usize);
+    } else {
+        first_to_color.sort_by_key(|(_, v)| *v);
+        first_to_color.reverse();
+    }
+
+    for (k, _) in first_to_color.into_iter().rev() {
         later_to_color.push_back(k);
     }
 
     while let Some(r) = later_to_color.pop_back() {
-        let mut used_colors: FxHashSet<Reg> = FxHashSet::default();
-        let inter = graph.get(&r).expect("");
-        for v in inter {
-            if v.is_physical() {
-                used_colors.insert(*v);
-            }
-            if let Some(c) = colors.get(v) {
-                used_colors.insert(*c);
-            }
-        }
-        // find the first color that is not used
-        let color = if r.is_usual() {
-            i_colors.iter().find(|c| !used_colors.contains(c))
-        } else {
-            f_colors.iter().find(|c| !used_colors.contains(c))
-        };
-        if let Some(color) = color {
-            colors.insert(r, *color);
+        let mut interred_colors: FxHashSet<Reg> = physical_inters(graph, Some(&colors), &r);
+        if let Some(color) = select_free_color(i_colors, f_colors, &r, &interred_colors) {
+            colors.insert(r, color);
         } else {
             to_spill.insert(r);
         }
@@ -256,15 +277,6 @@ pub fn simplify_graph(
     i_colors: &[Reg],
     f_colors: &[Reg],
 ) -> (FxHashMap<Reg, FxHashSet<Reg>>, VecDeque<Reg>) {
-    fn remove_node(g: &mut FxHashMap<Reg, FxHashSet<Reg>>, r: Reg) {
-        let nbs = g.remove(&r).unwrap_or_default();
-        for nb in nbs {
-            if let Some(nb_nbs) = g.get_mut(&nb) {
-                nb_nbs.remove(&r);
-            }
-        }
-    }
-
     let mut graph_to_simplify = graph.clone();
 
     let mut later_to_color: VecDeque<Reg> = VecDeque::new();
@@ -277,10 +289,7 @@ pub fn simplify_graph(
             if k.is_physical() {
                 continue;
             }
-            let num_inter = v
-                .iter()
-                .filter(|v| v.is_usual() == k.is_usual() && !special_regs().contains(v))
-                .count();
+            let num_inter = v.iter().filter(|v| v.is_usual() == k.is_usual()).count();
             if k.is_float() {
                 if num_inter < f_colors.len() {
                     to_remove.push(*k);
@@ -441,7 +450,8 @@ mod tests {
         graph.insert(i_v1, FxHashSet::from_iter(vec![i_v2, i_v3]));
         graph.insert(i_v2, FxHashSet::from_iter(vec![i_v1, i_v3]));
         graph.insert(i_v3, FxHashSet::from_iter(vec![i_v1, i_v2]));
-        let (colors, to_spill) = super::reg_alloc(&graph, free_iregs(), free_fregs()).unwrap();
+        let (colors, to_spill) =
+            super::reg_alloc(&graph, free_uregs(), free_fregs(), None).unwrap();
         // dbg!(&colors);
         check_alloc(&graph, &colors, &to_spill);
     }
@@ -459,18 +469,18 @@ mod tests {
             .map(|(k, v)| (k, v.into_iter().collect()))
             .collect();
         // dbg!(&g);
-        let (colors, spills) = reg_alloc(&g, &[REG_A0, REG_A1], &[]).unwrap();
+        let (colors, spills) = reg_alloc(&g, &[REG_A0, REG_A1], &[], None).unwrap();
         // dbg!(&colors);
         // dbg!(&spills);
         assert!(spills.len() == 1);
         check_alloc(&g, &colors, &spills);
 
-        let (colors, spills) = reg_alloc(&g, &[REG_A0], &[]).unwrap();
+        let (colors, spills) = reg_alloc(&g, &[REG_A0], &[], None).unwrap();
         // dbg!(&colors);
         assert!(spills.len() == 2);
         check_alloc(&g, &colors, &spills);
 
-        let (colors, spills) = reg_alloc(&g, &[REG_A0, REG_A1, REG_A2], &[]).unwrap();
+        let (colors, spills) = reg_alloc(&g, &[REG_A0, REG_A1, REG_A2], &[], None).unwrap();
         // dbg!(&colors);
         assert!(spills.is_empty());
         check_alloc(&g, &colors, &spills);
