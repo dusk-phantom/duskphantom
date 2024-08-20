@@ -72,8 +72,6 @@ pub fn optimize_func(func: &mut Func) -> Result<()> {
 
     phisicalize::handle_long_jump(func, &REG_T0, 20_0000);
 
-    pre_inst_split::handle_pre_split_li(func)?;
-
     fprintln!("log/after_inst_scheduling.s", "{}", func.gen_asm());
     // register allocation
     reg_alloc::handle_reg_alloc(func)?;
@@ -84,10 +82,6 @@ pub fn optimize_func(func: &mut Func) -> Result<()> {
 
     // processing stack frame's opening and closing
     stack::handle_stack(func)?;
-
-    fprintln!("log/before_split_li.s", "{}", func.gen_asm());
-    post_inst_split::post_handle_inst_split(func)?;
-    fprintln!("log/after_split_li.s", "{}", func.gen_asm());
 
     // inst scheduling
     schedule::handle_inst_scheduling(func)?;
