@@ -1,7 +1,4 @@
-use compiler::{
-    backend::{self, irs::Func},
-    utils::diff,
-};
+use compiler::{backend::irs::Func, utils::diff};
 use indoc::indoc;
 #[allow(unused)]
 use insta::assert_snapshot;
