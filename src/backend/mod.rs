@@ -4,6 +4,8 @@ pub mod irs;
 pub mod optimize;
 mod phisicalize;
 
+mod libthrd;
+
 use rayon::prelude::*;
 
 pub use crate::context;

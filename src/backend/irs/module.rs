@@ -1,5 +1,7 @@
 // 一个module 是一个 基础独立编译单元, 或者理解成c的一个 独立代码文件
 
+use libthrd::LIB_THRD;
+
 use super::*;
 use crate::config::CONFIG;
 pub struct Module {
@@ -81,6 +83,8 @@ impl Module {
                     .join("\n")
             });
         };
+
+        funcs.push_str(LIB_THRD);
 
         gen_asm::GenTool::gen_prog("test.c", global.as_str(), funcs.as_str())
     }
