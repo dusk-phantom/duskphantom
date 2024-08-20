@@ -214,6 +214,15 @@ impl Inst {
             _ => None,
         }
     }
+
+    pub fn stack_slot_mut(&mut self) -> Option<&mut StackSlot> {
+        match self {
+            Inst::Load(load) => Some(load.src_mut()),
+            Inst::Store(store) => Some(store.dst_mut()),
+            Inst::LocalAddr(local_addr) => Some(local_addr.stack_slot_mut()),
+            _ => None,
+        }
+    }
 }
 
 //*********************************************************************************

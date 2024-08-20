@@ -59,6 +59,11 @@ impl IRBuilder {
         }
         let max_callee_regs_stacks =
             Self::prepare_max_callee_regs_stack(&mut funcs, &caller_regs_stacks)?;
+        max_callee_regs_stacks.iter().for_each(|(func, n)| {
+            if let Some(f) = funcs.iter_mut().find(|f| f.name() == func) {
+                f.max_callee_regs_stack = *n;
+            }
+        });
         Self::realloc_stack_slots(&mut funcs, &max_callee_regs_stacks)?;
         Ok(funcs)
     }
