@@ -205,6 +205,15 @@ impl Inst {
             Inst::Beq(_) | Inst::Bne(_) | Inst::Bge(_) | Inst::Blt(_) | Inst::Bgt(_) | Inst::Ble(_)
         )
     }
+
+    pub fn stack_slot(&self) -> Option<&StackSlot> {
+        match self {
+            Inst::Load(load) => Some(load.src()),
+            Inst::Store(store) => Some(store.dst()),
+            Inst::LocalAddr(local_addr) => Some(local_addr.stack_slot()),
+            _ => None,
+        }
+    }
 }
 
 //*********************************************************************************

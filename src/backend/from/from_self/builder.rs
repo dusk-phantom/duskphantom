@@ -213,13 +213,8 @@ impl IRBuilder {
             /* ***** 统计每个 slot 使用的次数 ***** */
             for bb in f.iter_bbs() {
                 for inst in bb.insts() {
-                    let stack_slot = match inst {
-                        Inst::Load(load) => *load.src(),
-                        Inst::Store(store) => *store.dst(),
-                        Inst::LocalAddr(local_addr) => *local_addr.stack_slot(),
-                        _ => {
-                            continue;
-                        }
+                    let Some(stack_slot) = inst.stack_slot().cloned() else {
+                        continue;
                     };
                     let new_times = old_stack_slots.get(&stack_slot).unwrap_or(&0) + 1;
                     old_stack_slots.insert(stack_slot, new_times);
