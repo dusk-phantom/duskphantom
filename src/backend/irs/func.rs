@@ -133,7 +133,7 @@ impl Func {
         regs
     }
 
-    // iter bbs in a special order,in which entry is the first one
+    /// iter bbs in a special order,in which entry is the first one
     pub fn iter_bbs(&self) -> BBIter {
         let other_bbs: Vec<&Block> = self.other_bbs.iter().collect();
         BBIter {
@@ -148,6 +148,14 @@ impl Func {
         let mut bbs = vec![&mut self.entry];
         bbs.extend(self.other_bbs.iter_mut());
         bbs.into_iter()
+    }
+
+    pub fn other_bbs(&self) -> &Vec<Block> {
+        &self.other_bbs
+    }
+
+    pub fn other_bbs_mut(&mut self) -> &mut Vec<Block> {
+        &mut self.other_bbs
     }
 
     // get exit bbs, which are the bbs that end with ret or tail call
