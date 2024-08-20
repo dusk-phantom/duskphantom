@@ -7,6 +7,13 @@ use super::*;
 /// 不断重复上述过程,直到不能再交换为止
 #[allow(unused)]
 pub fn handle_reorder(func: &mut Func) -> Result<()> {
+    let other_bbs = func.other_bbs();
+    let new_order = PHCL::new(func)?.optimize_layout();
+    let new_other_bbs = new_order
+        .into_iter()
+        .map(|id| other_bbs[id].clone())
+        .collect::<Vec<_>>();
+    *func.other_bbs_mut() = new_other_bbs;
     Ok(())
 }
 
@@ -35,15 +42,15 @@ impl PHCL {
     fn new(func: &Func) -> Result<Self> {
         // 初始化单元的 group
         let groups: Vec<Vec<BBIdx>> = func
-            .iter_bbs()
-            .skip(1) // entry bb 不参与 块重排, 也就是, 这个 idx 就是 other_bbs 的 idx
+            .other_bbs()
+            .iter()
             .enumerate()
             .map(|(i, _)| vec![i])
             .collect();
 
         let label_idx_map: HashMap<String, BBIdx> = func
-            .iter_bbs()
-            .skip(1)
+            .other_bbs()
+            .iter()
             .enumerate()
             .map(|(i, bb)| (bb.label().to_string(), i))
             .collect();
@@ -68,6 +75,7 @@ impl PHCL {
     fn optimize_layout(&mut self) -> Vec<BBIdx> {
         // 1. 基本块分组
         while self.groups.len() > 1 {
+            // 不断合并 grp, 合并到只有 1 个 grp
             if let Some((idx_a, idx_b)) = self.find_most_frequent_pair() {
                 self.merge_groups(idx_a, idx_b);
             } else {
@@ -114,6 +122,7 @@ impl PHCL {
                     }
                 }
             }
+            // 注意 total_weight 与 max_weight 的数值, 这可以保证: layout == NULL 的时候也可以使用
             if total_weight > max_weight {
                 max_weight = total_weight;
                 best_grp = Some(idx);
@@ -128,7 +137,7 @@ impl PHCL {
         let mut best_pair: Option<(GRPIdx, GRPIdx)> = None;
         for i /* 组下标 */ in 0..self.groups.len() {
             for j in i + 1..self.groups.len() {
-                let mut total_weight : Weight = 0 as Weight;
+                let mut total_weight : Weight = 0.0;
                 for bb_a in &self.groups[i] {
                     for bb_b in &self.groups[j] {
                         if let Some( weight ) = self.edges.get( &(*bb_a, *bb_b) ) {
@@ -181,7 +190,9 @@ pub fn handle_single_jmp(func: &mut Func) -> Result<()> {
         }
     }
 
-    to_merge.retain(|_, to| to != func.entry().label());
+    to_merge.retain(
+        |_, to| to != func.entry().label(), /* 虽然我们不会有 -> entry */
+    );
 
     while let Some((from, to)) = to_merge.iter().next() {
         func.merge_bb(from, to)?;
@@ -276,9 +287,11 @@ mod tests {
         f.push_bb(bb2);
         f.push_bb(bb3);
 
+        let _f_before = format!("{:?}", &f);
         let f_asm_before = f.gen_asm();
 
         handle_single_jmp(&mut f).unwrap();
+        let _f_after = format!("{:?}", &f);
         let f_asm_after = f.gen_asm();
 
         assert_snapshot!(diff(&f_asm_before,&f_asm_after),@r###"
