@@ -71,15 +71,17 @@ pub fn count_spill_costs(func: &Func) -> FxHashMap<Reg, usize> {
             let defs = inst.defs();
             for r in uses.iter().filter(|r| r.is_virtual()) {
                 let c = cost.entry(**r).or_insert(0);
-                *c += 2 * factor;
+                let to_add = 2_usize.saturating_mul(factor);
+                *c = (*c).saturating_add(to_add);
             }
             for r in defs.iter().filter(|r| r.is_virtual()) {
                 if uses.contains(r) {
                     let c = cost.entry(**r).or_insert(0);
-                    *c += factor;
+                    *c = (*c).saturating_add(factor);
                 } else {
                     let c = cost.entry(**r).or_insert(0);
-                    *c += 2 * factor;
+                    let to_add = 2_usize.saturating_mul(factor);
+                    *c = (*c).saturating_add(to_add);
                 }
             }
         }
