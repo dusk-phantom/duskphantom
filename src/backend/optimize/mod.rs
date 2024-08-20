@@ -17,8 +17,12 @@ pub mod reg_alloc;
 
 pub mod caller_callee;
 
+<<<<<<< HEAD
 /// 块相关的优化
 pub mod block;
+=======
+pub mod block_reorder;
+>>>>>>> 6c398c9 (块重排)
 
 /// 栈相关的优化
 pub mod stack;
@@ -59,7 +63,11 @@ fn test_symplify_and_desimplify_term(func: &mut Func) {
 
 #[allow(unused)]
 pub fn optimize_func(func: &mut Func) -> Result<()> {
+<<<<<<< HEAD
     block::handle_block_simplify(func)?;
+=======
+    block_reorder::handle_reorder(func)?;
+>>>>>>> 6c398c9 (块重排)
 
     // inst combine? 匹配一些模式,将多条指令合并成一条
     fprintln!("log/before_inst_combine.s", "{}", func.gen_asm());
