@@ -3,6 +3,7 @@ name = "duskphantom"
 version = "0.1.0"
 edition = "2021"
 default-run = "compiler-cs"
+license = "MIT OR Apache-2.0"
 
 [lib]
 name = "compiler"
