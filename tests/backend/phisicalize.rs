@@ -272,6 +272,7 @@ fn test_handle_offset_overflow() {
             depth: 0,
         },
         other_bbs: [],
+        max_callee_regs_stack: 0,
     }
     "###);
 }
