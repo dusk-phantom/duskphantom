@@ -4,41 +4,39 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs";
     flake-utils.url = "github:numtide/flake-utils";
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
+  outputs = { self, nixpkgs, flake-utils, rust-overlay, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = import nixpkgs { inherit system; };
-        overrides = builtins.fromTOML (builtins.readFile ./rust-toolchain.toml);
-        libPath = pkgs.lib.makeLibraryPath [
-          # load external libraries that you need in your rust project here
-        ];
+        overlays = [ (import rust-overlay) ];
+        pkgs = import nixpkgs { inherit system overlays; };
+        lib = pkgs.lib;
+        toolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
       in {
         devShell = pkgs.mkShell {
-          buildInputs = with pkgs; [
-            llvmPackages_16.bintools
-            llvmPackages_16.libllvm
-            llvmPackages_16.llvm
-            llvmPackages_16.stdenv
-            clang
-            rustup
-            glib
-            gcc
+          # 本机环境 (不保证可移植)
+          nativeBuildInputs = (with pkgs; [
+            # pkg-config 用于管理: 编译、链接时所需库的路径
+            pkg-config
+            clang_16
+            llvm_16
             libxml2
-            (with pkgsCross.riscv64; [ glib.stdenv.cc buildPackages.gdb ])
-            qemu
+          ]) ++ [
+            # Mold Linker for faster builds (only on Linux)
+            (lib.optionals pkgs.stdenv.isLinux pkgs.mold)
+          ] ++ [
+            # rust
+            # pkgs.rust-analyzer-unwrapped
+            pkgs.cargo-insta
+            toolchain
           ];
-          LD_LIBRARY_PATH = libPath;
-          RUSTC_VERSION = overrides.toolchain.channel;
-
-          shellHook = ''
-            export PATH=$PATH:''${CARGO_HOME:-~/.cargo}/bin
-            export PATH=$PATH:''${RUSTUP_HOME:-~/.rustup}/toolchains/$RUSTC_VERSION-x86_64-unknown-linux-gnu/bin/
-          '';
-
-          # LIBCLANG_PATH = pkgs.lib.makeLibraryPath [ pkgs.llvmPackages_latest.libclang.lib ];
-
+          buildInputs = with pkgs; [ pkgsCross.riscv64.buildPackages.gcc qemu ];
+          RUST_SRC_PATH = "${toolchain}/lib/rustlib/src/rust/library";
         };
       });
 }
