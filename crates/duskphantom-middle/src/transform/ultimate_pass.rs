@@ -23,7 +23,8 @@ use super::{
     make_parallel, mem2reg, redundance_elim, sink_code,
 };
 
-pub fn optimize_program(program: &mut Program) -> Result<bool> {
+#[allow(unused)]
+pub fn optimize_program(program: &mut Program, level: usize) -> Result<bool> {
     mem2reg::optimize_program(program)?;
     main_loop(program)?;
     if CONFIG.open_auto_parallel {

@@ -91,21 +91,12 @@ rustc-hash = { workspace = true }
 [dev-dependencies]
 criterion = { workspace = true }
 
-# [[bench]]
-# name = "parse_expr"
-# harness = false
-
-# [[bench]]
-# name = "reg_set"
-# harness = false
-
 # 特性管理
 [features]
 default = [
-    "log_enabled",     # 用来指定是否开启日志,提交的时候应该关闭
-    "backend_opt",     # 用来指定是否开启后端优化,提交的时候应该开启
-    "clang_enabled",   # 解除该行注释获取基于clang的前后端, 比赛提交的时候该行需要注释掉
-    "gen_virtual_asm", # 解除该行注释获取生成虚拟汇编的功能
+    "log_enabled",   # 用来指定是否开启日志,提交的时候应该关闭
+    "backend_opt",   # 用来指定是否开启后端优化,提交的时候应该开启
+    "clang_enabled", # 解除该行注释获取基于clang的前后端, 比赛提交的时候该行需要注释掉
 ]
 clang_enabled = ["llvm-ir"]
 gen_virtual_asm = []

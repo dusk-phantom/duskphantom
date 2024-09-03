@@ -36,16 +36,24 @@ pub struct Program {
 use anyhow::{Context, Result};
 use duskphantom_utils::context;
 
-pub fn gen(program: &frontend::Program) -> Result<Program> {
-    irgen::gen(program).with_context(|| context!())
-    // match irgen::gen(program) {
-    //     Ok(program) => Ok(program),
-    //     Err(_) => Err(MiddleError::GenError),
-    // }
+impl TryFrom<&frontend::Program> for Program {
+    type Error = anyhow::Error;
+    fn try_from(program: &frontend::Program) -> Result<Self> {
+        irgen::gen(program).with_context(|| context!())
+    }
+}
+impl TryFrom<frontend::Program> for Program {
+    type Error = anyhow::Error;
+    fn try_from(program: frontend::Program) -> Result<Self> {
+        irgen::gen(&program)
+    }
 }
 
-pub fn optimize(program: &mut Program) {
-    ultimate_pass::optimize_program(program).unwrap();
+pub fn optimize(program: &mut Program, level: usize) {
+    if level == 0 {
+        return;
+    }
+    ultimate_pass::optimize_program(program, level).unwrap();
 }
 
 impl Default for Program {

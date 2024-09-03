@@ -26,7 +26,8 @@ mod from_llvm_tests {
     fn parse_to_backend(code: &str) -> Result<Program> {
         let tmp_cfile = tempfile::Builder::new().suffix(".c").tempfile()?;
         std::fs::write(tmp_cfile.path(), code)?;
-        let front: clang_frontend::Program = clang_frontend::Program::parse_file(tmp_cfile.path())?;
+        let front: clang_frontend::Program =
+            clang_frontend::Program::parse_c_file(tmp_cfile.path())?;
         let program: Program = from_llvm::gen_from_clang(&front)?;
         Ok(program)
     }

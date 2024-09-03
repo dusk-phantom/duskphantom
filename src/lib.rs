@@ -18,14 +18,13 @@ use anyhow::Context;
 
 use duskphantom_utils::context;
 
-#[cfg(not(feature = "gen_virtual_asm"))]
-use backend::irs::checker::ProgramChecker;
 use clang_front_back::clang_backend;
 use clang_front_back::clang_frontend;
 use errors::CompilerError;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
-pub mod args;
+pub mod cli;
+use cli::Cli;
 
 pub mod config;
 pub mod errors;
@@ -36,39 +35,30 @@ pub use duskphantom_middle as middle;
 use clap::arg;
 
 /// compile sysy source code to rv64gc asm
-pub fn compile(
-    sy_path: &str,
-    output_path: &str,
-    opt_flag: bool,
-    asm_flag: bool,
-    ll_path: Option<String>,
-) -> Result<(), CompilerError> {
-    let content = std::fs::read_to_string(sy_path).map_err(CompilerError::IOError)?;
+pub fn compile(cli: &Cli) -> Result<(), CompilerError> {
+    let content = std::fs::read_to_string(&cli.sy).map_err(CompilerError::IOError)?;
     let mut program = frontend::parse(&content)?;
-    if opt_flag {
-        frontend::optimize(&mut program);
+    if cli.optimize != 0 {
+        frontend::optimize(&mut program, cli.optimize);
     }
-    let mut program = middle::gen(&program)?;
-    if opt_flag {
-        middle::optimize(&mut program);
+
+    let mut program = middle::Program::try_from(program)?;
+    if cli.optimize != 0 {
+        middle::optimize(&mut program, cli.optimize);
     }
-    if let Some(ll_path) = ll_path {
+    if let Some(ll_path) = cli.ll.as_ref() {
         std::fs::write(ll_path, program.module.gen_llvm_ir()).with_context(|| context!())?;
     }
     let mut program = backend::from_self::gen_from_self(&program)?;
 
-    if opt_flag {
+    if cli.optimize != 0 {
         backend::optimize(&mut program)?;
     } else {
         backend::phisicalize(&mut program)?;
     }
 
-    // check valid
-    #[cfg(not(feature = "gen_virtual_asm"))]
-    assert!(backend::irs::checker::Riscv.check_prog(&program));
-
     let asm = program.gen_asm();
-    output(asm, output_path, asm_flag)
+    output(asm, &cli.output, cli.asm)
 }
 
 #[cfg(feature = "clang_enabled")]
@@ -81,13 +71,12 @@ pub fn compile_clang(
     ll_path: Option<String>,
 ) -> Result<(), CompilerError> {
     use duskphantom_backend::BackendError;
-    let mut program = clang_frontend::Program::parse_file(sy_path)?;
+    let mut program = clang_frontend::Program::parse_c_file(sy_path)?;
     if opt_flag {
-        clang_frontend::optimize(&mut program)?;
+        clang_frontend::optimize(&mut program, 3)?;
     }
     if let Some(ll_path) = ll_path {
-        std::fs::write(ll_path, program.gen_ll().with_context(|| context!())?)
-            .map_err(CompilerError::IOError)?;
+        std::fs::write(ll_path, program.emit_llvm_ir()).map_err(CompilerError::IOError)?;
     }
     let mut program = backend::from_llvm::gen_from_clang(&program)
         .map_err(|e| BackendError::GenFromLlvmError(format!("{e:?}")))?;
@@ -96,79 +85,63 @@ pub fn compile_clang(
     } else {
         backend::phisicalize(&mut program)?;
     }
-    // check valid
-    #[cfg(not(feature = "gen_virtual_asm"))]
-    assert!(backend::irs::checker::Riscv.check_prog(&program));
 
     let asm = program.gen_asm();
     output(asm, output_path, asm_flag)
 }
 
 #[cfg(feature = "clang_enabled")]
-pub fn compile_clang_llc(
-    sy_path: &str,
-    output_path: &str,
-    opt_flag: bool,
-    asm_flag: bool,
-    ll_path: Option<String>,
-) -> Result<(), CompilerError> {
-    let mut program = clang_frontend::Program::parse_file(sy_path)?;
-    if opt_flag {
-        clang_frontend::optimize(&mut program)?;
+pub fn compile_clang_llc(cli: &Cli) -> Result<(), CompilerError> {
+    let mut program = clang_frontend::Program::parse_c_file(&cli.sy)?;
+
+    if cli.optimize != 0 {
+        clang_frontend::optimize(&mut program, cli.optimize)?;
     }
-    if let Some(ll_path) = ll_path {
-        std::fs::write(ll_path, program.gen_ll().with_context(|| context!())?)
-            .map_err(CompilerError::IOError)?;
+
+    if let Some(ll_path) = &cli.ll {
+        std::fs::write(ll_path, program.emit_llvm_ir()).map_err(CompilerError::IOError)?;
     }
-    let mut program = clang_backend::gen_from_clang(&program)?;
-    if opt_flag {
-        clang_backend::optimize(&mut program);
+    let mut program = clang_backend::Program::try_from(&program)?;
+
+    if cli.optimize != 0 {
+        clang_backend::optimize(&mut program, cli.optimize)?;
     }
+
     let asm = program.gen_asm()?;
-    output(asm, output_path, asm_flag)
+    output(asm, &cli.output, cli.asm)
 }
 
 #[cfg(feature = "clang_enabled")]
-pub fn compile_self_llc(
-    sy_path: &str,
-    output_path: &str,
-    opt_flag: bool,
-    asm_flag: bool,
-    ll_path: Option<String>,
-) -> Result<(), CompilerError> {
-    let content = std::fs::read_to_string(sy_path).map_err(CompilerError::IOError)?;
+pub fn compile_self_llc(cli: &Cli) -> Result<(), CompilerError> {
+    let content = std::fs::read_to_string(cli.sy.as_str()).map_err(CompilerError::IOError)?;
     let mut program = frontend::parse(&content)?;
-    if opt_flag {
-        frontend::optimize(&mut program);
+    if cli.optimize != 0 {
+        frontend::optimize(&mut program, cli.optimize);
     }
-    let mut program = middle::gen(&program)?;
-    if opt_flag {
-        middle::optimize(&mut program);
+
+    let mut program = middle::Program::try_from(program)?;
+    if cli.optimize != 0 {
+        middle::optimize(&mut program, cli.optimize);
     }
+
     // 中端接clang
     let llvm_ir = program.module.gen_llvm_ir();
-    if let Some(ll_path) = ll_path {
+    if let Some(ll_path) = cli.ll.as_ref() {
         std::fs::write(ll_path, llvm_ir.clone()).with_context(|| context!())?;
     }
-    let mut builder = tempfile::Builder::new();
-    let tmp_llvm_file = builder.suffix(".ll").tempfile().unwrap();
-    fs::write(&tmp_llvm_file, llvm_ir.as_bytes())?;
-    let llvm = llvm_ir::Module::from_ir_path(&tmp_llvm_file).expect("llvm ir file not found");
-    let program = clang_frontend::Program {
-        tmp_llvm_file,
-        llvm,
-    };
-    let mut program = clang_backend::gen_from_clang(&program)?;
-    if opt_flag {
-        clang_backend::optimize(&mut program);
+    let program = clang_frontend::Program::parse_ll_code(&llvm_ir)?;
+    let mut program = clang_backend::Program::try_from(&program)?;
+
+    if cli.optimize != 0 {
+        clang_backend::optimize(&mut program, cli.optimize)?;
     }
     let asm = program.gen_asm()?;
-    output(asm, output_path, asm_flag)
+    output(asm, &cli.output, cli.asm)
 }
 
 fn output(asm: String, output_path: &str, asm_flag: bool) -> Result<(), CompilerError> {
     if !asm_flag {
-        std::fs::write(output_path, asm2bin(asm)?).map_err(CompilerError::IOError)?;
+        std::fs::write(output_path, gcc_asm2bin(asm)?).map_err(CompilerError::IOError)?;
         let mut permission = fs::metadata(output_path)?.permissions();
         permission.set_mode(0o755);
         fs::set_permissions(output_path, permission)?;
@@ -179,7 +152,7 @@ fn output(asm: String, output_path: &str, asm_flag: bool) -> Result<(), Compiler
 }
 
 #[allow(unused)]
-pub fn asm2bin(asm: String) -> anyhow::Result<Vec<u8>> {
+pub fn gcc_asm2bin(asm: String) -> anyhow::Result<Vec<u8>> {
     // 使用riskv64-linux-gnu-gcc编译
     let mut builder = tempfile::Builder::new();
     let tmp_asm_file = builder.suffix(".s").tempfile().unwrap();

@@ -35,6 +35,8 @@ impl Program {
         None
     }
     pub fn gen_asm(&self) -> String {
+        #[cfg(not(feature = "gen_virtual_asm"))]
+        assert!(backend::irs::checker::Riscv.check_prog(&program));
         // Note: only consider single module program now
         let mut asm = String::with_capacity(1024 * 1024);
         for module in self.modules.iter() {

@@ -35,4 +35,4 @@ pub fn parse(src: &str) -> Result<Program, FrontendError> {
 }
 
 #[allow(unused)]
-pub fn optimize(program: &mut Program) {}
+pub fn optimize(program: &mut Program, level: usize) {}

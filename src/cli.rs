@@ -23,7 +23,7 @@ use super::*;
 pub struct Cli {
     pub sy: String,
     #[arg(short = 'O', long, default_value = "0")]
-    pub optimize: i32,
+    pub optimize: usize,
     #[arg(short = 'S', long)]
     pub asm: bool,
     #[arg(short = 'o', long, value_name = "output")]

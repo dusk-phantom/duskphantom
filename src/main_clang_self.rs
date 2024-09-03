@@ -18,13 +18,13 @@ fn main() {
     #[cfg(feature = "clang_enabled")]
     {
         use clap::Parser;
-        use duskphantom::args::Cli;
+        use duskphantom::cli::Cli;
         let cli = Cli::parse();
         start_compiler_cs(&cli);
     }
 }
 #[cfg(feature = "clang_enabled")]
-fn start_compiler_cs(cli: &duskphantom::args::Cli) {
+fn start_compiler_cs(cli: &duskphantom::cli::Cli) {
     use duskphantom::compile_clang;
     use duskphantom::errors::handle_error;
     use std::borrow::Borrow;

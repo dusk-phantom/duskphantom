@@ -16,51 +16,89 @@
 
 use anyhow::{anyhow, Context, Result};
 use duskphantom_utils::context;
-use tempfile::NamedTempFile;
 
 use super::*;
-use std::process::Command;
+use std::{fs, process::Command};
 
 // 从clang frontend 生成riscv 汇编
 pub struct Program {
-    pub tmp_llvm_file: NamedTempFile,
-    pub opt: bool,
+    llvm_ir_s: String,
 }
 
 #[allow(unused)]
-pub fn optimize(program: &mut Program) {
-    program.opt = true;
+pub fn optimize(program: &mut Program, level: usize) -> Result<()> {
+    let tmp_llvm_file = tempfile::Builder::new().suffix(".ll").tempfile().unwrap();
+    fs::write(tmp_llvm_file.path(), program.llvm_ir_s.as_bytes()).unwrap();
+
+    let tmp_opt_file = tempfile::Builder::new().suffix(".ll").tempfile().unwrap();
+
+    let opt = match level {
+        0 => "-O0",
+        1 => "-O1",
+        2 => "-O2",
+        3 => "-O3",
+        _ => "-O0",
+    };
+    let mut cmd = Command::new("opt");
+    cmd.arg("-S")
+        .arg(tmp_llvm_file.path())
+        .arg("-o")
+        .arg(tmp_opt_file.path())
+        .arg(opt);
+    let output = cmd
+        .output()
+        .map_err(|e| anyhow!("msg: exec opt failed: {}", e))
+        .with_context(|| context!())?;
+    if !output.status.success() {
+        return Err(anyhow!(
+            "msg: exec opt failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    program.llvm_ir_s = std::fs::read_to_string(tmp_opt_file.path())
+        .map_err(|e| anyhow!("msg: read opt failed: {}", e))
+        .with_context(|| context!())?;
+
+    Ok(())
 }
 
-pub fn gen_from_clang(program: &clang_frontend::Program) -> Result<Program> {
-    let tmp_llvm_file = NamedTempFile::new()
-        .map_err(|e| anyhow!("msg: create tmp file failed: {}", e))
-        .with_context(|| context!())?;
-    let mut cmd = Command::new("cp");
-    cmd.arg(program.tmp_llvm_file.path())
-        .arg(tmp_llvm_file.path());
-    let output = cmd.output().expect("msg: exec clang failed");
-    if !output.status.success() {
-        return Err(anyhow!("msg: exec clang failed"));
+impl TryFrom<clang_frontend::Program> for Program {
+    type Error = anyhow::Error;
+    fn try_from(program: clang_frontend::Program) -> std::result::Result<Self, Self::Error> {
+        Self::try_from(&program)
     }
-    Ok(Program {
-        tmp_llvm_file,
-        opt: false,
-    })
+}
+
+impl TryFrom<&clang_frontend::Program> for Program {
+    type Error = anyhow::Error;
+    fn try_from(program: &clang_frontend::Program) -> std::result::Result<Self, Self::Error> {
+        Ok(Program {
+            llvm_ir_s: program.emit_llvm_ir().to_string(),
+        })
+    }
 }
 
 impl Program {
+    pub fn parse_ll_code(ll_code: &str) -> Result<Self> {
+        Ok(Program {
+            llvm_ir_s: ll_code.to_string(),
+        })
+    }
+
     pub fn gen_asm(&mut self) -> Result<String> {
-        let tmp_llvm_file = self.tmp_llvm_file.path();
+        let tmp_llvm_file = tempfile::Builder::new().suffix(".ll").tempfile()?;
+        fs::write(tmp_llvm_file.path(), self.llvm_ir_s.as_bytes())
+            .map_err(|e| anyhow!("msg: write llvm ir failed: {}", e))
+            .with_context(|| context!())?;
+        let tmp_asm_file = tempfile::Builder::new().suffix(".s").tempfile()?;
         let mut cmd = Command::new("llc");
         cmd.arg("-march=riscv64")
             .arg("-mattr=+m,+f,+d,+a,+c")
-            .arg(tmp_llvm_file)
+            .arg(tmp_llvm_file.path())
             .arg("-o")
-            .arg(tmp_llvm_file);
-        if self.opt {
-            cmd.arg("-O3");
-        }
+            .arg(tmp_asm_file.path());
+
         let output = cmd
             .output()
             .map_err(|e| anyhow!("msg: exec llc failed: {}", e))
@@ -71,7 +109,7 @@ impl Program {
                 String::from_utf8_lossy(&output.stderr)
             ));
         }
-        std::fs::read_to_string(tmp_llvm_file)
+        std::fs::read_to_string(tmp_asm_file.path())
             .map_err(|e| anyhow!("msg: read asm failed: {}", e))
             .with_context(|| context!())
     }

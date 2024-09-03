@@ -23,9 +23,9 @@ mod build_glob_var;
 mod build_op;
 
 pub use super::irs::*;
-pub use clang_front_back::clang_frontend;
 pub use anyhow::{anyhow, Context, Result};
 pub use builder::IRBuilder;
+pub use clang_front_back::clang_frontend;
 pub use duskphantom_utils::context;
 
 #[cfg(feature = "clang_enabled")]
