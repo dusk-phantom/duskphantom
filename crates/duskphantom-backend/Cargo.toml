@@ -39,7 +39,7 @@ opt_address_computation = [] # 该特性用来指定是否开启s0辅助寻址�
 
 [dev-dependencies]
 criterion = { workspace = true }
-graph = { workspace = true }
+duskphantom-graph = { workspace = true }
 insta = { workspace = true }
 indoc = { workspace = true }
 rand = { workspace = true }

@@ -14,21 +14,19 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-extern crate compiler;
-
 pub fn main() {
     #[cfg(feature = "clang_enabled")]
     {
         use clap::Parser;
-        use compiler::args::Cli;
+        use duskphantom::args::Cli;
         let cli = Cli::parse();
         start_compiler_cl(&cli);
     }
 }
 #[cfg(feature = "clang_enabled")]
-fn start_compiler_cl(cli: &compiler::args::Cli) {
-    use compiler::compile_clang_llc;
-    use compiler::errors::handle_error;
+fn start_compiler_cl(cli: &duskphantom::args::Cli) {
+    use duskphantom::compile_clang_llc;
+    use duskphantom::errors::handle_error;
     use std::borrow::Borrow;
     let (sy_path, output_path, opt_flag, asm_flag, ll_path) = (
         &cli.sy,

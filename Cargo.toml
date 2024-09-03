@@ -9,34 +9,34 @@ license = "MIT OR Apache-2.0"
 name = "duskphantom"
 path = "src/lib.rs"
 
-# # 使用自己编写的前端中端后端
-# [[bin]]
-# name = "compiler"
-# path = "src/main.rs"
+# 使用自己编写的前端中端后端
+[[bin]]
+name = "compiler"
+path = "src/main.rs"
 
-# # 使用clang作为前端,使用llc作为后端
-# [[bin]]
-# name = "compiler-cl"
-# path = "src/main_clang_llc.rs"
+# 使用clang作为前端,使用llc作为后端
+[[bin]]
+name = "compiler-cl"
+path = "src/main_clang_llc.rs"
 
-# # 使用clang作为前端,自身实现后端
-# [[bin]]
-# name = "compiler-cs"
-# path = "src/main_clang_self.rs"
+# 使用clang作为前端,自身实现后端
+[[bin]]
+name = "compiler-cs"
+path = "src/main_clang_self.rs"
 
 
-# # 使用自己实现的中端导出llvm ir,使用llc作为后端
-# [[bin]]
-# name = "compiler-sc"
-# path = "src/main_self_llc.rs"
+# 使用自己实现的中端导出llvm ir,使用llc作为后端
+[[bin]]
+name = "compiler-sc"
+path = "src/main_self_llc.rs"
 
 [workspace]
 members = ["crates/*"]
 
 [workspace.dependencies]
 anyhow = "1.0.86"
-graph = { path = "crates/graph" }
 duskphantom = { path = "." }
+duskphantom-graph = { path = "crates/duskphantom-graph" }
 duskphantom-utils = { path = "crates/duskphantom-utils" }
 duskphantom-backend = { path = "crates/duskphantom-backend" }
 duskphantom-frontend = { path = "crates/duskphantom-frontend" }
@@ -78,6 +78,9 @@ tempfile = { workspace = true }
 winnow = { workspace = true }
 anyhow = { workspace = true }
 duskphantom-utils = { workspace = true }
+duskphantom-frontend = { workspace = true }
+duskphantom-middle = { workspace = true }
+duskphantom-backend = { workspace = true }
 hexf-parse = { workspace = true }
 
 regex = { workspace = true }

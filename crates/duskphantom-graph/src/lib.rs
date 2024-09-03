@@ -235,7 +235,7 @@ impl<T: GraphNode> From<UdGraph<T>> for HashMap<T, HashSet<T>> {
 /// a macro to create a graph
 /// # Example
 /// ```rust
-/// use graph::*;
+/// use duskphantom_graph::*;
 /// let g: UdGraph<u32> = udgraph!(
 ///    {1 -> 2,3},
 ///   {2 -> 3}
@@ -243,7 +243,7 @@ impl<T: GraphNode> From<UdGraph<T>> for HashMap<T, HashSet<T>> {
 /// ```
 /// or
 /// ```rust
-/// use graph::*;
+/// use duskphantom_graph::*;
 /// let g: UdGraph<u32> = udgraph!(u32; {1 -> 2,3}, {2 -> 3}).unwrap();
 /// ```
 macro_rules! udgraph {

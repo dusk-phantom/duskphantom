@@ -402,7 +402,7 @@ pub fn g2txt(g: &FxHashMap<Reg, FxHashSet<Reg>>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use graph::{udgraph, UdGraph};
+    use duskphantom_graph::{udgraph, UdGraph};
     fn check_alloc(
         graph: &FxHashMap<Reg, FxHashSet<Reg>>,
         colors: &FxHashMap<Reg, Reg>,

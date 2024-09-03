@@ -26,12 +26,12 @@ use errors::CompilerError;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 pub mod args;
-pub mod backend;
 
 pub mod config;
 pub mod errors;
-pub mod frontend;
-pub mod middle;
+pub use duskphantom_backend as backend;
+pub use duskphantom_frontend as frontend;
+pub use duskphantom_middle as middle;
 
 use clap::arg;
 
@@ -80,8 +80,7 @@ pub fn compile_clang(
     asm_flag: bool,
     ll_path: Option<String>,
 ) -> Result<(), CompilerError> {
-    use errors::BackendError;
-
+    use duskphantom_backend::BackendError;
     let mut program = clang_frontend::Program::parse_file(sy_path)?;
     if opt_flag {
         clang_frontend::optimize(&mut program)?;

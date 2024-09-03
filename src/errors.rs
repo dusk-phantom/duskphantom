@@ -14,6 +14,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+pub use duskphantom_backend::BackendError;
+pub use duskphantom_frontend::errors::FrontendError;
+pub use duskphantom_middle::errors::MiddleError;
 use thiserror::Error;
 
 // 全局error处理表
@@ -36,48 +39,6 @@ pub enum CompilerError {
     Other(#[from] anyhow::Error),
 }
 
-// 前端错误
-#[derive(Debug, Error)]
-pub enum FrontendError {
-    // 解析错误
-    #[error("parse error")]
-    ParseError(String),
-    // 优化错误
-    #[error("optimize error")]
-    OptimizeError,
-}
-
-// 中端错误
-#[derive(Debug, Error)]
-pub enum MiddleError {
-    // 生成错误
-    #[error("gen error")]
-    GenError,
-    // 优化错误
-    #[error("optimize error")]
-    OptimizeError,
-    // Custom error
-    #[error("custom error")]
-    CustomError(String),
-}
-
-// 后端错误
-#[derive(Debug, Error)]
-pub enum BackendError {
-    // 生成错误
-    #[error("gen error")]
-    GenError,
-    // 优化错误
-    #[error("optimize error")]
-    OptimizeError,
-    #[error("gen from llvm error: {0}")]
-    GenFromLlvmError(String),
-    #[error("internal consistency error: {0}")]
-    InternalConsistencyError(String),
-    #[error(transparent)]
-    Other(#[from] anyhow::Error),
-}
-
 /// 全局 错误处理函数
 pub fn handle_error(err: &CompilerError) {
     match err {
@@ -89,8 +50,8 @@ pub fn handle_error(err: &CompilerError) {
             FrontendError::ParseError(msg) => {
                 eprintln!("msg: parse error: {}", msg);
             }
-            FrontendError::OptimizeError => {
-                eprintln!("msg: optimize error");
+            FrontendError::OptimizeError(e) => {
+                eprintln!("msg: optimize error: {e}");
             }
         },
         _ => (),

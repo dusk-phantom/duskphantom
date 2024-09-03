@@ -308,6 +308,9 @@ dependencies = [
  "clap 4.5.13",
  "criterion",
  "diff",
+ "duskphantom-backend",
+ "duskphantom-frontend",
+ "duskphantom-middle",
  "duskphantom-utils",
  "hexf-parse",
  "lazy_static",
@@ -331,9 +334,9 @@ dependencies = [
  "clang-front-back",
  "criterion",
  "duskphantom-frontend",
+ "duskphantom-graph",
  "duskphantom-middle",
  "duskphantom-utils",
- "graph",
  "indoc",
  "insta",
  "lazy_static",
@@ -363,6 +366,13 @@ dependencies = [
  "thiserror",
  "typed-arena",
  "winnow",
+]
+
+[[package]]
+name = "duskphantom-graph"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
 ]
 
 [[package]]
@@ -438,13 +448,6 @@ dependencies = [
  "cfg-if",
  "libc",
  "wasi",
-]
-
-[[package]]
-name = "graph"
-version = "0.1.0"
-dependencies = [
- "anyhow",
 ]
 
 [[package]]
