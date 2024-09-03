@@ -1,7 +1,12 @@
 [package]
 name = "duskphantom-backend"
 version = "0.0.1"
-edition = "2021"
+description = "Backend for DuskPhantom Compiler"
+edition.workspace = true
+license.workspace = true
+license-file.workspace = true
+repository.workspace = true
+
 
 [lib]
 name = "duskphantom_backend"
