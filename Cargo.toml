@@ -2,7 +2,7 @@
 name = "duskphantom"
 version = "0.0.1"
 edition = "2021"
-# default-run = "compiler-cs"
+default-run = "compiler"
 license = "MIT OR Apache-2.0"
 
 [lib]
