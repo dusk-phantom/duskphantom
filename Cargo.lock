@@ -127,7 +127,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "clang-front-back"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "duskphantom-utils",
@@ -301,7 +301,7 @@ checksum = "56254986775e3233ffa9c4d7d3faaf6d36a2c09d30b20687e9f88bc8bafc16c8"
 
 [[package]]
 name = "duskphantom"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "clang-front-back",
@@ -328,7 +328,7 @@ dependencies = [
 
 [[package]]
 name = "duskphantom-backend"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "clang-front-back",
@@ -352,7 +352,7 @@ dependencies = [
 
 [[package]]
 name = "duskphantom-frontend"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "criterion",
@@ -370,14 +370,14 @@ dependencies = [
 
 [[package]]
 name = "duskphantom-graph"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "anyhow",
 ]
 
 [[package]]
 name = "duskphantom-middle"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "diff",
@@ -398,7 +398,7 @@ dependencies = [
 
 [[package]]
 name = "duskphantom-utils"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "diff",
