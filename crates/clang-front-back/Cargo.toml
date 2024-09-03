@@ -1,7 +1,11 @@
 [package]
 name = "clang-front-back"
 version = "0.0.1"
-edition = "2021"
+description = "Frontend and Backend Based on Clang"
+edition.workspace = true
+license.workspace = true
+license-file.workspace = true
+repository.workspace = true
 
 
 [dependencies]
