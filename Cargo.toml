@@ -45,7 +45,7 @@ duskphantom = { path = "." }
 duskphantom-graph = { version = "0.0.*", path = "crates/duskphantom-graph" }
 duskphantom-utils = { version = "0.0.*", path = "crates/duskphantom-utils" }
 duskphantom-backend = { path = "crates/duskphantom-backend" }
-duskphantom-frontend = { path = "crates/duskphantom-frontend" }
+duskphantom-frontend = { version = "0.0.*", path = "crates/duskphantom-frontend" }
 duskphantom-middle = { path = "crates/duskphantom-middle" }
 clang-front-back = { path = "crates/clang-front-back" }
 rayon = "1.8.0"
