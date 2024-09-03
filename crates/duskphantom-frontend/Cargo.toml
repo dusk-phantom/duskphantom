@@ -1,7 +1,11 @@
 [package]
 name = "duskphantom-frontend"
 version = "0.0.1"
-edition = "2021"
+description = "Frontend for DuskPhantom"
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+license-file.workspace = true
 
 [[bench]]
 name = "parse_expr"

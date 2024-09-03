@@ -33,11 +33,17 @@ path = "src/main_self_llc.rs"
 [workspace]
 members = ["crates/*"]
 
+[workspace.package]
+repository = "https://github.com/dusk-phantom/duskphantom"
+license = "MIT OR Apache-2.0"
+license-file = "LICENSE"
+edition = "2021"
+
 [workspace.dependencies]
 anyhow = "1.0.86"
 duskphantom = { path = "." }
-duskphantom-graph = { path = "crates/duskphantom-graph" }
-duskphantom-utils = { path = "crates/duskphantom-utils" }
+duskphantom-graph = { version = "0.0.*", path = "crates/duskphantom-graph" }
+duskphantom-utils = { version = "0.0.*", path = "crates/duskphantom-utils" }
 duskphantom-backend = { path = "crates/duskphantom-backend" }
 duskphantom-frontend = { path = "crates/duskphantom-frontend" }
 duskphantom-middle = { path = "crates/duskphantom-middle" }
