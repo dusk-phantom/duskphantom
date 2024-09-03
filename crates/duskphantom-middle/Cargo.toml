@@ -17,8 +17,12 @@ typed-arena = { workspace = true }
 llvm-ir = { workspace = true, optional = true }
 winnow = { workspace = true }
 anyhow = { workspace = true }
-duskphantom_utils = { workspace = true }
-duskphantom_frontend = { workspace = true }
+duskphantom-utils = { workspace = true }
+duskphantom-frontend = { workspace = true }
+# duskphantom_backend = { workspace = true }
 hexf-parse = { workspace = true }
 regex = { workspace = true }
 diff = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true }

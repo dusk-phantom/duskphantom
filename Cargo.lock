@@ -102,6 +102,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "79296716171880943b8470b5f8d03aa55eb2e645a4874bdbb28adb49162e012c"
 
 [[package]]
+name = "byteorder"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
+
+[[package]]
 name = "cast"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -124,7 +130,7 @@ name = "clang-front-back"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "duskphantom_utils",
+ "duskphantom-utils",
  "insta",
  "lazy_static",
  "llvm-ir",
@@ -302,7 +308,7 @@ dependencies = [
  "clap 4.5.13",
  "criterion",
  "diff",
- "duskphantom_utils",
+ "duskphantom-utils",
  "hexf-parse",
  "lazy_static",
  "llvm-ir",
@@ -312,6 +318,48 @@ dependencies = [
  "serde",
  "serde_yaml",
  "tempfile",
+ "thiserror",
+ "typed-arena",
+ "winnow",
+]
+
+[[package]]
+name = "duskphantom-backend"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clang-front-back",
+ "criterion",
+ "duskphantom-frontend",
+ "duskphantom-middle",
+ "duskphantom-utils",
+ "graph",
+ "indoc",
+ "insta",
+ "lazy_static",
+ "llvm-ir",
+ "rand",
+ "rayon",
+ "rustc-hash",
+ "serde",
+ "serde_yaml",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
+name = "duskphantom-frontend"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "criterion",
+ "diff",
+ "duskphantom-utils",
+ "hexf-parse",
+ "insta",
+ "llvm-ir",
+ "rayon",
+ "regex",
  "thiserror",
  "typed-arena",
  "winnow",
@@ -323,9 +371,10 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "diff",
- "duskphantom_frontend",
- "duskphantom_utils",
+ "duskphantom-frontend",
+ "duskphantom-utils",
  "hexf-parse",
+ "insta",
  "lazy_static",
  "llvm-ir",
  "rayon",
@@ -338,43 +387,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "duskphantom_backend"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clang-front-back",
- "criterion",
- "duskphantom",
- "duskphantom_utils",
- "lazy_static",
- "llvm-ir",
- "rayon",
- "rustc-hash",
- "serde",
- "serde_yaml",
- "tempfile",
- "thiserror",
-]
-
-[[package]]
-name = "duskphantom_frontend"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "criterion",
- "diff",
- "duskphantom_utils",
- "hexf-parse",
- "llvm-ir",
- "rayon",
- "regex",
- "thiserror",
- "typed-arena",
- "winnow",
-]
-
-[[package]]
-name = "duskphantom_utils"
+name = "duskphantom-utils"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -415,6 +428,17 @@ name = "fastrand"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9fc0510504f03c51ada170672ac806f1f105a88aa97a5281117e1ddc3368e51a"
+
+[[package]]
+name = "getrandom"
+version = "0.2.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c4567c8db10ae91089c99af84c68c38da3ec2f087c3f82960bcdbf3656b6f4d7"
+dependencies = [
+ "cfg-if",
+ "libc",
+ "wasi",
+]
 
 [[package]]
 name = "graph"
@@ -465,6 +489,12 @@ dependencies = [
  "equivalent",
  "hashbrown",
 ]
+
+[[package]]
+name = "indoc"
+version = "2.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b248f5224d1d606005e02c97f5aa4e88eeb230488bcc03bc9ca4d7991399f2b5"
 
 [[package]]
 name = "insta"
@@ -618,6 +648,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ppv-lite86"
+version = "0.2.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77957b295656769bb8ad2b6a6b09d897d94f05c41b069aede1fcdaa675eaea04"
+dependencies = [
+ "zerocopy",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.85"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -633,6 +672,36 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fa76aaf39101c457836aec0ce2316dbdc3ab723cdda1c6bd4e6ad4208acaca7"
 dependencies = [
  "proc-macro2",
+]
+
+[[package]]
+name = "rand"
+version = "0.8.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "34af8d1a0e25924bc5b7c43c079c942339d8f0a8b57c39049bef581b46327404"
+dependencies = [
+ "libc",
+ "rand_chacha",
+ "rand_core",
+]
+
+[[package]]
+name = "rand_chacha"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6c10a63a0fa32252be49d21e7709d4d4baf8d231c2dbce1eaa8141b9b127d88"
+dependencies = [
+ "ppv-lite86",
+ "rand_core",
+]
+
+[[package]]
+name = "rand_core"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
+dependencies = [
+ "getrandom",
 ]
 
 [[package]]
@@ -893,6 +962,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "wasi"
+version = "0.11.0+wasi-snapshot-preview1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c8d87e72b64a3b4db28d11ce29237c246188f4f51057d65a7eab63b7987e423"
+
+[[package]]
 name = "wasm-bindgen"
 version = "0.2.92"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1067,4 +1142,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "59b5e5f6c299a3c7890b876a2a587f3115162487e704907d9b6cd29473052ba1"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "zerocopy"
+version = "0.7.35"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b9b4fd18abc82b8136838da5d50bae7bdea537c574d8dc1a34ed098d6c166f0"
+dependencies = [
+ "byteorder",
+ "zerocopy-derive",
+]
+
+[[package]]
+name = "zerocopy-derive"
+version = "0.7.35"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa4f8080344d4671fb4e831a13ad1e68092748387dfc4f55e356242fae12ce3e"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]

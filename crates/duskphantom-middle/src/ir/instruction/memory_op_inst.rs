@@ -29,7 +29,7 @@ impl IRBuilder {
     ///
     /// # Example
     /// ```rust
-    /// # use compiler::middle::ir::*;
+    /// # use duskphantom_middle::ir::*;
     /// let mut ir_builder = IRBuilder::new();
     /// let alloca_0 = ir_builder.get_alloca(ValueType::Int, 1);// %alloca_0 = alloca i32
     /// let alloca_1 = ir_builder.get_alloca(ValueType::Int, 2);// %alloca_1 = alloca i32, i32 2
@@ -54,7 +54,7 @@ impl IRBuilder {
     ///
     /// # Example
     /// ```rust
-    /// # use compiler::middle::ir::*;
+    /// # use duskphantom_middle::ir::*;
     /// let mut ir_builder = IRBuilder::new();
     /// let ptr = ir_builder.get_alloca(ValueType::Int, 1);// %ptr = alloca i32
     /// let load_0 = ir_builder.get_load(ValueType::Int, Operand::Instruction(ptr));// %load_0 = load i32, ptr
@@ -79,7 +79,7 @@ impl IRBuilder {
     ///
     /// # Example
     /// ```rust
-    /// # use compiler::middle::ir::*;
+    /// # use duskphantom_middle::ir::*;
     /// let mut ir_builder = IRBuilder::new();
     /// let ptr = ir_builder.get_alloca(ValueType::Int, 1);// %ptr = alloca i32
     /// let value = Operand::Constant(1.into());// %value = 1
@@ -112,7 +112,7 @@ impl IRBuilder {
     ///
     /// # Example
     /// ```rust
-    /// # use compiler::middle::ir::*;
+    /// # use duskphantom_middle::ir::*;
     /// let mut ir_builder = IRBuilder::new();
     /// let ptr = ir_builder.get_alloca(ValueType::Int, 1);// %ptr = alloca i32
     /// let index = vec![Operand::Constant(1.into())];// %index = 1

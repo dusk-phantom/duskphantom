@@ -1,5 +1,5 @@
 [package]
-name = "duskphantom_frontend"
+name = "duskphantom-frontend"
 version = "0.1.0"
 edition = "2021"
 
@@ -14,10 +14,11 @@ typed-arena = { workspace = true }
 llvm-ir = { workspace = true, optional = true }
 winnow = { workspace = true }
 anyhow = { workspace = true }
-duskphantom_utils = { workspace = true }
+duskphantom-utils = { workspace = true }
 hexf-parse = { workspace = true }
 regex = { workspace = true }
 diff = { workspace = true }
 
 [dev-dependencies]
 criterion = "0.3.0"
+insta = { workspace = true }

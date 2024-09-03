@@ -33,6 +33,7 @@ pub use operand::*;
 
 pub use super::irs::*;
 
+pub use duskphantom_middle as middle;
 pub use duskphantom_utils::context;
 pub use duskphantom_utils::fprintln;
 pub use duskphantom_utils::mem;

@@ -14,15 +14,5 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-use thiserror::Error;
-
-// 前端错误
-#[derive(Debug, Error)]
-pub enum FrontendError {
-    // 解析错误
-    #[error("parse error")]
-    ParseError(String),
-    // 优化错误
-    #[error("optimize error")]
-    OptimizeError(#[from] anyhow::Error),
-}
+mod effect_analysis;
+mod memory_ssa;

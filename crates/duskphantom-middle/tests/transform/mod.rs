@@ -14,15 +14,17 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-use thiserror::Error;
+mod block_fuse;
+mod constant_fold;
+mod dead_code_elim;
+mod func_inline;
+mod load_elim;
+mod loop_optimization;
+mod make_parallel;
+mod mem2reg;
+mod redundance_elim;
+mod store_elim;
+mod symbolic_eval;
 
-// 前端错误
-#[derive(Debug, Error)]
-pub enum FrontendError {
-    // 解析错误
-    #[error("parse error")]
-    ParseError(String),
-    // 优化错误
-    #[error("optimize error")]
-    OptimizeError(#[from] anyhow::Error),
-}
+pub use duskphantom_frontend::parse;
+pub use duskphantom_utils::diff::diff;

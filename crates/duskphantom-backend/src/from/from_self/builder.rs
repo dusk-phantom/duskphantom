@@ -20,7 +20,6 @@ use std::collections::HashMap;
 
 use super::Address;
 use crate::*;
-use duskphantom::middle;
 use duskphantom_utils::mem::ObjPtr;
 pub struct IRBuilder;
 

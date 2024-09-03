@@ -440,8 +440,8 @@ impl Ord for dyn Instruction {
 ///
 /// # Example
 /// ```
-/// # use compiler::middle::ir::instruction::{head::Head,downcast_ref};
-/// # use compiler::middle::ir::ir_builder::IRBuilder;
+/// # use duskphantom_middle::ir::instruction::{head::Head,downcast_ref};
+/// # use duskphantom_middle::ir::ir_builder::IRBuilder;
 /// # let mut ir_builder = IRBuilder::new();
 /// let dyn_head = ir_builder.new_head();
 /// let head = downcast_ref::<Head>(dyn_head.as_ref().as_ref());
@@ -468,11 +468,11 @@ where
 ///
 /// # Example
 /// ```
-/// # use compiler::middle::ir::instruction::{head::Head,downcast_mut};
-/// # use compiler::middle::ir::ir_builder::IRBuilder;
+/// # use duskphantom_middle::ir::instruction::{head::Head,downcast_mut};
+/// # use duskphantom_middle::ir::ir_builder::IRBuilder;
 /// # let mut ir_builder = IRBuilder::new();
 /// let mut dyn_head = ir_builder.new_head();
-/// let add_inst = downcast_mut::<Head>(dyn_head.as_mut().as_mut());
+/// let add_inst = downcast_mut::<Head>(dyn_head.as_mut());
 /// ```
 ///
 /// # Panics

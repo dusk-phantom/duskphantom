@@ -19,8 +19,7 @@ use std::collections::HashMap;
 use super::*;
 use anyhow::{anyhow, Context, Result};
 
-use duskphantom::middle;
-use duskphantom::middle::ir::Instruction;
+use middle::ir::Instruction;
 
 use builder::IRBuilder;
 

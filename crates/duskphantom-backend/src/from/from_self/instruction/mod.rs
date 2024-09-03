@@ -26,11 +26,10 @@ pub use builder::IRBuilder;
 
 // pub use crate::utils::mem::ObjPtr;
 
-pub use duskphantom::middle;
-pub use crate::{*, ssa2tac_three_float, ssa2tac_three_usual_Itype};
+pub use crate::{ssa2tac_three_float, ssa2tac_three_usual_Itype, *};
 
-pub use duskphantom::middle::ir::instruction::binary_inst::BinaryInst;
-pub use duskphantom::middle::ir::instruction::downcast_ref;
-pub use duskphantom::middle::ir::Instruction;
 pub use anyhow::{Context, Result};
+pub use middle::ir::instruction::binary_inst::BinaryInst;
+pub use middle::ir::instruction::downcast_ref;
+pub use middle::ir::Instruction;
 pub use var::FloatVar;

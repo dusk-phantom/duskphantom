@@ -22,7 +22,6 @@ use super::*;
 use anyhow::Result;
 
 use crate::*;
-use duskphantom::middle;
 
 impl IRBuilder {
     pub fn build_global_var(self_global_vars: &Vec<middle::ir::GlobalPtr>) -> Result<Vec<Var>> {

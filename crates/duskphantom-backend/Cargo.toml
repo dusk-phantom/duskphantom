@@ -1,5 +1,5 @@
 [package]
-name = "duskphantom_backend"
+name = "duskphantom-backend"
 version = "0.1.0"
 edition = "2021"
 
@@ -12,8 +12,9 @@ name = "reg_set"
 harness = false
 
 [dependencies]
-duskphantom = { workspace = true }
-duskphantom_utils = { workspace = true, features = ["log_enabled"] }
+duskphantom-utils = { workspace = true, features = ["log_enabled"] }
+duskphantom-frontend = { workspace = true }
+duskphantom-middle = { workspace = true }
 rayon = { workspace = true }
 llvm-ir = { workspace = true, optional = true }
 anyhow = { workspace = true }
@@ -37,4 +38,8 @@ backend_opt = ["opt_address_computation"]
 opt_address_computation = [] # 该特性用来指定是否开启s0辅助寻址计算优化
 
 [dev-dependencies]
-criterion = "0.3.0"
+criterion = { workspace = true }
+graph = { workspace = true }
+insta = { workspace = true }
+indoc = { workspace = true }
+rand = { workspace = true }

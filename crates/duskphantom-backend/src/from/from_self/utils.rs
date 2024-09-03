@@ -18,7 +18,7 @@ use super::*;
 use anyhow::Result;
 use std::collections::HashMap;
 
-use duskphantom::middle;
+use duskphantom_middle as middle;
 
 macro_rules! branch {
     ($beq:ident /* beq */,  $label_map:ident /* label_map */) => {{
