@@ -16,10 +16,8 @@
 
 use std::collections::HashMap;
 
-use anyhow::{anyhow, Context, Result};
-
+use crate::middle::ir::instruction::downcast_ref;
 use crate::{
-    backend::from_self::downcast_ref,
     context,
     middle::{
         analysis::call_graph::{CallEdge, CallGraph},
@@ -34,6 +32,7 @@ use crate::{
         Program,
     },
 };
+use anyhow::{anyhow, Context, Result};
 use duskphantom_utils::paral_counter::ParalCounter;
 
 use super::Transform;

@@ -16,8 +16,7 @@
 
 #[cfg(test)]
 pub mod tests_effect_analysis {
-    use insta::assert_snapshot;
-
+    use super::super::compiler;
     use compiler::{
         frontend::parse,
         middle::{
@@ -26,6 +25,7 @@ pub mod tests_effect_analysis {
             transform::{constant_fold, dead_code_elim, inst_combine, mem2reg},
         },
     };
+    use insta::assert_snapshot;
 
     #[test]
     fn test_trivial() {

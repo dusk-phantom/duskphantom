@@ -14,18 +14,15 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::{HashMap, HashSet};
-
-use crate::{
-    backend::from_self::downcast_ref,
-    middle::{
-        ir::{
-            instruction::{misc_inst::Call, InstType},
-            FunPtr, InstPtr,
-        },
-        Program,
+use crate::middle::ir::instruction::downcast_ref;
+use crate::middle::{
+    ir::{
+        instruction::{misc_inst::Call, InstType},
+        FunPtr, InstPtr,
     },
+    Program,
 };
+use std::collections::{HashMap, HashSet};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct CallEdge {

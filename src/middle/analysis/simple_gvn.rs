@@ -14,20 +14,17 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::middle::ir::instruction::downcast_ref;
+use crate::middle::ir::{
+    instruction::{
+        misc_inst::{Call, FCmp, ICmp},
+        InstType,
+    },
+    InstPtr, Operand,
+};
 use std::{
     collections::HashMap,
     hash::{DefaultHasher, Hash, Hasher},
-};
-
-use crate::{
-    backend::from_self::downcast_ref,
-    middle::ir::{
-        instruction::{
-            misc_inst::{Call, FCmp, ICmp},
-            InstType,
-        },
-        InstPtr, Operand,
-    },
 };
 
 use super::memory_ssa::MemorySSA;

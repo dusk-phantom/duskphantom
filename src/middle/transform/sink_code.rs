@@ -18,10 +18,10 @@ use std::collections::{HashMap, HashSet};
 
 use anyhow::{anyhow, Context, Result};
 
-use crate::backend::from_self::downcast_ref;
 use crate::context;
 use crate::middle::analysis::dominator_tree::DominatorTree;
 use crate::middle::analysis::effect_analysis::EffectAnalysis;
+use crate::middle::ir::instruction::downcast_ref;
 use crate::middle::ir::instruction::misc_inst::Phi;
 use crate::middle::ir::instruction::{downcast_mut, InstType};
 use crate::middle::ir::{BBPtr, InstPtr, Operand};

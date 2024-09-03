@@ -18,8 +18,8 @@ use std::collections::HashSet;
 
 use anyhow::{anyhow, Context, Result};
 
+use crate::middle::ir::instruction::downcast_ref;
 use crate::{
-    backend::from_self::downcast_ref,
     context,
     middle::{
         ir::{

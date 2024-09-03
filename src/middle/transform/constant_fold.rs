@@ -16,7 +16,7 @@
 
 use anyhow::Result;
 
-use crate::backend::from_self::downcast_ref;
+use crate::middle::ir::instruction::downcast_ref;
 use crate::middle::ir::instruction::misc_inst::FCmp;
 use crate::middle::ir::instruction::misc_inst::FCmpOp;
 use crate::middle::ir::instruction::misc_inst::ICmp;

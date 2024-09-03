@@ -14,8 +14,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-use compiler::frontend::*;
 use criterion::{criterion_group, criterion_main, Criterion};
+use duskphantom_frontend::*;
 
 #[allow(unused)]
 fn bench_all(c: &mut Criterion) {

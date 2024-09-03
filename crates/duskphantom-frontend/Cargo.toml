@@ -1,0 +1,23 @@
+[package]
+name = "duskphantom_frontend"
+version = "0.1.0"
+edition = "2021"
+
+[[bench]]
+name = "parse_expr"
+harness = false
+
+[dependencies]
+rayon = { workspace = true }
+thiserror = { workspace = true }
+typed-arena = { workspace = true }
+llvm-ir = { workspace = true, optional = true }
+winnow = { workspace = true }
+anyhow = { workspace = true }
+duskphantom_utils = { workspace = true }
+hexf-parse = { workspace = true }
+regex = { workspace = true }
+diff = { workspace = true }
+
+[dev-dependencies]
+criterion = "0.3.0"

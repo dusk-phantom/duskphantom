@@ -14,6 +14,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+use anyhow::{anyhow, Context, Result};
+use duskphantom_utils::context;
 use tempfile::NamedTempFile;
 
 use super::*;
@@ -30,14 +32,16 @@ pub fn optimize(program: &mut Program) {
     program.opt = true;
 }
 
-pub fn gen_from_clang(program: &clang_frontend::Program) -> Result<Program, CompilerError> {
-    let tmp_llvm_file = NamedTempFile::new().expect("msg: create tmp_llvm_file failed");
+pub fn gen_from_clang(program: &clang_frontend::Program) -> Result<Program> {
+    let tmp_llvm_file = NamedTempFile::new()
+        .map_err(|e| anyhow!("msg: create tmp file failed: {}", e))
+        .with_context(|| context!())?;
     let mut cmd = Command::new("cp");
     cmd.arg(program.tmp_llvm_file.path())
         .arg(tmp_llvm_file.path());
     let output = cmd.output().expect("msg: exec clang failed");
     if !output.status.success() {
-        panic!("msg: exec clang failed");
+        return Err(anyhow!("msg: exec clang failed"));
     }
     Ok(Program {
         tmp_llvm_file,
@@ -46,7 +50,7 @@ pub fn gen_from_clang(program: &clang_frontend::Program) -> Result<Program, Comp
 }
 
 impl Program {
-    pub fn gen_asm(&mut self) -> String {
+    pub fn gen_asm(&mut self) -> Result<String> {
         let tmp_llvm_file = self.tmp_llvm_file.path();
         let mut cmd = Command::new("llc");
         cmd.arg("-march=riscv64")
@@ -57,13 +61,18 @@ impl Program {
         if self.opt {
             cmd.arg("-O3");
         }
-        let output = cmd.output().expect("msg: exec llc failed");
+        let output = cmd
+            .output()
+            .map_err(|e| anyhow!("msg: exec llc failed: {}", e))
+            .with_context(|| context!())?;
         if !output.status.success() {
-            panic!(
-                "msg: exec llc failed\n{}",
+            return Err(anyhow!(
+                "msg: exec llc failed: {}",
                 String::from_utf8_lossy(&output.stderr)
-            );
+            ));
         }
-        std::fs::read_to_string(tmp_llvm_file).expect("msg: read asm failed")
+        std::fs::read_to_string(tmp_llvm_file)
+            .map_err(|e| anyhow!("msg: read asm failed: {}", e))
+            .with_context(|| context!())
     }
 }

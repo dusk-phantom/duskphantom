@@ -17,3 +17,5 @@
 mod analysis;
 mod irgen;
 mod transform;
+
+pub use duskphantom as compiler;

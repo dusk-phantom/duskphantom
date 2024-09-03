@@ -14,7 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-extern crate compiler;
+extern crate duskphantom as compiler;
 #[cfg(test)]
 pub mod tests {
     use duskphantom_utils::paral_counter::ParalCounter;

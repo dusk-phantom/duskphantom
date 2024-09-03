@@ -16,10 +16,8 @@
 
 use std::collections::{HashMap, HashSet};
 
-use anyhow::{anyhow, Context, Result};
-
+use crate::middle::ir::instruction::downcast_ref;
 use crate::{
-    backend::from_self::downcast_ref,
     context,
     middle::{
         analysis::dominator_tree::DominatorTree,
@@ -30,6 +28,7 @@ use crate::{
         Program,
     },
 };
+use anyhow::{anyhow, Context, Result};
 use duskphantom_utils::mem::{ObjPool, ObjPtr};
 
 use super::{alias_analysis::EffectRange, effect_analysis::EffectAnalysis};

@@ -16,10 +16,10 @@
 
 #[cfg(test)]
 mod tests {
-    use insta::assert_snapshot;
-
     use compiler::frontend::parse;
     use compiler::middle::irgen::*;
+    use duskphantom as compiler;
+    use insta::assert_snapshot;
 
     #[test]
     fn test_normal() {

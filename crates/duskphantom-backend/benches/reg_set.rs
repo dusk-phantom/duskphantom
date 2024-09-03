@@ -14,7 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-use compiler::backend::irs::*;
+use duskphantom_backend::irs::*;
 use criterion::black_box;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 

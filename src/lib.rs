@@ -20,16 +20,14 @@ use duskphantom_utils::context;
 
 #[cfg(not(feature = "gen_virtual_asm"))]
 use backend::irs::checker::ProgramChecker;
+use clang_front_back::clang_backend;
+use clang_front_back::clang_frontend;
 use errors::CompilerError;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 pub mod args;
 pub mod backend;
 
-#[cfg(feature = "clang_enabled")]
-pub mod clang_backend;
-#[cfg(feature = "clang_enabled")]
-pub mod clang_frontend;
 pub mod config;
 pub mod errors;
 pub mod frontend;
@@ -127,7 +125,7 @@ pub fn compile_clang_llc(
     if opt_flag {
         clang_backend::optimize(&mut program);
     }
-    let asm = program.gen_asm();
+    let asm = program.gen_asm()?;
     output(asm, output_path, asm_flag)
 }
 
@@ -165,7 +163,7 @@ pub fn compile_self_llc(
     if opt_flag {
         clang_backend::optimize(&mut program);
     }
-    let asm = program.gen_asm();
+    let asm = program.gen_asm()?;
     output(asm, output_path, asm_flag)
 }
 

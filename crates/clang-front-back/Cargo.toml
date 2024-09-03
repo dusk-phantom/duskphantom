@@ -1,0 +1,29 @@
+[package]
+name = "clang-front-back"
+version = "0.1.0"
+edition = "2021"
+
+
+[dependencies]
+duskphantom_utils = { workspace = true, features = ["log_enabled"] }
+rayon = { workspace = true }
+llvm-ir = { workspace = true, optional = true }
+anyhow = { workspace = true }
+rustc-hash = { workspace = true }
+lazy_static = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+insta = { workspace = true }
+tempfile = { workspace = true }
+serde_yaml = { workspace = true }
+
+[features]
+default = [
+    "backend_opt",     # 用来指定是否开启后端优化,提交的时候应该开启
+    "clang_enabled",   # 解除该行注释获取基于clang的前后端, 比赛提交的时候该行需要注释掉
+    "gen_virtual_asm", # 解除该行注释获取生成虚拟汇编的功能
+]
+clang_enabled = ["llvm-ir"]
+gen_virtual_asm = []
+backend_opt = ["opt_address_computation"]
+opt_address_computation = [] # 该特性用来指定是否开启s0辅助寻址计算优化

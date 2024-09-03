@@ -14,29 +14,26 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::{HashMap, HashSet};
-
-use crate::{
-    backend::from_self::downcast_ref,
-    middle::{
-        analysis::{
-            dominator_tree::DominatorTree,
-            effect_analysis::{Effect, EffectAnalysis},
-            loop_tools::{self, LoopForest, LoopPtr},
-        },
-        ir::{
-            instruction::{
-                downcast_mut,
-                misc_inst::{ICmp, ICmpOp, Phi},
-                InstType,
-            },
-            BBPtr, Constant, InstPtr, Operand, ValueType,
-        },
-        Program,
+use crate::middle::ir::instruction::downcast_ref;
+use crate::middle::{
+    analysis::{
+        dominator_tree::DominatorTree,
+        effect_analysis::{Effect, EffectAnalysis},
+        loop_tools::{self, LoopForest, LoopPtr},
     },
+    ir::{
+        instruction::{
+            downcast_mut,
+            misc_inst::{ICmp, ICmpOp, Phi},
+            InstType,
+        },
+        BBPtr, Constant, InstPtr, Operand, ValueType,
+    },
+    Program,
 };
 use anyhow::Result;
 use duskphantom_utils::cprintln;
+use std::collections::{HashMap, HashSet};
 
 use super::{loop_simplify, Transform};
 
@@ -249,7 +246,7 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
             .get_call(*func_create, vec![Constant::Int(N_THREAD - 1).into()]);
         candidate.init_bb.get_last_inst().insert_before(inst_create);
 
-        // Create parallized exit and indvar
+        // Create parallelized exit and indvar
         //
         // i = init_val
         // d = next_delta

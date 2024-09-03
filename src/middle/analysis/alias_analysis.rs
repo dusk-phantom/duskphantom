@@ -14,15 +14,12 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::{HashMap, HashSet};
-
-use crate::{
-    backend::from_self::downcast_ref,
-    middle::ir::{
-        instruction::{memory_op_inst::GetElementPtr, InstType},
-        Constant, Operand, ValueType,
-    },
+use crate::middle::ir::instruction::downcast_ref;
+use crate::middle::ir::{
+    instruction::{memory_op_inst::GetElementPtr, InstType},
+    Constant, Operand, ValueType,
 };
+use std::collections::{HashMap, HashSet};
 
 #[derive(Clone)]
 pub enum EffectRange {

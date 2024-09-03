@@ -26,4 +26,5 @@ mod redundance_elim;
 mod store_elim;
 mod symbolic_eval;
 
+pub use super::compiler;
 pub use duskphantom_utils::diff::diff;

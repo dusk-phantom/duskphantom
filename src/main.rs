@@ -15,12 +15,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // use self lib
-extern crate compiler;
+extern crate duskphantom;
 
 use std::borrow::Borrow;
 
 use clap::Parser;
-use compiler::{args::Cli, compile, errors::handle_error};
+use duskphantom::{args::Cli, compile, errors::handle_error};
 
 fn main() {
     let cli = Cli::parse();

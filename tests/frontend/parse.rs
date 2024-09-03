@@ -19,7 +19,7 @@
 pub mod tests_parse {
     use insta::assert_debug_snapshot;
 
-    use compiler::{errors::FrontendError, frontend::*};
+    use duskphantom::{errors::FrontendError, frontend::*};
 
     #[test]
     fn test_simple_main() {

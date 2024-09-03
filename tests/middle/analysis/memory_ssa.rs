@@ -16,8 +16,7 @@
 
 #[cfg(test)]
 pub mod tests_memory_ssa {
-    use insta::assert_snapshot;
-
+    use super::super::compiler;
     use compiler::{
         frontend::parse,
         middle::{
@@ -26,6 +25,7 @@ pub mod tests_memory_ssa {
             transform::{dead_code_elim, inst_combine, mem2reg, redundance_elim},
         },
     };
+    use insta::assert_snapshot;
 
     #[test]
     fn test_trivial() {

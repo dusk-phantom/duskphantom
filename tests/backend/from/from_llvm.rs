@@ -18,10 +18,10 @@
 #[cfg(feature = "clang_enabled")]
 
 mod from_llvm_tests {
-
+    use super::super::compiler;
     use anyhow::Result;
+    use clang_front_back::clang_frontend;
     use compiler::backend::irs::*;
-    use compiler::clang_frontend;
     use insta::assert_debug_snapshot;
 
     fn parse_to_backend(code: &str) -> Result<Program> {

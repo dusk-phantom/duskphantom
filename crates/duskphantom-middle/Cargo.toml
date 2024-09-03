@@ -1,0 +1,24 @@
+[package]
+name = "duskphantom-middle"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "duskphantom_middle"
+path = "src/lib.rs"
+
+[dependencies]
+rayon = { workspace = true }
+lazy_static = { workspace = true }
+serde = { workspace = true }
+serde_yaml = { workspace = true }
+thiserror = { workspace = true }
+typed-arena = { workspace = true }
+llvm-ir = { workspace = true, optional = true }
+winnow = { workspace = true }
+anyhow = { workspace = true }
+duskphantom_utils = { workspace = true }
+duskphantom_frontend = { workspace = true }
+hexf-parse = { workspace = true }
+regex = { workspace = true }
+diff = { workspace = true }

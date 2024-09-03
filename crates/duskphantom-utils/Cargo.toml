@@ -5,9 +5,13 @@ edition = "2021"
 
 [lib]
 name = "duskphantom_utils"
-src = "src/lib.rs"
+path = "src/lib.rs"
 
 [dependencies]
 anyhow.workspace = true
 diff = "0.1.13"
 typed-arena = "2.0.2"
+
+[features]
+default = []
+log_enabled = []

@@ -14,18 +14,15 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::{HashMap, HashSet};
-
-use crate::{
-    backend::from_self::downcast_ref,
-    middle::{
-        ir::{
-            instruction::{misc_inst::Call, InstType},
-            FunPtr, InstPtr, Operand,
-        },
-        Program,
+use crate::middle::ir::instruction::downcast_ref;
+use crate::middle::{
+    ir::{
+        instruction::{misc_inst::Call, InstType},
+        FunPtr, InstPtr, Operand,
     },
+    Program,
 };
+use std::collections::{HashMap, HashSet};
 
 use super::{alias_analysis::EffectRange, call_graph::CallGraph};
 
