@@ -40,7 +40,8 @@ macro_rules! llvm2tac_three_usual {
             let tac_inst = $tac_inst_ty::new(dst.into(), op1.into(), rhs);
             ret.extend([tac_inst.into()]);
         } else {
-            return Err(anyhow!("operand type not supported")).with_context(|| context!());
+            return Err(anyhow!("operand type not supported"))
+                .with_context(|| duskphantom_utils::context!());
         }
         Ok(ret)
     }};

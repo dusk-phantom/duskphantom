@@ -19,3 +19,4 @@ mod gen_asm;
 mod optimize;
 mod phisicalize;
 pub use compiler::backend::irs::*;
+pub use duskphantom_utils::diff::diff;

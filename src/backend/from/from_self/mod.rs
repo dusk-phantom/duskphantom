@@ -33,6 +33,11 @@ pub use operand::*;
 
 pub use super::irs::*;
 
+pub use duskphantom_utils::context;
+pub use duskphantom_utils::fprintln;
+pub use duskphantom_utils::mem;
+pub use duskphantom_utils::mem::ObjPtr;
+
 /// 中端层面，地址是唯一的
 /// 因此我可以将地址作为 id
 /// 用在 parameter 和 instruction 上

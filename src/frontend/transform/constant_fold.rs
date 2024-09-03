@@ -21,8 +21,8 @@ use anyhow::{anyhow, Context, Result};
 use crate::{
     context,
     frontend::{BinaryOp, Decl, Expr, Program, Stmt, Type, TypedIdent, UnaryOp},
-    utils::frame_map::FrameMap,
 };
+use duskphantom_utils::frame_map::FrameMap;
 
 use super::reshape_array::{reshape_array, reshape_const_array};
 

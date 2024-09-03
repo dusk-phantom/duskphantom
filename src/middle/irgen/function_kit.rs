@@ -17,7 +17,7 @@
 use crate::middle;
 use crate::middle::ir::{BBPtr, FunPtr, ValueType};
 use crate::middle::irgen::value::Value;
-use crate::utils::frame_map::FrameMap;
+use duskphantom_utils::frame_map::FrameMap;
 
 /// Kit for translating a function to middle IR
 pub struct FunctionKit<'a> {

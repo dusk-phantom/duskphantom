@@ -269,7 +269,7 @@ impl FakeInst {
                 inst.replace_operand(old, new);
             }
             FakeInst::Phi(inst, bb) => {
-                let phi = downcast_mut::<Phi>(inst.as_mut().as_mut());
+                let phi = downcast_mut::<Phi>(inst.as_mut());
                 phi.replace_incoming_value_at(*bb, new.clone());
             }
         }

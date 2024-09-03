@@ -13,11 +13,12 @@
 // limitations under the License.
 //
 // SPDX-License-Identifier: Apache-2.0
-
+use super::*;
 #[cfg(test)]
 pub mod tests_func_inline {
     use insta::assert_snapshot;
 
+    use super::*;
     use compiler::{
         frontend::parse,
         middle::{
@@ -26,7 +27,6 @@ pub mod tests_func_inline {
                 block_fuse, constant_fold, dead_code_elim, func_inline, inst_combine, mem2reg,
             },
         },
-        utils::diff::diff,
     };
 
     #[test]

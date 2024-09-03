@@ -14,7 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::utils::paral_counter::ParalCounter;
+use duskphantom_utils::paral_counter::ParalCounter;
 use std::hash::Hash;
 use std::ops::Deref;
 

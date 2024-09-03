@@ -53,22 +53,26 @@ impl IRBuilder {
         variable_or_constant: bool,
         initializer: Constant,
     ) -> GlobalPtr {
-        self.gvar_pool.alloc(GlobalVariable::new(
-            name,
-            value_type,
-            variable_or_constant,
-            initializer,
-        ))
+        self.gvar_pool
+            .alloc(GlobalVariable::new(
+                name,
+                value_type,
+                variable_or_constant,
+                initializer,
+            ))
+            .into()
     }
 
     /// Copy a global variable
     pub fn copy_global_variable(&mut self, new_name: String, global: GlobalPtr) -> GlobalPtr {
-        self.gvar_pool.alloc(GlobalVariable::new(
-            new_name,
-            global.value_type.clone(),
-            global.variable_or_constant,
-            global.initializer.clone(),
-        ))
+        self.gvar_pool
+            .alloc(GlobalVariable::new(
+                new_name,
+                global.as_ref().value_type.clone(),
+                global.as_ref().variable_or_constant,
+                global.as_ref().initializer.clone(),
+            ))
+            .into()
     }
 
     /// Allocate a space for func, return a pointer to this space.
@@ -116,9 +120,9 @@ impl IRBuilder {
         unsafe {
             inst.get_manager_mut().set_id(id);
             let ic = inst;
-            inst.get_manager_mut().set_self_ptr(ic);
+            inst.get_manager_mut().set_self_ptr(ic.into());
         }
-        inst
+        inst.into()
     }
 
     /// Copy a instruction.
@@ -134,14 +138,16 @@ impl IRBuilder {
             let id = self.new_inst_id();
             inst.get_manager_mut().set_id(id);
             let ic = inst;
-            inst.get_manager_mut().set_self_ptr(ic);
-            inst
+            inst.get_manager_mut().set_self_ptr(ic.into());
+            inst.into()
         }
     }
 
     /// Allocate a space for parameter, return a pointer to this space.
     pub fn new_parameter(&mut self, name: String, value_type: ValueType) -> ParaPtr {
-        self.param_pool.alloc(Parameter::new(name, value_type))
+        self.param_pool
+            .alloc(Parameter::new(name, value_type))
+            .into()
     }
 }
 

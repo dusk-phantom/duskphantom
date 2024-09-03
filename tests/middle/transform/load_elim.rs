@@ -13,11 +13,12 @@
 // limitations under the License.
 //
 // SPDX-License-Identifier: Apache-2.0
-
+use super::*;
 #[cfg(test)]
 pub mod tests_load_elim {
     use insta::assert_snapshot;
 
+    use super::*;
     use compiler::{
         frontend::parse,
         middle::{
@@ -25,7 +26,6 @@ pub mod tests_load_elim {
             irgen::gen,
             transform::{dead_code_elim, load_elim, mem2reg, redundance_elim},
         },
-        utils::diff::diff,
     };
 
     #[test]

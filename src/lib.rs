@@ -16,6 +16,8 @@
 
 use anyhow::Context;
 
+use duskphantom_utils::context;
+
 #[cfg(not(feature = "gen_virtual_asm"))]
 use backend::irs::checker::ProgramChecker;
 use errors::CompilerError;
@@ -32,7 +34,6 @@ pub mod config;
 pub mod errors;
 pub mod frontend;
 pub mod middle;
-pub mod utils;
 
 use clap::arg;
 

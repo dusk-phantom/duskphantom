@@ -14,8 +14,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{frontend, middle, utils::frame_map::FrameMap};
+use crate::{frontend, middle};
 use anyhow::Result;
+use duskphantom_utils::frame_map::FrameMap;
 use program_kit::ProgramKit;
 
 mod function_kit;

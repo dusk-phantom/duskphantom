@@ -14,8 +14,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::fprintln;
-
 use super::*;
 
 /** @brief GetElementPtrInst

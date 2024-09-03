@@ -297,6 +297,7 @@ dependencies = [
  "clap 4.5.13",
  "criterion",
  "diff",
+ "duskphantom_utils",
  "graph",
  "hexf-parse",
  "indoc",
@@ -314,6 +315,15 @@ dependencies = [
  "thiserror",
  "typed-arena",
  "winnow",
+]
+
+[[package]]
+name = "duskphantom_utils"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "diff",
+ "typed-arena",
 ]
 
 [[package]]

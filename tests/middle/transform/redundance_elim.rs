@@ -13,11 +13,10 @@
 // limitations under the License.
 //
 // SPDX-License-Identifier: Apache-2.0
-
+use super::*;
 #[cfg(test)]
 pub mod tests_constant_fold {
-    use insta::assert_snapshot;
-
+    use super::*;
     use compiler::{
         frontend::parse,
         middle::{
@@ -27,8 +26,8 @@ pub mod tests_constant_fold {
                 redundance_elim,
             },
         },
-        utils::diff::diff,
     };
+    use insta::assert_snapshot;
 
     #[test]
     fn test_redundant_load() {

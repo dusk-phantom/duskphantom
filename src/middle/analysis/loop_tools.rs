@@ -16,7 +16,7 @@
 
 use dominator_tree::DominatorTree;
 
-use crate::utils::mem::{ObjPool, ObjPtr};
+use duskphantom_utils::mem::{ObjPool, ObjPtr};
 
 use super::*;
 

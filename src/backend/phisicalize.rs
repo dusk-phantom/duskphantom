@@ -16,9 +16,8 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::fprintln;
-
 use super::irs::*;
+use duskphantom_utils::fprintln;
 
 // turn virtual backend module to phisic backend module
 #[allow(unused)]

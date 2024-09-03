@@ -28,8 +28,8 @@ impl IRBuilder {
     pub fn build_global_var(self_global_vars: &Vec<middle::ir::GlobalPtr>) -> Result<Vec<Var>> {
         let mut global_vars = Vec::new();
         for global_var in self_global_vars {
-            let name = &global_var.name;
-            let new_var = match &global_var.initializer {
+            let name = &global_var.as_ref().name;
+            let new_var = match &global_var.as_ref().initializer {
                 middle::ir::Constant::SignedChar(_) => unimplemented!(),
                 middle::ir::Constant::Int(i) => Self::build_int_var(name, *i)?,
                 middle::ir::Constant::Float(f) => Self::build_float_var(name, *f)?,

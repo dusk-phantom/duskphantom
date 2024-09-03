@@ -227,7 +227,7 @@ pub fn handle_single_jmp(func: &mut Func) -> Result<()> {
 mod tests {
     use insta::assert_snapshot;
 
-    use crate::utils::diff::diff;
+    use duskphantom_utils::diff::diff;
 
     use super::*;
     fn new_bb(label: &str) -> Block {

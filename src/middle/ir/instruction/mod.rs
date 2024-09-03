@@ -23,16 +23,52 @@ pub mod misc_inst;
 pub mod terminator_inst;
 pub mod unary_inst;
 
-pub type InstPtr = ObjPtr<Box<dyn Instruction>>;
-
-use crate::{define_inst_type_enum, gen_common_code};
-use std::any::Any;
+// pub type InstPtr = ObjPtr<Box<dyn Instruction>>;
+// impl Display for InstPtr {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         write!(f, "{}", self.as_ref())
+//     }
+// }
+#[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, Debug)]
+pub struct InstPtr(ObjPtr<Box<dyn Instruction>>);
 
 impl Display for InstPtr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_ref())
+        write!(f, "{}", self.0.as_ref())
     }
 }
+impl From<ObjPtr<Box<dyn Instruction>>> for InstPtr {
+    fn from(ptr: ObjPtr<Box<dyn Instruction>>) -> Self {
+        Self(ptr)
+    }
+}
+impl From<InstPtr> for ObjPtr<Box<dyn Instruction>> {
+    fn from(value: InstPtr) -> Self {
+        value.0
+    }
+}
+impl Deref for InstPtr {
+    type Target = Box<dyn Instruction>;
+    fn deref(&self) -> &Self::Target {
+        self.0.as_ref()
+    }
+}
+impl DerefMut for InstPtr {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.0.as_mut()
+    }
+}
+impl AsRef<Box<dyn Instruction>> for InstPtr {
+    fn as_ref(&self) -> &Box<dyn Instruction> {
+        self.0.as_ref()
+    }
+}
+
+use crate::{define_inst_type_enum, gen_common_code};
+use std::{
+    any::Any,
+    ops::{Deref, DerefMut},
+};
 
 define_inst_type_enum!(
     // You will never get this type

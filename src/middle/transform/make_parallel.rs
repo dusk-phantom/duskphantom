@@ -16,11 +16,8 @@
 
 use std::collections::{HashMap, HashSet};
 
-use anyhow::Result;
-
 use crate::{
     backend::from_self::downcast_ref,
-    cprintln,
     middle::{
         analysis::{
             dominator_tree::DominatorTree,
@@ -38,6 +35,8 @@ use crate::{
         Program,
     },
 };
+use anyhow::Result;
+use duskphantom_utils::cprintln;
 
 use super::{loop_simplify, Transform};
 
@@ -304,7 +303,7 @@ impl<'a, const N_THREAD: i32> MakeParallel<'a, N_THREAD> {
         candidate.init_bb.get_last_inst().insert_before(inst_ub);
 
         // Replace indvar to parallelized indvar
-        let phi = downcast_mut::<Phi>(candidate.indvar.as_mut().as_mut());
+        let phi = downcast_mut::<Phi>(candidate.indvar.as_mut());
         phi.replace_incoming_value_at(candidate.init_bb, inst_lb.into());
 
         // Replace exit condition to parallelized exit condition

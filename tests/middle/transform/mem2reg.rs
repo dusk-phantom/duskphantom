@@ -14,14 +14,15 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+use super::*;
 #[cfg(test)]
 pub mod tests_mem2reg {
     use insta::assert_snapshot;
 
+    use super::*;
     use compiler::{
         frontend::parse,
         middle::{irgen::gen, transform::mem2reg},
-        utils::diff::diff,
     };
 
     #[test]

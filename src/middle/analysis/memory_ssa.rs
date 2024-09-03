@@ -29,8 +29,8 @@ use crate::{
         },
         Program,
     },
-    utils::mem::{ObjPool, ObjPtr},
 };
+use duskphantom_utils::mem::{ObjPool, ObjPtr};
 
 use super::{alias_analysis::EffectRange, effect_analysis::EffectAnalysis};
 
@@ -682,7 +682,7 @@ impl RangeToNodeFrame {
 fn readonly_deref(op: &Operand, mut index: Vec<Option<i32>>) -> Option<Operand> {
     match op {
         Operand::Global(gvar) => {
-            let mut val = &gvar.initializer;
+            let mut val = &gvar.as_ref().initializer;
 
             // For a[0][1][2], it translates to something like `gep (gep a, 0, 0), 0, 1, 2`
             // Calling `readonly_deref` on it will first push `2, 1` to index array, and then push `0 + 0, 0` (reversed!)

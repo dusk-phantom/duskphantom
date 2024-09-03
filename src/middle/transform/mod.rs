@@ -18,10 +18,9 @@ use std::time::Instant;
 
 use anyhow::Result;
 
-#[allow(unused)]
-use crate::{cprintln, utils::diff::diff};
-
 use super::Program;
+#[allow(unused)]
+use duskphantom_utils::{cprintln, diff::diff};
 
 pub mod block_fuse;
 pub mod constant_fold;

@@ -14,13 +14,13 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::context;
 use crate::frontend::{BinaryOp, Expr};
 use crate::middle::ir::instruction::misc_inst::{FCmpOp, ICmpOp};
 use crate::middle::ir::{Constant, ValueType};
 use crate::middle::irgen::function_kit::FunctionKit;
 use crate::middle::irgen::value::Value;
 use anyhow::{anyhow, Context};
+use duskphantom_utils::context;
 
 impl<'a> FunctionKit<'a> {
     /// Generate a binary expression
@@ -339,8 +339,9 @@ impl<'a> FunctionKit<'a> {
                     // Load right operand to alt block, jump to final block
                     self.exit = Some(alt_entry);
                     let rop = self.gen_expr(rhs)?.load(ValueType::Bool, self)?;
-                    let mut alt_exit: crate::utils::mem::ObjPtr<crate::middle::ir::BasicBlock> =
-                        self.exit.unwrap();
+                    let mut alt_exit: duskphantom_utils::mem::ObjPtr<
+                        crate::middle::ir::BasicBlock,
+                    > = self.exit.unwrap();
                     alt_exit.push_back(self.program.mem_pool.get_br(None));
                     alt_exit.set_true_bb(final_entry);
 

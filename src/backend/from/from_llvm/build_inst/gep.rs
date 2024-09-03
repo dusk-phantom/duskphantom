@@ -14,7 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::fprintln;
+use duskphantom_utils::fprintln;
 
 use super::*;
 #[allow(unused)]

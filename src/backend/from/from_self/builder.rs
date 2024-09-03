@@ -21,8 +21,7 @@ use std::collections::HashMap;
 use super::Address;
 use crate::backend::*;
 use crate::middle;
-use crate::utils::mem::ObjPtr;
-
+use duskphantom_utils::mem::ObjPtr;
 pub struct IRBuilder;
 
 impl IRBuilder {
@@ -105,7 +104,11 @@ impl IRBuilder {
             fmms,
             &mut insert_back_for_remove_phi,
         )?;
-        let params: Vec<_> = self_func.params.iter().map(|p| p.name.clone()).collect();
+        let params: Vec<_> = self_func
+            .params
+            .iter()
+            .map(|p| p.as_ref().name.clone())
+            .collect();
         let mut m_f = Func::new(self_func.name.clone(), params, entry);
         // *m_f.caller_regs_stack_mut() = Some(caller_reg_stack.try_into()?); // caller_reg_stack 是 build_entry 的时候确定的, 然后绑定到函数里面
 
@@ -353,7 +356,7 @@ impl IRBuilder {
         let mut m_bb = Block::new(Self::label_name_from(bb));
         for inst in bb.iter() {
             let gen_insts = Self::build_instruction(
-                &inst,
+                &inst.into(),
                 stack_allocator,
                 stack_slots,
                 reg_gener,
@@ -385,7 +388,7 @@ impl IRBuilder {
         let mut float_idx = 0;
         let mut usual_idx = 0;
         for param in func.params.iter() {
-            let is_usual: bool = match &param.value_type {
+            let is_usual: bool = match &param.as_ref().value_type {
                 middle::ir::ValueType::Float => false,
                 middle::ir::ValueType::Pointer(_)
                 | middle::ir::ValueType::Bool
@@ -424,7 +427,7 @@ impl IRBuilder {
         let bb = func.entry.with_context(|| context!())?;
         for inst in bb.iter() {
             let gen_insts = Self::build_instruction(
-                &inst,
+                &inst.into(),
                 stack_allocator,
                 stack_slots,
                 reg_gener,

@@ -198,7 +198,7 @@ impl BasicBlock {
         // Remove phi operand
         for mut inst in self.iter() {
             if inst.get_type() == InstType::Phi {
-                let inst = downcast_mut::<Phi>(inst.as_mut().as_mut());
+                let inst = downcast_mut::<Phi>(inst.as_mut());
                 inst.remove_incoming_value(pred.id);
 
                 // If phi has only one operand, replace with the operand
@@ -222,7 +222,7 @@ impl BasicBlock {
         // Replace phi operand
         for mut inst in self.iter() {
             if inst.get_type() == InstType::Phi {
-                let inst = downcast_mut::<Phi>(inst.as_mut().as_mut());
+                let inst = downcast_mut::<Phi>(inst.as_mut());
                 inst.replace_incoming_value(from, to);
             }
         }

@@ -40,7 +40,7 @@ macro_rules! fprintln {
         {
             let mut s=format!($($arg)*);
             s.push('\n');
-            $crate::utils::log::must_write($file, &s,false);
+            $crate::log::must_write($file, &s,false);
         }
     };
     ($file:expr;$mode:literal;$($arg:tt)*) => {
@@ -49,7 +49,7 @@ macro_rules! fprintln {
             let mut s=format!($($arg)*);
             s.push('\n');
             let append=$mode=='a';
-            $crate::utils::log::must_write($file, &s,append);
+            $crate::log::must_write($file, &s,append);
         }
     };
 }

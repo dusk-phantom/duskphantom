@@ -79,7 +79,7 @@ impl<'a> LoopSimplifier<'a> {
 
         let mut inst = head.get_first_inst();
         while let InstType::Phi = inst.get_type() {
-            let phi = downcast_mut::<Phi>(inst.as_mut().as_mut());
+            let phi = downcast_mut::<Phi>(inst.as_mut());
 
             let incoming_values = backedge_blocks_index
                 .iter()
@@ -161,7 +161,7 @@ impl<'a> LoopSimplifier<'a> {
                 break;
             }
 
-            let phi = downcast_mut::<Phi>(phi.as_mut().as_mut());
+            let phi = downcast_mut::<Phi>(phi.as_mut());
             let incoming_values = out_bb_index
                 .iter()
                 .map(|&index| phi.get_incoming_values()[index].clone())

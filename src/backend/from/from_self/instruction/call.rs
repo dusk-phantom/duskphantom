@@ -23,7 +23,7 @@ impl IRBuilder {
         stack_slots: &HashMap<Address, StackSlot>,
         reg_gener: &mut RegGenerator,
         regs: &mut HashMap<Address, Reg>,
-        fmms: &mut HashMap<Fmm, FloatVar>
+        fmms: &mut HashMap<Fmm, FloatVar>,
     ) -> Result<Vec<Inst>> {
         if call.func.name.contains("llvm.memset") {
             return Self::build_memset_inst(call, stack_slots, regs);
@@ -86,22 +86,16 @@ impl IRBuilder {
                         // fmm
                         let p_reg = Reg::new(REG_FA0.id() + f_arg_num, false);
                         phisic_arg_regs.push(p_reg);
-                        let (v_reg, prepare) = Self::_prepare_fmm(
-                            &fmm,
-                            reg_gener,
-                            fmms
-                        ).with_context(|| context!())?;
+                        let (v_reg, prepare) = Self::_prepare_fmm(&fmm, reg_gener, fmms)
+                            .with_context(|| context!())?;
                         ret_insts.extend(prepare);
                         let mv = MvInst::new(p_reg.into(), v_reg.into());
                         ret_insts.push(mv.into());
                         f_arg_num += 1;
                     } else {
                         // fmm 额外参数
-                        let (v_reg, prepare) = Self::_prepare_fmm(
-                            &fmm,
-                            reg_gener,
-                            fmms
-                        ).with_context(|| context!())?;
+                        let (v_reg, prepare) = Self::_prepare_fmm(&fmm, reg_gener, fmms)
+                            .with_context(|| context!())?;
                         ret_insts.extend(prepare);
                         let sd = SdInst::new(v_reg, extra_arg_stack.into(), REG_SP);
                         extra_arg_stack += 8;
@@ -126,9 +120,8 @@ impl IRBuilder {
                 }
                 _ => {
                     /*  Operand::Label(_) */
-                    return Err(anyhow!("argument can't be a label".to_string())).with_context(
-                        || context!()
-                    );
+                    return Err(anyhow!("argument can't be a label".to_string()))
+                        .with_context(|| context!());
                 }
             }
         }
@@ -150,12 +143,11 @@ impl IRBuilder {
             middle::ir::ValueType::Void => {
                 ret_insts.push(call_inst.into());
             }
-            | middle::ir::ValueType::Int
+            middle::ir::ValueType::Int
             | middle::ir::ValueType::Float
             | middle::ir::ValueType::Bool => {
-                let (dst, ret_a0) = if
-                    func.return_type == middle::ir::ValueType::Int ||
-                    func.return_type == middle::ir::ValueType::Bool
+                let (dst, ret_a0) = if func.return_type == middle::ir::ValueType::Int
+                    || func.return_type == middle::ir::ValueType::Bool
                 {
                     (reg_gener.gen_virtual_usual_reg(), REG_A0)
                 } else {
@@ -168,9 +160,8 @@ impl IRBuilder {
                 ret_insts.push(mv.into());
             }
             _ => {
-                return Err(
-                    anyhow!("sysy only return: void | float | int".to_string())
-                ).with_context(|| context!());
+                return Err(anyhow!("sysy only return: void | float | int".to_string()))
+                    .with_context(|| context!());
             }
         }
 
@@ -180,7 +171,7 @@ impl IRBuilder {
     fn build_memset_inst(
         call: &middle::ir::instruction::misc_inst::Call,
         stack_slots: &HashMap<Address, StackSlot>,
-        regs: &mut HashMap<Address, Reg>
+        regs: &mut HashMap<Address, Reg>,
     ) -> Result<Vec<Inst>> {
         assert!(call.func.name.contains("llvm.memset"));
         let mut ret: Vec<Inst> = Vec::new();
@@ -216,9 +207,8 @@ impl IRBuilder {
                         let laddr = LocalAddr::new(a_n, slot);
                         ret.push(laddr.into());
                     } else {
-                        let reg = Self::local_var_except_param_from(instr, regs).with_context(
-                            || context!()
-                        )?;
+                        let reg = Self::local_var_except_param_from(instr, regs)
+                            .with_context(|| context!())?;
                         let a_n = Reg::new(REG_A0.id() + i_arg, true);
                         phisic_arg_regs.push(a_n);
                         let mv = MvInst::new(a_n.into(), reg.into());

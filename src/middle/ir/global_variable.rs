@@ -14,12 +14,36 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+use std::ops::{Deref, DerefMut};
+
 use super::*;
 
-pub type GlobalPtr = ObjPtr<GlobalVariable>;
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct GlobalPtr(ObjPtr<GlobalVariable>);
 impl Display for GlobalPtr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "@{}", self.name)
+        write!(f, "@{}", self.0.name)
+    }
+}
+impl Deref for GlobalPtr {
+    type Target = GlobalVariable;
+    fn deref(&self) -> &Self::Target {
+        self.0.as_ref()
+    }
+}
+impl DerefMut for GlobalPtr {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.0.as_mut()
+    }
+}
+impl AsRef<GlobalVariable> for GlobalPtr {
+    fn as_ref(&self) -> &GlobalVariable {
+        self.0.as_ref()
+    }
+}
+impl From<ObjPtr<GlobalVariable>> for GlobalPtr {
+    fn from(ptr: ObjPtr<GlobalVariable>) -> Self {
+        Self(ptr)
     }
 }
 

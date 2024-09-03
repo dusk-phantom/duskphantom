@@ -14,6 +14,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+use std::ops::{Deref, DerefMut};
+
 use super::*;
 use crate::define_graph_iterator;
 
@@ -180,10 +182,32 @@ fn run_postorder(bb: BBPtr, visited: &mut HashSet<BBPtr>, container: &mut Vec<BB
     container.push(bb);
 }
 
-pub type ParaPtr = ObjPtr<Parameter>;
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct ParaPtr(ObjPtr<Parameter>);
 impl Display for ParaPtr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "%{}", self.name)
+        write!(f, "%{}", self.0.name)
+    }
+}
+impl Deref for ParaPtr {
+    type Target = Parameter;
+    fn deref(&self) -> &Parameter {
+        self.0.as_ref()
+    }
+}
+impl DerefMut for ParaPtr {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.0.as_mut()
+    }
+}
+impl AsRef<Parameter> for ParaPtr {
+    fn as_ref(&self) -> &Parameter {
+        self.0.as_ref()
+    }
+}
+impl From<ObjPtr<Parameter>> for ParaPtr {
+    fn from(ptr: ObjPtr<Parameter>) -> Self {
+        Self(ptr)
     }
 }
 

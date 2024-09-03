@@ -14,8 +14,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{/* errors::MiddleError, */ frontend, utils::mem::ObjPtr};
+use crate::{/* errors::MiddleError, */ frontend};
 use anyhow::Context;
+use duskphantom_utils::mem::ObjPtr;
 use ir::ir_builder::IRBuilder;
 use transform::ultimate_pass;
 

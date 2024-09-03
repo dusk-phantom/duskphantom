@@ -36,6 +36,6 @@ pub use ir_builder::IRBuilder;
 pub use operand::Operand;
 pub use value_type::ValueType;
 
-use crate::utils::mem::{ObjPool, ObjPtr};
+pub use duskphantom_utils::mem::{ObjPool, ObjPtr};
 use std::collections::{HashSet, VecDeque};
 use std::fmt::Display;

@@ -24,9 +24,9 @@ mod build_op;
 
 pub use super::irs::*;
 pub use crate::clang_frontend;
-pub use crate::context;
 pub use anyhow::{anyhow, Context, Result};
 pub use builder::IRBuilder;
+pub use duskphantom_utils::context;
 
 #[cfg(feature = "clang_enabled")]
 #[allow(unused)]

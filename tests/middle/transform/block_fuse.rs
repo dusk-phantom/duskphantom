@@ -13,7 +13,7 @@
 // limitations under the License.
 //
 // SPDX-License-Identifier: Apache-2.0
-
+use super::*;
 #[cfg(test)]
 pub mod tests_block_fuse {
     use insta::assert_snapshot;
@@ -22,10 +22,11 @@ pub mod tests_block_fuse {
         frontend::parse,
         middle::{
             irgen::gen,
-            transform::{block_fuse, constant_fold, dead_code_elim, mem2reg, inst_combine},
+            transform::{block_fuse, constant_fold, dead_code_elim, inst_combine, mem2reg},
         },
-        utils::diff::diff,
     };
+
+    use super::*;
 
     #[test]
     fn test_trivial_merge() {

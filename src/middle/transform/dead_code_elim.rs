@@ -61,7 +61,7 @@ impl<'a> Transform for DeadCodeElim<'a> {
         self.program
             .module
             .global_variables
-            .retain(|var| !var.get_user().is_empty());
+            .retain(|var| !var.as_ref().get_user().is_empty());
         let len1 = self.program.module.global_variables.len();
         changed |= len0 != len1;
         Ok(changed)

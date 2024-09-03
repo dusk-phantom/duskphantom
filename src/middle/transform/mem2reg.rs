@@ -31,8 +31,8 @@ use crate::{
         },
         Program,
     },
-    utils::frame_map::FrameMap,
 };
+use duskphantom_utils::frame_map::FrameMap;
 
 use super::Transform;
 
@@ -109,7 +109,7 @@ impl PhiPack {
     /// Add an argument to the "phi" instruction
     pub fn add_argument(&mut self, phi_arg: PhiArg) {
         // Get mutable reference of phi
-        let phi = downcast_mut::<Phi>(self.inst.as_mut().as_mut());
+        let phi = downcast_mut::<Phi>(self.inst.as_mut());
 
         // Add argument to phi
         phi.add_incoming_value(phi_arg.1, phi_arg.0);

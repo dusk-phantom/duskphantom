@@ -13,12 +13,13 @@
 // limitations under the License.
 //
 // SPDX-License-Identifier: Apache-2.0
-
+use super::*;
 #[cfg(test)]
 pub mod tests_make_parallel {
 
     use insta::assert_snapshot;
 
+    use super::*;
     use compiler::{
         frontend::parse,
         middle::{
@@ -27,7 +28,6 @@ pub mod tests_make_parallel {
                 dead_code_elim, inst_combine, make_parallel, mem2reg, redundance_elim, sink_code,
             },
         },
-        utils::diff::diff,
     };
 
     #[test]

@@ -119,7 +119,7 @@ mod tests {
     #[allow(unused)]
     use super::*;
 
-    use crate::utils::diff::diff;
+    use duskphantom_utils::diff::diff;
 
     #[test]
     fn test_post_split_li() {

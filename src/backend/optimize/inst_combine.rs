@@ -543,7 +543,7 @@ mod tests {
 
     use insta::assert_snapshot;
 
-    use crate::utils::diff::diff;
+    use duskphantom_utils::diff::diff;
 
     use super::*;
     #[test]

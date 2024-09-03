@@ -14,7 +14,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-use compiler::{backend::irs::Func, utils::diff};
+use super::*;
+use compiler::backend::irs::Func;
 use indoc::indoc;
 #[allow(unused)]
 use insta::assert_snapshot;

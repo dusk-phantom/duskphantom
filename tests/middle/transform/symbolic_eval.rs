@@ -16,16 +16,15 @@
 
 #[cfg(test)]
 pub mod tests_symbolic_eval {
-    use insta::assert_snapshot;
-
+    use super::super::*;
     use compiler::{
         frontend::parse,
         middle::{
             irgen::gen,
-            transform::{constant_fold, dead_code_elim, mem2reg, inst_combine},
+            transform::{constant_fold, dead_code_elim, inst_combine, mem2reg},
         },
-        utils::diff::diff,
     };
+    use insta::assert_snapshot;
 
     #[test]
     fn test_merge_phi() {

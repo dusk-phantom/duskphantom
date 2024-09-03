@@ -14,7 +14,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{config::CONFIG, fprintln};
+use crate::config::CONFIG;
+use duskphantom_utils::fprintln;
 
 use super::irs::*;
 use std::collections::{HashMap, HashSet, VecDeque};

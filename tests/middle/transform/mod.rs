@@ -25,3 +25,5 @@ mod mem2reg;
 mod redundance_elim;
 mod store_elim;
 mod symbolic_eval;
+
+pub use duskphantom_utils::diff::diff;

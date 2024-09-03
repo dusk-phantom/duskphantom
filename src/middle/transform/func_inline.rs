@@ -33,8 +33,8 @@ use crate::{
         },
         Program,
     },
-    utils::paral_counter::ParalCounter,
 };
+use duskphantom_utils::paral_counter::ParalCounter;
 
 use super::Transform;
 
@@ -239,7 +239,7 @@ impl<'a> FuncInline<'a> {
                     .with_context(|| context!())?;
                 if inst.get_type() == InstType::Phi {
                     let inst = downcast_ref::<Phi>(inst.as_ref().as_ref());
-                    let new_inst = downcast_mut::<Phi>(new_inst.as_mut().as_mut());
+                    let new_inst = downcast_mut::<Phi>(new_inst.as_mut());
 
                     // Replace operand for phi instruction
                     for (old_op, old_bb) in inst.get_incoming_values().iter() {

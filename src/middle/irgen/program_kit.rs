@@ -18,8 +18,8 @@ use anyhow::Result;
 
 use crate::middle::ir::FunPtr;
 use crate::middle::irgen::value::Value;
-use crate::utils::frame_map::FrameMap;
 use crate::{frontend, middle};
+use duskphantom_utils::frame_map::FrameMap;
 
 /// Kit for translating a program to middle IR
 pub struct ProgramKit<'a> {

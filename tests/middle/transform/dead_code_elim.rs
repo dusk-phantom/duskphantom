@@ -13,18 +13,18 @@
 // limitations under the License.
 //
 // SPDX-License-Identifier: Apache-2.0
-
+use super::*;
 #[cfg(test)]
 pub mod tests_dce {
     use insta::assert_snapshot;
 
+    use super::*;
     use compiler::{
         frontend::parse,
         middle::{
             irgen::gen,
             transform::{dead_code_elim, mem2reg},
         },
-        utils::diff::diff,
     };
 
     #[test]

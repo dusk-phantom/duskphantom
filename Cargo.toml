@@ -2,33 +2,33 @@
 name = "duskphantom"
 version = "0.1.0"
 edition = "2021"
-default-run = "compiler-cs"
+# default-run = "compiler-cs"
 license = "MIT OR Apache-2.0"
 
 [lib]
 name = "compiler"
 path = "src/lib.rs"
 
-# 使用自己编写的前端中端后端
-[[bin]]
-name = "compiler"
-path = "src/main.rs"
+# # 使用自己编写的前端中端后端
+# [[bin]]
+# name = "compiler"
+# path = "src/main.rs"
 
-# 使用clang作为前端,使用llc作为后端
-[[bin]]
-name = "compiler-cl"
-path = "src/main_clang_llc.rs"
+# # 使用clang作为前端,使用llc作为后端
+# [[bin]]
+# name = "compiler-cl"
+# path = "src/main_clang_llc.rs"
 
-# 使用clang作为前端,自身实现后端
-[[bin]]
-name = "compiler-cs"
-path = "src/main_clang_self.rs"
+# # 使用clang作为前端,自身实现后端
+# [[bin]]
+# name = "compiler-cs"
+# path = "src/main_clang_self.rs"
 
 
-# 使用自己实现的中端导出llvm ir,使用llc作为后端
-[[bin]]
-name = "compiler-sc"
-path = "src/main_self_llc.rs"
+# # 使用自己实现的中端导出llvm ir,使用llc作为后端
+# [[bin]]
+# name = "compiler-sc"
+# path = "src/main_self_llc.rs"
 
 [workspace]
 members = ["crates/*"]
@@ -37,6 +37,7 @@ members = ["crates/*"]
 anyhow = "1.0.86"
 graph = { path = "crates/graph" }
 duskphantom = { path = "." }
+duskphantom_utils = { path = "crates/duskphantom-utils" }
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -56,6 +57,7 @@ tempfile = "3.9.0"
 winnow = "0.6.5"
 anyhow = { workspace = true }
 graph = { workspace = true }
+duskphantom_utils = { workspace = true }
 hexf-parse = "0.2.1"
 insta = "1.39.0"
 bitvec = "1.0.1"
@@ -68,18 +70,18 @@ rustc-hash = "2.0.0"
 [dev-dependencies]
 criterion = "0.3.0"
 
-[[bench]]
-name = "parse_expr"
-harness = false
+# [[bench]]
+# name = "parse_expr"
+# harness = false
 
-[[bench]]
-name = "reg_set"
-harness = false
+# [[bench]]
+# name = "reg_set"
+# harness = false
 
 # 特性管理
 [features]
 default = [
-    # "log_enabled",     # 用来指定是否开启日志,提交的时候应该关闭
+    "log_enabled",     # 用来指定是否开启日志,提交的时候应该关闭
     "backend_opt",     # 用来指定是否开启后端优化,提交的时候应该开启
     "clang_enabled",   # 解除该行注释获取基于clang的前后端, 比赛提交的时候该行需要注释掉
     "gen_virtual_asm", # 解除该行注释获取生成虚拟汇编的功能

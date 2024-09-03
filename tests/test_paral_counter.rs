@@ -17,7 +17,7 @@
 extern crate compiler;
 #[cfg(test)]
 pub mod tests {
-    use compiler::utils::paral_counter::ParalCounter;
+    use duskphantom_utils::paral_counter::ParalCounter;
     use std::collections::HashSet;
     use std::sync::Arc;
     #[test]

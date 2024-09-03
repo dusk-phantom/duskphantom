@@ -13,18 +13,18 @@
 // limitations under the License.
 //
 // SPDX-License-Identifier: Apache-2.0
-
+use super::*;
 #[cfg(test)]
 pub mod tests_constant_fold {
     use insta::assert_snapshot;
 
+    use super::*;
     use compiler::{
         frontend::parse,
         middle::{
             irgen::gen,
             transform::{constant_fold, mem2reg},
         },
-        utils::diff::diff,
     };
 
     #[test]

@@ -14,20 +14,16 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::{HashMap, HashSet};
-
+use super::*;
 use analysis::RegLives;
-use compiler::{
-    backend::{self, irs::*},
-    fprintln, frontend, middle,
-    utils::diff::diff,
-};
+use compiler::{frontend, middle};
 use insta::{assert_debug_snapshot, assert_snapshot};
-use reg_alloc::{free_fregs, free_uregs, reg_alloc};
+use reg_alloc::reg_alloc;
+use std::collections::{HashMap, HashSet};
 pub fn backend_from_self(code: &str) -> Program {
     let f = frontend::parse(code).unwrap();
     let m = middle::r#gen(&f).unwrap();
-    backend::from_self::gen_from_self(&m).unwrap()
+    compiler::backend::from_self::gen_from_self(&m).unwrap()
 }
 
 pub fn find_func<'a>(b: &'a Program, name: &str) -> &'a Func {

@@ -40,8 +40,8 @@ impl Operand {
         match self {
             Operand::Constant(c) => c.get_type(),
             // Type of global var identifier (@gvar) is pointer
-            Operand::Global(g) => ValueType::Pointer(g.value_type.clone().into()),
-            Operand::Parameter(p) => p.value_type.clone(),
+            Operand::Global(g) => ValueType::Pointer(g.as_ref().value_type.clone().into()),
+            Operand::Parameter(p) => p.as_ref().value_type.clone(),
             Operand::Instruction(inst) => inst.get_value_type(),
         }
     }
