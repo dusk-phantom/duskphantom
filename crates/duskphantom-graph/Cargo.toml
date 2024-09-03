@@ -2,6 +2,8 @@
 name = "duskphantom-graph"
 version = "0.0.1"
 edition = "2021"
+description = "Graph Utills for duskphantom project"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 anyhow = { workspace = true }
