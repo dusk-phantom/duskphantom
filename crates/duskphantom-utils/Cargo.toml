@@ -2,6 +2,8 @@
 name = "duskphantom-utils"
 version = "0.0.1"
 edition = "2021"
+description = "Utilities for DuskPhantom"
+license = "MIT OR Apache-2.0"
 
 [lib]
 name = "duskphantom_utils"
