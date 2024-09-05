@@ -16,7 +16,8 @@
 
 use std::collections::{HashMap, HashSet};
 
-use anyhow::{anyhow, Result};
+pub use anyhow::anyhow;
+pub use anyhow::Result;
 
 pub trait GraphNode: std::hash::Hash + std::cmp::Eq + Sized + Clone {}
 
@@ -262,7 +263,7 @@ macro_rules! udgraph {
         parse_graph()
     }};
     ($n_ty:ty;$({$key:tt $sep:tt $($tos:tt),*}$(,)?)*) => {{
-        let parse_graph=||->anyhow::Result<$crate::UdGraph<$n_ty>>{
+        let parse_graph=||->$crate::Result<$crate::UdGraph<$n_ty>>{
             let mut g=$crate::UdGraph::new();
             $(
                 $(
