@@ -24,7 +24,7 @@ use reg_alloc::reg_alloc;
 use std::collections::{HashMap, HashSet};
 pub fn backend_from_self(code: &str) -> Program {
     let f = frontend::parse(code).unwrap();
-    let m = middle::r#gen(&f).unwrap();
+    let m = middle::Program::try_from(&f).unwrap();
     duskphantom_backend::from_self::gen_from_self(&m).unwrap()
 }
 
