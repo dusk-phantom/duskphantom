@@ -16,12 +16,13 @@
 
 use checker::FuncChecker;
 
-mod graph_color;
+pub mod graph_color;
 #[allow(unused)]
-mod pbqp;
-pub use graph_color::*;
+pub mod ilp;
+
 #[allow(unused)]
-pub use pbqp::*;
+#[cfg(feature = "ilp_alloc")]
+pub use ilp::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use super::*;
@@ -34,19 +35,198 @@ pub fn handle_reg_alloc(func: &mut Func) -> Result<()> {
     let could_merge = collect_mergeable_regs(func, &reg_graph);
 
     remove_special_regs(&mut reg_graph);
-    if let Ok(colors) = try_perfect_alloc(&reg_graph, &dtd, &could_merge) {
+    if let Ok(colors) = graph_color::try_perfect_alloc(&reg_graph, &dtd, &could_merge) {
         // println!("### perfect alloc {}", func.name());
         apply_colors(func, colors)?;
     } else {
         let spill_costs = count_spill_costs(func);
+        #[cfg(feature = "ilp_alloc")]
         let (colors, spills) =
-            reg_alloc(&reg_graph, free_uregs(), free_fregs(), Some(&spill_costs))?;
+            ilp::alloc(&reg_graph, free_uregs(), free_fregs(), Some(&spill_costs))?;
+        #[cfg(not(feature = "ilp_alloc"))]
+        let (colors, spills) =
+            graph_color::alloc(&reg_graph, free_uregs(), free_fregs(), Some(&spill_costs))?;
         apply_colors(func, colors)?;
         apply_spills(func, spills)?;
     }
     // 删除因为寄存器合并而产生的冗余指令
     remove_redundant_insts(func);
 
+    Ok(())
+}
+
+pub fn apply_colors(func: &mut Func, colors: FxHashMap<Reg, Reg>) -> Result<()> {
+    for block in func.iter_bbs_mut() {
+        for inst in block.insts_mut() {
+            let uses: Vec<Reg> = inst.uses().into_iter().cloned().collect();
+            let defs: Vec<Reg> = inst.defs().into_iter().cloned().collect();
+            for r in uses.iter().filter(|r| r.is_virtual()) {
+                if let Some(color) = colors.get(r) {
+                    inst.replace_use(*r, *color)?;
+                }
+            }
+            for r in defs.into_iter().filter(|r| r.is_virtual()) {
+                if let Some(color) = colors.get(&r) {
+                    inst.replace_def(r, *color)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// FIXME: some bug exists
+/// 使用t0-t2来处理spill的虚拟寄存器
+pub fn apply_spills(func: &mut Func, spills: FxHashSet<Reg>) -> Result<()> {
+    if spills.is_empty() {
+        return Ok(());
+    }
+    phisicalize::phisicalize_reg(func)
+}
+
+/// FIXME: now have some bug, need more precise analysis for reg lives
+/// 延迟t0-t2的释放的方式来处理spill的虚拟寄存器,
+/// 也就是在使用到spill的虚拟寄存器时,选择t0-t2中一个将其物理化,在使用完后,直到被下一个spill虚拟寄存器使用前,才释放占有的物理寄存器
+#[allow(unused)]
+pub fn apply_spills2(func: &mut Func, spills: FxHashSet<Reg>) -> Result<()> {
+    if spills.is_empty() {
+        return Ok(());
+    }
+    let reg_lives = Func::reg_lives(func)?;
+
+    let mut ssa = func
+        .stack_allocator_mut()
+        .take()
+        .ok_or(anyhow!("stack allocator is none"))?;
+    let mut v_ss = FxHashMap::default();
+    let mut get_ss_for_spill = |r: &Reg| -> Result<StackSlot> {
+        if let Some(ss) = v_ss.get(r) {
+            return Ok(*ss);
+        }
+        let ss = ssa.alloc(8);
+        v_ss.insert(*r, ss);
+        Ok(ss)
+    };
+
+    // key: virtual reg, value: the physical reg that is used to store the value of the virtual reg
+    let mut owner: FxHashMap<Reg, Reg> = FxHashMap::default();
+    let mut owned: FxHashSet<Reg> = FxHashSet::default();
+    let i_tmps = tmp_u_regs();
+    let f_tmps = tmp_f_regs();
+    for block in func.iter_bbs_mut() {
+        let mut new_insts = vec![];
+        for inst in block.insts_mut() {
+            let uses: Vec<Reg> = inst.uses().into_iter().cloned().collect();
+            let defs: Vec<Reg> = inst.defs().into_iter().cloned().collect();
+            let mut used: FxHashSet<Reg> = FxHashSet::default();
+            let mut to_add_before = vec![];
+            let mut to_add_after = vec![];
+            for r in uses.iter().filter(|r| spills.contains(r)) {
+                if let Some(phy) = owner.get(r) {
+                    inst.replace_use(*r, *phy);
+                    used.insert(*phy);
+                } else {
+                    let phy = if r.is_usual() {
+                        i_tmps.iter().find(|r| !owned.contains(r))
+                    } else {
+                        f_tmps.iter().find(|r| !owned.contains(r))
+                    };
+                    if let Some(phy) = phy {
+                        used.insert(*phy);
+                        // load the value of the virtual reg to the physical reg
+                        let ss = get_ss_for_spill(r)?;
+                        let load = LoadInst::new(*phy, ss);
+                        to_add_before.push(load.into());
+                        owner.insert(*r, *phy);
+                        owned.insert(*phy);
+                        inst.replace_use(*r, *phy);
+                    } else {
+                        // release one of the tmps
+                        let phy = if r.is_usual() {
+                            i_tmps.iter().find(|r| !used.contains(r))
+                        } else {
+                            f_tmps.iter().find(|r| !used.contains(r))
+                        }
+                        .unwrap();
+                        if let Some((k, _)) = owner.iter().find(|(_, v)| *v == phy) {
+                            let k = *k;
+                            owner.remove(&k);
+                            owned.remove(phy);
+                            // write back old value to stack_slot
+                            let ss = get_ss_for_spill(&k)?;
+                            let store = StoreInst::new(ss, *phy);
+                            to_add_before.push(store.into());
+                        }
+
+                        used.insert(*phy);
+
+                        // load the value of the virtual reg to the physical reg
+                        let ss = get_ss_for_spill(r)?;
+                        let load = LoadInst::new(*phy, ss);
+                        to_add_before.push(load.into());
+                        owner.insert(*r, *phy);
+                        owned.insert(*phy);
+                    }
+                }
+            }
+
+            for r in defs.into_iter().filter(|r| spills.contains(r)) {
+                if let Some(phy) = owner.get(&r) {
+                    inst.replace_def(r, *phy);
+                } else {
+                    let phy = if r.is_usual() {
+                        i_tmps.iter().find(|r| !owned.contains(r))
+                    } else {
+                        f_tmps.iter().find(|r| !owned.contains(r))
+                    };
+                    if let Some(phy) = phy {
+                        owner.insert(r, *phy);
+                        owned.insert(*phy);
+                        inst.replace_def(r, *phy);
+                    } else {
+                        // release one of the tmps
+                        let phy = if r.is_usual() {
+                            i_tmps.iter().find(|r| !used.contains(r))
+                        } else {
+                            f_tmps.iter().find(|r| !used.contains(r))
+                        }
+                        .unwrap();
+                        if let Some((k, _)) = owner.iter().find(|(_, v)| *v == phy) {
+                            let k = *k;
+                            owner.remove(&k);
+                            owned.remove(phy);
+                            // write back old value to stack_slot
+                            let ss = get_ss_for_spill(&k)?;
+                            let store = StoreInst::new(ss, *phy);
+                            to_add_before.push(store.into());
+                        }
+                        owner.insert(r, *phy);
+                        owned.insert(*phy);
+                    }
+                }
+            }
+
+            new_insts.extend(to_add_before);
+            new_insts.push(inst.clone());
+            new_insts.extend(to_add_after);
+        }
+
+        *block.insts_mut() = new_insts;
+
+        let mut insert_before_term = vec![];
+        for (owner, phy) in owner.iter() {
+            if reg_lives.live_outs(block).contains(owner) {
+                let ss = get_ss_for_spill(phy)?;
+                let store = StoreInst::new(ss, *owner);
+                insert_before_term.push(store.into());
+            }
+        }
+        for inst in insert_before_term {
+            block.insert_before_term(inst);
+        }
+    }
+
+    func.stack_allocator_mut().replace(ssa);
     Ok(())
 }
 
@@ -57,6 +237,23 @@ pub fn remove_special_regs(graph: &mut FxHashMap<Reg, FxHashSet<Reg>>) {
                 if let Some(inter) = graph.get_mut(&r2) {
                     inter.remove(r);
                 }
+            }
+        }
+    }
+}
+
+pub fn remove_matches(graph: &mut FxHashMap<Reg, FxHashSet<Reg>>, f: impl Fn(&Reg) -> bool) {
+    let mut to_remove = vec![];
+    for (r, _) in graph.iter() {
+        if f(r) {
+            to_remove.push(*r);
+        }
+    }
+    for r in to_remove {
+        let inter = graph.remove(&r).unwrap_or_default();
+        for r2 in inter {
+            if let Some(inter) = graph.get_mut(&r2) {
+                inter.remove(&r);
             }
         }
     }

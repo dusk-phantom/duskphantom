@@ -14,6 +14,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+use checker::ProgramChecker;
+
 use super::*;
 
 // 一个program是一个程序, 可能由多个 module组成
@@ -36,7 +38,7 @@ impl Program {
     }
     pub fn gen_asm(&self) -> String {
         #[cfg(not(feature = "gen_virtual_asm"))]
-        assert!(backend::irs::checker::Riscv.check_prog(&program));
+        assert!(crate::irs::checker::Riscv.check_prog(self));
         // Note: only consider single module program now
         let mut asm = String::with_capacity(1024 * 1024);
         for module in self.modules.iter() {

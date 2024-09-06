@@ -14,7 +14,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-use reg_alloc::reg_alloc;
 use rustc_hash::FxHashSet;
 
 use super::*;

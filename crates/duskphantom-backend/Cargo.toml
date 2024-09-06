@@ -1,6 +1,6 @@
 [package]
 name = "duskphantom-backend"
-version = "0.0.1"
+version = "0.0.2"
 description = "Backend for DuskPhantom Compiler"
 edition.workspace = true
 license.workspace = true
@@ -30,17 +30,20 @@ thiserror = { workspace = true }
 tempfile = { workspace = true }
 serde_yaml = { workspace = true }
 clang-front-back = { workspace = true }
+z3 = { workspace = true, optional = true }
 
 [features]
 default = [
     "backend_opt",     # 用来指定是否开启后端优化,提交的时候应该开启
     "clang_enabled",   # 解除该行注释获取基于clang的前后端, 比赛提交的时候该行需要注释掉
     "gen_virtual_asm", # 解除该行注释获取生成虚拟汇编的功能
+    # "ilp_alloc",       # 启动ilp 寄存器分配, 启动该特性会导致在寄存器冲突图比较小的情况下调用z3作为求解器的ilp寄存器分配
 ]
 clang_enabled = ["llvm-ir"]
 gen_virtual_asm = []
 backend_opt = ["opt_address_computation"]
 opt_address_computation = [] # 该特性用来指定是否开启s0辅助寻址计算优化
+ilp_alloc = ["z3"]
 
 [dev-dependencies]
 criterion = { workspace = true }
